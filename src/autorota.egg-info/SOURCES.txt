@@ -1,0 +1,11 @@
+pyproject.toml
+src/autorota/__init__.py
+src/autorota/__main__.py
+src/autorota/employee.py
+src/autorota/shift.py
+src/autorota/shop.py
+src/autorota/tiebreak.py
+src/autorota.egg-info/PKG-INFO
+src/autorota.egg-info/SOURCES.txt
+src/autorota.egg-info/dependency_links.txt
+src/autorota.egg-info/top_level.txt
