@@ -13,7 +13,7 @@ class RotaDict(collections.UserDict[date, dict[Shift, list[Employee]]]):
         for day in sorted(self.data.keys()):
             res.append(f"{day}:")
             for shift, emps in self.data[day].items():
-                res.append(f"\t{shift.showHours()}: {emps[0]}")
+                res.append(f"\t{shift.frame}: {emps[0]}")
 
         return "\n".join(res)
 
