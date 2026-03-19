@@ -43,6 +43,60 @@ class AvailDict(collections.UserDict[Weekday, dict[int, Availability]]):
             avail = random.choice(list(Availability))
             self.set_range(day, 0, 23, avail)
 
+    def prompt_day(self, weekday: Weekday, start_hour: int = 6, end_hour: int = 22) -> None:
+        """Interactively edit availability for a single weekday.
+
+        Enter a range and availability level, e.g.:
+          9-17 yes   — mark hours 9 through 17 as YES
+          18 no      — mark hour 18 as NO
+          done       — finish editing this day
+        """
+        abbrev: dict[str, Availability] = {
+            "y": Availability.YES, "yes": Availability.YES,
+            "m": Availability.MAYBE, "maybe": Availability.MAYBE,
+            "n": Availability.NO, "no": Availability.NO,
+        }
+        symbol: dict[Availability, str] = {
+            Availability.YES: "Y", Availability.MAYBE: "M", Availability.NO: "N",
+        }
+
+        while True:
+            hours = range(start_hour, end_hour)
+            header = "  ".join(f"{h:02}" for h in hours)
+            row = "  ".join(symbol[self.data[weekday][h]] for h in hours)
+            print(f"\n{weekday.name}")
+            print(header)
+            print(row)
+            print("  Y=yes  M=maybe  N=no  |  e.g. '9-17 yes'  '18 no'  'done'")
+
+            raw = input("> ").strip().lower()
+            if raw in ("done", ""):
+                break
+
+            parts = raw.split()
+            if len(parts) != 2:
+                print("Invalid — expected '<hour-or-range> <yes|no|maybe>'")
+                continue
+
+            range_part, avail_part = parts
+            if avail_part not in abbrev:
+                print(f"Unknown availability '{avail_part}' — use yes, no, or maybe")
+                continue
+
+            avail = abbrev[avail_part]
+            try:
+                if "-" in range_part:
+                    s, e = range_part.split("-", 1)
+                    s, e = int(s), int(e)
+                    if s == e:
+                        self.data[weekday][s] = avail
+                    else:
+                        self.set_range(weekday, s, e, avail)
+                else:
+                    self.data[weekday][int(range_part)] = avail
+            except (ValueError, KeyError) as exc:
+                print(f"Error: {exc}")
+
     def show(
         self,
         start_hour: int = 6,
@@ -133,3 +187,37 @@ class Employee:
         self, weekday: Weekday, start_hour: int, end_hour: int, avail: Availability
     ):
         self.final_avail.set_range(weekday, start_hour, end_hour, avail)
+
+    def edit_default_avail(self, start_hour: int = 6, end_hour: int = 22) -> None:
+        """Interactively set default (reusable) availability across all weekdays.
+
+        After completing, final_avail is reset to match the new default.
+        """
+        print(f"\n=== Default Availability: {self.name} ===")
+        print("Set your usual weekly availability. Press Enter or type 'done' to skip a day.\n")
+        self.default_avail.show(start_hour, end_hour)
+
+        for day in Weekday:
+            ans = input(f"\nEdit {day.name}? [y/N] ").strip().lower()
+            if ans in ("y", "yes"):
+                self.default_avail.prompt_day(day, start_hour, end_hour)
+
+        self.update_final_avail()
+        print("\nDefault availability saved. Final availability reset to match.")
+
+    def edit_final_avail(self, start_hour: int = 6, end_hour: int = 22) -> None:
+        """Interactively set final (week-specific) availability.
+
+        Starts from a fresh copy of default_avail so only exceptions need to be entered.
+        """
+        print(f"\n=== Final Availability for the Week: {self.name} ===")
+        print("Adjust your availability for this specific week (defaults shown below).\n")
+        self.update_final_avail()
+        self.final_avail.show(start_hour, end_hour)
+
+        for day in Weekday:
+            ans = input(f"\nEdit {day.name}? [y/N] ").strip().lower()
+            if ans in ("y", "yes"):
+                self.final_avail.prompt_day(day, start_hour, end_hour)
+
+        print("\nFinal availability saved.")

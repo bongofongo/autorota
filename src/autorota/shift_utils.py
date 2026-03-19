@@ -17,41 +17,47 @@ WDAY_MAP = {
 }
 
 
-def dsdict_to_json(dsdict: DateShiftDict, fp: Path):
-    def to_json_dict(obj: DateShiftDict):
+def dsdict_to_json(dsdict: DateShiftDict, fp: Path) -> None:
+    def serialise(obj: DateShiftDict):
         return {
-            d.isoformat(): [{"start": s.start_hour, "end": s.end_hour} for s in shifts]
+            d.isoformat(): [
+                {
+                    "start": s.dt_start.hour,
+                    "end": s.dt_end.hour,
+                }
+                for s in shifts
+            ]
             for d, shifts in obj.items()
         }
 
-    with open(fp) as f:
-        json.dump(dsdict, f, default=to_json_dict)
+    with open(fp, "w") as f:
+        json.dump(serialise(obj=dsdict), f, indent=2)
 
 
 def dsdict_from_json(fp: Path) -> DateShiftDict:
     with open(fp) as f:
         data = json.load(f)
 
-    res = {}
-    for d, shifts in data.items():
-        date = d.fromisoformat()
-        res[date] = [Shift(s["start"], s["end"], date) for s in shifts]
-
-    return res
+    return {
+        date.fromisoformat(d): [
+            PShift(s["start"], s["end"]).toShift(date.fromisoformat(d))
+            for s in shifts
+        ]
+        for d, shifts in data.items()
+    }
 
 
 def loadOverrides(path: Path) -> DateShiftDict:
     with open(path) as f:
         data = json.load(f)
 
-    overrides: DateShiftDict = {}
-    for isodate, shifts in data.items():
-        realdate = date.fromisoformat(isodate)
-        overrides[realdate] = [
-            Shift(shift["start"], shift["end"], realdate) for shift in shifts
+    return {
+        date.fromisoformat(isodate): [
+            PShift(shift["start"], shift["end"]).toShift(date.fromisoformat(isodate))
+            for shift in shifts
         ]
-
-    return overrides
+        for isodate, shifts in data.items()
+    }
 
 
 def loadWeekdaySchedule(path: Path) -> dict[int, list[PShift]]:
@@ -67,20 +73,15 @@ def loadWeekdaySchedule(path: Path) -> dict[int, list[PShift]]:
 def loadShifts(
     start_date: date, duration: int, override_fp: Path, weekday_fp: Path
 ) -> DateShiftDict:
-    weekdays, overrides = (
-        loadWeekdaySchedule(weekday_fp),
-        loadOverrides(override_fp),
-    )
+    weekdays = loadWeekdaySchedule(weekday_fp)
+    overrides = loadOverrides(override_fp)
 
-    res_schedule: DateShiftDict = {}
-    period = (start_date + timedelta(days=i) for i in range(duration))
-    for day in period:
+    res: DateShiftDict = {}
+    for i in range(duration):
+        day = start_date + timedelta(days=i)
         if day in overrides:
-            res_schedule[day] = overrides[day]
+            res[day] = overrides[day]
         else:
-            pshift_list = weekdays[day.weekday()]
-            res_schedule[day] = [
-                Shift(pshift.start_hour, pshift.end_hour, day) for pshift in pshift_list
-            ]
+            res[day] = [pshift.toShift(day) for pshift in weekdays[day.weekday()]]
 
-    return res_schedule
+    return res

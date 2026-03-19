@@ -13,9 +13,9 @@ class PShift:
     def __init__(self, start, end):
         self.start_hour, self.end_hour = start, end
 
-    # TODO: BUG, end_hour past midnight, pshift doesn't store date. problem.
-    def toShift(self, date: date):
-        delta = timedelta(hours=(self.end_hour - self.start_hour))
+    def toShift(self, date: date) -> "Shift":
+        end = self.end_hour if self.end_hour > self.start_hour else self.end_hour + 24
+        delta = timedelta(hours=(end - self.start_hour))
         return Shift(datetime.combine(date, time(hour=self.start_hour)), delta)
 
 
