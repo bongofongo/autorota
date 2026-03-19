@@ -4,12 +4,13 @@ src/autorota/__init__.py
 src/autorota/__main__.py
 src/autorota/employee.py
 src/autorota/rota.py
+src/autorota/schedule.py
 src/autorota/shift.py
 src/autorota/shift_utils.py
-src/autorota/shop.py
-src/autorota/tiebreak.py
-src/autorota/utils.py
 src/autorota.egg-info/PKG-INFO
 src/autorota.egg-info/SOURCES.txt
 src/autorota.egg-info/dependency_links.txt
 src/autorota.egg-info/top_level.txt
+src/autorota/gui/__init__.py
+src/autorota/gui/__main__.py
+src/autorota/gui/app.py
