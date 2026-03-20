@@ -273,9 +273,9 @@ th {
   text-transform: uppercase;
 }
 
-/* ─── Employee list ──────────────────────────────────── */
+/* ─── Item list (employees, shifts, etc.) ────────────── */
 
-.btn-add-employee {
+.btn-add-item {
   display: block;
   width: 100%;
   padding: 0.6rem;
@@ -290,17 +290,17 @@ th {
   transition: background 0.15s;
 }
 
-.btn-add-employee:hover {
+.btn-add-item:hover {
   background: #dbeafe;
 }
 
-.employee-list-items {
+.item-list {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-.employee-list-row {
+.item-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -312,24 +312,24 @@ th {
   transition: background 0.1s;
 }
 
-.employee-list-row:hover {
+.item-row:hover {
   background: #f0f7ff;
   border-color: #d0e0f0;
 }
 
-.employee-list-info {
+.item-info {
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
 }
 
-.employee-list-name {
+.item-name {
   font-weight: 600;
   font-size: 0.95rem;
   color: #2c3e50;
 }
 
-.employee-list-meta {
+.item-meta {
   font-size: 0.8rem;
   color: #777;
 }

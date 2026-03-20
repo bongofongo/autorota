@@ -1,6 +1,10 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # autorota
 
-A Rust backend for cafe shift-scheduling software. Given a roster of employees and a set of weekly shift requirements, the system automatically assigns employees to shifts based on their availability and constraints.
+A Rust + Tauri desktop app for cafe shift scheduling. Given a roster of employees and a set of weekly shift requirements, the system automatically assigns employees to shifts based on their availability and constraints.
 
 ## Purpose
 
@@ -23,57 +27,53 @@ Two-pass approach:
 
 ## Architecture
 
-The project is a **Cargo workspace** with three crates:
+**Cargo workspace** with two active crates:
 
 ```
 autorota/
-  Cargo.toml                # workspace manifest
+  Cargo.toml                      # workspace manifest
   crates/
-    autorota-core/          # pure library: models, scheduler, db layer
-    autorota-tauri/         # Tauri desktop shell (thin command wrappers)
-    autorota-uniffi/        # iOS target via UniFFI Swift bindings
+    autorota-core/                # pure library: models, scheduler, db layer
+      src/
+        lib.rs
+        models/                   # employee, availability, shift, assignment, rota
+        scheduler/                # mod.rs (algorithm), scoring.rs, tiebreak.rs
+        db/                       # mod.rs (pool + migrations), queries.rs
+      migrations/                 # 3 SQL migration files (embedded at runtime)
+      tests/                      # db_integration.rs, scheduler_test.rs
+    app-desktop/                  # Tauri v2 desktop shell
+      src/                        # Frontend: main.ts (single-file UI), styles.css
+      src-tauri/                  # Tauri backend: lib.rs (command handlers), tauri.conf.json
 ```
 
-All business logic lives in `autorota-core`. The other crates are thin platform adapters.
+All business logic lives in `autorota-core`. `app-desktop/src-tauri` is a thin adapter exposing Tauri commands that call into core. The frontend is a single TypeScript file (`src/main.ts`) built with Vite.
 
-### autorota-core layout
+`AppState` in `src-tauri/src/lib.rs` wraps a `Mutex<SqlitePool>` and is shared across all Tauri commands. The database file (`autorota.db`) is created in the OS app data directory on first launch.
 
-```
-crates/autorota-core/src/
-  lib.rs
-  models/
-    employee.rs       # Employee struct + serde
-    availability.rs   # Availability map, AvailabilityState enum
-    shift.rs          # Shift + ShiftTemplate structs
-    assignment.rs     # Assignment struct + status enum
-    rota.rs           # Rota (weekly schedule) struct
-  scheduler/
-    mod.rs            # algorithm entry point
-    scoring.rs        # employee scoring/ranking
-    tiebreak.rs
-  db/
-    mod.rs            # SQLx connection pool, migrations
-    queries.rs        # typed query functions
-```
+Migrations are embedded as strings in `db/mod.rs` and run automatically on `connect()`. Migration 002 uses conditional logic (checks column existence) to be idempotent.
 
 ## Stack
 
-| Concern | Choice | Reason |
-|---|---|---|
-| Async runtime | Tokio | Works in Tauri, required by SQLx |
-| Database | SQLite via SQLx | Embeds on iOS, trivial Postgres migration path |
-| Desktop | Tauri | Direct Rust integration, fast iteration |
-| iOS bindings | UniFFI | Auto-generates Swift from annotated Rust |
-| Serialization | Serde + serde_json | JSON for config and FFI types |
-
-## Database
-
-SQLite to start. SQLx supports both SQLite and Postgres with the same API — migration is a connection string change and minor query adjustments. Postgres becomes relevant only if a sync server is added later.
+| Concern | Choice |
+|---|---|
+| Async runtime | Tokio |
+| Database | SQLite via SQLx |
+| Desktop | Tauri v2 |
+| Serialization | Serde + serde_json |
+| Frontend build | Vite + TypeScript |
 
 ## Dev commands
 
-```
+```bash
+# Rust (run from workspace root)
 cargo fmt
 cargo clippy
 cargo test
+cargo test -p autorota-core                    # core tests only
+cargo test -p autorota-core db_integration     # single test file
+
+# Desktop app (run from crates/app-desktop/)
+npm install
+npm run tauri dev      # starts Vite + Tauri with hot reload
+npm run tauri build    # production build
 ```

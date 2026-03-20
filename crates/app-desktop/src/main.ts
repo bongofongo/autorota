@@ -140,16 +140,16 @@ function renderEmployeesView() {
   content.innerHTML = `
     <h1>Employees</h1>
     <div class="card">
-      <button class="btn-add-employee" id="add-employee-btn">+</button>
-      <div class="employee-list-items">
+      <button class="btn-add-item" id="add-employee-btn">+</button>
+      <div class="item-list">
         ${sorted.length === 0 ? '<p class="empty-state">No employees yet. Click + to add one.</p>' : ""}
         ${sorted
           .map(
             (e) => `
-          <div class="employee-list-row" data-id="${e.id}">
-            <div class="employee-list-info">
-              <span class="employee-list-name">${e.name}</span>
-              <span class="employee-list-meta">${e.roles.join(", ")} &middot; ${e.target_weekly_hours}h/wk &middot; Started ${e.start_date}</span>
+          <div class="item-row" data-id="${e.id}">
+            <div class="item-info">
+              <span class="item-name">${e.name}</span>
+              <span class="item-meta">${e.roles.join(", ")} &middot; ${e.target_weekly_hours}h/wk &middot; Started ${e.start_date}</span>
             </div>
             <div class="kebab-wrap">
               <button class="kebab-btn" data-id="${e.id}" title="More options">&#8942;</button>
@@ -171,7 +171,7 @@ function renderEmployeesView() {
     renderView();
   });
 
-  document.querySelectorAll(".employee-list-row").forEach((row) => {
+  document.querySelectorAll(".item-row").forEach((row) => {
     row.addEventListener("click", (e) => {
       const target = e.target as HTMLElement;
       // Don't navigate if clicking the kebab area
@@ -760,14 +760,17 @@ async function renderEditShiftTemplateView() {
   });
 }
 
-function renderShiftsView() {
+function renderCreateShiftTemplateView() {
   const content = document.getElementById("content")!;
   const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   content.innerHTML = `
-    <h1>Shift Templates</h1>
+    <div class="detail-header">
+      <button class="back-btn" id="back-to-shifts">&larr; Back</button>
+      <h1>New Shift Template</h1>
+    </div>
     <div class="card">
-      <div class="form-row">
+      <div class="create-form">
         <div class="form-group">
           <label>Name</label>
           <input id="tmpl-name" type="text" placeholder="Morning Barista" />
@@ -778,62 +781,39 @@ function renderShiftsView() {
             ${weekdays.map((d) => `<label class="day-check"><input type="checkbox" value="${d}" checked />${DAY_LETTERS[d]}</label>`).join("")}
           </div>
         </div>
-        <div class="form-group">
-          <label>Start</label>
-          <input id="tmpl-start" type="time" value="07:00" />
+        <div class="form-row">
+          <div class="form-group">
+            <label>Start</label>
+            <input id="tmpl-start" type="time" value="07:00" />
+          </div>
+          <div class="form-group">
+            <label>End</label>
+            <input id="tmpl-end" type="time" value="12:00" />
+          </div>
+          <div class="form-group">
+            <label>Role</label>
+            <input id="tmpl-role" type="text" placeholder="Barista" />
+          </div>
+          <div class="form-group">
+            <label>Min Staff</label>
+            <input id="tmpl-min" type="number" value="1" min="1" />
+          </div>
+          <div class="form-group">
+            <label>Max Staff</label>
+            <input id="tmpl-max" type="number" value="1" min="1" />
+          </div>
         </div>
-        <div class="form-group">
-          <label>End</label>
-          <input id="tmpl-end" type="time" value="12:00" />
-        </div>
-        <div class="form-group">
-          <label>Role</label>
-          <input id="tmpl-role" type="text" placeholder="barista" />
-        </div>
-        <div class="form-group">
-          <label>Min</label>
-          <input id="tmpl-min" type="number" value="1" min="1" />
-        </div>
-        <div class="form-group">
-          <label>Max</label>
-          <input id="tmpl-max" type="number" value="1" min="1" />
-        </div>
-        <button class="btn-primary" id="add-tmpl-btn">Add</button>
-      </div>
-    </div>
-    <div class="card">
-      <div class="table-wrap">
-      <table>
-        <thead>
-          <tr><th>Name</th><th>Days</th><th>Time</th><th>Role</th><th>Staff</th><th></th></tr>
-        </thead>
-        <tbody>
-          ${shiftTemplates
-            .map(
-              (t) => `
-            <tr>
-              <td>${t.name}</td>
-              <td>${weekdaysToLetters(t.weekdays)}</td>
-              <td>${t.start_time.slice(0, 5)} – ${t.end_time.slice(0, 5)}</td>
-              <td>${t.required_role}</td>
-              <td>${t.min_employees}–${t.max_employees}</td>
-              <td>
-                <div class="kebab-wrap">
-                  <button class="kebab-btn tmpl-kebab-btn" data-id="${t.id}" title="More options">&#8942;</button>
-                  <div class="kebab-dropdown" id="tmpl-kebab-${t.id}">
-                    <button class="kebab-item edit-tmpl" data-id="${t.id}">Edit</button>
-                    <button class="kebab-item kebab-delete delete-tmpl" data-id="${t.id}">Delete</button>
-                  </div>
-                </div>
-              </td>
-            </tr>`
-            )
-            .join("")}
-        </tbody>
-      </table>
+        <button class="btn-primary" id="add-tmpl-btn" style="margin-top: 1rem;">Create Shift Template</button>
       </div>
     </div>
   `;
+
+  document.getElementById("back-to-shifts")!.addEventListener("click", () => {
+    currentView = "shifts";
+    document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
+    document.querySelector('[data-view="shifts"]')?.classList.add("active");
+    renderView();
+  });
 
   document.getElementById("add-tmpl-btn")!.addEventListener("click", async () => {
     const name = (document.getElementById("tmpl-name") as HTMLInputElement).value.trim();
@@ -861,7 +841,57 @@ function renderShiftsView() {
     });
 
     await fetchShiftTemplates();
-    renderShiftsView();
+    currentView = "shifts";
+    document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
+    document.querySelector('[data-view="shifts"]')?.classList.add("active");
+    renderView();
+  });
+}
+
+function renderShiftsView() {
+  const content = document.getElementById("content")!;
+
+  content.innerHTML = `
+    <h1>Shift Templates</h1>
+    <div class="card">
+      <button class="btn-add-item" id="add-tmpl-btn">+</button>
+      <div class="item-list">
+        ${shiftTemplates.length === 0 ? '<p class="empty-state">No shift templates yet. Click + to add one.</p>' : ""}
+        ${shiftTemplates
+          .map(
+            (t) => `
+          <div class="item-row" data-id="${t.id}">
+            <div class="item-info">
+              <span class="item-name">${t.name}</span>
+              <span class="item-meta">${t.required_role} &middot; ${weekdaysToLetters(t.weekdays)} &middot; ${t.start_time.slice(0, 5)}–${t.end_time.slice(0, 5)} &middot; ${t.min_employees}–${t.max_employees} staff</span>
+            </div>
+            <div class="kebab-wrap">
+              <button class="kebab-btn tmpl-kebab-btn" data-id="${t.id}" title="More options">&#8942;</button>
+              <div class="kebab-dropdown" id="tmpl-kebab-${t.id}">
+                <button class="kebab-item edit-tmpl" data-id="${t.id}">Edit</button>
+                <button class="kebab-item kebab-delete delete-tmpl" data-id="${t.id}">Delete</button>
+              </div>
+            </div>
+          </div>`
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+
+  document.getElementById("add-tmpl-btn")!.addEventListener("click", () => {
+    currentView = "create-shift-template";
+    document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
+    renderView();
+  });
+
+  document.querySelectorAll(".item-row").forEach((row) => {
+    row.addEventListener("click", (e) => {
+      if ((e.target as HTMLElement).closest(".kebab-wrap")) return;
+      editShiftTemplateId = parseInt((row as HTMLElement).dataset.id!);
+      currentView = "edit-shift-template";
+      renderView();
+    });
   });
 
   document.querySelectorAll(".tmpl-kebab-btn").forEach((btn) => {
@@ -1109,6 +1139,9 @@ async function renderView() {
       break;
     case "shifts":
       renderShiftsView();
+      break;
+    case "create-shift-template":
+      renderCreateShiftTemplateView();
       break;
     case "edit-shift-template":
       await renderEditShiftTemplateView();
