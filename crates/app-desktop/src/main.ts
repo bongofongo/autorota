@@ -441,6 +441,105 @@ async function renderEditEmployeeView() {
   });
 }
 
+function getComingWeekRange(): string {
+  const today = new Date();
+  const day = today.getDay(); // 0=Sun, 1=Mon...
+  const daysUntilNextMonday = day === 0 ? 1 : day === 1 ? 7 : 8 - day;
+  const monday = new Date(today);
+  monday.setDate(today.getDate() + daysUntilNextMonday);
+  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const fmt = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  return `${fmt(monday)} \u2013 ${fmt(sunday)} ${sunday.getFullYear()}`;
+}
+
+function createAvailGridInteraction(gridEl: HTMLElement): {
+  applyState: (s: "Yes" | "Maybe" | "No") => void;
+  readCells: () => Record<string, string>;
+  clearSelection: () => void;
+  selectAll: () => void;
+} {
+  const allCells = Array.from(gridEl.querySelectorAll(".avail-cell")) as HTMLElement[];
+  const NUM_DAYS = 7;
+  const SEL_BORDER = "#2980b9";
+  const B = 2;
+  let anchorIndex: number | null = null;
+
+  function cellCoords(idx: number): [number, number] {
+    return [idx % NUM_DAYS, Math.floor(idx / NUM_DAYS)];
+  }
+  function cellAt(col: number, row: number): HTMLElement {
+    return allCells[row * NUM_DAYS + col];
+  }
+  function clearSelection() {
+    allCells.forEach((c) => { c.classList.remove("avail-selected"); c.style.boxShadow = ""; });
+  }
+  function selectRect(col1: number, row1: number, col2: number, row2: number) {
+    const minCol = Math.min(col1, col2), maxCol = Math.max(col1, col2);
+    const minRow = Math.min(row1, row2), maxRow = Math.max(row1, row2);
+    for (let r = minRow; r <= maxRow; r++) {
+      for (let c = minCol; c <= maxCol; c++) {
+        const cell = cellAt(c, r);
+        cell.classList.add("avail-selected");
+        const shadows: string[] = [];
+        if (r === minRow) shadows.push(`inset 0 ${B}px 0 0 ${SEL_BORDER}`);
+        if (r === maxRow) shadows.push(`inset 0 -${B}px 0 0 ${SEL_BORDER}`);
+        if (c === minCol) shadows.push(`inset ${B}px 0 0 0 ${SEL_BORDER}`);
+        if (c === maxCol) shadows.push(`inset -${B}px 0 0 0 ${SEL_BORDER}`);
+        cell.style.boxShadow = shadows.join(", ");
+      }
+    }
+  }
+  function getSelectedCells(): HTMLElement[] {
+    return allCells.filter((c) => c.classList.contains("avail-selected"));
+  }
+  function applyState(state: "Yes" | "Maybe" | "No") {
+    const selected = getSelectedCells();
+    if (selected.length === 0) return;
+    selected.forEach((c) => { c.dataset.state = state; });
+  }
+  function readCells(): Record<string, string> {
+    const avail: Record<string, string> = {};
+    allCells.forEach((el) => {
+      avail[`${el.dataset.day}:${el.dataset.hour}`] = el.dataset.state || "Maybe";
+    });
+    return avail;
+  }
+  function selectAll() {
+    allCells.forEach((c) => c.classList.add("avail-selected"));
+  }
+
+  gridEl.addEventListener("mousedown", (e) => {
+    const cell = (e.target as HTMLElement).closest(".avail-cell") as HTMLElement | null;
+    if (!cell) return;
+    e.preventDefault();
+    const idx = allCells.indexOf(cell);
+    if (idx === -1) return;
+    if (e.shiftKey && anchorIndex !== null) {
+      const [ac, ar] = cellCoords(anchorIndex);
+      const [cc, cr] = cellCoords(idx);
+      if (!e.metaKey && !e.ctrlKey) clearSelection();
+      selectRect(ac, ar, cc, cr);
+    } else if (e.metaKey || e.ctrlKey) {
+      cell.classList.toggle("avail-selected");
+      if (cell.classList.contains("avail-selected")) {
+        cell.style.boxShadow = `inset ${B}px ${B}px 0 0 ${SEL_BORDER}, inset -${B}px -${B}px 0 0 ${SEL_BORDER}`;
+      } else {
+        cell.style.boxShadow = "";
+      }
+      anchorIndex = idx;
+    } else {
+      clearSelection();
+      cell.classList.add("avail-selected");
+      cell.style.boxShadow = `inset ${B}px ${B}px 0 0 ${SEL_BORDER}, inset -${B}px -${B}px 0 0 ${SEL_BORDER}`;
+      anchorIndex = idx;
+    }
+  });
+
+  return { applyState, readCells, clearSelection, selectAll };
+}
+
 async function renderEmployeeDetailView() {
   const content = document.getElementById("content")!;
   if (selectedEmployeeId === null) {
@@ -459,6 +558,30 @@ async function renderEmployeeDetailView() {
   const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
+  function buildGridHTML(data: Record<string, string>): string {
+    return `<div class="avail-grid">
+      <div class="header-cell"></div>
+      ${weekdays.map((d) => `<div class="header-cell">${d}</div>`).join("")}
+      ${hours.map((h) => {
+        const label = `${h.toString().padStart(2, "0")}:00`;
+        const cells = weekdays.map((d) => {
+          const key = `${d}:${h}`;
+          const state = data[key] || "Maybe";
+          return `<div class="avail-cell" data-day="${d}" data-hour="${h}" data-state="${state}"></div>`;
+        }).join("");
+        return `<div class="hour-label">${label}</div>${cells}`;
+      }).join("")}
+    </div>`;
+  }
+
+  const legend = `<div class="avail-legend">
+    <span><span class="legend-swatch yes"></span> Available</span>
+    <span><span class="legend-swatch maybe"></span> Maybe</span>
+    <span><span class="legend-swatch no"></span> Unavailable</span>
+  </div>`;
+
+  const weekLabel = getComingWeekRange();
+
   content.innerHTML = `
     <div class="detail-header">
       <button class="back-btn" id="back-to-list">&larr; Back</button>
@@ -474,39 +597,28 @@ async function renderEmployeeDetailView() {
       ${emp.notes ? `<div class="detail-notes"><strong>Notes:</strong> ${emp.notes}</div>` : ""}
       ${emp.bank_details ? `<div class="detail-notes"><strong>Bank Details:</strong> ${emp.bank_details}</div>` : ""}
     </div>
-    <div class="card">
-      <h2 style="font-size:1.1rem; margin-bottom:0.75rem;">Default Availability</h2>
-      <div class="avail-toolbar">
-        <span style="font-size:0.8rem; color:#555;">Apply to selection:</span>
+    <details class="card avail-section" open>
+      <summary>Default Availability</summary>
+      <div class="avail-toolbar" id="default-avail-toolbar">
         <button class="paint-btn" data-state="Yes">Yes <kbd>Y</kbd></button>
         <button class="paint-btn" data-state="Maybe">Maybe <kbd>M</kbd></button>
         <button class="paint-btn" data-state="No">No <kbd>N</kbd></button>
-        <span style="font-size:0.75rem; color:#999; margin-left:0.5rem;">Click to select, Shift+click for range</span>
-        <button class="btn-primary" id="save-avail" style="margin-left:auto;">Save Availability</button>
       </div>
-      <div class="avail-grid-wrap"><div class="avail-grid" id="avail-grid">
-        <div class="header-cell"></div>
-        ${weekdays.map((d) => `<div class="header-cell">${d}</div>`).join("")}
-        ${hours
-          .map((h) => {
-            const label = `${h.toString().padStart(2, "0")}:00`;
-            const cells = weekdays
-              .map((d) => {
-                const key = `${d}:${h}`;
-                const state = emp.default_availability[key] || "Maybe";
-                return `<div class="avail-cell" data-day="${d}" data-hour="${h}" data-state="${state}"></div>`;
-              })
-              .join("");
-            return `<div class="hour-label">${label}</div>${cells}`;
-          })
-          .join("")}
-      </div></div>
-      <div class="avail-legend">
-        <span><span class="legend-swatch yes"></span> Available</span>
-        <span><span class="legend-swatch maybe"></span> Maybe</span>
-        <span><span class="legend-swatch no"></span> Unavailable</span>
+      <div class="avail-grid-wrap" id="default-avail-wrap">${buildGridHTML(emp.default_availability)}</div>
+      ${legend}
+    </details>
+    <details class="card avail-section" open>
+      <summary>Availability for ${weekLabel}</summary>
+      <div class="avail-toolbar" id="week-avail-toolbar">
+        <button class="paint-btn" data-state="Yes">Yes <kbd>Y</kbd></button>
+        <button class="paint-btn" data-state="Maybe">Maybe <kbd>M</kbd></button>
+        <button class="paint-btn" data-state="No">No <kbd>N</kbd></button>
+        <button id="reset-week-avail" class="btn-reset">↺ Reset</button>
+        <button id="save-week-avail" class="btn-primary">&#10003;</button>
       </div>
-    </div>
+      <div class="avail-grid-wrap" id="week-avail-wrap">${buildGridHTML(emp.availability)}</div>
+      ${legend}
+    </details>
   `;
 
   // ─── Back button ───────────────────────────────────────
@@ -516,144 +628,97 @@ async function renderEmployeeDetailView() {
     renderView();
   });
 
-  // ─── Selection state ────────────────────────────────────
-  const grid = document.getElementById("avail-grid")!;
-  const allCells = Array.from(grid.querySelectorAll(".avail-cell")) as HTMLElement[];
-  const NUM_DAYS = 7;
+  // ─── Wire up both grids ────────────────────────────────
+  const defaultGridEl = document.querySelector("#default-avail-wrap .avail-grid") as HTMLElement;
+  const weekGridEl = document.querySelector("#week-avail-wrap .avail-grid") as HTMLElement;
+  const defaultGrid = createAvailGridInteraction(defaultGridEl);
+  const weekGrid = createAvailGridInteraction(weekGridEl);
 
-  // Cell index -> (col, row) where col=day index, row=hour index
-  function cellCoords(idx: number): [number, number] {
-    return [idx % NUM_DAYS, Math.floor(idx / NUM_DAYS)];
+  // Track which grid was last interacted with for keyboard routing
+  let activeGrid = defaultGrid;
+  defaultGridEl.addEventListener("mousedown", () => { activeGrid = defaultGrid; });
+  weekGridEl.addEventListener("mousedown", () => { activeGrid = weekGrid; });
+
+  // currentEmp tracks the last-saved state so partial saves don't clobber each other
+  let currentEmp = { ...emp };
+
+  async function autoSaveDefault() {
+    currentEmp = { ...currentEmp, default_availability: defaultGrid.readCells() };
+    await invoke("update_employee", { employee: currentEmp });
+    await fetchEmployees();
   }
 
-  function cellAt(col: number, row: number): HTMLElement {
-    return allCells[row * NUM_DAYS + col];
-  }
-
-  let anchorIndex: number | null = null; // the cell that started the selection
-
-  const SEL_BORDER = "#2980b9";
-  const B = 2; // border width in px
-
-  function clearSelection() {
-    allCells.forEach((c) => {
-      c.classList.remove("avail-selected");
-      c.style.boxShadow = "";
+  // ─── Default toolbar paint buttons (auto-save) ─────────
+  document.querySelectorAll("#default-avail-toolbar .paint-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const state = (btn as HTMLElement).dataset.state as "Yes" | "Maybe" | "No";
+      defaultGrid.applyState(state);
+      await autoSaveDefault();
     });
-  }
-
-  function selectRect(col1: number, row1: number, col2: number, row2: number) {
-    const minCol = Math.min(col1, col2);
-    const maxCol = Math.max(col1, col2);
-    const minRow = Math.min(row1, row2);
-    const maxRow = Math.max(row1, row2);
-    for (let r = minRow; r <= maxRow; r++) {
-      for (let c = minCol; c <= maxCol; c++) {
-        const cell = cellAt(c, r);
-        cell.classList.add("avail-selected");
-        const shadows: string[] = [];
-        if (r === minRow) shadows.push(`inset 0 ${B}px 0 0 ${SEL_BORDER}`);
-        if (r === maxRow) shadows.push(`inset 0 -${B}px 0 0 ${SEL_BORDER}`);
-        if (c === minCol) shadows.push(`inset ${B}px 0 0 0 ${SEL_BORDER}`);
-        if (c === maxCol) shadows.push(`inset -${B}px 0 0 0 ${SEL_BORDER}`);
-        cell.style.boxShadow = shadows.join(", ");
-      }
-    }
-  }
-
-  function getSelectedCells(): HTMLElement[] {
-    return allCells.filter((c) => c.classList.contains("avail-selected"));
-  }
-
-  function applyState(state: "Yes" | "Maybe" | "No") {
-    const selected = getSelectedCells();
-    if (selected.length === 0) return;
-    selected.forEach((c) => { c.dataset.state = state; });
-  }
-
-  // ─── Grid click: select / shift+click rectangle ───────
-  grid.addEventListener("mousedown", (e) => {
-    const cell = (e.target as HTMLElement).closest(".avail-cell") as HTMLElement | null;
-    if (!cell) return;
-    e.preventDefault();
-
-    const idx = allCells.indexOf(cell);
-    if (idx === -1) return;
-
-    if (e.shiftKey && anchorIndex !== null) {
-      // Rectangle select from anchor to this cell
-      const [ac, ar] = cellCoords(anchorIndex);
-      const [cc, cr] = cellCoords(idx);
-      if (!e.metaKey && !e.ctrlKey) clearSelection();
-      selectRect(ac, ar, cc, cr);
-    } else if (e.metaKey || e.ctrlKey) {
-      // Toggle individual cell
-      cell.classList.toggle("avail-selected");
-      if (cell.classList.contains("avail-selected")) {
-        cell.style.boxShadow = `inset ${B}px ${B}px 0 0 ${SEL_BORDER}, inset -${B}px -${B}px 0 0 ${SEL_BORDER}`;
-      } else {
-        cell.style.boxShadow = "";
-      }
-      anchorIndex = idx;
-    } else {
-      // Single click: clear others, select this one
-      clearSelection();
-      cell.classList.add("avail-selected");
-      cell.style.boxShadow = `inset ${B}px ${B}px 0 0 ${SEL_BORDER}, inset -${B}px -${B}px 0 0 ${SEL_BORDER}`;
-      anchorIndex = idx;
-    }
   });
 
-  // ─── Toolbar buttons apply state to selection ──────────
-  document.querySelectorAll(".paint-btn").forEach((btn) => {
+  // ─── Week toolbar paint buttons (no auto-save) ─────────
+  document.querySelectorAll("#week-avail-toolbar .paint-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       const state = (btn as HTMLElement).dataset.state as "Yes" | "Maybe" | "No";
-      applyState(state);
+      weekGrid.applyState(state);
     });
   });
 
-  // ─── Keyboard: Y/M/N apply state to selection ─────────
+  // ─── Save week availability ────────────────────────────
+  document.getElementById("save-week-avail")!.addEventListener("click", async () => {
+    const btn = document.getElementById("save-week-avail") as HTMLButtonElement;
+    currentEmp = { ...currentEmp, availability: weekGrid.readCells() };
+    await invoke("update_employee", { employee: currentEmp });
+    await fetchEmployees();
+    btn.textContent = "Saved!";
+    setTimeout(() => { btn.textContent = "\u2713"; }, 1500);
+  });
+
+  // ─── Reset week to default ─────────────────────────────
+  document.getElementById("reset-week-avail")!.addEventListener("click", async () => {
+    const defaultData = defaultGrid.readCells();
+    const weekCells = weekGridEl.querySelectorAll(".avail-cell") as NodeListOf<HTMLElement>;
+    weekCells.forEach((el) => {
+      el.dataset.state = defaultData[`${el.dataset.day}:${el.dataset.hour}`] || "Maybe";
+    });
+    currentEmp = { ...currentEmp, availability: defaultData };
+    await invoke("update_employee", { employee: currentEmp });
+    await fetchEmployees();
+  });
+
+  // ─── Keyboard: Y/M/N apply state to active grid ───────
   function handleAvailKeydown(e: KeyboardEvent) {
     const key = e.key.toLowerCase();
-    if (key === "y") { applyState("Yes"); e.preventDefault(); }
-    else if (key === "m") { applyState("Maybe"); e.preventDefault(); }
-    else if (key === "n") { applyState("No"); e.preventDefault(); }
-    else if (key === "a" && (e.metaKey || e.ctrlKey)) {
-      // Select all cells
+    if (key === "y") {
+      activeGrid.applyState("Yes"); e.preventDefault();
+      if (activeGrid === defaultGrid) autoSaveDefault();
+    } else if (key === "m") {
+      activeGrid.applyState("Maybe"); e.preventDefault();
+      if (activeGrid === defaultGrid) autoSaveDefault();
+    } else if (key === "n") {
+      activeGrid.applyState("No"); e.preventDefault();
+      if (activeGrid === defaultGrid) autoSaveDefault();
+    } else if (key === "a" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
-      allCells.forEach((c) => c.classList.add("avail-selected"));
+      activeGrid.selectAll();
     } else if (key === "escape") {
-      clearSelection();
+      activeGrid.clearSelection();
     }
   }
+  function handleOutsideClick(e: MouseEvent) {
+    if (!defaultGridEl.contains(e.target as Node) && !weekGridEl.contains(e.target as Node)) {
+      defaultGrid.clearSelection();
+      weekGrid.clearSelection();
+    }
+  }
+
   document.addEventListener("keydown", handleAvailKeydown);
-  cleanupCurrentView = () => document.removeEventListener("keydown", handleAvailKeydown);
-
-  // ─── Save availability ─────────────────────────────────
-  document.getElementById("save-avail")!.addEventListener("click", async () => {
-    const cells = grid.querySelectorAll(".avail-cell");
-    const avail: Record<string, string> = {};
-    cells.forEach((cell) => {
-      const el = cell as HTMLElement;
-      const day = el.dataset.day!;
-      const hour = el.dataset.hour!;
-      const state = el.dataset.state || "Maybe";
-      avail[`${day}:${hour}`] = state;
-    });
-
-    const updated: Employee = {
-      ...emp,
-      default_availability: avail,
-      availability: avail,
-    };
-
-    await invoke("update_employee", { employee: updated });
-    await fetchEmployees();
-
-    const btn = document.getElementById("save-avail") as HTMLButtonElement;
-    btn.textContent = "Saved!";
-    setTimeout(() => { btn.textContent = "Save Availability"; }, 1500);
-  });
+  document.addEventListener("mousedown", handleOutsideClick);
+  cleanupCurrentView = () => {
+    document.removeEventListener("keydown", handleAvailKeydown);
+    document.removeEventListener("mousedown", handleOutsideClick);
+  };
 }
 
 const DAY_LETTERS: Record<string, string> = {

@@ -492,6 +492,52 @@ th {
 
 /* ─── Availability calendar ──────────────────────────── */
 
+details.avail-section > summary {
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  user-select: none;
+  color: #333;
+}
+
+details.avail-section > summary::-webkit-details-marker { display: none; }
+
+details.avail-section > summary::before {
+  content: "▸";
+  font-size: 0.7rem;
+  color: #aaa;
+}
+
+details.avail-section[open] > summary {
+  margin-bottom: 0.65rem;
+}
+
+details.avail-section[open] > summary::before {
+  content: "▾";
+}
+
+.btn-reset {
+  padding: 0.22rem 0.65rem;
+  border: 1px solid #ccc;
+  border-radius: 20px;
+  background: transparent;
+  color: #888;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 500;
+  margin-left: auto;
+}
+
+.btn-reset:hover {
+  border-color: #aaa;
+  color: #555;
+  background: #f7f7f7;
+}
+
 .avail-toolbar {
   display: flex;
   align-items: center;
@@ -561,7 +607,7 @@ th {
 
 .avail-grid .hour-label {
   background: #f8f8f8;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: #777;
   text-align: right;
   padding: 0 0.4rem;
@@ -570,11 +616,11 @@ th {
   justify-content: flex-end;
   border-right: 1px solid #ddd;
   border-bottom: 1px solid #eee;
-  min-height: 28px;
+  min-height: 20px;
 }
 
 .avail-grid .avail-cell {
-  min-height: 28px;
+  min-height: 20px;
   border-right: 1px solid #eee;
   border-bottom: 1px solid #eee;
   cursor: pointer;
