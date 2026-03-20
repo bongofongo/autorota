@@ -60,6 +60,7 @@ impl SchedulerState {
     fn record_assignment(
         &mut self,
         employee_id: i64,
+        employee_name: Option<String>,
         shift: &Shift,
         rota_id: i64,
         status: AssignmentStatus,
@@ -80,6 +81,7 @@ impl SchedulerState {
             shift_id: shift.id,
             employee_id,
             status,
+            employee_name,
         });
     }
 
@@ -224,6 +226,7 @@ pub fn schedule_pure(
     }
 
     let shift_map: HashMap<i64, &Shift> = shifts.iter().map(|s| (s.id, s)).collect();
+    let emp_map: HashMap<i64, &Employee> = employees.iter().map(|e| (e.id, e)).collect();
     let mut state = SchedulerState::new();
     let mut warnings = Vec::new();
 
@@ -233,7 +236,8 @@ pub fn schedule_pure(
             continue;
         }
         if let Some(shift) = shift_map.get(&a.shift_id) {
-            state.record_assignment(a.employee_id, shift, rota_id, AssignmentStatus::Overridden);
+            let name = emp_map.get(&a.employee_id).map(|e| e.name.clone());
+            state.record_assignment(a.employee_id, name, shift, rota_id, AssignmentStatus::Overridden);
         }
     }
 
@@ -336,7 +340,7 @@ pub fn schedule_pure(
                 "[Scheduler]     Assigned: {} (score={:?})",
                 winner.name, candidates[0].1
             );
-            state.record_assignment(winner.id, shift, rota_id, AssignmentStatus::Proposed);
+            state.record_assignment(winner.id, Some(winner.name.clone()), shift, rota_id, AssignmentStatus::Proposed);
         }
 
         let filled = state.slots_filled(shift.id);

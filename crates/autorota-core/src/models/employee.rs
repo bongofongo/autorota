@@ -23,6 +23,9 @@ pub struct Employee {
     pub default_availability: Availability,
     /// Week-specific availability, copied from default at the start of each scheduling run.
     pub availability: Availability,
+    /// Soft-delete flag: true if the employee has been removed.
+    #[serde(default)]
+    pub deleted: bool,
 }
 
 impl Employee {

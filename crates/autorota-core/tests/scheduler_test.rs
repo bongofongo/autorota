@@ -43,6 +43,7 @@ fn make_employee(id: i64, name: &str, role: &str, avail_state: AvailabilityState
         bank_details: None,
         default_availability: avail.clone(),
         availability: avail,
+        deleted: false,
     }
 }
 
@@ -184,6 +185,7 @@ fn overrides_respected() {
         shift_id: 1,
         employee_id: 2,
         status: AssignmentStatus::Overridden,
+        employee_name: Some("Bob".to_string()),
     }];
 
     let result = schedule_pure(&[shift], &[alice, bob], &existing, 1, week_start());

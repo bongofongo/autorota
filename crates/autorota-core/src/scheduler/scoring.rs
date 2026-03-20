@@ -59,6 +59,7 @@ mod tests {
             bank_details: None,
             default_availability: Availability::default(),
             availability: avail,
+            deleted: false,
         }
     }
 

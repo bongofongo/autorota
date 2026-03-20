@@ -6,7 +6,7 @@ use autorota_core::models::rota::Rota;
 use autorota_core::models::shift::ShiftTemplate;
 use autorota_core::scheduler;
 use autorota_core::scheduler::ScheduleResult;
-use chrono::NaiveDate;
+use chrono::{Datelike, Local, NaiveDate};
 use sqlx::SqlitePool;
 use tauri::{AppHandle, Manager, State};
 use tokio::sync::Mutex;
@@ -168,9 +168,18 @@ async fn finalize_rota(state: State<'_, AppState>, id: i64) -> Result<(), String
 #[tauri::command]
 async fn create_assignment(
     state: State<'_, AppState>,
-    assignment: Assignment,
+    mut assignment: Assignment,
 ) -> Result<i64, String> {
     let pool = get_pool(&state).await?;
+    // Snapshot the employee name if not already set
+    if assignment.employee_name.is_none() {
+        if let Some(emp) = queries::get_employee(&pool, assignment.employee_id)
+            .await
+            .map_err(|e| e.to_string())?
+        {
+            assignment.employee_name = Some(emp.name);
+        }
+    }
     queries::insert_assignment(&pool, &assignment)
         .await
         .map_err(|e| e.to_string())
@@ -200,6 +209,13 @@ async fn run_schedule(
     let pool = get_pool(&state).await?;
     let date = NaiveDate::parse_from_str(&week_start, "%Y-%m-%d")
         .map_err(|e| format!("Invalid date: {e}"))?;
+
+    // Guard: only allow scheduling for future weeks
+    let today = Local::now().date_naive();
+    let current_monday = today - chrono::Duration::days(today.weekday().num_days_from_monday() as i64);
+    if date <= current_monday {
+        return Err("Cannot generate schedule for current or past weeks".to_string());
+    }
 
     println!("[run_schedule] week_start={}", date);
 
@@ -276,7 +292,8 @@ async fn get_week_schedule(
     let shifts = queries::list_shifts_for_rota(&pool, rota.id)
         .await
         .map_err(|e| e.to_string())?;
-    let employees = queries::list_employees(&pool)
+    // Use list_all_employees (including soft-deleted) so historical schedules can resolve names
+    let employees = queries::list_all_employees(&pool)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -288,7 +305,12 @@ async fn get_week_schedule(
         .iter()
         .filter_map(|a| {
             let shift = shifts.iter().find(|s| s.id == a.shift_id)?;
-            let emp = emp_map.get(&a.employee_id)?;
+            // Resolve employee name: prefer live employee data, fall back to snapshot
+            let employee_name = emp_map
+                .get(&a.employee_id)
+                .map(|e| e.name.clone())
+                .or_else(|| a.employee_name.clone())
+                .unwrap_or_else(|| format!("Employee #{}", a.employee_id));
             Some(ScheduleEntry {
                 shift_id: shift.id,
                 date: shift.date.to_string(),
@@ -296,8 +318,8 @@ async fn get_week_schedule(
                 start_time: shift.start_time.format("%H:%M").to_string(),
                 end_time: shift.end_time.format("%H:%M").to_string(),
                 required_role: shift.required_role.clone(),
-                employee_id: emp.id,
-                employee_name: emp.name.clone(),
+                employee_id: a.employee_id,
+                employee_name,
                 status: a.status.to_string(),
             })
         })

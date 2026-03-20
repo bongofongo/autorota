@@ -98,6 +98,13 @@ function todayISO(): string {
   return toLocalISODate(new Date());
 }
 
+function getWeekCategory(weekStart: string): "past" | "current" | "future" {
+  const currentMonday = toLocalISODate(getMonday(new Date()));
+  if (weekStart < currentMonday) return "past";
+  if (weekStart === currentMonday) return "current";
+  return "future";
+}
+
 function toTitleCase(s: string): string {
   return s.replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -958,14 +965,28 @@ async function renderRotaView() {
   }
 
   const hasAssignments = schedule !== null && schedule.entries.length > 0;
-  console.log("[Rota] hasAssignments:", hasAssignments, "rotaViewMode:", rotaViewMode);
+  const weekCategory = getWeekCategory(selectedWeek);
+  console.log("[Rota] hasAssignments:", hasAssignments, "rotaViewMode:", rotaViewMode, "weekCategory:", weekCategory);
+
+  // For past/current weeks with assignments, default to assigned view
+  if (weekCategory !== "future" && hasAssignments && rotaViewMode === "template") {
+    rotaViewMode = "assigned";
+  }
+
+  const categoryBadge = weekCategory === "past"
+    ? `<span class="week-badge week-badge-past">Past</span>`
+    : weekCategory === "current"
+      ? `<span class="week-badge week-badge-current">Current Week</span>`
+      : "";
+
+  const canGenerate = weekCategory === "future";
 
   content.innerHTML = `
-    <h1>Week of ${formatWeekLabel(selectedWeek)}</h1>
+    <h1>Week of ${formatWeekLabel(selectedWeek)} ${categoryBadge}</h1>
     <div class="card">
-      <div class="form-row">
+      ${canGenerate ? `<div class="form-row">
         <button class="btn-primary" id="generate-btn">Generate Schedule</button>
-      </div>
+      </div>` : ""}
       <div class="form-group" style="margin-top: 0.5rem;">
         <label>View</label>
         <select id="rota-view-select">
@@ -980,32 +1001,35 @@ async function renderRotaView() {
     </div>
   `;
 
-  // Generate button
-  document.getElementById("generate-btn")!.addEventListener("click", async () => {
-    const btn = document.getElementById("generate-btn") as HTMLButtonElement;
-    btn.disabled = true;
-    btn.textContent = "Generating...";
-    console.log("[Generate] Starting schedule for week:", selectedWeek);
-    try {
-      const result: ScheduleResult = await invoke("run_schedule", { weekStart: selectedWeek });
-      console.log("[Generate] Result:", JSON.stringify(result, null, 2));
-      console.log("[Generate] Assignments:", result.assignments.length, "Warnings:", result.warnings.length);
-      if (result.warnings.length > 0) {
-        const warningsEl = document.getElementById("schedule-warnings")!;
-        warningsEl.innerHTML = result.warnings.map(w =>
-          `<p style="color: orange;">Warning: Shift ${w.shift_id} needs ${w.needed} staff but only ${w.filled} assigned.</p>`
-        ).join("");
+  // Generate button (only present for future weeks)
+  const generateBtn = document.getElementById("generate-btn");
+  if (generateBtn) {
+    generateBtn.addEventListener("click", async () => {
+      const btn = generateBtn as HTMLButtonElement;
+      btn.disabled = true;
+      btn.textContent = "Generating...";
+      console.log("[Generate] Starting schedule for week:", selectedWeek);
+      try {
+        const result: ScheduleResult = await invoke("run_schedule", { weekStart: selectedWeek });
+        console.log("[Generate] Result:", JSON.stringify(result, null, 2));
+        console.log("[Generate] Assignments:", result.assignments.length, "Warnings:", result.warnings.length);
+        if (result.warnings.length > 0) {
+          const warningsEl = document.getElementById("schedule-warnings")!;
+          warningsEl.innerHTML = result.warnings.map(w =>
+            `<p style="color: orange;">Warning: Shift ${w.shift_id} needs ${w.needed} staff but only ${w.filled} assigned.</p>`
+          ).join("");
+        }
+        rotaViewMode = "assigned";
+        console.log("[Generate] Switching to assigned view, re-rendering...");
+        await renderRotaView();
+      } catch (err) {
+        console.error("[Generate] Error:", err);
+        alert(`Schedule error: ${err}`);
+        btn.disabled = false;
+        btn.textContent = "Generate Schedule";
       }
-      rotaViewMode = "assigned";
-      console.log("[Generate] Switching to assigned view, re-rendering...");
-      await renderRotaView();
-    } catch (err) {
-      console.error("[Generate] Error:", err);
-      alert(`Schedule error: ${err}`);
-      btn.disabled = false;
-      btn.textContent = "Generate Schedule";
-    }
-  });
+    });
+  }
 
   // View mode dropdown
   document.getElementById("rota-view-select")!.addEventListener("change", (e) => {

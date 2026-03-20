@@ -7,7 +7,7 @@ use crate::models::employee::Employee;
 use crate::models::rota::Rota;
 use crate::models::shift::{Shift, ShiftTemplate};
 
-type ShiftTemplateRow = (i64, String, String, String, String, String, u32, u32);
+type ShiftTemplateRow = (i64, String, String, String, String, String, u32, u32, bool);
 type ShiftRow = (i64, i64, i64, String, String, String, String, u32, u32);
 
 // ─── Employees ───────────────────────────────────────────────
@@ -38,8 +38,8 @@ pub async fn insert_employee(pool: &SqlitePool, emp: &Employee) -> Result<i64, s
 }
 
 pub async fn get_employee(pool: &SqlitePool, id: i64) -> Result<Option<Employee>, sqlx::Error> {
-    let row: Option<(i64, String, String, String, f64, f64, f64, Option<String>, Option<String>, String, String)> = sqlx::query_as(
-        "SELECT id, name, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, default_availability, availability
+    let row: Option<(i64, String, String, String, f64, f64, f64, Option<String>, Option<String>, String, String, bool)> = sqlx::query_as(
+        "SELECT id, name, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, default_availability, availability, deleted
          FROM employees WHERE id = ?",
     )
     .bind(id)
@@ -50,8 +50,20 @@ pub async fn get_employee(pool: &SqlitePool, id: i64) -> Result<Option<Employee>
 }
 
 pub async fn list_employees(pool: &SqlitePool) -> Result<Vec<Employee>, sqlx::Error> {
-    let rows: Vec<(i64, String, String, String, f64, f64, f64, Option<String>, Option<String>, String, String)> = sqlx::query_as(
-        "SELECT id, name, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, default_availability, availability
+    let rows: Vec<(i64, String, String, String, f64, f64, f64, Option<String>, Option<String>, String, String, bool)> = sqlx::query_as(
+        "SELECT id, name, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, default_availability, availability, deleted
+         FROM employees WHERE deleted = 0 ORDER BY start_date",
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows.into_iter().map(employee_from_row).collect())
+}
+
+/// List all employees including soft-deleted ones (for historical schedule display).
+pub async fn list_all_employees(pool: &SqlitePool) -> Result<Vec<Employee>, sqlx::Error> {
+    let rows: Vec<(i64, String, String, String, f64, f64, f64, Option<String>, Option<String>, String, String, bool)> = sqlx::query_as(
+        "SELECT id, name, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, default_availability, availability, deleted
          FROM employees ORDER BY start_date",
     )
     .fetch_all(pool)
@@ -87,7 +99,7 @@ pub async fn update_employee(pool: &SqlitePool, emp: &Employee) -> Result<(), sq
 }
 
 pub async fn delete_employee(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
-    sqlx::query("DELETE FROM employees WHERE id = ?")
+    sqlx::query("UPDATE employees SET deleted = 1 WHERE id = ?")
         .bind(id)
         .execute(pool)
         .await?;
@@ -107,6 +119,7 @@ fn employee_from_row(
         Option<String>,
         String,
         String,
+        bool,
     ),
 ) -> Employee {
     let (
@@ -121,6 +134,7 @@ fn employee_from_row(
         bank_details,
         default_avail_json,
         avail_json,
+        deleted,
     ) = row;
     Employee {
         id,
@@ -135,6 +149,7 @@ fn employee_from_row(
         bank_details,
         default_availability: Availability::from_json(&default_avail_json).unwrap_or_default(),
         availability: Availability::from_json(&avail_json).unwrap_or_default(),
+        deleted,
     }
 }
 
@@ -167,8 +182,8 @@ pub async fn insert_shift_template(
 
 pub async fn list_shift_templates(pool: &SqlitePool) -> Result<Vec<ShiftTemplate>, sqlx::Error> {
     let rows: Vec<ShiftTemplateRow> = sqlx::query_as(
-        "SELECT id, name, weekdays, start_time, end_time, required_role, min_employees, max_employees
-         FROM shift_templates ORDER BY start_time",
+        "SELECT id, name, weekdays, start_time, end_time, required_role, min_employees, max_employees, deleted
+         FROM shift_templates WHERE deleted = 0 ORDER BY start_time",
     )
     .fetch_all(pool)
     .await?;
@@ -205,7 +220,7 @@ pub async fn update_shift_template(
 }
 
 pub async fn delete_shift_template(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
-    sqlx::query("DELETE FROM shift_templates WHERE id = ?")
+    sqlx::query("UPDATE shift_templates SET deleted = 1 WHERE id = ?")
         .bind(id)
         .execute(pool)
         .await?;
@@ -228,7 +243,7 @@ fn string_to_weekdays(s: &str) -> Vec<Weekday> {
 }
 
 fn shift_template_from_row(row: ShiftTemplateRow) -> Option<ShiftTemplate> {
-    let (id, name, weekdays_str, start_str, end_str, required_role, min_emp, max_emp) = row;
+    let (id, name, weekdays_str, start_str, end_str, required_role, min_emp, max_emp, deleted) = row;
     Some(ShiftTemplate {
         id,
         name,
@@ -238,6 +253,7 @@ fn shift_template_from_row(row: ShiftTemplateRow) -> Option<ShiftTemplate> {
         required_role,
         min_employees: min_emp,
         max_employees: max_emp,
+        deleted,
     })
 }
 
@@ -397,13 +413,14 @@ pub async fn insert_assignment(
     let status_str = assignment.status.to_string();
 
     let id: i64 = sqlx::query_scalar(
-        "INSERT INTO assignments (rota_id, shift_id, employee_id, status)
-         VALUES (?, ?, ?, ?) RETURNING id",
+        "INSERT INTO assignments (rota_id, shift_id, employee_id, status, employee_name)
+         VALUES (?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(assignment.rota_id)
     .bind(assignment.shift_id)
     .bind(assignment.employee_id)
     .bind(&status_str)
+    .bind(&assignment.employee_name)
     .fetch_one(pool)
     .await?;
 
@@ -414,8 +431,8 @@ pub async fn list_assignments_for_rota(
     pool: &SqlitePool,
     rota_id: i64,
 ) -> Result<Vec<Assignment>, sqlx::Error> {
-    let rows: Vec<(i64, i64, i64, i64, String)> = sqlx::query_as(
-        "SELECT id, rota_id, shift_id, employee_id, status
+    let rows: Vec<(i64, i64, i64, i64, String, Option<String>)> = sqlx::query_as(
+        "SELECT id, rota_id, shift_id, employee_id, status, employee_name
          FROM assignments WHERE rota_id = ? ORDER BY id",
     )
     .bind(rota_id)
@@ -457,13 +474,14 @@ pub async fn update_assignment_status(
     Ok(())
 }
 
-fn assignment_from_row(row: (i64, i64, i64, i64, String)) -> Option<Assignment> {
-    let (id, rota_id, shift_id, employee_id, status_str) = row;
+fn assignment_from_row(row: (i64, i64, i64, i64, String, Option<String>)) -> Option<Assignment> {
+    let (id, rota_id, shift_id, employee_id, status_str, employee_name) = row;
     Some(Assignment {
         id,
         rota_id,
         shift_id,
         employee_id,
         status: status_str.parse().ok()?,
+        employee_name,
     })
 }

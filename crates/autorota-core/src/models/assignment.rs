@@ -39,4 +39,6 @@ pub struct Assignment {
     pub shift_id: i64,
     pub employee_id: i64,
     pub status: AssignmentStatus,
+    /// Snapshot of the employee name at the time of assignment.
+    pub employee_name: Option<String>,
 }

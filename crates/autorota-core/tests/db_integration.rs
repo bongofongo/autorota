@@ -251,6 +251,7 @@ async fn employee_crud() {
         bank_details: None,
         default_availability: avail.clone(),
         availability: avail,
+        deleted: false,
     };
 
     let id = queries::insert_employee(&pool, &emp).await.unwrap();
@@ -276,8 +277,12 @@ async fn employee_crud() {
     assert_eq!(all.len(), 1);
 
     queries::delete_employee(&pool, id).await.unwrap();
-    let deleted = queries::get_employee(&pool, id).await.unwrap();
-    assert!(deleted.is_none());
+    // Soft-delete: get_employee still returns the row, but with deleted=true
+    let soft_deleted = queries::get_employee(&pool, id).await.unwrap().unwrap();
+    assert!(soft_deleted.deleted);
+    // list_employees filters out soft-deleted
+    let active = queries::list_employees(&pool).await.unwrap();
+    assert!(active.is_empty());
 }
 
 #[tokio::test]
@@ -293,6 +298,7 @@ async fn shift_template_crud() {
         required_role: "barista".to_string(),
         min_employees: 1,
         max_employees: 2,
+        deleted: false,
     };
 
     let id = queries::insert_shift_template(&pool, &tmpl).await.unwrap();
@@ -321,6 +327,7 @@ async fn full_scheduling_flow() {
         bank_details: None,
         default_availability: Availability::default(),
         availability: Availability::default(),
+        deleted: false,
     };
     let emp_id = queries::insert_employee(&pool, &emp).await.unwrap();
 
@@ -334,6 +341,7 @@ async fn full_scheduling_flow() {
         required_role: "barista".to_string(),
         min_employees: 1,
         max_employees: 1,
+        deleted: false,
     };
     let tmpl_id = queries::insert_shift_template(&pool, &tmpl).await.unwrap();
 
@@ -362,6 +370,7 @@ async fn full_scheduling_flow() {
         shift_id,
         employee_id: emp_id,
         status: AssignmentStatus::Proposed,
+        employee_name: Some("Bob".to_string()),
     };
     let assign_id = queries::insert_assignment(&pool, &assignment)
         .await

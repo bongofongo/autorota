@@ -59,5 +59,17 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         sqlx::raw_sql(m3).execute(pool).await?;
     }
 
+    // Migration 004: add soft-delete flags and snapshot employee name in assignments.
+    let has_deleted_col: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) > 0 FROM pragma_table_info('employees') WHERE name = 'deleted'",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    if !has_deleted_col {
+        let m4 = include_str!("../../migrations/004_history_support.sql");
+        sqlx::raw_sql(m4).execute(pool).await?;
+    }
+
     Ok(())
 }

@@ -12,6 +12,9 @@ pub struct ShiftTemplate {
     pub required_role: String,
     pub min_employees: u32,
     pub max_employees: u32,
+    /// Soft-delete flag: true if the template has been removed.
+    #[serde(default)]
+    pub deleted: bool,
 }
 
 /// A concrete shift instance for a specific date, materialised from a ShiftTemplate.
