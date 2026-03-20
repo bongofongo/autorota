@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AutoRota</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <button class="sidebar-toggle" id="sidebar-toggle">&#9776;</button>
+      <aside id="sidebar">
+        <div class="sidebar-header">
+          <h2>AutoRota</h2>
+          <button class="sidebar-close" id="sidebar-close">&times;</button>
+        </div>
+        <nav>
+          <button class="nav-btn active" data-view="employees">Employees</button>
+          <button class="nav-btn" data-view="shifts">Shifts</button>
+          <button class="nav-btn" data-view="rota">Rota</button>
+        </nav>
+        <div class="week-nav">
+          <button class="week-nav-btn" id="week-prev">&#8249;</button>
+          <span id="week-label"></span>
+          <button class="week-nav-btn" id="week-next">&#8250;</button>
+        </div>
+        <div id="employee-list"></div>
+      </aside>
+      <main id="content">
+        <p>Loading...</p>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
