@@ -5,7 +5,7 @@ use crate::models::shift::Shift;
 /// Composite score for ranking an employee against a shift.
 /// Returned as a tuple so lexicographic Ord gives the correct priority:
 ///   1. Availability quality (Yes=2 > Maybe=1; No is filtered by eligibility)
-///   2. Fairness — fewer weekly hours assigned so far ranks higher
+///   2. Fairness — distance below target weekly hours (more remaining = higher rank)
 ///   3. Daily budget remaining — more slack ranks higher
 ///
 /// Higher tuple value = better candidate.
@@ -15,9 +15,10 @@ pub fn score_employee(
     weekly_hours: f32,
     daily_hours: f32,
 ) -> (u8, i32, i32) {
-    let avail = employee
-        .availability
-        .for_window(shift.weekday(), shift.start_hour(), shift.end_hour());
+    let avail =
+        employee
+            .availability
+            .for_window(shift.weekday(), shift.start_hour(), shift.end_hour());
 
     let availability_rank = match avail {
         AvailabilityState::Yes => 2,
@@ -25,8 +26,9 @@ pub fn score_employee(
         AvailabilityState::No => 0,
     };
 
-    // Negate weekly hours so employees with fewer hours rank higher.
-    let fairness_rank = (-weekly_hours * 100.0) as i32;
+    // Prefer employees who are furthest below their target weekly hours.
+    let remaining_to_target = employee.target_weekly_hours - weekly_hours;
+    let fairness_rank = (remaining_to_target * 100.0) as i32;
 
     let daily_remaining = employee.max_daily_hours - daily_hours - shift.duration_hours();
     let daily_budget_rank = (daily_remaining * 100.0) as i32;
@@ -40,7 +42,7 @@ mod tests {
     use crate::models::availability::Availability;
     use chrono::{NaiveDate, NaiveTime, Weekday};
 
-    fn make_employee(max_daily: f32, max_weekly: f32) -> Employee {
+    fn make_employee(max_daily: f32, target_weekly: f32) -> Employee {
         let mut avail = Availability::default();
         for h in 6..18 {
             avail.set(Weekday::Mon, h, AvailabilityState::Yes);
@@ -49,8 +51,12 @@ mod tests {
             id: 1,
             name: "Test".to_string(),
             roles: vec!["barista".to_string()],
+            start_date: NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+            target_weekly_hours: target_weekly,
+            weekly_hours_deviation: 6.0,
             max_daily_hours: max_daily,
-            max_weekly_hours: max_weekly,
+            notes: None,
+            bank_details: None,
             default_availability: Availability::default(),
             availability: avail,
         }
@@ -79,7 +85,8 @@ mod tests {
 
         // Change availability to Maybe
         for h in 6..18 {
-            emp.availability.set(Weekday::Mon, h, AvailabilityState::Maybe);
+            emp.availability
+                .set(Weekday::Mon, h, AvailabilityState::Maybe);
         }
         let score_maybe = score_employee(&emp, &shift, 0.0, 0.0);
 

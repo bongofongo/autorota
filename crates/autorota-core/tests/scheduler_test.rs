@@ -35,8 +35,12 @@ fn make_employee(id: i64, name: &str, role: &str, avail_state: AvailabilityState
         id,
         name: name.to_string(),
         roles: vec![role.to_string()],
+        start_date: NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+        target_weekly_hours: 40.0,
+        weekly_hours_deviation: 6.0,
         max_daily_hours: 8.0,
-        max_weekly_hours: 40.0,
+        notes: None,
+        bank_details: None,
         default_availability: avail.clone(),
         availability: avail,
     }
@@ -107,9 +111,11 @@ fn wrong_role_excluded() {
 #[test]
 fn weekly_hour_cap_respected() {
     let mut emp = make_employee(1, "Alice", "barista", AvailabilityState::Yes);
-    emp.max_weekly_hours = 10.0; // can only work 10h total
+    // target=4, deviation=6 → max=10h
+    emp.target_weekly_hours = 4.0;
+    emp.weekly_hours_deviation = 6.0;
 
-    // Two 6-hour shifts — only the first should be assigned
+    // Two 6-hour shifts — only the first should be assigned (6 < 10, but 12 > 10)
     let s1 = make_shift(1, date(23), 7, 13, "barista"); // 6h
     let s2 = make_shift(2, date(24), 7, 13, "barista"); // 6h, would exceed 10h cap
 

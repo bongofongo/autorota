@@ -18,13 +18,17 @@ pub async fn insert_employee(pool: &SqlitePool, emp: &Employee) -> Result<i64, s
     let avail = emp.availability.to_json().unwrap_or_default();
 
     let id = sqlx::query_scalar(
-        "INSERT INTO employees (name, roles, max_daily_hours, max_weekly_hours, default_availability, availability)
-         VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO employees (name, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, default_availability, availability)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(&emp.name)
     .bind(&roles_json)
+    .bind(emp.start_date.to_string())
+    .bind(emp.target_weekly_hours)
+    .bind(emp.weekly_hours_deviation)
     .bind(emp.max_daily_hours)
-    .bind(emp.max_weekly_hours)
+    .bind(&emp.notes)
+    .bind(&emp.bank_details)
     .bind(&default_avail)
     .bind(&avail)
     .fetch_one(pool)
@@ -34,8 +38,8 @@ pub async fn insert_employee(pool: &SqlitePool, emp: &Employee) -> Result<i64, s
 }
 
 pub async fn get_employee(pool: &SqlitePool, id: i64) -> Result<Option<Employee>, sqlx::Error> {
-    let row: Option<(i64, String, String, f64, f64, String, String)> = sqlx::query_as(
-        "SELECT id, name, roles, max_daily_hours, max_weekly_hours, default_availability, availability
+    let row: Option<(i64, String, String, String, f64, f64, f64, Option<String>, Option<String>, String, String)> = sqlx::query_as(
+        "SELECT id, name, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, default_availability, availability
          FROM employees WHERE id = ?",
     )
     .bind(id)
@@ -46,9 +50,9 @@ pub async fn get_employee(pool: &SqlitePool, id: i64) -> Result<Option<Employee>
 }
 
 pub async fn list_employees(pool: &SqlitePool) -> Result<Vec<Employee>, sqlx::Error> {
-    let rows: Vec<(i64, String, String, f64, f64, String, String)> = sqlx::query_as(
-        "SELECT id, name, roles, max_daily_hours, max_weekly_hours, default_availability, availability
-         FROM employees ORDER BY name",
+    let rows: Vec<(i64, String, String, String, f64, f64, f64, Option<String>, Option<String>, String, String)> = sqlx::query_as(
+        "SELECT id, name, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, default_availability, availability
+         FROM employees ORDER BY start_date",
     )
     .fetch_all(pool)
     .await?;
@@ -62,13 +66,17 @@ pub async fn update_employee(pool: &SqlitePool, emp: &Employee) -> Result<(), sq
     let avail = emp.availability.to_json().unwrap_or_default();
 
     sqlx::query(
-        "UPDATE employees SET name = ?, roles = ?, max_daily_hours = ?, max_weekly_hours = ?,
-         default_availability = ?, availability = ? WHERE id = ?",
+        "UPDATE employees SET name = ?, roles = ?, start_date = ?, target_weekly_hours = ?, weekly_hours_deviation = ?, max_daily_hours = ?,
+         notes = ?, bank_details = ?, default_availability = ?, availability = ? WHERE id = ?",
     )
     .bind(&emp.name)
     .bind(&roles_json)
+    .bind(emp.start_date.to_string())
+    .bind(emp.target_weekly_hours)
+    .bind(emp.weekly_hours_deviation)
     .bind(emp.max_daily_hours)
-    .bind(emp.max_weekly_hours)
+    .bind(&emp.notes)
+    .bind(&emp.bank_details)
     .bind(&default_avail)
     .bind(&avail)
     .bind(emp.id)
@@ -86,16 +94,46 @@ pub async fn delete_employee(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Err
     Ok(())
 }
 
-fn employee_from_row(row: (i64, String, String, f64, f64, String, String)) -> Employee {
-    let (id, name, roles_json, max_daily, max_weekly, default_avail_json, avail_json) = row;
+fn employee_from_row(
+    row: (
+        i64,
+        String,
+        String,
+        String,
+        f64,
+        f64,
+        f64,
+        Option<String>,
+        Option<String>,
+        String,
+        String,
+    ),
+) -> Employee {
+    let (
+        id,
+        name,
+        roles_json,
+        start_date_str,
+        target_weekly,
+        deviation,
+        max_daily,
+        notes,
+        bank_details,
+        default_avail_json,
+        avail_json,
+    ) = row;
     Employee {
         id,
         name,
         roles: serde_json::from_str(&roles_json).unwrap_or_default(),
+        start_date: NaiveDate::parse_from_str(&start_date_str, "%Y-%m-%d")
+            .unwrap_or_else(|_| NaiveDate::default()),
+        target_weekly_hours: target_weekly as f32,
+        weekly_hours_deviation: deviation as f32,
         max_daily_hours: max_daily as f32,
-        max_weekly_hours: max_weekly as f32,
-        default_availability: Availability::from_json(&default_avail_json)
-            .unwrap_or_default(),
+        notes,
+        bank_details,
+        default_availability: Availability::from_json(&default_avail_json).unwrap_or_default(),
         availability: Availability::from_json(&avail_json).unwrap_or_default(),
     }
 }
@@ -135,7 +173,35 @@ pub async fn list_shift_templates(pool: &SqlitePool) -> Result<Vec<ShiftTemplate
     .fetch_all(pool)
     .await?;
 
-    Ok(rows.into_iter().filter_map(shift_template_from_row).collect())
+    Ok(rows
+        .into_iter()
+        .filter_map(shift_template_from_row)
+        .collect())
+}
+
+pub async fn update_shift_template(
+    pool: &SqlitePool,
+    tmpl: &ShiftTemplate,
+) -> Result<(), sqlx::Error> {
+    let weekdays_str = weekdays_to_string(&tmpl.weekdays);
+    let start = tmpl.start_time.to_string();
+    let end = tmpl.end_time.to_string();
+
+    sqlx::query(
+        "UPDATE shift_templates SET name = ?, weekdays = ?, start_time = ?, end_time = ?, required_role = ?, min_employees = ?, max_employees = ? WHERE id = ?",
+    )
+    .bind(&tmpl.name)
+    .bind(&weekdays_str)
+    .bind(&start)
+    .bind(&end)
+    .bind(&tmpl.required_role)
+    .bind(tmpl.min_employees)
+    .bind(tmpl.max_employees)
+    .bind(tmpl.id)
+    .execute(pool)
+    .await?;
+
+    Ok(())
 }
 
 pub async fn delete_shift_template(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
@@ -147,7 +213,11 @@ pub async fn delete_shift_template(pool: &SqlitePool, id: i64) -> Result<(), sql
 }
 
 fn weekdays_to_string(weekdays: &[Weekday]) -> String {
-    weekdays.iter().map(|w| w.to_string()).collect::<Vec<_>>().join(",")
+    weekdays
+        .iter()
+        .map(|w| w.to_string())
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 fn string_to_weekdays(s: &str) -> Vec<Weekday> {
@@ -210,12 +280,11 @@ pub async fn materialise_shifts(
 // ─── Rotas ───────────────────────────────────────────────────
 
 pub async fn insert_rota(pool: &SqlitePool, week_start: NaiveDate) -> Result<i64, sqlx::Error> {
-    let id: i64 = sqlx::query_scalar(
-        "INSERT INTO rotas (week_start, finalized) VALUES (?, 0) RETURNING id",
-    )
-    .bind(week_start.to_string())
-    .fetch_one(pool)
-    .await?;
+    let id: i64 =
+        sqlx::query_scalar("INSERT INTO rotas (week_start, finalized) VALUES (?, 0) RETURNING id")
+            .bind(week_start.to_string())
+            .fetch_one(pool)
+            .await?;
 
     Ok(id)
 }
@@ -248,11 +317,10 @@ pub async fn get_rota_by_week(
     pool: &SqlitePool,
     week_start: NaiveDate,
 ) -> Result<Option<Rota>, sqlx::Error> {
-    let row: Option<(i64,)> =
-        sqlx::query_as("SELECT id FROM rotas WHERE week_start = ?")
-            .bind(week_start.to_string())
-            .fetch_optional(pool)
-            .await?;
+    let row: Option<(i64,)> = sqlx::query_as("SELECT id FROM rotas WHERE week_start = ?")
+        .bind(week_start.to_string())
+        .fetch_optional(pool)
+        .await?;
 
     match row {
         Some((id,)) => get_rota(pool, id).await,
@@ -365,7 +433,10 @@ pub async fn delete_shifts_for_rota(pool: &SqlitePool, rota_id: i64) -> Result<(
     Ok(())
 }
 
-pub async fn delete_proposed_assignments(pool: &SqlitePool, rota_id: i64) -> Result<(), sqlx::Error> {
+pub async fn delete_proposed_assignments(
+    pool: &SqlitePool,
+    rota_id: i64,
+) -> Result<(), sqlx::Error> {
     sqlx::query("DELETE FROM assignments WHERE rota_id = ? AND status = 'Proposed'")
         .bind(rota_id)
         .execute(pool)

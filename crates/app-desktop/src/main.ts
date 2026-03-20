@@ -6,8 +6,12 @@ interface Employee {
   id: number;
   name: string;
   roles: string[];
+  start_date: string;
+  target_weekly_hours: number;
+  weekly_hours_deviation: number;
   max_daily_hours: number;
-  max_weekly_hours: number;
+  notes: string | null;
+  bank_details: string | null;
   default_availability: Record<string, string>;
   availability: Record<string, string>;
 }
@@ -54,6 +58,9 @@ let shiftTemplates: ShiftTemplate[] = [];
 let currentView = "employees";
 let selectedWeek = toLocalISODate(getMonday(new Date()));
 let selectedEmployeeId: number | null = null;
+let editEmployeeId: number | null = null;
+let editShiftTemplateId: number | null = null;
+let cleanupCurrentView: (() => void) | null = null;
 
 // ─── API wrappers ───────────────────────────────────────────
 
@@ -87,6 +94,18 @@ function toLocalISODate(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+function todayISO(): string {
+  return toLocalISODate(new Date());
+}
+
+function toTitleCase(s: string): string {
+  return s.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function parseRoles(csv: string): string[] {
+  return csv.split(",").map((r) => toTitleCase(r.trim())).filter(Boolean);
+}
+
 // ─── Rendering ──────────────────────────────────────────────
 
 function renderSidebarEmployees() {
@@ -114,97 +133,304 @@ function renderSidebarEmployees() {
 
 function renderEmployeesView() {
   const content = document.getElementById("content")!;
+
+  // Sort employees by start_date (already sorted from DB, but ensure)
+  const sorted = [...employees].sort((a, b) => a.start_date.localeCompare(b.start_date));
+
   content.innerHTML = `
     <h1>Employees</h1>
     <div class="card">
-      <div class="form-row">
-        <div class="form-group">
-          <label>Name</label>
-          <input id="emp-name" type="text" placeholder="Employee name" />
-        </div>
-        <div class="form-group">
-          <label>Roles (comma-separated)</label>
-          <input id="emp-roles" type="text" placeholder="barista, cashier" />
-        </div>
-        <div class="form-group">
-          <label>Max Daily Hours</label>
-          <input id="emp-daily" type="number" value="8" step="0.5" />
-        </div>
-        <div class="form-group">
-          <label>Max Weekly Hours</label>
-          <input id="emp-weekly" type="number" value="40" step="0.5" />
-        </div>
-        <button class="btn-primary" id="add-employee-btn">Add</button>
-      </div>
-    </div>
-    <div class="card">
-      <div class="table-wrap">
-      <table>
-        <thead>
-          <tr><th>Name</th><th>Roles</th><th>Daily</th><th>Weekly</th><th></th></tr>
-        </thead>
-        <tbody id="emp-table-body">
-          ${employees
-            .map(
-              (e) => `
-            <tr>
-              <td><a href="#" class="emp-link" data-id="${e.id}" style="color:#3498db;text-decoration:none;font-weight:500;">${e.name}</a></td>
-              <td>${e.roles.join(", ")}</td>
-              <td>${e.max_daily_hours}h</td>
-              <td>${e.max_weekly_hours}h</td>
-              <td><button class="btn-danger delete-emp" data-id="${e.id}">Delete</button></td>
-            </tr>`
-            )
-            .join("")}
-        </tbody>
-      </table>
+      <button class="btn-add-employee" id="add-employee-btn">+</button>
+      <div class="employee-list-items">
+        ${sorted.length === 0 ? '<p class="empty-state">No employees yet. Click + to add one.</p>' : ""}
+        ${sorted
+          .map(
+            (e) => `
+          <div class="employee-list-row" data-id="${e.id}">
+            <div class="employee-list-info">
+              <span class="employee-list-name">${e.name}</span>
+              <span class="employee-list-meta">${e.roles.join(", ")} &middot; ${e.target_weekly_hours}h/wk &middot; Started ${e.start_date}</span>
+            </div>
+            <div class="kebab-wrap">
+              <button class="kebab-btn" data-id="${e.id}" title="More options">&#8942;</button>
+              <div class="kebab-dropdown" id="kebab-${e.id}">
+                <button class="kebab-item edit-emp" data-id="${e.id}">Edit</button>
+                <button class="kebab-item kebab-delete delete-emp" data-id="${e.id}">Delete</button>
+              </div>
+            </div>
+          </div>`
+          )
+          .join("")}
       </div>
     </div>
   `;
 
-  document.getElementById("add-employee-btn")!.addEventListener("click", async () => {
-    const name = (document.getElementById("emp-name") as HTMLInputElement).value.trim();
-    const rolesStr = (document.getElementById("emp-roles") as HTMLInputElement).value.trim();
-    const daily = parseFloat((document.getElementById("emp-daily") as HTMLInputElement).value);
-    const weekly = parseFloat((document.getElementById("emp-weekly") as HTMLInputElement).value);
+  document.getElementById("add-employee-btn")!.addEventListener("click", () => {
+    currentView = "create-employee";
+    document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
+    renderView();
+  });
 
-    if (!name) return;
-
-    const roles = rolesStr.split(",").map((r) => r.trim()).filter(Boolean);
-
-    await invoke("create_employee", {
-      employee: {
-        id: 0,
-        name,
-        roles,
-        max_daily_hours: daily,
-        max_weekly_hours: weekly,
-        default_availability: {},
-        availability: {},
-      },
+  document.querySelectorAll(".employee-list-row").forEach((row) => {
+    row.addEventListener("click", (e) => {
+      const target = e.target as HTMLElement;
+      // Don't navigate if clicking the kebab area
+      if (target.closest(".kebab-wrap")) return;
+      selectedEmployeeId = parseInt((row as HTMLElement).dataset.id!);
+      currentView = "employee-detail";
+      document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
+      renderView();
     });
+  });
 
-    await fetchEmployees();
-    renderEmployeesView();
+  // Kebab toggle
+  document.querySelectorAll(".kebab-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const id = (btn as HTMLElement).dataset.id!;
+      const dropdown = document.getElementById(`kebab-${id}`)!;
+      const isOpen = dropdown.classList.contains("open");
+      // Close all open dropdowns first
+      document.querySelectorAll(".kebab-dropdown.open").forEach((d) => d.classList.remove("open"));
+      if (!isOpen) dropdown.classList.add("open");
+    });
+  });
+
+  // Close dropdowns on outside click
+  document.addEventListener("click", closeKebabs);
+  const prevCleanup = cleanupCurrentView;
+  cleanupCurrentView = () => {
+    prevCleanup?.();
+    document.removeEventListener("click", closeKebabs);
+  };
+
+  document.querySelectorAll(".edit-emp").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      editEmployeeId = parseInt((btn as HTMLElement).dataset.id!);
+      currentView = "edit-employee";
+      document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
+      renderView();
+    });
   });
 
   document.querySelectorAll(".delete-emp").forEach((btn) => {
     btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
       const id = parseInt((e.target as HTMLElement).dataset.id!);
       await invoke("delete_employee", { id });
       await fetchEmployees();
       renderEmployeesView();
     });
   });
+}
 
-  document.querySelectorAll(".emp-link").forEach((link) => {
-    link.addEventListener("click", (e) => {
-      e.preventDefault();
-      selectedEmployeeId = parseInt((e.target as HTMLElement).dataset.id!);
-      currentView = "employee-detail";
-      document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
-      renderView();
+function closeKebabs() {
+  document.querySelectorAll(".kebab-dropdown.open").forEach((d) => d.classList.remove("open"));
+}
+
+function renderCreateEmployeeView() {
+  const content = document.getElementById("content")!;
+
+  content.innerHTML = `
+    <div class="detail-header">
+      <button class="back-btn" id="back-to-list">&larr; Back</button>
+      <h1>New Employee</h1>
+    </div>
+    <div class="card">
+      <div class="create-form">
+        <div class="form-group">
+          <label>Name *</label>
+          <input id="emp-name" type="text" placeholder="Employee name" />
+        </div>
+        <div class="form-group">
+          <label>Roles * (comma-separated)</label>
+          <input id="emp-roles" type="text" placeholder="barista, cashier" />
+        </div>
+        <div class="form-group">
+          <label>Start Date *</label>
+          <input id="emp-start-date" type="date" value="${todayISO()}" />
+        </div>
+        <h3 class="form-section-title">Work Preferences</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Target Weekly Hours *</label>
+            <input id="emp-target-weekly" type="number" value="30" step="0.5" min="0" />
+          </div>
+          <div class="form-group">
+            <label>Weekly Deviation (+/-) *</label>
+            <input id="emp-deviation" type="number" value="6" step="0.5" min="0" />
+          </div>
+          <div class="form-group">
+            <label>Max Daily Hours *</label>
+            <input id="emp-daily" type="number" value="8" step="0.5" min="0" />
+          </div>
+        </div>
+        <h3 class="form-section-title">Optional</h3>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea id="emp-notes" rows="3" placeholder="Any notes about this employee..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Bank Details</label>
+          <input id="emp-bank" type="text" placeholder="BSB / Account number" />
+        </div>
+        <button class="btn-primary" id="create-emp-btn" style="margin-top: 1rem;">Create Employee</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("back-to-list")!.addEventListener("click", () => {
+    currentView = "employees";
+    document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
+    document.querySelector('[data-view="employees"]')?.classList.add("active");
+    renderView();
+  });
+
+  document.getElementById("create-emp-btn")!.addEventListener("click", async () => {
+    const name = (document.getElementById("emp-name") as HTMLInputElement).value.trim();
+    const rolesStr = (document.getElementById("emp-roles") as HTMLInputElement).value.trim();
+    const startDate = (document.getElementById("emp-start-date") as HTMLInputElement).value;
+    const targetWeekly = parseFloat((document.getElementById("emp-target-weekly") as HTMLInputElement).value);
+    const deviation = parseFloat((document.getElementById("emp-deviation") as HTMLInputElement).value);
+    const daily = parseFloat((document.getElementById("emp-daily") as HTMLInputElement).value);
+    const notes = (document.getElementById("emp-notes") as HTMLTextAreaElement).value.trim() || null;
+    const bank = (document.getElementById("emp-bank") as HTMLInputElement).value.trim() || null;
+
+    if (!name || !rolesStr || !startDate) return;
+
+    const roles = parseRoles(rolesStr);
+
+    await invoke("create_employee", {
+      employee: {
+        id: 0,
+        name,
+        roles,
+        start_date: startDate,
+        target_weekly_hours: targetWeekly,
+        weekly_hours_deviation: deviation,
+        max_daily_hours: daily,
+        notes,
+        bank_details: bank,
+        default_availability: {},
+        availability: {},
+      },
     });
+
+    await fetchEmployees();
+    // Navigate to the employees list
+    currentView = "employees";
+    document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
+    document.querySelector('[data-view="employees"]')?.classList.add("active");
+    renderView();
+  });
+}
+
+async function renderEditEmployeeView() {
+  const content = document.getElementById("content")!;
+  if (editEmployeeId === null) {
+    currentView = "employees";
+    renderEmployeesView();
+    return;
+  }
+
+  const emp: Employee | null = await invoke("get_employee", { id: editEmployeeId });
+  if (!emp) {
+    currentView = "employees";
+    renderEmployeesView();
+    return;
+  }
+
+  content.innerHTML = `
+    <div class="detail-header">
+      <button class="back-btn" id="back-to-list">&larr; Back</button>
+      <h1>Edit Employee</h1>
+    </div>
+    <div class="card">
+      <div class="create-form">
+        <div class="form-group">
+          <label>Name *</label>
+          <input id="emp-name" type="text" value="${emp.name}" />
+        </div>
+        <div class="form-group">
+          <label>Roles * (comma-separated)</label>
+          <input id="emp-roles" type="text" value="${emp.roles.join(", ")}" />
+        </div>
+        <div class="form-group">
+          <label>Start Date *</label>
+          <input id="emp-start-date" type="date" value="${emp.start_date}" />
+        </div>
+        <h3 class="form-section-title">Work Preferences</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Target Weekly Hours *</label>
+            <input id="emp-target-weekly" type="number" value="${emp.target_weekly_hours}" step="0.5" min="0" />
+          </div>
+          <div class="form-group">
+            <label>Weekly Deviation (+/-) *</label>
+            <input id="emp-deviation" type="number" value="${emp.weekly_hours_deviation}" step="0.5" min="0" />
+          </div>
+          <div class="form-group">
+            <label>Max Daily Hours *</label>
+            <input id="emp-daily" type="number" value="${emp.max_daily_hours}" step="0.5" min="0" />
+          </div>
+        </div>
+        <h3 class="form-section-title">Optional</h3>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea id="emp-notes" rows="3">${emp.notes ?? ""}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Bank Details</label>
+          <input id="emp-bank" type="text" value="${emp.bank_details ?? ""}" />
+        </div>
+        <button class="btn-primary" id="save-emp-btn" style="margin-top: 1rem;">Save Changes</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("back-to-list")!.addEventListener("click", () => {
+    editEmployeeId = null;
+    currentView = "employees";
+    document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
+    document.querySelector('[data-view="employees"]')?.classList.add("active");
+    renderView();
+  });
+
+  document.getElementById("save-emp-btn")!.addEventListener("click", async () => {
+    const name = (document.getElementById("emp-name") as HTMLInputElement).value.trim();
+    const rolesStr = (document.getElementById("emp-roles") as HTMLInputElement).value.trim();
+    const startDate = (document.getElementById("emp-start-date") as HTMLInputElement).value;
+    const targetWeekly = parseFloat((document.getElementById("emp-target-weekly") as HTMLInputElement).value);
+    const deviation = parseFloat((document.getElementById("emp-deviation") as HTMLInputElement).value);
+    const daily = parseFloat((document.getElementById("emp-daily") as HTMLInputElement).value);
+    const notes = (document.getElementById("emp-notes") as HTMLTextAreaElement).value.trim() || null;
+    const bank = (document.getElementById("emp-bank") as HTMLInputElement).value.trim() || null;
+
+    if (!name || !rolesStr || !startDate) return;
+
+    const roles = parseRoles(rolesStr);
+
+    await invoke("update_employee", {
+      employee: {
+        ...emp,
+        name,
+        roles,
+        start_date: startDate,
+        target_weekly_hours: targetWeekly,
+        weekly_hours_deviation: deviation,
+        max_daily_hours: daily,
+        notes,
+        bank_details: bank,
+      },
+    });
+
+    await fetchEmployees();
+    editEmployeeId = null;
+    currentView = "employees";
+    document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
+    document.querySelector('[data-view="employees"]')?.classList.add("active");
+    renderView();
   });
 }
 
@@ -234,9 +460,12 @@ async function renderEmployeeDetailView() {
     <div class="card">
       <div class="detail-meta">
         <div class="meta-item"><strong>Roles:</strong> ${emp.roles.join(", ") || "None"}</div>
+        <div class="meta-item"><strong>Start Date:</strong> ${emp.start_date}</div>
+        <div class="meta-item"><strong>Target Weekly:</strong> ${emp.target_weekly_hours}h (${"\u00B1"}${emp.weekly_hours_deviation}h)</div>
         <div class="meta-item"><strong>Max Daily:</strong> ${emp.max_daily_hours}h</div>
-        <div class="meta-item"><strong>Max Weekly:</strong> ${emp.max_weekly_hours}h</div>
       </div>
+      ${emp.notes ? `<div class="detail-notes"><strong>Notes:</strong> ${emp.notes}</div>` : ""}
+      ${emp.bank_details ? `<div class="detail-notes"><strong>Bank Details:</strong> ${emp.bank_details}</div>` : ""}
     </div>
     <div class="card">
       <h2 style="font-size:1.1rem; margin-bottom:0.75rem;">Default Availability</h2>
@@ -275,7 +504,6 @@ async function renderEmployeeDetailView() {
 
   // ─── Back button ───────────────────────────────────────
   document.getElementById("back-to-list")!.addEventListener("click", () => {
-    document.removeEventListener("keydown", handleAvailKeydown);
     selectedEmployeeId = null;
     currentView = "employees";
     renderView();
@@ -392,6 +620,7 @@ async function renderEmployeeDetailView() {
     }
   }
   document.addEventListener("keydown", handleAvailKeydown);
+  cleanupCurrentView = () => document.removeEventListener("keydown", handleAvailKeydown);
 
   // ─── Save availability ─────────────────────────────────
   document.getElementById("save-avail")!.addEventListener("click", async () => {
@@ -426,6 +655,109 @@ const DAY_LETTERS: Record<string, string> = {
 
 function weekdaysToLetters(days: string[]): string {
   return days.map((d) => DAY_LETTERS[d] || d).join("");
+}
+
+async function renderEditShiftTemplateView() {
+  const content = document.getElementById("content")!;
+  if (editShiftTemplateId === null) {
+    currentView = "shifts";
+    renderShiftsView();
+    return;
+  }
+
+  const tmpl = shiftTemplates.find((t) => t.id === editShiftTemplateId);
+  if (!tmpl) {
+    currentView = "shifts";
+    renderShiftsView();
+    return;
+  }
+
+  const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+  content.innerHTML = `
+    <div class="detail-header">
+      <button class="back-btn" id="back-to-shifts">&larr; Back</button>
+      <h1>Edit Shift Template</h1>
+    </div>
+    <div class="card">
+      <div class="create-form">
+        <div class="form-group">
+          <label>Name</label>
+          <input id="tmpl-name" type="text" value="${tmpl.name}" />
+        </div>
+        <div class="form-group">
+          <label>Days</label>
+          <div class="day-checkboxes">
+            ${weekdays.map((d) => `<label class="day-check"><input type="checkbox" value="${d}" ${tmpl.weekdays.includes(d) ? "checked" : ""} />${DAY_LETTERS[d]}</label>`).join("")}
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Start</label>
+            <input id="tmpl-start" type="time" value="${tmpl.start_time.slice(0, 5)}" />
+          </div>
+          <div class="form-group">
+            <label>End</label>
+            <input id="tmpl-end" type="time" value="${tmpl.end_time.slice(0, 5)}" />
+          </div>
+          <div class="form-group">
+            <label>Role</label>
+            <input id="tmpl-role" type="text" value="${tmpl.required_role}" />
+          </div>
+          <div class="form-group">
+            <label>Min Staff</label>
+            <input id="tmpl-min" type="number" value="${tmpl.min_employees}" min="1" />
+          </div>
+          <div class="form-group">
+            <label>Max Staff</label>
+            <input id="tmpl-max" type="number" value="${tmpl.max_employees}" min="1" />
+          </div>
+        </div>
+        <button class="btn-primary" id="save-tmpl-btn" style="margin-top: 1rem;">Save Changes</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("back-to-shifts")!.addEventListener("click", () => {
+    editShiftTemplateId = null;
+    currentView = "shifts";
+    document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
+    document.querySelector('[data-view="shifts"]')?.classList.add("active");
+    renderView();
+  });
+
+  document.getElementById("save-tmpl-btn")!.addEventListener("click", async () => {
+    const name = (document.getElementById("tmpl-name") as HTMLInputElement).value.trim();
+    const checked = Array.from(document.querySelectorAll(".day-checkboxes input:checked")) as HTMLInputElement[];
+    const selectedDays = checked.map((cb) => cb.value);
+    const startVal = (document.getElementById("tmpl-start") as HTMLInputElement).value;
+    const endVal = (document.getElementById("tmpl-end") as HTMLInputElement).value;
+    const role = (document.getElementById("tmpl-role") as HTMLInputElement).value.trim();
+    const minEmp = parseInt((document.getElementById("tmpl-min") as HTMLInputElement).value);
+    const maxEmp = parseInt((document.getElementById("tmpl-max") as HTMLInputElement).value);
+
+    if (!name || !role || selectedDays.length === 0) return;
+
+    await invoke("update_shift_template", {
+      template: {
+        ...tmpl,
+        name,
+        weekdays: selectedDays,
+        start_time: startVal + ":00",
+        end_time: endVal + ":00",
+        required_role: toTitleCase(role),
+        min_employees: minEmp,
+        max_employees: maxEmp,
+      },
+    });
+
+    await fetchShiftTemplates();
+    editShiftTemplateId = null;
+    currentView = "shifts";
+    document.querySelectorAll(".nav-btn").forEach((b) => b.classList.remove("active"));
+    document.querySelector('[data-view="shifts"]')?.classList.add("active");
+    renderView();
+  });
 }
 
 function renderShiftsView() {
@@ -485,7 +817,15 @@ function renderShiftsView() {
               <td>${t.start_time.slice(0, 5)} – ${t.end_time.slice(0, 5)}</td>
               <td>${t.required_role}</td>
               <td>${t.min_employees}–${t.max_employees}</td>
-              <td><button class="btn-danger delete-tmpl" data-id="${t.id}">Delete</button></td>
+              <td>
+                <div class="kebab-wrap">
+                  <button class="kebab-btn tmpl-kebab-btn" data-id="${t.id}" title="More options">&#8942;</button>
+                  <div class="kebab-dropdown" id="tmpl-kebab-${t.id}">
+                    <button class="kebab-item edit-tmpl" data-id="${t.id}">Edit</button>
+                    <button class="kebab-item kebab-delete delete-tmpl" data-id="${t.id}">Delete</button>
+                  </div>
+                </div>
+              </td>
             </tr>`
             )
             .join("")}
@@ -514,7 +854,7 @@ function renderShiftsView() {
         weekdays: selectedDays,
         start_time: startVal + ":00",
         end_time: endVal + ":00",
-        required_role: role,
+        required_role: toTitleCase(role),
         min_employees: minEmp,
         max_employees: maxEmp,
       },
@@ -524,8 +864,36 @@ function renderShiftsView() {
     renderShiftsView();
   });
 
+  document.querySelectorAll(".tmpl-kebab-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const id = (btn as HTMLElement).dataset.id!;
+      const dropdown = document.getElementById(`tmpl-kebab-${id}`)!;
+      const isOpen = dropdown.classList.contains("open");
+      document.querySelectorAll(".kebab-dropdown.open").forEach((d) => d.classList.remove("open"));
+      if (!isOpen) dropdown.classList.add("open");
+    });
+  });
+
+  document.addEventListener("click", closeKebabs);
+  const prevCleanup = cleanupCurrentView;
+  cleanupCurrentView = () => {
+    prevCleanup?.();
+    document.removeEventListener("click", closeKebabs);
+  };
+
+  document.querySelectorAll(".edit-tmpl").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      editShiftTemplateId = parseInt((btn as HTMLElement).dataset.id!);
+      currentView = "edit-shift-template";
+      renderView();
+    });
+  });
+
   document.querySelectorAll(".delete-tmpl").forEach((btn) => {
     btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
       const id = parseInt((e.target as HTMLElement).dataset.id!);
       try {
         await invoke("delete_shift_template", { id });
@@ -724,15 +1092,26 @@ function renderRotaGrid(weekdays: string[], schedule: WeekSchedule | null): stri
 }
 
 async function renderView() {
+  cleanupCurrentView?.();
+  cleanupCurrentView = null;
   switch (currentView) {
     case "employees":
       renderEmployeesView();
+      break;
+    case "create-employee":
+      renderCreateEmployeeView();
+      break;
+    case "edit-employee":
+      await renderEditEmployeeView();
       break;
     case "employee-detail":
       await renderEmployeeDetailView();
       break;
     case "shifts":
       renderShiftsView();
+      break;
+    case "edit-shift-template":
+      await renderEditShiftTemplateView();
       break;
     case "rota":
       await renderRotaView();

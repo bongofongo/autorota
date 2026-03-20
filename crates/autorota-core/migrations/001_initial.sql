@@ -4,6 +4,11 @@ CREATE TABLE IF NOT EXISTS employees (
     roles TEXT NOT NULL DEFAULT '[]',                    -- JSON array of role strings
     max_daily_hours REAL NOT NULL DEFAULT 8.0,
     max_weekly_hours REAL NOT NULL DEFAULT 40.0,
+    start_date TEXT NOT NULL DEFAULT '2026-01-01',
+    target_weekly_hours REAL NOT NULL DEFAULT 40.0,
+    weekly_hours_deviation REAL NOT NULL DEFAULT 6.0,
+    notes TEXT,
+    bank_details TEXT,
     default_availability TEXT NOT NULL DEFAULT '{}',     -- JSON: {"Mon:8":"Yes", ...}
     availability TEXT NOT NULL DEFAULT '{}'              -- JSON: week-specific override
 );

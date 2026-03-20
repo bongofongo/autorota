@@ -122,9 +122,10 @@ fn is_eligible(
     }
 
     // Must not have No availability for any hour of the shift
-    let avail = employee
-        .availability
-        .for_window(shift.weekday(), shift.start_hour(), shift.end_hour());
+    let avail =
+        employee
+            .availability
+            .for_window(shift.weekday(), shift.start_hour(), shift.end_hour());
     if avail == AvailabilityState::No {
         return false;
     }
@@ -144,7 +145,7 @@ fn is_eligible(
 
     // Must have weekly budget remaining
     let weekly = state.employee_weekly_hours(employee.id);
-    if weekly + shift_hours > employee.max_weekly_hours {
+    if weekly + shift_hours > employee.max_weekly_hours() {
         return false;
     }
 
@@ -190,12 +191,36 @@ pub fn schedule_pure(
     rota_id: i64,
     week_start: NaiveDate,
 ) -> ScheduleResult {
-    println!("[Scheduler] Starting schedule_pure: {} shifts, {} employees, {} existing assignments, rota_id={}, week_start={}", shifts.len(), employees.len(), existing_assignments.len(), rota_id, week_start);
+    println!(
+        "[Scheduler] Starting schedule_pure: {} shifts, {} employees, {} existing assignments, rota_id={}, week_start={}",
+        shifts.len(),
+        employees.len(),
+        existing_assignments.len(),
+        rota_id,
+        week_start
+    );
     for s in shifts {
-        println!("[Scheduler]   Shift id={} date={} {}–{} role={} min={} max={}", s.id, s.date, s.start_time, s.end_time, s.required_role, s.min_employees, s.max_employees);
+        println!(
+            "[Scheduler]   Shift id={} date={} {}–{} role={} min={} max={}",
+            s.id,
+            s.date,
+            s.start_time,
+            s.end_time,
+            s.required_role,
+            s.min_employees,
+            s.max_employees
+        );
     }
     for e in employees {
-        println!("[Scheduler]   Employee id={} name={} roles={:?} daily={}h weekly={}h", e.id, e.name, e.roles, e.max_daily_hours, e.max_weekly_hours);
+        println!(
+            "[Scheduler]   Employee id={} name={} roles={:?} daily={}h target_weekly={}h (±{})",
+            e.id,
+            e.name,
+            e.roles,
+            e.max_daily_hours,
+            e.target_weekly_hours,
+            e.weekly_hours_deviation
+        );
     }
 
     let shift_map: HashMap<i64, &Shift> = shifts.iter().map(|s| (s.id, s)).collect();
@@ -243,12 +268,24 @@ pub fn schedule_pure(
             .then(a.start_time.cmp(&b.start_time)) // earlier time first
     });
 
-    println!("[Scheduler] Pass 2: {} shifts to fill (sorted by difficulty)", shift_order.len());
+    println!(
+        "[Scheduler] Pass 2: {} shifts to fill (sorted by difficulty)",
+        shift_order.len()
+    );
 
     // For each shift, fill remaining slots one at a time
     for shift in &shift_order {
         let remaining = shift.max_employees - state.slots_filled(shift.id);
-        println!("[Scheduler]   Filling shift id={} {} {} {}–{} role={} (need {} more)", shift.id, shift.date, shift.weekday(), shift.start_time, shift.end_time, shift.required_role, remaining);
+        println!(
+            "[Scheduler]   Filling shift id={} {} {} {}–{} role={} (need {} more)",
+            shift.id,
+            shift.date,
+            shift.weekday(),
+            shift.start_time,
+            shift.end_time,
+            shift.required_role,
+            remaining
+        );
 
         for slot in 0..remaining {
             // Find and score all eligible candidates
@@ -264,7 +301,7 @@ pub fn schedule_pure(
                         let daily = state.employee_daily_hours(e.id, shift.date);
                         let weekly = state.employee_weekly_hours(e.id);
                         let hours = shift.duration_hours();
-                        println!("[Scheduler]     {} ineligible: role={} avail={} already_assigned={} daily={}/{}h weekly={}/{}h shift_hours={}", e.name, has_role, avail, already, daily, e.max_daily_hours, weekly, e.max_weekly_hours, hours);
+                        println!("[Scheduler]     {} ineligible: role={} avail={} already_assigned={} daily={}/{}h weekly={}/{}h shift_hours={}", e.name, has_role, avail, already, daily, e.max_daily_hours, weekly, e.max_weekly_hours(), hours);
                     }
                     eligible
                 })
@@ -277,7 +314,11 @@ pub fn schedule_pure(
                 })
                 .collect();
 
-            println!("[Scheduler]     Slot {}: {} eligible candidates", slot + 1, candidates.len());
+            println!(
+                "[Scheduler]     Slot {}: {} eligible candidates",
+                slot + 1,
+                candidates.len()
+            );
 
             if candidates.is_empty() {
                 println!("[Scheduler]     No candidates available, stopping fill for this shift");
@@ -291,7 +332,10 @@ pub fn schedule_pure(
             });
 
             let winner = candidates[0].0;
-            println!("[Scheduler]     Assigned: {} (score={:?})", winner.name, candidates[0].1);
+            println!(
+                "[Scheduler]     Assigned: {} (score={:?})",
+                winner.name, candidates[0].1
+            );
             state.record_assignment(winner.id, shift, rota_id, AssignmentStatus::Proposed);
         }
 
@@ -305,7 +349,11 @@ pub fn schedule_pure(
         }
     }
 
-    println!("[Scheduler] Done: {} assignments, {} warnings", state.assignments.len(), warnings.len());
+    println!(
+        "[Scheduler] Done: {} assignments, {} warnings",
+        state.assignments.len(),
+        warnings.len()
+    );
     ScheduleResult {
         assignments: state.assignments,
         warnings,

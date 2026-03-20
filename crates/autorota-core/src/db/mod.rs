@@ -1,7 +1,7 @@
 pub mod queries;
 
-use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::SqlitePool;
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::str::FromStr;
 
 /// Create a connection pool and run migrations.
@@ -45,6 +45,18 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     if has_old_column {
         let m2 = include_str!("../../migrations/002_weekdays_and_cascade.sql");
         sqlx::raw_sql(m2).execute(pool).await?;
+    }
+
+    // Migration 003: add employee work preference fields if they don't exist yet.
+    let has_target_weekly: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) > 0 FROM pragma_table_info('employees') WHERE name = 'target_weekly_hours'",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    if !has_target_weekly {
+        let m3 = include_str!("../../migrations/003_employee_work_prefs.sql");
+        sqlx::raw_sql(m3).execute(pool).await?;
     }
 
     Ok(())

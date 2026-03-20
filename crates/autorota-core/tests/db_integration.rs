@@ -189,9 +189,9 @@ async fn migration_from_old_schema_with_data() {
     }
 
     // Now connect via db::connect — this must not fail with FK constraint error
-    let pool = db::connect(&url).await.expect(
-        "db::connect should succeed on old-schema DB with existing data (migration 002)",
-    );
+    let pool = db::connect(&url)
+        .await
+        .expect("db::connect should succeed on old-schema DB with existing data (migration 002)");
 
     // Verify migration worked: 'weekdays' column should exist, 'weekday' should not
     let has_weekdays: bool = sqlx::query_scalar(
@@ -200,7 +200,10 @@ async fn migration_from_old_schema_with_data() {
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert!(has_weekdays, "migrated schema should have 'weekdays' column");
+    assert!(
+        has_weekdays,
+        "migrated schema should have 'weekdays' column"
+    );
 
     let still_has_weekday: bool = sqlx::query_scalar(
         "SELECT COUNT(*) > 0 FROM pragma_table_info('shift_templates') WHERE name = 'weekday'",
@@ -240,8 +243,12 @@ async fn employee_crud() {
         id: 0,
         name: "Alice".to_string(),
         roles: vec!["barista".to_string(), "cashier".to_string()],
+        start_date: NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+        target_weekly_hours: 40.0,
+        weekly_hours_deviation: 6.0,
         max_daily_hours: 8.0,
-        max_weekly_hours: 40.0,
+        notes: None,
+        bank_details: None,
         default_availability: avail.clone(),
         availability: avail,
     };
@@ -306,8 +313,12 @@ async fn full_scheduling_flow() {
         id: 0,
         name: "Bob".to_string(),
         roles: vec!["barista".to_string()],
+        start_date: NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+        target_weekly_hours: 40.0,
+        weekly_hours_deviation: 6.0,
         max_daily_hours: 8.0,
-        max_weekly_hours: 40.0,
+        notes: None,
+        bank_details: None,
         default_availability: Availability::default(),
         availability: Availability::default(),
     };
@@ -352,7 +363,9 @@ async fn full_scheduling_flow() {
         employee_id: emp_id,
         status: AssignmentStatus::Proposed,
     };
-    let assign_id = queries::insert_assignment(&pool, &assignment).await.unwrap();
+    let assign_id = queries::insert_assignment(&pool, &assignment)
+        .await
+        .unwrap();
 
     // Confirm the assignment
     queries::update_assignment_status(&pool, assign_id, AssignmentStatus::Confirmed)
