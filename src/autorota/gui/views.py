@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
+from collections.abc import Callable
 from copy import deepcopy
 from datetime import date, timedelta
 from pathlib import Path
@@ -95,11 +96,17 @@ class ScheduleView(ttk.Frame):
 # ---------------------------------------------------------------------------
 
 class EmployeesView(ttk.Frame):
-    """Two-pane employee manager: list on the left, editor on the right."""
+    """Detail-only employee editor; the list lives in the sidebar."""
 
-    def __init__(self, parent):
+    def __init__(
+        self,
+        parent,
+        employees: list[Employee],
+        refresh_cb: Callable[[], None],
+    ):
         super().__init__(parent)
-        self._employees: list[Employee] = []
+        self._employees = employees
+        self._refresh_cb = refresh_cb
         self._detail_pane: ttk.Frame | None = None
         self._build()
 
@@ -112,67 +119,21 @@ class EmployeesView(ttk.Frame):
             anchor="w", pady=(0, 8)
         )
 
-        paned = ttk.PanedWindow(self, orient="horizontal")
-        paned.pack(fill="both", expand=True)
-
-        # Left — employee list
-        list_frame = ttk.Frame(paned, width=200)
-        list_frame.pack_propagate(False)
-        paned.add(list_frame, weight=0)
-
-        lb_wrap = ttk.Frame(list_frame)
-        lb_wrap.pack(fill="both", expand=True)
-        vsb = ttk.Scrollbar(lb_wrap, orient="vertical")
-        self._listbox = tk.Listbox(
-            lb_wrap, yscrollcommand=vsb.set,
-            selectmode="single", activestyle="none",
-            font=("", 10),
-        )
-        vsb.config(command=self._listbox.yview)
-        vsb.pack(side="right", fill="y")
-        self._listbox.pack(fill="both", expand=True)
-        self._listbox.bind("<<ListboxSelect>>", self._on_list_select)
-
-        btn_row = ttk.Frame(list_frame)
-        btn_row.pack(fill="x", pady=(4, 0))
-        ttk.Button(btn_row, text="New",    command=self._new_employee).pack(side="left", expand=True, fill="x", padx=(0, 1))
-        ttk.Button(btn_row, text="Delete", command=self._delete_employee).pack(side="left", expand=True, fill="x", padx=(1, 0))
-
-        # Right — detail area
-        self._detail_container = ttk.Frame(paned)
-        paned.add(self._detail_container, weight=1)
-
         self._placeholder = ttk.Label(
-            self._detail_container,
+            self,
             text="Select an employee or press New.",
             foreground="#888888",
         )
         self._placeholder.pack(expand=True)
 
     # ------------------------------------------------------------------
-    # List management
+    # Public API (called by App)
     # ------------------------------------------------------------------
 
-    def _refresh_list(self):
-        self._listbox.delete(0, tk.END)
-        for emp in self._employees:
-            self._listbox.insert(tk.END, emp.name)
+    def open_detail(self, emp: Employee | None) -> None:
+        self._open_detail(emp)
 
-    def _on_list_select(self, _event):
-        sel = self._listbox.curselection()
-        if sel:
-            self._open_detail(self._employees[sel[0]])
-
-    def _new_employee(self):
-        self._listbox.selection_clear(0, tk.END)
-        self._open_detail(None)
-
-    def _delete_employee(self):
-        sel = self._listbox.curselection()
-        if not sel:
-            return
-        self._employees.pop(sel[0])
-        self._refresh_list()
+    def clear_detail(self) -> None:
         self._clear_detail()
 
     # ------------------------------------------------------------------
@@ -199,7 +160,7 @@ class EmployeesView(ttk.Frame):
             self._detail_pane.destroy()
         self._placeholder.pack_forget()
 
-        pane = ttk.Frame(self._detail_container)
+        pane = ttk.Frame(self)
         pane.pack(fill="both", expand=True)
         self._detail_pane = pane
 
@@ -222,7 +183,7 @@ class EmployeesView(ttk.Frame):
             notebook.add(tab, text=tab_label)
             ttk.Label(
                 tab,
-                text="Click a cell to cycle:  Y = yes   M = maybe   N = no",
+                text="Click to select  •  Shift+click range  •  Ctrl/Cmd+click toggle",
                 foreground="#555555",
             ).pack(anchor="w", padx=6, pady=(6, 4))
             AvailEditor(tab, avail_dict).pack(fill="both", expand=True, padx=6, pady=(0, 6))
@@ -257,54 +218,8 @@ class EmployeesView(ttk.Frame):
             new_emp.final_avail   = deepcopy(edit_final)
             self._employees.append(new_emp)
 
-        self._refresh_list()
+        self._refresh_cb()
         self._clear_detail()
-
-
-# ---------------------------------------------------------------------------
-# Availability view
-# ---------------------------------------------------------------------------
-
-class AvailabilityView(ttk.Frame):
-    """Hour-by-hour weekly availability grid (Y / M / N)."""
-
-    def __init__(self, parent):
-        super().__init__(parent)
-        self._build()
-
-    def _build(self):
-        ttk.Label(self, text="Availability", font=("", 13, "bold")).pack(
-            anchor="w", pady=(0, 4)
-        )
-        ttk.Label(
-            self,
-            text="Showing default availability for a demo employee.",
-            foreground="#666666",
-        ).pack(anchor="w", pady=(0, 8))
-
-        emp = Employee("Demo Employee")
-        self._render(emp.default_avail)
-
-    def _render(self, avail: AvailDict, start_hour: int = 6, end_hour: int = 22):
-        hours = list(range(start_hour, end_hour))
-        col_headers = [f"{h:02}:00" for h in hours]
-        row_headers = _DAY_ABBR
-
-        cells: list[list[str]] = []
-        colors: dict[tuple[int, int], str] = {}
-
-        for r, day in enumerate(Weekday):
-            row = []
-            for c, hour in enumerate(hours):
-                a = avail[day][hour]
-                row.append(a.name[0])          # Y / M / N
-                colors[(r, c)] = _AVAIL_COLOR[a]
-            cells.append(row)
-
-        CalendarGrid(
-            self, col_headers, row_headers, cells,
-            cell_colors=colors, col_width=5, row_hdr_width=6, cell_height=4,
-        ).pack(fill="both", expand=True)
 
 
 # ---------------------------------------------------------------------------
@@ -312,7 +227,7 @@ class AvailabilityView(ttk.Frame):
 # ---------------------------------------------------------------------------
 
 class ShiftsView(ttk.Frame):
-    """Weekly shift pattern loaded from shifts.json."""
+    """Weekly shift pattern: one row per weekday, shifts listed inline."""
 
     def __init__(self, parent):
         super().__init__(parent)
@@ -325,39 +240,47 @@ class ShiftsView(ttk.Frame):
 
         weekday_shifts = loadWeekdaySchedule(_SHIFTS_JSON)
 
-        # Build all unique frames using a dummy date so we can call .frame
-        from datetime import datetime
-        _dummy = date(2000, 1, 3)   # a Monday
+        # Scrollable container
+        canvas = tk.Canvas(self, highlightthickness=0)
+        vsb = ttk.Scrollbar(self, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=vsb.set)
+        vsb.pack(side="right", fill="y")
+        canvas.pack(fill="both", expand=True)
 
-        all_frames: list[str] = []
-        seen: set[str] = set()
-        for day_idx in range(7):
-            for ps in weekday_shifts.get(day_idx, []):
-                label = f"{ps.start_hour:02}:00 – {ps.end_hour:02}:00"
-                if label not in seen:
-                    all_frames.append(label)
-                    seen.add(label)
-        all_frames.sort()
+        inner = ttk.Frame(canvas)
+        canvas.create_window((0, 0), window=inner, anchor="nw")
+        inner.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
+        )
+        canvas.bind_all(
+            "<MouseWheel>",
+            lambda e: canvas.yview_scroll(int(-1 * (e.delta / 120)), "units"),
+        )
 
-        col_headers = _DAY_ABBR
-        row_headers = all_frames
+        for day in Weekday:
+            row = ttk.Frame(inner)
+            row.pack(fill="x", padx=4, pady=3)
 
-        cells: list[list[str]] = []
-        colors: dict[tuple[int, int], str] = {}
+            ttk.Label(
+                row, text=day.name[:3].title(),
+                font=("", 10, "bold"), width=10, anchor="w",
+            ).pack(side="left")
 
-        for r, frame in enumerate(all_frames):
-            row = []
-            for c, day in enumerate(Weekday):
-                match = any(
-                    f"{ps.start_hour:02}:00 – {ps.end_hour:02}:00" == frame
-                    for ps in weekday_shifts.get(day.value, [])
-                )
-                row.append("✓" if match else "")
-                if match:
-                    colors[(r, c)] = _SHIFT_COLOR
-            cells.append(row)
+            ttk.Separator(row, orient="vertical").pack(side="left", fill="y", padx=(0, 8))
 
-        CalendarGrid(
-            self, col_headers, row_headers, cells,
-            cell_colors=colors, col_width=8, row_hdr_width=16, cell_height=6,
-        ).pack(fill="both", expand=True)
+            shifts_today = sorted(
+                weekday_shifts.get(day.value, []),
+                key=lambda ps: ps.start_hour,
+            )
+            if shifts_today:
+                for ps in shifts_today:
+                    label = f"({ps.start_hour:02}:00\u2013{ps.end_hour:02}:00)"
+                    chip = tk.Label(
+                        row, text=label,
+                        bg=_SHIFT_COLOR, relief="flat",
+                        padx=6, pady=3, font=("", 9),
+                    )
+                    chip.pack(side="left", padx=(0, 6))
+            else:
+                ttk.Label(row, text="—", foreground="#999999").pack(side="left")
