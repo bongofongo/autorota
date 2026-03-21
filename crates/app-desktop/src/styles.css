@@ -474,6 +474,10 @@ th {
   background: #eee;
 }
 
+.detail-header #edit-employee-btn {
+  margin-left: auto;
+}
+
 .detail-meta {
   display: flex;
   gap: 2rem;
@@ -773,6 +777,15 @@ details.avail-section[open] > summary::before {
   min-height: 60px;
 }
 
+.rota-shift-card.shift-past {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.rota-day-header.day-past {
+  opacity: 0.5;
+}
+
 /* ─── Swap Mode ──────────────────────────────────────── */
 
 .rota-employee.swappable {
@@ -980,9 +993,6 @@ details.avail-section[open] > summary::before {
 
 /* ─── Schedule warnings ────────────────────────────────────── */
 .schedule-warning {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.6rem;
   background: #fffbeb;
   border: 1px solid #f59e0b;
   border-radius: 6px;
@@ -992,10 +1002,29 @@ details.avail-section[open] > summary::before {
   color: #92400e;
 }
 
-.schedule-warning .warning-icon {
-  font-size: 1rem;
-  line-height: 1.4;
+.warning-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.warning-header:hover {
+  opacity: 0.8;
+}
+
+.warning-chevron {
+  font-size: 0.7rem;
   flex-shrink: 0;
+}
+
+.warning-body {
+  margin-top: 0.4rem;
+}
+
+.schedule-warning.collapsed .warning-body {
+  display: none;
 }
 
 .schedule-warning .warning-text {

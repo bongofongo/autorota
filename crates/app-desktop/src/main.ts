@@ -86,6 +86,7 @@ let editEmployeeId: number | null = null;
 let editShiftTemplateId: number | null = null;
 let cleanupCurrentView: (() => void) | null = null;
 let lastScheduleWarnings: ShortfallWarning[] = [];
+let warningsCollapsed = false;
 let editMode = false;
 
 // ─── API wrappers ───────────────────────────────────────────
@@ -129,6 +130,13 @@ function getWeekCategory(weekStart: string): "past" | "current" | "future" {
   if (weekStart < currentMonday) return "past";
   if (weekStart === currentMonday) return "current";
   return "future";
+}
+
+function shiftDateForDay(weekStart: string, dayAbbrev: string): string {
+  const offsets: Record<string, number> = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 };
+  const d = new Date(weekStart + "T00:00:00");
+  d.setDate(d.getDate() + (offsets[dayAbbrev] ?? 0));
+  return toLocalISODate(d);
 }
 
 function toTitleCase(s: string): string {
@@ -612,6 +620,7 @@ async function renderEmployeeDetailView() {
     <div class="detail-header">
       <button class="back-btn" id="back-to-list">&larr; Back</button>
       <h1>${emp.name}</h1>
+      <button class="btn-secondary" id="edit-employee-btn">Edit</button>
     </div>
     <div class="card">
       <div class="detail-meta">
@@ -651,6 +660,12 @@ async function renderEmployeeDetailView() {
   document.getElementById("back-to-list")!.addEventListener("click", () => {
     selectedEmployeeId = null;
     currentView = "employees";
+    renderView();
+  });
+
+  document.getElementById("edit-employee-btn")!.addEventListener("click", () => {
+    editEmployeeId = selectedEmployeeId;
+    currentView = "edit-employee";
     renderView();
   });
 
@@ -1112,6 +1127,7 @@ async function renderRotaView() {
         console.log("[Generate] Result:", JSON.stringify(result, null, 2));
         console.log("[Generate] Assignments:", result.assignments.length, "Warnings:", result.warnings.length);
         lastScheduleWarnings = result.warnings;
+        warningsCollapsed = false;
         rotaViewMode = "assigned";
         console.log("[Generate] Switching to assigned view, re-rendering...");
         await renderRotaView();
@@ -1148,6 +1164,12 @@ async function renderRotaView() {
     });
   }
 
+  // Warning toggle
+  document.getElementById("warning-toggle")?.addEventListener("click", () => {
+    warningsCollapsed = !warningsCollapsed;
+    renderRotaView();
+  });
+
   // View mode dropdown
   document.getElementById("rota-view-select")!.addEventListener("change", (e) => {
     rotaViewMode = (e.target as HTMLSelectElement).value as "template" | "assigned";
@@ -1163,6 +1185,7 @@ async function renderRotaView() {
 
 interface RotaShiftCard {
   shiftId: number;
+  date: string;
   name: string;
   startTime: string;
   endTime: string;
@@ -1173,12 +1196,20 @@ interface RotaShiftCard {
 
 function renderScheduleWarnings(warnings: ShortfallWarning[]): string {
   if (warnings.length === 0) return "";
+  const count = warnings.length;
+  const label = `⚠ ${count} shift${count > 1 ? "s" : ""} could not be fully staffed`;
   const lines = warnings.map(w => {
     const staffed = `${w.filled}/${w.needed} staff`;
     return `<div class="warning-text">${w.weekday} ${w.start_time}–${w.end_time} (${w.required_role}): ${staffed} assigned</div>`;
   }).join("");
-  const heading = `<div class="warning-text"><strong>⚠ ${warnings.length} shift${warnings.length > 1 ? "s" : ""} could not be fully staffed</strong></div>`;
-  return `<div class="schedule-warning"><div>${heading}${lines}</div></div>`;
+  const chevron = warningsCollapsed ? "▶" : "▼";
+  return `<div class="schedule-warning${warningsCollapsed ? " collapsed" : ""}">
+    <div class="warning-header" id="warning-toggle">
+      <span class="warning-chevron">${chevron}</span>
+      <strong class="warning-text">${label}</strong>
+    </div>
+    <div class="warning-body">${lines}</div>
+  </div>`;
 }
 
 function renderRotaGrid(weekdays: string[], schedule: WeekSchedule | null): string {
@@ -1209,6 +1240,7 @@ function renderRotaGrid(weekdays: string[], schedule: WeekSchedule | null): stri
         if (!byDay[day]) continue;
         byDay[day].push({
           shiftId: shift.id,
+          date: shift.date,
           name: shift.required_role,
           startTime: shift.start_time,
           endTime: shift.end_time,
@@ -1244,6 +1276,7 @@ function renderRotaGrid(weekdays: string[], schedule: WeekSchedule | null): stri
         for (const s of shifts) {
           byDay[day].push({
             shiftId: s.entry.shift_id,
+            date: s.entry.date,
             name: s.entry.required_role,
             startTime: s.entry.start_time,
             endTime: s.entry.end_time,
@@ -1261,6 +1294,7 @@ function renderRotaGrid(weekdays: string[], schedule: WeekSchedule | null): stri
       if (!byDay[day]) continue;
       byDay[day].push({
         shiftId: shift.id,
+        date: shift.date,
         name: shift.required_role,
         startTime: shift.start_time,
         endTime: shift.end_time,
@@ -1279,6 +1313,7 @@ function renderRotaGrid(weekdays: string[], schedule: WeekSchedule | null): stri
         if (!byDay[day]) continue;
         byDay[day].push({
           shiftId: 0,
+          date: shiftDateForDay(selectedWeek, day),
           name: tmpl.name,
           startTime: tmpl.start_time.slice(0, 5),
           endTime: tmpl.end_time.slice(0, 5),
@@ -1307,8 +1342,11 @@ function renderRotaGrid(weekdays: string[], schedule: WeekSchedule | null): stri
   let html = `<div class="rota-grid-wrap"><div class="rota-grid" style="grid-template-columns: repeat(7, 1fr);">`;
 
   // Header row
+  const today = todayISO();
   for (const day of weekdays) {
-    html += `<div class="rota-day-header">${day}</div>`;
+    const dayDate = shiftDateForDay(selectedWeek, day);
+    const dayPast = dayDate < today;
+    html += `<div class="rota-day-header${dayPast ? " day-past" : ""}">${day}</div>`;
   }
 
   // Shift cards row by row
@@ -1316,28 +1354,31 @@ function renderRotaGrid(weekdays: string[], schedule: WeekSchedule | null): stri
     for (const day of weekdays) {
       const shift = byDay[day][row];
       if (shift) {
+        const isPast = shift.date < today;
+        const canInteract = isInteractive && !isPast;
+
         const empHtml = shift.employees.length > 0
           ? shift.employees.map((e) => {
               const cls = e.status === "Confirmed" ? "status-confirmed" : e.status === "Overridden" ? "status-overridden" : "status-proposed";
-              const swappable = isInteractive ? ` data-assignment-id="${e.assignmentId}" data-shift-id="${shift.shiftId}" data-employee-id="${e.employeeId}"` : "";
+              const swappable = canInteract ? ` data-assignment-id="${e.assignmentId}" data-shift-id="${shift.shiftId}" data-employee-id="${e.employeeId}"` : "";
               let actions = "";
-              if (editMode) {
+              if (editMode && !isPast) {
                 actions += `<span class="edit-remove-btn" data-assignment-id="${e.assignmentId}" title="Remove">&times;</span>`;
                 if (e.status === "Proposed") {
                   actions += `<span class="edit-confirm-btn" data-assignment-id="${e.assignmentId}" title="Confirm">&#x2713;</span>`;
                 }
               }
-              return `<div class="rota-employee ${cls}${isInteractive ? " swappable" : ""}"${swappable}><span class="rota-employee-name">${e.name}</span>${actions}</div>`;
+              return `<div class="rota-employee ${cls}${canInteract ? " swappable" : ""}"${swappable}><span class="rota-employee-name">${e.name}</span>${actions}</div>`;
             }).join("")
           : "";
 
-        const addBtn = editMode && shift.employees.length < shift.maxEmployees
+        const addBtn = editMode && !isPast && shift.employees.length < shift.maxEmployees
           ? `<button class="edit-add-employee-btn" data-shift-id="${shift.shiftId}" data-rota-id="${schedule?.rota_id}">+ Add</button>`
           : "";
 
-        const cardAttrs = isInteractive && shift.shiftId ? ` data-shift-id="${shift.shiftId}" data-max-employees="${shift.maxEmployees}"` : "";
+        const cardAttrs = canInteract && shift.shiftId ? ` data-shift-id="${shift.shiftId}" data-max-employees="${shift.maxEmployees}"` : "";
 
-        html += `<div class="rota-shift-card${editMode ? " edit-mode" : ""}"${cardAttrs}>
+        html += `<div class="rota-shift-card${editMode ? " edit-mode" : ""}${isPast ? " shift-past" : ""}"${cardAttrs}>
           <div class="rota-shift-name">${shift.name}</div>
           <div class="rota-shift-time">${shift.startTime} – ${shift.endTime}</div>
           ${empHtml}
