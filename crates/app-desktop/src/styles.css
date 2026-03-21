@@ -773,6 +773,122 @@ details.avail-section[open] > summary::before {
   min-height: 60px;
 }
 
+/* ─── Swap Mode ──────────────────────────────────────── */
+
+.rota-employee.swappable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.rota-employee.swap-source {
+  outline: 2px solid #3498db;
+  outline-offset: -1px;
+  opacity: 0.7;
+}
+
+.rota-employee.swap-target {
+  background: rgba(46, 204, 113, 0.15);
+  cursor: pointer;
+}
+
+.rota-employee.swap-hover {
+  background: rgba(46, 204, 113, 0.4);
+  outline: 2px solid #27ae60;
+  outline-offset: -1px;
+}
+
+/* ─── Edit Mode ──────────────────────────────────────── */
+
+.rota-shift-card.edit-mode {
+  position: relative;
+}
+
+.rota-employee {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.rota-employee-name {
+  flex: 1;
+}
+
+.edit-remove-btn,
+.edit-confirm-btn {
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 0.9rem;
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.edit-remove-btn:hover,
+.edit-confirm-btn:hover {
+  opacity: 1;
+}
+
+.edit-remove-btn {
+  color: #e74c3c;
+}
+
+.edit-confirm-btn {
+  color: #27ae60;
+}
+
+.edit-add-employee-btn {
+  margin-top: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  background: #f0f7ff;
+  border: 1px dashed #3498db;
+  border-radius: 4px;
+  color: #3498db;
+  font-size: 0.75rem;
+  cursor: pointer;
+  width: 100%;
+}
+
+.edit-add-employee-btn:hover {
+  background: #dbeafe;
+}
+
+.employee-picker {
+  position: absolute;
+  z-index: 60;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  max-height: 200px;
+  overflow-y: auto;
+  min-width: 150px;
+  margin-top: 0.25rem;
+}
+
+.employee-picker-item {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.employee-picker-item:hover {
+  background: #f0f7ff;
+}
+
+.btn-secondary {
+  background: #f5f5f5;
+  border: 1px solid #ccc;
+  color: #555;
+  padding: 0.4rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.btn-secondary:hover {
+  background: #e8e8e8;
+}
+
 /* ─── Responsive ──────────────────────────────────────── */
 
 @media (max-width: 768px) {
@@ -860,6 +976,30 @@ details.avail-section[open] > summary::before {
     flex-direction: column;
     gap: 0.5rem;
   }
+}
+
+/* ─── Schedule warnings ────────────────────────────────────── */
+.schedule-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  background: #fffbeb;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  padding: 0.65rem 0.9rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+  color: #92400e;
+}
+
+.schedule-warning .warning-icon {
+  font-size: 1rem;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
+.schedule-warning .warning-text {
+  line-height: 1.4;
 }
 
 /* ─── Week category badges ─────────────────────────────────── */

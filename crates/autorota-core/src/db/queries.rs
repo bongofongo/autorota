@@ -474,6 +474,48 @@ pub async fn update_assignment_status(
     Ok(())
 }
 
+pub async fn update_assignment_shift(
+    pool: &SqlitePool,
+    id: i64,
+    new_shift_id: i64,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE assignments SET shift_id = ? WHERE id = ?")
+        .bind(new_shift_id)
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn swap_assignment_shifts(
+    pool: &SqlitePool,
+    id_a: i64,
+    shift_a: i64,
+    id_b: i64,
+    shift_b: i64,
+) -> Result<(), sqlx::Error> {
+    // Swap: A gets B's shift, B gets A's shift
+    sqlx::query("UPDATE assignments SET shift_id = ? WHERE id = ?")
+        .bind(shift_b)
+        .bind(id_a)
+        .execute(pool)
+        .await?;
+    sqlx::query("UPDATE assignments SET shift_id = ? WHERE id = ?")
+        .bind(shift_a)
+        .bind(id_b)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn delete_assignment(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM assignments WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
 fn assignment_from_row(row: (i64, i64, i64, i64, String, Option<String>)) -> Option<Assignment> {
     let (id, rota_id, shift_id, employee_id, status_str, employee_name) = row;
     Some(Assignment {

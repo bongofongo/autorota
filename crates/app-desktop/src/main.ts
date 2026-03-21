@@ -28,6 +28,7 @@ interface ShiftTemplate {
 }
 
 interface ScheduleEntry {
+  assignment_id: number;
   shift_id: number;
   date: string;
   weekday: string;
@@ -37,6 +38,18 @@ interface ScheduleEntry {
   employee_id: number;
   employee_name: string;
   status: string;
+  max_employees: number;
+}
+
+interface ShiftInfo {
+  id: number;
+  date: string;
+  weekday: string;
+  start_time: string;
+  end_time: string;
+  required_role: string;
+  min_employees: number;
+  max_employees: number;
 }
 
 interface WeekSchedule {
@@ -44,11 +57,22 @@ interface WeekSchedule {
   week_start: string;
   finalized: boolean;
   entries: ScheduleEntry[];
+  shifts: ShiftInfo[];
+}
+
+interface ShortfallWarning {
+  shift_id: number;
+  needed: number;
+  filled: number;
+  weekday: string;
+  start_time: string;
+  end_time: string;
+  required_role: string;
 }
 
 interface ScheduleResult {
   assignments: unknown[];
-  warnings: { shift_id: number; needed: number; filled: number }[];
+  warnings: ShortfallWarning[];
 }
 
 // ─── State ──────────────────────────────────────────────────
@@ -61,6 +85,8 @@ let selectedEmployeeId: number | null = null;
 let editEmployeeId: number | null = null;
 let editShiftTemplateId: number | null = null;
 let cleanupCurrentView: (() => void) | null = null;
+let lastScheduleWarnings: ShortfallWarning[] = [];
+let editMode = false;
 
 // ─── API wrappers ───────────────────────────────────────────
 
@@ -1045,21 +1071,28 @@ async function renderRotaView() {
       : "";
 
   const canGenerate = weekCategory === "future";
+  const canEdit = !(schedule?.finalized);
+
+  // When in edit mode, force assigned view
+  if (editMode && rotaViewMode !== "assigned") {
+    rotaViewMode = "assigned";
+  }
 
   content.innerHTML = `
     <h1>Week of ${formatWeekLabel(selectedWeek)} ${categoryBadge}</h1>
     <div class="card">
-      ${canGenerate ? `<div class="form-row">
-        <button class="btn-primary" id="generate-btn">Generate Schedule</button>
-      </div>` : ""}
+      <div class="form-row" style="gap: 0.5rem;">
+        ${canGenerate ? `<button class="btn-primary" id="generate-btn">Generate Schedule</button>` : ""}
+        ${canEdit ? `<button class="${editMode ? "btn-primary" : "btn-secondary"}" id="edit-mode-btn">${editMode ? "Exit Edit Mode" : "Edit Mode"}</button>` : ""}
+      </div>
       <div class="form-group" style="margin-top: 0.5rem;">
         <label>View</label>
-        <select id="rota-view-select">
+        <select id="rota-view-select" ${editMode ? "disabled" : ""}>
           <option value="template" ${rotaViewMode === "template" ? "selected" : ""}>Template View</option>
-          <option value="assigned" ${rotaViewMode === "assigned" ? "selected" : ""} ${!hasAssignments ? "disabled" : ""}>Assigned Shifts${!hasAssignments ? " (no schedule yet)" : ""}</option>
+          <option value="assigned" ${rotaViewMode === "assigned" ? "selected" : ""} ${!hasAssignments && !editMode ? "disabled" : ""}>Assigned Shifts${!hasAssignments && !editMode ? " (no schedule yet)" : ""}</option>
         </select>
       </div>
-      <div id="schedule-warnings"></div>
+      ${renderScheduleWarnings(lastScheduleWarnings)}
     </div>
     <div class="card" id="schedule-grid">
       ${renderRotaGrid(weekdays, schedule)}
@@ -1078,12 +1111,7 @@ async function renderRotaView() {
         const result: ScheduleResult = await invoke("run_schedule", { weekStart: selectedWeek });
         console.log("[Generate] Result:", JSON.stringify(result, null, 2));
         console.log("[Generate] Assignments:", result.assignments.length, "Warnings:", result.warnings.length);
-        if (result.warnings.length > 0) {
-          const warningsEl = document.getElementById("schedule-warnings")!;
-          warningsEl.innerHTML = result.warnings.map(w =>
-            `<p style="color: orange;">Warning: Shift ${w.shift_id} needs ${w.needed} staff but only ${w.filled} assigned.</p>`
-          ).join("");
-        }
+        lastScheduleWarnings = result.warnings;
         rotaViewMode = "assigned";
         console.log("[Generate] Switching to assigned view, re-rendering...");
         await renderRotaView();
@@ -1096,55 +1124,153 @@ async function renderRotaView() {
     });
   }
 
+  // Edit mode toggle
+  const editModeBtn = document.getElementById("edit-mode-btn");
+  if (editModeBtn) {
+    editModeBtn.addEventListener("click", async () => {
+      if (!editMode) {
+        // Entering edit mode: materialise shifts if no rota exists
+        if (!schedule) {
+          try {
+            await invoke("materialise_week", { weekStart: selectedWeek });
+          } catch (err) {
+            alert(`Failed to prepare week: ${err}`);
+            return;
+          }
+        }
+        await fetchEmployees();
+        editMode = true;
+        rotaViewMode = "assigned";
+      } else {
+        editMode = false;
+      }
+      await renderRotaView();
+    });
+  }
+
   // View mode dropdown
   document.getElementById("rota-view-select")!.addEventListener("change", (e) => {
     rotaViewMode = (e.target as HTMLSelectElement).value as "template" | "assigned";
     console.log("[Rota] View mode changed to:", rotaViewMode);
     renderRotaView();
   });
+
+  // Attach interactive listeners for drag-drop and edit mode
+  if (rotaViewMode === "assigned" && !(schedule?.finalized)) {
+    attachRotaInteractiveListeners(schedule);
+  }
 }
 
 interface RotaShiftCard {
+  shiftId: number;
   name: string;
   startTime: string;
   endTime: string;
   role: string;
-  employees: { name: string; status: string }[];
+  maxEmployees: number;
+  employees: { assignmentId: number; employeeId: number; name: string; status: string }[];
+}
+
+function renderScheduleWarnings(warnings: ShortfallWarning[]): string {
+  if (warnings.length === 0) return "";
+  const lines = warnings.map(w => {
+    const staffed = `${w.filled}/${w.needed} staff`;
+    return `<div class="warning-text">${w.weekday} ${w.start_time}–${w.end_time} (${w.required_role}): ${staffed} assigned</div>`;
+  }).join("");
+  const heading = `<div class="warning-text"><strong>⚠ ${warnings.length} shift${warnings.length > 1 ? "s" : ""} could not be fully staffed</strong></div>`;
+  return `<div class="schedule-warning"><div>${heading}${lines}</div></div>`;
 }
 
 function renderRotaGrid(weekdays: string[], schedule: WeekSchedule | null): string {
-  console.log("[RotaGrid] Rendering mode:", rotaViewMode, "entries:", schedule?.entries.length ?? 0);
+  console.log("[RotaGrid] Rendering mode:", rotaViewMode, "editMode:", editMode, "entries:", schedule?.entries.length ?? 0);
   const byDay: Record<string, RotaShiftCard[]> = {};
   for (const day of weekdays) byDay[day] = [];
 
-  if (rotaViewMode === "assigned" && schedule && schedule.entries.length > 0) {
-    // Group entries by day + shift_id to combine multiple employees per shift
-    const shiftMap: Record<string, Record<number, { entry: ScheduleEntry; employees: { name: string; status: string }[] }>> = {};
-    for (const day of weekdays) shiftMap[day] = {};
+  const weekCategory = getWeekCategory(selectedWeek);
+  const isInteractive = rotaViewMode === "assigned" && !(schedule?.finalized);
 
-    for (const entry of schedule.entries) {
-      if (!shiftMap[entry.weekday]) continue;
-      if (!shiftMap[entry.weekday][entry.shift_id]) {
-        shiftMap[entry.weekday][entry.shift_id] = { entry, employees: [] };
-      }
-      shiftMap[entry.weekday][entry.shift_id].employees.push({
-        name: entry.employee_name,
-        status: entry.status,
-      });
-    }
-
-    for (const day of weekdays) {
-      const shifts = Object.values(shiftMap[day]);
-      shifts.sort((a, b) => a.entry.start_time.localeCompare(b.entry.start_time));
-      for (const s of shifts) {
-        byDay[day].push({
-          name: s.entry.required_role,
-          startTime: s.entry.start_time,
-          endTime: s.entry.end_time,
-          role: s.entry.required_role,
-          employees: s.employees,
+  if (rotaViewMode === "assigned" && schedule) {
+    // In edit mode, build from schedule.shifts so empty shifts also appear
+    // In normal assigned mode, build from entries only
+    if (editMode && schedule.shifts.length > 0) {
+      // Build cards from all shifts, attaching any assignments
+      const entryByShift: Record<number, { assignmentId: number; employeeId: number; name: string; status: string }[]> = {};
+      for (const entry of schedule.entries) {
+        if (!entryByShift[entry.shift_id]) entryByShift[entry.shift_id] = [];
+        entryByShift[entry.shift_id].push({
+          assignmentId: entry.assignment_id,
+          employeeId: entry.employee_id,
+          name: entry.employee_name,
+          status: entry.status,
         });
       }
+      for (const shift of schedule.shifts) {
+        const day = shift.weekday.slice(0, 3);
+        if (!byDay[day]) continue;
+        byDay[day].push({
+          shiftId: shift.id,
+          name: shift.required_role,
+          startTime: shift.start_time,
+          endTime: shift.end_time,
+          role: shift.required_role,
+          maxEmployees: shift.max_employees,
+          employees: entryByShift[shift.id] || [],
+        });
+      }
+      for (const day of weekdays) {
+        byDay[day].sort((a, b) => a.startTime.localeCompare(b.startTime));
+      }
+    } else if (schedule.entries.length > 0) {
+      // Group entries by day + shift_id to combine multiple employees per shift
+      const shiftMap: Record<string, Record<number, { entry: ScheduleEntry; employees: { assignmentId: number; employeeId: number; name: string; status: string }[] }>> = {};
+      for (const day of weekdays) shiftMap[day] = {};
+
+      for (const entry of schedule.entries) {
+        if (!shiftMap[entry.weekday]) continue;
+        if (!shiftMap[entry.weekday][entry.shift_id]) {
+          shiftMap[entry.weekday][entry.shift_id] = { entry, employees: [] };
+        }
+        shiftMap[entry.weekday][entry.shift_id].employees.push({
+          assignmentId: entry.assignment_id,
+          employeeId: entry.employee_id,
+          name: entry.employee_name,
+          status: entry.status,
+        });
+      }
+
+      for (const day of weekdays) {
+        const shifts = Object.values(shiftMap[day]);
+        shifts.sort((a, b) => a.entry.start_time.localeCompare(b.entry.start_time));
+        for (const s of shifts) {
+          byDay[day].push({
+            shiftId: s.entry.shift_id,
+            name: s.entry.required_role,
+            startTime: s.entry.start_time,
+            endTime: s.entry.end_time,
+            role: s.entry.required_role,
+            maxEmployees: s.entry.max_employees,
+            employees: s.employees,
+          });
+        }
+      }
+    }
+  } else if (schedule && schedule.shifts.length > 0) {
+    // Use materialised shifts when a schedule exists (preserves historical data)
+    for (const shift of schedule.shifts) {
+      const day = shift.weekday.slice(0, 3);
+      if (!byDay[day]) continue;
+      byDay[day].push({
+        shiftId: shift.id,
+        name: shift.required_role,
+        startTime: shift.start_time,
+        endTime: shift.end_time,
+        role: shift.required_role,
+        maxEmployees: shift.max_employees,
+        employees: [],
+      });
+    }
+    for (const day of weekdays) {
+      byDay[day].sort((a, b) => a.startTime.localeCompare(b.startTime));
     }
   } else {
     // Template view: expand shift templates into weekday columns
@@ -1152,10 +1278,12 @@ function renderRotaGrid(weekdays: string[], schedule: WeekSchedule | null): stri
       for (const day of tmpl.weekdays) {
         if (!byDay[day]) continue;
         byDay[day].push({
+          shiftId: 0,
           name: tmpl.name,
           startTime: tmpl.start_time.slice(0, 5),
           endTime: tmpl.end_time.slice(0, 5),
           role: tmpl.required_role,
+          maxEmployees: tmpl.max_employees,
           employees: [],
         });
       }
@@ -1173,7 +1301,7 @@ function renderRotaGrid(weekdays: string[], schedule: WeekSchedule | null): stri
   if (isEmpty) {
     return rotaViewMode === "template"
       ? `<p>No shift templates configured. Go to the <strong>Shifts</strong> tab to add some.</p>`
-      : `<p>Schedule generated but no assignments were made. Check that employees and shift templates are configured.</p>`;
+      : `<p>No shifts found. ${editMode ? "No shift templates configured." : "Check that employees and shift templates are configured."}</p>`;
   }
 
   let html = `<div class="rota-grid-wrap"><div class="rota-grid" style="grid-template-columns: repeat(7, 1fr);">`;
@@ -1191,14 +1319,29 @@ function renderRotaGrid(weekdays: string[], schedule: WeekSchedule | null): stri
         const empHtml = shift.employees.length > 0
           ? shift.employees.map((e) => {
               const cls = e.status === "Confirmed" ? "status-confirmed" : e.status === "Overridden" ? "status-overridden" : "status-proposed";
-              return `<div class="rota-employee ${cls}">${e.name}</div>`;
+              const swappable = isInteractive ? ` data-assignment-id="${e.assignmentId}" data-shift-id="${shift.shiftId}" data-employee-id="${e.employeeId}"` : "";
+              let actions = "";
+              if (editMode) {
+                actions += `<span class="edit-remove-btn" data-assignment-id="${e.assignmentId}" title="Remove">&times;</span>`;
+                if (e.status === "Proposed") {
+                  actions += `<span class="edit-confirm-btn" data-assignment-id="${e.assignmentId}" title="Confirm">&#x2713;</span>`;
+                }
+              }
+              return `<div class="rota-employee ${cls}${isInteractive ? " swappable" : ""}"${swappable}><span class="rota-employee-name">${e.name}</span>${actions}</div>`;
             }).join("")
           : "";
 
-        html += `<div class="rota-shift-card">
+        const addBtn = editMode && shift.employees.length < shift.maxEmployees
+          ? `<button class="edit-add-employee-btn" data-shift-id="${shift.shiftId}" data-rota-id="${schedule?.rota_id}">+ Add</button>`
+          : "";
+
+        const cardAttrs = isInteractive && shift.shiftId ? ` data-shift-id="${shift.shiftId}" data-max-employees="${shift.maxEmployees}"` : "";
+
+        html += `<div class="rota-shift-card${editMode ? " edit-mode" : ""}"${cardAttrs}>
           <div class="rota-shift-name">${shift.name}</div>
           <div class="rota-shift-time">${shift.startTime} – ${shift.endTime}</div>
           ${empHtml}
+          ${addBtn}
         </div>`;
       } else {
         html += `<div class="rota-shift-empty"></div>`;
@@ -1208,6 +1351,175 @@ function renderRotaGrid(weekdays: string[], schedule: WeekSchedule | null): stri
 
   html += `</div></div>`;
   return html;
+}
+
+function attachRotaInteractiveListeners(schedule: WeekSchedule | null) {
+  // Swap mode: mousedown on employee badge → highlight swap targets → mouseup to swap
+  let swapSource: { assignmentId: number; shiftId: number } | null = null;
+
+  function cancelSwap() {
+    swapSource = null;
+    document.querySelectorAll(".swap-source").forEach((el) => el.classList.remove("swap-source"));
+    document.querySelectorAll(".swap-target").forEach((el) => el.classList.remove("swap-target"));
+    document.querySelectorAll(".swap-hover").forEach((el) => el.classList.remove("swap-hover"));
+  }
+
+  document.querySelectorAll<HTMLElement>(".rota-employee.swappable").forEach((el) => {
+    el.addEventListener("mousedown", (e) => {
+      // Ignore if clicking edit mode action buttons
+      if ((e.target as HTMLElement).closest(".edit-remove-btn, .edit-confirm-btn")) return;
+      e.preventDefault();
+
+      const assignmentId = parseInt(el.dataset.assignmentId!);
+      const shiftId = parseInt(el.dataset.shiftId!);
+      swapSource = { assignmentId, shiftId };
+
+      el.classList.add("swap-source");
+
+      // Highlight all employee badges in OTHER shifts as swap targets
+      document.querySelectorAll<HTMLElement>(".rota-employee.swappable").forEach((target) => {
+        const targetShiftId = parseInt(target.dataset.shiftId!);
+        if (targetShiftId !== shiftId) {
+          target.classList.add("swap-target");
+        }
+      });
+    });
+
+    el.addEventListener("mouseenter", () => {
+      if (swapSource && parseInt(el.dataset.shiftId!) !== swapSource.shiftId) {
+        el.classList.add("swap-hover");
+      }
+    });
+
+    el.addEventListener("mouseleave", () => {
+      el.classList.remove("swap-hover");
+    });
+
+    el.addEventListener("mouseup", async () => {
+      if (!swapSource) return;
+      const targetAssignmentId = parseInt(el.dataset.assignmentId!);
+      const targetShiftId = parseInt(el.dataset.shiftId!);
+
+      if (targetShiftId === swapSource.shiftId) {
+        cancelSwap();
+        return;
+      }
+
+      const sourceId = swapSource.assignmentId;
+      cancelSwap();
+
+      try {
+        await invoke("swap_assignments", { idA: sourceId, idB: targetAssignmentId });
+        await renderRotaView();
+      } catch (err) {
+        alert(`Failed to swap: ${err}`);
+      }
+    });
+  });
+
+  // Cancel swap on mouseup anywhere else
+  document.addEventListener("mouseup", () => {
+    if (swapSource) cancelSwap();
+  }, { once: false });
+
+  // Edit mode listeners
+  if (editMode) {
+    // Remove buttons
+    document.querySelectorAll<HTMLElement>(".edit-remove-btn").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const id = parseInt(btn.dataset.assignmentId!);
+        try {
+          await invoke("delete_assignment", { id });
+          await renderRotaView();
+        } catch (err) {
+          alert(`Failed to remove assignment: ${err}`);
+        }
+      });
+    });
+
+    // Confirm buttons
+    document.querySelectorAll<HTMLElement>(".edit-confirm-btn").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const id = parseInt(btn.dataset.assignmentId!);
+        try {
+          await invoke("update_assignment_status", { id, status: "Confirmed" });
+          await renderRotaView();
+        } catch (err) {
+          alert(`Failed to confirm assignment: ${err}`);
+        }
+      });
+    });
+
+    // Add employee buttons
+    document.querySelectorAll<HTMLElement>(".edit-add-employee-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        // Close any existing picker
+        document.querySelectorAll(".employee-picker").forEach((p) => p.remove());
+
+        const shiftId = parseInt(btn.dataset.shiftId!);
+        const rotaId = parseInt(btn.dataset.rotaId!);
+
+        // Get employees already assigned to this shift
+        const assignedIds = new Set<number>();
+        const card = btn.closest(".rota-shift-card");
+        if (card) {
+          card.querySelectorAll<HTMLElement>(".rota-employee[data-employee-id]").forEach((el) => {
+            assignedIds.add(parseInt(el.dataset.employeeId!));
+          });
+        }
+
+        const available = employees.filter((emp) => !assignedIds.has(emp.id));
+        if (available.length === 0) {
+          alert("No available employees to add.");
+          return;
+        }
+
+        const picker = document.createElement("div");
+        picker.className = "employee-picker";
+        for (const emp of available) {
+          const item = document.createElement("div");
+          item.className = "employee-picker-item";
+          item.textContent = emp.name;
+          item.addEventListener("click", async () => {
+            picker.remove();
+            try {
+              await invoke("create_assignment", {
+                assignment: {
+                  id: 0,
+                  rota_id: rotaId,
+                  shift_id: shiftId,
+                  employee_id: emp.id,
+                  status: "Overridden",
+                  employee_name: emp.name,
+                },
+              });
+              await renderRotaView();
+            } catch (err) {
+              alert(`Failed to add assignment: ${err}`);
+            }
+          });
+          picker.appendChild(item);
+        }
+
+        // Position relative to the button
+        btn.style.position = "relative";
+        btn.insertAdjacentElement("afterend", picker);
+
+        // Close on outside click
+        const closeHandler = (ev: MouseEvent) => {
+          if (!picker.contains(ev.target as Node)) {
+            picker.remove();
+            document.removeEventListener("click", closeHandler);
+          }
+        };
+        // Delay to avoid immediate close from current click
+        setTimeout(() => document.addEventListener("click", closeHandler), 0);
+      });
+    });
+  }
 }
 
 async function renderView() {
@@ -1277,6 +1589,8 @@ function shiftWeek(delta: number) {
   const d = new Date(selectedWeek + "T00:00:00");
   d.setDate(d.getDate() + delta * 7);
   selectedWeek = toLocalISODate(getMonday(d));
+  lastScheduleWarnings = [];
+  editMode = false;
   updateWeekLabel();
   if (currentView === "rota") renderRotaView();
 }

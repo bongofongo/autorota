@@ -197,6 +197,127 @@ async fn update_assignment_status(
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+async fn move_assignment(
+    state: State<'_, AppState>,
+    id: i64,
+    new_shift_id: i64,
+) -> Result<(), String> {
+    let pool = get_pool(&state).await?;
+
+    // Load the assignment to find its rota
+    let assignment = sqlx::query_as::<_, (i64, i64, i64, i64, String, Option<String>)>(
+        "SELECT id, rota_id, shift_id, employee_id, status, employee_name FROM assignments WHERE id = ?"
+    )
+    .bind(id)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| e.to_string())?
+    .ok_or("Assignment not found")?;
+
+    let rota_id = assignment.1;
+
+    // Validate target shift belongs to same rota
+    let target_shift = sqlx::query_as::<_, (i64, i64, u32)>(
+        "SELECT id, rota_id, max_employees FROM shifts WHERE id = ?"
+    )
+    .bind(new_shift_id)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| e.to_string())?
+    .ok_or("Target shift not found")?;
+
+    if target_shift.1 != rota_id {
+        return Err("Target shift belongs to a different rota".into());
+    }
+
+    // Check capacity
+    let current_count: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM assignments WHERE shift_id = ?"
+    )
+    .bind(new_shift_id)
+    .fetch_one(&pool)
+    .await
+    .map_err(|e| e.to_string())?;
+
+    if current_count.0 >= target_shift.2 as i64 {
+        return Err("Target shift is at capacity".into());
+    }
+
+    queries::update_assignment_shift(&pool, id, new_shift_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn swap_assignments(
+    state: State<'_, AppState>,
+    id_a: i64,
+    id_b: i64,
+) -> Result<(), String> {
+    let pool = get_pool(&state).await?;
+
+    let a = sqlx::query_as::<_, (i64, i64)>(
+        "SELECT id, shift_id FROM assignments WHERE id = ?"
+    )
+    .bind(id_a)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| e.to_string())?
+    .ok_or("Assignment A not found")?;
+
+    let b = sqlx::query_as::<_, (i64, i64)>(
+        "SELECT id, shift_id FROM assignments WHERE id = ?"
+    )
+    .bind(id_b)
+    .fetch_optional(&pool)
+    .await
+    .map_err(|e| e.to_string())?
+    .ok_or("Assignment B not found")?;
+
+    queries::swap_assignment_shifts(&pool, a.0, a.1, b.0, b.1)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn delete_assignment(
+    state: State<'_, AppState>,
+    id: i64,
+) -> Result<(), String> {
+    let pool = get_pool(&state).await?;
+    queries::delete_assignment(&pool, id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn materialise_week(
+    state: State<'_, AppState>,
+    week_start: String,
+) -> Result<i64, String> {
+    let pool = get_pool(&state).await?;
+    let date = NaiveDate::parse_from_str(&week_start, "%Y-%m-%d")
+        .map_err(|e| format!("Invalid date: {e}"))?;
+
+    // Reuse existing rota or create new one with materialised shifts
+    match queries::get_rota_by_week(&pool, date)
+        .await
+        .map_err(|e| e.to_string())?
+    {
+        Some(existing) => Ok(existing.id),
+        None => {
+            let id = queries::insert_rota(&pool, date)
+                .await
+                .map_err(|e| e.to_string())?;
+            queries::materialise_shifts(&pool, id, date)
+                .await
+                .map_err(|e| e.to_string())?;
+            Ok(id)
+        }
+    }
+}
+
 // ─── Scheduling ──────────────────────────────────────────────
 
 /// Create a rota for the given week, materialise shifts from templates,
@@ -312,6 +433,7 @@ async fn get_week_schedule(
                 .or_else(|| a.employee_name.clone())
                 .unwrap_or_else(|| format!("Employee #{}", a.employee_id));
             Some(ScheduleEntry {
+                assignment_id: a.id,
                 shift_id: shift.id,
                 date: shift.date.to_string(),
                 weekday: shift.weekday().to_string(),
@@ -321,7 +443,22 @@ async fn get_week_schedule(
                 employee_id: a.employee_id,
                 employee_name,
                 status: a.status.to_string(),
+                max_employees: shift.max_employees,
             })
+        })
+        .collect();
+
+    let shift_infos: Vec<ShiftInfo> = shifts
+        .iter()
+        .map(|s| ShiftInfo {
+            id: s.id,
+            date: s.date.to_string(),
+            weekday: s.weekday().to_string(),
+            start_time: s.start_time.format("%H:%M").to_string(),
+            end_time: s.end_time.format("%H:%M").to_string(),
+            required_role: s.required_role.clone(),
+            min_employees: s.min_employees,
+            max_employees: s.max_employees,
         })
         .collect();
 
@@ -330,11 +467,13 @@ async fn get_week_schedule(
         week_start: rota.week_start.to_string(),
         finalized: rota.finalized,
         entries,
+        shifts: shift_infos,
     }))
 }
 
 #[derive(serde::Serialize)]
 struct ScheduleEntry {
+    assignment_id: i64,
     shift_id: i64,
     date: String,
     weekday: String,
@@ -344,6 +483,19 @@ struct ScheduleEntry {
     employee_id: i64,
     employee_name: String,
     status: String,
+    max_employees: u32,
+}
+
+#[derive(serde::Serialize)]
+struct ShiftInfo {
+    id: i64,
+    date: String,
+    weekday: String,
+    start_time: String,
+    end_time: String,
+    required_role: String,
+    min_employees: u32,
+    max_employees: u32,
 }
 
 #[derive(serde::Serialize)]
@@ -352,6 +504,7 @@ struct WeekSchedule {
     week_start: String,
     finalized: bool,
     entries: Vec<ScheduleEntry>,
+    shifts: Vec<ShiftInfo>,
 }
 
 // ─── App entry ───────────────────────────────────────────────
@@ -379,6 +532,10 @@ pub fn run() {
             finalize_rota,
             create_assignment,
             update_assignment_status,
+            move_assignment,
+            swap_assignments,
+            delete_assignment,
+            materialise_week,
             run_schedule,
             get_week_schedule,
         ])
