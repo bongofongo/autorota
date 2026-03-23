@@ -292,6 +292,67 @@ async fn delete_assignment(
 }
 
 #[tauri::command]
+async fn delete_shift(state: State<'_, AppState>, id: i64) -> Result<(), String> {
+    let pool = get_pool(&state).await?;
+    queries::delete_shift(&pool, id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn update_shift_times(
+    state: State<'_, AppState>,
+    id: i64,
+    start_time: String,
+    end_time: String,
+) -> Result<(), String> {
+    let pool = get_pool(&state).await?;
+    let start = chrono::NaiveTime::parse_from_str(&start_time, "%H:%M")
+        .or_else(|_| chrono::NaiveTime::parse_from_str(&start_time, "%H:%M:%S"))
+        .map_err(|e| format!("Invalid start time: {e}"))?;
+    let end = chrono::NaiveTime::parse_from_str(&end_time, "%H:%M")
+        .or_else(|_| chrono::NaiveTime::parse_from_str(&end_time, "%H:%M:%S"))
+        .map_err(|e| format!("Invalid end time: {e}"))?;
+    queries::update_shift_times(&pool, id, start, end)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn create_ad_hoc_shift(
+    state: State<'_, AppState>,
+    rota_id: i64,
+    date: String,
+    start_time: String,
+    end_time: String,
+    required_role: String,
+) -> Result<i64, String> {
+    let pool = get_pool(&state).await?;
+    let shift_date = NaiveDate::parse_from_str(&date, "%Y-%m-%d")
+        .map_err(|e| format!("Invalid date: {e}"))?;
+    let start = chrono::NaiveTime::parse_from_str(&start_time, "%H:%M")
+        .map_err(|e| format!("Invalid start time: {e}"))?;
+    let end = chrono::NaiveTime::parse_from_str(&end_time, "%H:%M")
+        .map_err(|e| format!("Invalid end time: {e}"))?;
+
+    let shift = autorota_core::models::shift::Shift {
+        id: 0,
+        template_id: None,
+        rota_id,
+        date: shift_date,
+        start_time: start,
+        end_time: end,
+        required_role,
+        min_employees: 1,
+        max_employees: 1,
+    };
+
+    queries::insert_shift(&pool, &shift)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn materialise_week(
     state: State<'_, AppState>,
     week_start: String,
@@ -535,6 +596,9 @@ pub fn run() {
             move_assignment,
             swap_assignments,
             delete_assignment,
+            delete_shift,
+            update_shift_times,
+            create_ad_hoc_shift,
             materialise_week,
             run_schedule,
             get_week_schedule,

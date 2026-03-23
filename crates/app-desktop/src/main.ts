@@ -1050,6 +1050,9 @@ function renderShiftsView() {
 }
 
 let rotaViewMode: "template" | "assigned" = "template";
+// True when the user has explicitly chosen a view mode for the current week.
+// Reset on week navigation so the auto-default can fire once per week.
+let rotaViewModeExplicit = false;
 
 async function renderRotaView() {
   const content = document.getElementById("content")!;
@@ -1074,8 +1077,9 @@ async function renderRotaView() {
   const weekCategory = getWeekCategory(selectedWeek);
   console.log("[Rota] hasAssignments:", hasAssignments, "rotaViewMode:", rotaViewMode, "weekCategory:", weekCategory);
 
-  // For past/current weeks with assignments, default to assigned view
-  if (weekCategory !== "future" && hasAssignments && rotaViewMode === "template") {
+  // For past/current weeks with assignments, default to assigned view —
+  // but only if the user hasn't explicitly chosen a view mode for this week.
+  if (!rotaViewModeExplicit && weekCategory !== "future" && hasAssignments && rotaViewMode === "template") {
     rotaViewMode = "assigned";
   }
 
@@ -1173,6 +1177,7 @@ async function renderRotaView() {
   // View mode dropdown
   document.getElementById("rota-view-select")!.addEventListener("change", (e) => {
     rotaViewMode = (e.target as HTMLSelectElement).value as "template" | "assigned";
+    rotaViewModeExplicit = true;
     console.log("[Rota] View mode changed to:", rotaViewMode);
     renderRotaView();
   });
@@ -1287,8 +1292,8 @@ function renderRotaGrid(weekdays: string[], schedule: WeekSchedule | null): stri
         }
       }
     }
-  } else if (schedule && schedule.shifts.length > 0) {
-    // Use materialised shifts when a schedule exists (preserves historical data)
+  } else if (rotaViewMode !== "template" && schedule && schedule.shifts.length > 0) {
+    // Use materialised shifts when a schedule exists and template view is not selected
     for (const shift of schedule.shifts) {
       const day = shift.weekday.slice(0, 3);
       if (!byDay[day]) continue;
@@ -1378,11 +1383,39 @@ function renderRotaGrid(weekdays: string[], schedule: WeekSchedule | null): stri
 
         const cardAttrs = canInteract && shift.shiftId ? ` data-shift-id="${shift.shiftId}" data-max-employees="${shift.maxEmployees}"` : "";
 
+        const deleteBtn = editMode && !isPast && shift.shiftId
+          ? `<button class="edit-delete-shift-btn" data-shift-id="${shift.shiftId}" title="Delete shift"><svg width="10" height="10" viewBox="0 0 12 13" fill="currentColor" aria-hidden="true"><rect x="1" y="2.5" width="10" height="1" rx="0.5"/><rect x="3.5" y="0.5" width="5" height="1.5" rx="0.5"/><path d="M2 4l.6 7.5A.5.5 0 002.6 12h6.8a.5.5 0 00.5-.5L10.5 4H2zm2.5 1.5h1v5h-1v-5zm3 0h1v5h-1v-5z"/></svg></button>`
+          : "";
+
+        const timeHtml = editMode && !isPast && shift.shiftId
+          ? `<div class="rota-shift-time editable-time">
+               <span class="edit-time" data-shift-id="${shift.shiftId}" data-field="start" data-value="${shift.startTime}">${shift.startTime}</span>
+               &ndash;
+               <span class="edit-time" data-shift-id="${shift.shiftId}" data-field="end" data-value="${shift.endTime}">${shift.endTime}</span>
+             </div>`
+          : `<div class="rota-shift-time">${shift.startTime} &ndash; ${shift.endTime}</div>`;
+
         html += `<div class="rota-shift-card${editMode ? " edit-mode" : ""}${isPast ? " shift-past" : ""}"${cardAttrs}>
+          ${deleteBtn}
           <div class="rota-shift-name">${shift.name}</div>
-          <div class="rota-shift-time">${shift.startTime} – ${shift.endTime}</div>
+          ${timeHtml}
           ${empHtml}
           ${addBtn}
+        </div>`;
+      } else {
+        html += `<div class="rota-shift-empty"></div>`;
+      }
+    }
+  }
+
+  // Add shift buttons at the bottom of each weekday column (edit mode only)
+  if (editMode && schedule) {
+    for (const day of weekdays) {
+      const dayDate = shiftDateForDay(selectedWeek, day);
+      const isPast = dayDate < today;
+      if (!isPast) {
+        html += `<div class="rota-add-shift-cell" style="position: relative;">
+          <button class="edit-add-shift-btn" data-date="${dayDate}" data-rota-id="${schedule.rota_id}">+ Add Shift</button>
         </div>`;
       } else {
         html += `<div class="rota-shift-empty"></div>`;
@@ -1560,6 +1593,122 @@ function attachRotaInteractiveListeners(schedule: WeekSchedule | null) {
         setTimeout(() => document.addEventListener("click", closeHandler), 0);
       });
     });
+
+    // Delete shift buttons
+    document.querySelectorAll<HTMLElement>(".edit-delete-shift-btn").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const shiftId = parseInt(btn.dataset.shiftId!);
+        try {
+          await invoke("delete_shift", { id: shiftId });
+          await renderRotaView();
+        } catch (err) {
+          alert(`Failed to delete shift: ${err}`);
+        }
+      });
+    });
+
+    // Inline time editing
+    document.querySelectorAll<HTMLElement>(".edit-time").forEach((span) => {
+      span.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const shiftId = parseInt(span.dataset.shiftId!);
+        const field = span.dataset.field!; // "start" or "end"
+        const currentValue = span.dataset.value!;
+
+        const input = document.createElement("input");
+        input.type = "time";
+        input.value = currentValue;
+        input.className = "inline-time-input";
+        span.replaceWith(input);
+        input.focus();
+
+        let saved = false;
+        const save = async () => {
+          if (saved) return;
+          saved = true;
+          const newValue = input.value;
+          if (!newValue || newValue === currentValue) {
+            await renderRotaView();
+            return;
+          }
+          const card = input.closest(".rota-shift-card");
+          let startTime = currentValue;
+          let endTime = currentValue;
+          if (field === "start") {
+            startTime = newValue;
+            const endSpan = card?.querySelector<HTMLElement>('.edit-time[data-field="end"]');
+            endTime = endSpan?.dataset.value || currentValue;
+          } else {
+            const startSpan = card?.querySelector<HTMLElement>('.edit-time[data-field="start"]');
+            startTime = startSpan?.dataset.value || currentValue;
+            endTime = newValue;
+          }
+          try {
+            await invoke("update_shift_times", { id: shiftId, startTime, endTime });
+            await renderRotaView();
+          } catch (err) {
+            alert(`Failed to update time: ${err}`);
+            await renderRotaView();
+          }
+        };
+
+        input.addEventListener("blur", save);
+        input.addEventListener("keydown", (ke) => {
+          if (ke.key === "Enter") input.blur();
+          if (ke.key === "Escape") renderRotaView();
+        });
+      });
+    });
+
+    // Add shift buttons
+    document.querySelectorAll<HTMLElement>(".edit-add-shift-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        document.querySelectorAll(".add-shift-form").forEach((f) => f.remove());
+
+        const date = btn.dataset.date!;
+        const rotaId = parseInt(btn.dataset.rotaId!);
+
+        const roles = [...new Set(shiftTemplates.map((t) => t.required_role))];
+        const roleOptions = roles.length > 0
+          ? roles.map((r) => `<option value="${r}">${r}</option>`).join("")
+          : `<option value="General">General</option>`;
+
+        const form = document.createElement("div");
+        form.className = "add-shift-form";
+        form.innerHTML = `
+          <label>Start <input type="time" class="asf-start" value="09:00"></label>
+          <label>End <input type="time" class="asf-end" value="17:00"></label>
+          <label>Role <select class="asf-role">${roleOptions}</select></label>
+          <button class="asf-create btn-primary">Create</button>
+        `;
+
+        btn.insertAdjacentElement("afterend", form);
+
+        form.querySelector(".asf-create")!.addEventListener("click", async () => {
+          const startTime = (form.querySelector(".asf-start") as HTMLInputElement).value;
+          const endTime = (form.querySelector(".asf-end") as HTMLInputElement).value;
+          const requiredRole = (form.querySelector(".asf-role") as HTMLSelectElement).value;
+          if (!startTime || !endTime) { alert("Please set both start and end times."); return; }
+          form.remove();
+          try {
+            await invoke("create_ad_hoc_shift", { rotaId, date, startTime, endTime, requiredRole });
+            await renderRotaView();
+          } catch (err) {
+            alert(`Failed to create shift: ${err}`);
+          }
+        });
+
+        const closeHandler = (ev: MouseEvent) => {
+          if (!form.contains(ev.target as Node)) {
+            form.remove();
+            document.removeEventListener("click", closeHandler);
+          }
+        };
+        setTimeout(() => document.addEventListener("click", closeHandler), 0);
+      });
+    });
   }
 }
 
@@ -1632,6 +1781,8 @@ function shiftWeek(delta: number) {
   selectedWeek = toLocalISODate(getMonday(d));
   lastScheduleWarnings = [];
   editMode = false;
+  rotaViewModeExplicit = false;
+  rotaViewMode = "template";
   updateWeekLabel();
   if (currentView === "rota") renderRotaView();
 }

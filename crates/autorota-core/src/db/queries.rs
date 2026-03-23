@@ -8,7 +8,7 @@ use crate::models::rota::Rota;
 use crate::models::shift::{Shift, ShiftTemplate};
 
 type ShiftTemplateRow = (i64, String, String, String, String, String, u32, u32, bool);
-type ShiftRow = (i64, i64, i64, String, String, String, String, u32, u32);
+type ShiftRow = (i64, Option<i64>, i64, String, String, String, String, u32, u32);
 
 // ─── Employees ───────────────────────────────────────────────
 
@@ -275,7 +275,7 @@ pub async fn materialise_shifts(
 
             let shift = crate::models::shift::Shift {
                 id: 0,
-                template_id: tmpl.id,
+                template_id: Some(tmpl.id),
                 rota_id,
                 date: shift_date,
                 start_time: tmpl.start_time,
@@ -443,8 +443,32 @@ pub async fn list_assignments_for_rota(
 }
 
 pub async fn delete_shifts_for_rota(pool: &SqlitePool, rota_id: i64) -> Result<(), sqlx::Error> {
-    sqlx::query("DELETE FROM shifts WHERE rota_id = ?")
+    // Only delete template-based shifts; preserve ad-hoc shifts (template_id IS NULL).
+    sqlx::query("DELETE FROM shifts WHERE rota_id = ? AND template_id IS NOT NULL")
         .bind(rota_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn delete_shift(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM shifts WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn update_shift_times(
+    pool: &SqlitePool,
+    id: i64,
+    start_time: NaiveTime,
+    end_time: NaiveTime,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE shifts SET start_time = ?, end_time = ? WHERE id = ?")
+        .bind(start_time.to_string())
+        .bind(end_time.to_string())
+        .bind(id)
         .execute(pool)
         .await?;
     Ok(())

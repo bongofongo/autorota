@@ -352,7 +352,7 @@ async fn full_scheduling_flow() {
     // Create a concrete shift from the template
     let shift = Shift {
         id: 0,
-        template_id: tmpl_id,
+        template_id: Some(tmpl_id),
         rota_id,
         date: week_start,
         start_time: NaiveTime::from_hms_opt(6, 0, 0).unwrap(),

@@ -21,7 +21,7 @@ pub struct ShiftTemplate {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Shift {
     pub id: i64,
-    pub template_id: i64,
+    pub template_id: Option<i64>,
     pub rota_id: i64,
     pub date: NaiveDate,
     pub start_time: NaiveTime,
@@ -35,7 +35,12 @@ impl Shift {
     pub fn duration_hours(&self) -> f32 {
         let start = self.start_time.num_seconds_from_midnight();
         let end = self.end_time.num_seconds_from_midnight();
-        (end.saturating_sub(start)) as f32 / 3600.0
+        let secs = if end >= start {
+            end - start
+        } else {
+            86400 - start + end
+        };
+        secs as f32 / 3600.0
     }
 
     pub fn weekday(&self) -> Weekday {

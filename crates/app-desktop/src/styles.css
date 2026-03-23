@@ -852,17 +852,20 @@ details.avail-section[open] > summary::before {
 .edit-add-employee-btn {
   margin-top: 0.25rem;
   padding: 0.2rem 0.5rem;
-  background: #f0f7ff;
-  border: 1px dashed #3498db;
+  background: none;
+  border: none;
   border-radius: 4px;
   color: #3498db;
   font-size: 0.75rem;
   cursor: pointer;
   width: 100%;
+  opacity: 0.7;
+  transition: opacity 0.15s, background 0.15s;
 }
 
 .edit-add-employee-btn:hover {
-  background: #dbeafe;
+  background: #f0f7ff;
+  opacity: 1;
 }
 
 .employee-picker {
@@ -900,6 +903,106 @@ details.avail-section[open] > summary::before {
 
 .btn-secondary:hover {
   background: #e8e8e8;
+}
+
+/* ─── Shift Editing (Edit Mode) ──────────────────────── */
+
+.edit-delete-shift-btn {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.2rem;
+  background: none;
+  border: none;
+  color: #e74c3c;
+  cursor: pointer;
+  opacity: 0.45;
+  transition: opacity 0.15s;
+  padding: 0.15rem;
+  line-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.edit-delete-shift-btn:hover {
+  opacity: 1;
+}
+
+.editable-time .edit-time {
+  cursor: pointer;
+  padding: 0 0.1rem;
+  border-radius: 2px;
+}
+
+.editable-time .edit-time:hover {
+  background: #f0f7ff;
+}
+
+.inline-time-input {
+  width: 5rem;
+  font-size: 0.75rem;
+  padding: 0.1rem 0.2rem;
+  border: 1px solid #3498db;
+  border-radius: 3px;
+}
+
+.rota-add-shift-cell {
+  padding: 0.25rem;
+}
+
+.edit-add-shift-btn {
+  padding: 0.3rem 0.5rem;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: #3498db;
+  font-size: 0.75rem;
+  cursor: pointer;
+  width: 100%;
+  opacity: 0.7;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.edit-add-shift-btn:hover {
+  background: #f0f7ff;
+  opacity: 1;
+}
+
+.add-shift-form {
+  position: absolute;
+  z-index: 60;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 160px;
+  margin-top: 0.25rem;
+}
+
+.add-shift-form label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.add-shift-form input[type="time"],
+.add-shift-form select {
+  font-size: 0.8rem;
+  padding: 0.15rem 0.3rem;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+.add-shift-form .asf-create {
+  font-size: 0.8rem;
+  padding: 0.3rem;
+  margin-top: 0.25rem;
 }
 
 /* ─── Responsive ──────────────────────────────────────── */

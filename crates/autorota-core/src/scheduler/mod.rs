@@ -16,6 +16,10 @@ pub struct ShortfallWarning {
     pub shift_id: i64,
     pub needed: u32,
     pub filled: u32,
+    pub weekday: String,
+    pub start_time: String,
+    pub end_time: String,
+    pub required_role: String,
 }
 
 /// The output of a scheduling run.
@@ -349,6 +353,10 @@ pub fn schedule_pure(
                 shift_id: shift.id,
                 needed: shift.min_employees,
                 filled,
+                weekday: shift.weekday().to_string(),
+                start_time: shift.start_time.format("%H:%M").to_string(),
+                end_time: shift.end_time.format("%H:%M").to_string(),
+                required_role: shift.required_role.clone(),
             });
         }
     }

@@ -71,5 +71,17 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         sqlx::raw_sql(m4).execute(pool).await?;
     }
 
+    // Migration 005: make template_id nullable on shifts to support ad-hoc shifts.
+    let template_id_notnull: bool = sqlx::query_scalar(
+        "SELECT \"notnull\" FROM pragma_table_info('shifts') WHERE name = 'template_id'",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    if template_id_notnull {
+        let m5 = include_str!("../../migrations/005_nullable_template_id.sql");
+        sqlx::raw_sql(m5).execute(pool).await?;
+    }
+
     Ok(())
 }

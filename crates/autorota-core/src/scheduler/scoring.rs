@@ -66,7 +66,7 @@ mod tests {
     fn make_shift() -> Shift {
         Shift {
             id: 1,
-            template_id: 1,
+            template_id: Some(1),
             rota_id: 1,
             date: NaiveDate::from_ymd_opt(2026, 3, 23).unwrap(),
             start_time: NaiveTime::from_hms_opt(7, 0, 0).unwrap(),

@@ -2,4 +2,6 @@
 title: "List of current bugs"
 ---
 
-1. On the shifts page, the kebab button is currently locked visually within it's box, whereas for the employee kebab it overlays outside the box, such that it's still visible when at the bottom of the box, for example.
+1. Swap feature doesn't work. I see a green plus icon, but nothing happens on "drop"
+2. Past shifts are affected by changing the shift template.
+3. Edit mode works well, but doesn't work on past weeks or the current week.

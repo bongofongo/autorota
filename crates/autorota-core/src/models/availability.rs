@@ -108,8 +108,15 @@ impl Availability {
     }
 
     /// Returns the worst (minimum) availability state across all hours of a shift window.
+    /// Handles overnight shifts where end_hour < start_hour.
     pub fn for_window(&self, weekday: Weekday, start_hour: u8, end_hour: u8) -> AvailabilityState {
-        (start_hour..end_hour)
+        let hours: Box<dyn Iterator<Item = u8>> = if end_hour > start_hour {
+            Box::new(start_hour..end_hour)
+        } else {
+            // Overnight: e.g. 07..24 then 0..02
+            Box::new((start_hour..24).chain(0..end_hour))
+        };
+        hours
             .map(|h| self.get(weekday, h))
             .min()
             .unwrap_or(AvailabilityState::No)

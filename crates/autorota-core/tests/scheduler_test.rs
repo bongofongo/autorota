@@ -50,7 +50,7 @@ fn make_employee(id: i64, name: &str, role: &str, avail_state: AvailabilityState
 fn make_shift(id: i64, date: NaiveDate, start: u32, end: u32, role: &str) -> Shift {
     Shift {
         id,
-        template_id: 1,
+        template_id: Some(1),
         rota_id: 1,
         date,
         start_time: time(start),
