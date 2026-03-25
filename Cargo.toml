@@ -2,6 +2,8 @@
 members = [
     "crates/autorota-core",
     "crates/app-desktop/src-tauri",
+    "crates/autorota-ffi",
+    "crates/uniffi-bindgen",
 ]
 resolver = "2"
 

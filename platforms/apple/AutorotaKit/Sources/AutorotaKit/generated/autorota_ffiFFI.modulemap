@@ -1,0 +1,4 @@
+module autorota_ffiFFI {
+    header "autorota_ffiFFI.h"
+    export *
+}

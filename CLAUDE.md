@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 # autorota
 
-A Rust + Tauri desktop app for cafe shift scheduling. Given a roster of employees and a set of weekly shift requirements, the system automatically assigns employees to shifts based on their availability and constraints.
+A multi-platform cafe shift scheduling app. Rust `autorota-core` provides the shared scheduling engine and SQLite database. Frontends: Tauri (desktop/web), SwiftUI (iOS/macOS). Future: Android (Kotlin via UniFFI), Linux.
 
 ## Purpose
 
@@ -27,24 +27,58 @@ Two-pass approach:
 
 ## Architecture
 
-**Cargo workspace** with two active crates:
+**Cargo workspace** with four active crates:
 
 ```
 autorota/
-  Cargo.toml                      # workspace manifest
+  Cargo.toml                          # workspace manifest
   crates/
-    autorota-core/                # pure library: models, scheduler, db layer
+    autorota-core/                    # pure library: models, scheduler, db layer
       src/
         lib.rs
-        models/                   # employee, availability, shift, assignment, rota
-        scheduler/                # mod.rs (algorithm), scoring.rs, tiebreak.rs
-        db/                       # mod.rs (pool + migrations), queries.rs
-      migrations/                 # 3 SQL migration files (embedded at runtime)
-      tests/                      # db_integration.rs, scheduler_test.rs
-    app-desktop/                  # Tauri v2 desktop shell
-      src/                        # Frontend: main.ts (single-file UI), styles.css
-      src-tauri/                  # Tauri backend: lib.rs (command handlers), tauri.conf.json
+        models/                       # employee, availability, shift, assignment, rota
+        scheduler/                    # mod.rs (algorithm), scoring.rs, tiebreak.rs
+        db/                           # mod.rs (pool + migrations), queries.rs
+      migrations/                     # SQL migration files (embedded at runtime)
+      tests/                          # db_integration.rs, scheduler_test.rs
+    app-desktop/                      # Tauri v2 desktop shell
+      src/                            # Frontend: main.ts (single-file UI), styles.css
+      src-tauri/                      # Tauri backend: lib.rs (command handlers), tauri.conf.json
+    autorota-ffi/                     # UniFFI wrapper → Swift/Kotlin bindings
+      src/
+        lib.rs                        # setup_scaffolding!(), OnceLock<Pool+Runtime>, #[uniffi::export] fns
+        types.rs                      # Ffi* mirror types (#[derive(uniffi::Record)])
+        error.rs                      # FfiError (#[derive(uniffi::Error)])
+    uniffi-bindgen/                   # Standalone CLI crate for generating bindings
+      src/main.rs                     # fn main() { uniffi::uniffi_bindgen_main() }
+  platforms/
+    apple/
+      AutorotaKit/                    # Swift Package (SPM library)
+        Package.swift
+        Sources/AutorotaKit/
+          generated/                  # uniffi-generated autorota_ffi.swift + headers (committed)
+          AutorotaKit.swift           # async wrappers, DB init helper, week utilities
+        XCFrameworks/                 # gitignored — built by scripts/build_xcframework.sh
+          AutorotaFFI.xcframework/
+      Apps/AutorotaApp/               # Xcode project (iOS 17 / macOS 14)
+        AutorotaApp/
+          AutorotaAppApp.swift        # @main, calls autorotaInitDb() on launch
+          Views/
+            ContentView.swift         # TabView: Rota / Employees / Templates
+            RotaView.swift
+            EmployeeListView.swift
+            EmployeeDetailView.swift
+            AvailabilityGridView.swift
+            ShiftTemplateListView.swift
+          ViewModels/
+            RotaViewModel.swift
+            EmployeeViewModel.swift
+            ShiftTemplateViewModel.swift
+  scripts/
+    build_xcframework.sh              # full Rust→XCFramework build pipeline
 ```
+
+### Rust layer
 
 All business logic lives in `autorota-core`. `app-desktop/src-tauri` is a thin adapter exposing Tauri commands that call into core. The frontend is a single TypeScript file (`src/main.ts`) built with Vite.
 
@@ -52,15 +86,35 @@ All business logic lives in `autorota-core`. `app-desktop/src-tauri` is a thin a
 
 Migrations are embedded as strings in `db/mod.rs` and run automatically on `connect()`. Migration 002 uses conditional logic (checks column existence) to be idempotent.
 
+### autorota-ffi crate
+
+UniFFI 0.28 wrapper exposing the full command surface to Swift (and future Kotlin). Key design decisions:
+
+- `crate-type = ["staticlib", "cdylib"]` — `.a` for XCFramework, `.dylib` for binding generation
+- Global `OnceLock<SqlitePool>` + `OnceLock<Runtime>` — all exported fns call `rt().block_on(...)`
+- `Availability` crosses the FFI boundary as `Vec<AvailabilitySlot>` (flattened from `HashMap<(Weekday,u8), AvailabilityState>`)
+- All chrono types cross as strings: dates `"YYYY-MM-DD"`, times `"HH:MM"`, weekdays `"Mon"`/`"Tue"` etc.
+- `uniffi-bindgen` is a **separate crate** (not a `[[bin]]` in `autorota-ffi`) with `uniffi = { features = ["cli"] }`
+
+### Apple platform
+
+- Min deployment: iOS 17 / macOS 14 (for `@Observable`)
+- `scripts/build_xcframework.sh` compiles for `aarch64-apple-darwin`, `x86_64-apple-darwin`, `aarch64-apple-ios`, `aarch64-apple-ios-sim`; lipo-s the macOS slices; generates Swift bindings; assembles XCFramework
+- **`SDKROOT` must be set per target** so `libsqlite3-sys`/cc-rs finds the correct SDK headers
+- `autorota_ffiFFI.modulemap` must be copied as `module.modulemap` into the XCFramework headers dir so Clang exposes `module autorota_ffiFFI` to Swift
+- `AutorotaKit.swift` provides async wrappers using `Task.detached` to keep blocking FFI calls off the main actor
+
 ## Stack
 
 | Concern | Choice |
 |---|---|
 | Async runtime | Tokio |
 | Database | SQLite via SQLx |
-| Desktop | Tauri v2 |
+| Desktop (Linux/Windows/macOS) | Tauri v2 |
+| iOS / macOS native | SwiftUI (iOS 17 / macOS 14) |
+| Swift bindings | UniFFI 0.28 |
 | Serialization | Serde + serde_json |
-| Frontend build | Vite + TypeScript |
+| Frontend build (desktop) | Vite + TypeScript |
 
 ## Dev commands
 
@@ -76,4 +130,12 @@ cargo test -p autorota-core db_integration     # single test file
 npm install
 npm run tauri dev      # starts Vite + Tauri with hot reload
 npm run tauri build    # production build
+
+# Apple platform (run from workspace root)
+# Prerequisites:
+#   sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+#   rustup target add aarch64-apple-ios aarch64-apple-ios-sim aarch64-apple-darwin x86_64-apple-darwin
+bash scripts/build_xcframework.sh             # full release build
+bash scripts/build_xcframework.sh --debug     # faster debug build
+# Then open platforms/apple/Apps/AutorotaApp in Xcode and build/run
 ```

@@ -2,3 +2,10 @@
 node_modules/
 *.pyc
 python_summary.txt
+
+# XCFramework binaries (built by scripts/build_xcframework.sh — do not commit)
+platforms/apple/AutorotaKit/XCFrameworks/
+# Xcode derived data
+*.xcuserstate
+xcuserdata/
+DerivedData/

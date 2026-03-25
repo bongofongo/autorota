@@ -1,0 +1,21 @@
+[package]
+name = "autorota-ffi"
+version.workspace = true
+edition.workspace = true
+autobins = false
+
+[lib]
+# staticlib → .a files for iOS/macOS linking
+# cdylib    → .dylib for uniffi-bindgen introspection during binding generation
+crate-type = ["staticlib", "cdylib"]
+
+[dependencies]
+autorota-core = { path = "../autorota-core" }
+uniffi = "0.28"
+tokio.workspace = true
+sqlx.workspace = true
+chrono.workspace = true
+thiserror = "2"
+
+# uniffi-bindgen is installed separately: cargo install uniffi-bindgen --version 0.28.3
+# Run: uniffi-bindgen generate --library target/.../libautorota_ffi.dylib --language swift --out-dir ...
