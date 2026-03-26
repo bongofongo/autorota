@@ -12,9 +12,8 @@ struct EmployeeDetailView: View {
         List {
             Section("Details") {
                 LabeledContent("Roles", value: employee.roles.joined(separator: ", "))
-                LabeledContent("Start date", value: employee.startDate)
-                LabeledContent("Target hours/week", value: String(format: "%.1f", employee.targetWeeklyHours))
-                LabeledContent("Deviation", value: "±\(String(format: "%.1f", employee.weeklyHoursDeviation))h")
+                LabeledContent("Target hours/week",
+                    value: "\(String(format: "%.1f", employee.targetWeeklyHours)) ± \(String(format: "%.1f", employee.weeklyHoursDeviation))h")
                 LabeledContent("Max daily hours", value: String(format: "%.1f", employee.maxDailyHours))
             }
 
@@ -24,8 +23,14 @@ struct EmployeeDetailView: View {
                 }
             }
 
-            Section("Default Availability") {
-                AvailabilityGridView(slots: employee.defaultAvailability, isEditable: false)
+            Section("Next Week's Availability") {
+                let range = AvailabilityGridView.inferredVisibleRange(from: employee.availability)
+                AvailabilityGridView(
+                    slots: employee.availability,
+                    isEditable: false,
+                    visibleHourStart: range.start,
+                    visibleHourEnd: range.end
+                )
             }
         }
         .navigationTitle(employee.name)
@@ -56,7 +61,21 @@ struct EmployeeEditSheet: View {
     @State private var deviation = 4.0
     @State private var maxDaily = 8.0
     @State private var notes = ""
-    @State private var availabilitySlots: [AvailabilitySlot] = []
+
+    // Dual availability state
+    @State private var defaultAvailabilitySlots: [AvailabilitySlot] = []
+    @State private var nextWeekSlots: [AvailabilitySlot] = []
+
+    // DisclosureGroup expansion state
+    @State private var defaultExpanded = false
+    @State private var nextWeekExpanded = true
+
+    // Visible hour range — shared by both grids, set via the Default Availability picker
+    @State private var defaultVisibleStart = 6
+    @State private var defaultVisibleEnd = 22
+
+    // Selection mode — disables Form scrolling while active
+    @State private var selectionModeActive = false
 
     private var isEditing: Bool { existing != nil }
 
@@ -69,23 +88,77 @@ struct EmployeeEditSheet: View {
                     DatePicker("Start date", selection: $startDate, displayedComponents: .date)
                 }
                 Section("Hours") {
-                    Stepper("Target: \(String(format: "%.0f", targetHours))h/week",
-                            value: $targetHours, in: 0...80, step: 1)
-                    Stepper("Deviation: ±\(String(format: "%.0f", deviation))h",
-                            value: $deviation, in: 0...20, step: 1)
-                    Stepper("Max daily: \(String(format: "%.0f", maxDaily))h",
-                            value: $maxDaily, in: 1...24, step: 1)
+                    StepperField(label: "Target", suffix: "h/week",
+                                 value: $targetHours, range: 0...80, step: 1)
+                    StepperField(label: "Deviation", suffix: "h ±",
+                                 value: $deviation, range: 0...20, step: 1)
+                    StepperField(label: "Max daily", suffix: "h",
+                                 value: $maxDaily, range: 1...24, step: 1)
                 }
                 Section("Notes") {
                     TextField("Optional notes", text: $notes, axis: .vertical)
                         .lineLimit(3...6)
                 }
-                Section("Default Availability") {
-                    AvailabilityGridView(slots: availabilitySlots, isEditable: true) { updated in
-                        availabilitySlots = updated
+
+                Section("Availability") {
+                    // Manual expand/collapse keeps the grid as a direct Section row
+                    // (same level as read-only view), so GeometryReader gets the same width.
+                    Button {
+                        withAnimation { nextWeekExpanded.toggle() }
+                    } label: {
+                        HStack {
+                            Text("Next Week").foregroundStyle(.primary)
+                            Spacer()
+                            Image(systemName: nextWeekExpanded ? "chevron.down" : "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+
+                    if nextWeekExpanded {
+                        AvailabilityGridView(
+                            slots: nextWeekSlots,
+                            isEditable: true,
+                            visibleHourStart: defaultVisibleStart,
+                            visibleHourEnd: defaultVisibleEnd,
+                            onChange: { nextWeekSlots = $0 },
+                            onSelectionModeChange: { selectionModeActive = $0 },
+                            onReset: { nextWeekSlots = defaultAvailabilitySlots }
+                        )
+                    }
+
+                    Button {
+                        withAnimation { defaultExpanded.toggle() }
+                    } label: {
+                        HStack {
+                            Text("Default").foregroundStyle(.primary)
+                            Spacer()
+                            Image(systemName: defaultExpanded ? "chevron.down" : "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+
+                    if defaultExpanded {
+                        AvailabilityGridView(
+                            slots: defaultAvailabilitySlots,
+                            isEditable: true,
+                            visibleHourStart: defaultVisibleStart,
+                            visibleHourEnd: defaultVisibleEnd,
+                            showRangePicker: true,
+                            onChange: { defaultAvailabilitySlots = $0 },
+                            onVisibleRangeChange: { start, end in
+                                defaultVisibleStart = start
+                                defaultVisibleEnd = end
+                            },
+                            onSelectionModeChange: { selectionModeActive = $0 }
+                        )
                     }
                 }
             }
+            .scrollDisabled(selectionModeActive)
             .navigationTitle(isEditing ? "Edit Employee" : "New Employee")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -111,12 +184,21 @@ struct EmployeeEditSheet: View {
         deviation = Double(e.weeklyHoursDeviation)
         maxDaily = Double(e.maxDailyHours)
         notes = e.notes ?? ""
-        availabilitySlots = e.defaultAvailability
+        defaultAvailabilitySlots = e.defaultAvailability
+        nextWeekSlots = e.availability
+        let range = AvailabilityGridView.inferredVisibleRange(from: e.defaultAvailability)
+        defaultVisibleStart = range.start
+        defaultVisibleEnd = range.end
     }
 
     private func save() {
         let fmt = DateFormatter()
         fmt.dateFormat = "yyyy-MM-dd"
+
+        let finalDefault = AvailabilityGridView.slotsWithOutOfRangeSetToNo(
+            slots: defaultAvailabilitySlots, start: defaultVisibleStart, end: defaultVisibleEnd)
+        let finalNextWeek = AvailabilityGridView.slotsWithOutOfRangeSetToNo(
+            slots: nextWeekSlots, start: defaultVisibleStart, end: defaultVisibleEnd)
 
         let emp = FfiEmployee(
             id: existing?.id ?? 0,
@@ -128,8 +210,8 @@ struct EmployeeEditSheet: View {
             maxDailyHours: Float(maxDaily),
             notes: notes.isEmpty ? nil : notes,
             bankDetails: existing?.bankDetails,
-            defaultAvailability: availabilitySlots,
-            availability: availabilitySlots,
+            defaultAvailability: finalDefault,
+            availability: finalNextWeek,
             deleted: false
         )
 
@@ -140,6 +222,71 @@ struct EmployeeEditSheet: View {
                 await viewModel.create(emp)
             }
             dismiss()
+        }
+    }
+}
+
+// MARK: - Stepper with editable text field
+
+private struct StepperField: View {
+    let label: String
+    let suffix: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let step: Double
+
+    @State private var textValue: String = ""
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        HStack {
+            Text(label)
+            Spacer()
+
+            Button {
+                value = max(range.lowerBound, value - step)
+            } label: {
+                Image(systemName: "minus.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.borderless)
+
+            TextField("", text: $textValue)
+                .keyboardType(.decimalPad)
+                .frame(width: 48)
+                .multilineTextAlignment(.center)
+                .textFieldStyle(.roundedBorder)
+                .focused($isFocused)
+                .onChange(of: isFocused) { _, focused in
+                    if !focused, let parsed = Double(textValue) {
+                        value = min(range.upperBound, max(range.lowerBound, parsed))
+                    }
+                }
+                .onSubmit {
+                    if let parsed = Double(textValue) {
+                        value = min(range.upperBound, max(range.lowerBound, parsed))
+                    }
+                }
+
+            Text(suffix)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Button {
+                value = min(range.upperBound, value + step)
+            } label: {
+                Image(systemName: "plus.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.borderless)
+        }
+        .onChange(of: value) { _, newVal in
+            if !isFocused {
+                textValue = String(format: "%.0f", newVal)
+            }
+        }
+        .onAppear {
+            textValue = String(format: "%.0f", value)
         }
     }
 }
