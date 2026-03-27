@@ -102,7 +102,10 @@ fn slots_to_availability(slots: Vec<AvailabilitySlot>) -> Result<Availability, F
 fn employee_to_ffi(e: Employee) -> FfiEmployee {
     FfiEmployee {
         id: e.id,
-        name: e.name,
+        display_name: e.display_name(),
+        first_name: e.first_name,
+        last_name: e.last_name,
+        nickname: e.nickname,
         roles: e.roles,
         start_date: e.start_date.to_string(),
         target_weekly_hours: e.target_weekly_hours,
@@ -119,7 +122,9 @@ fn employee_to_ffi(e: Employee) -> FfiEmployee {
 fn ffi_to_employee(e: FfiEmployee) -> Result<Employee, FfiError> {
     Ok(Employee {
         id: e.id,
-        name: e.name,
+        first_name: e.first_name,
+        last_name: e.last_name,
+        nickname: e.nickname,
         roles: e.roles,
         start_date: parse_date(&e.start_date)?,
         target_weekly_hours: e.target_weekly_hours,
@@ -284,6 +289,41 @@ pub fn delete_employee(id: i64) -> Result<(), FfiError> {
         .map_err(FfiError::from)
 }
 
+// ── Roles ─────────────────────────────────────────────────────────────────────
+
+#[uniffi::export]
+pub fn list_roles() -> Result<Vec<FfiRole>, FfiError> {
+    let pool = pool()?;
+    let rows = rt()
+        .block_on(queries::list_roles(pool))
+        .map_err(FfiError::from)?;
+    Ok(rows
+        .into_iter()
+        .map(|r| FfiRole { id: r.id, name: r.name })
+        .collect())
+}
+
+#[uniffi::export]
+pub fn create_role(name: String) -> Result<i64, FfiError> {
+    let pool = pool()?;
+    rt().block_on(queries::insert_role(pool, &name))
+        .map_err(FfiError::from)
+}
+
+#[uniffi::export]
+pub fn update_role(id: i64, name: String) -> Result<(), FfiError> {
+    let pool = pool()?;
+    rt().block_on(queries::update_role(pool, id, &name))
+        .map_err(FfiError::from)
+}
+
+#[uniffi::export]
+pub fn delete_role(id: i64) -> Result<(), FfiError> {
+    let pool = pool()?;
+    rt().block_on(queries::delete_role(pool, id))
+        .map_err(FfiError::from)
+}
+
 // ── Shift Templates ───────────────────────────────────────────────────────────
 
 #[uniffi::export]
@@ -365,7 +405,7 @@ pub fn create_assignment(mut assignment: FfiAssignment) -> Result<i64, FfiError>
             .block_on(queries::get_employee(pool, assignment.employee_id))
             .map_err(FfiError::from)?
         {
-            assignment.employee_name = Some(emp.name);
+            assignment.employee_name = Some(emp.display_name());
         }
     }
     let core = ffi_to_assignment(assignment)?;
@@ -619,7 +659,7 @@ pub fn get_week_schedule(week_start: String) -> Result<Option<FfiWeekSchedule>, 
                 let shift = shifts.iter().find(|s| s.id == a.shift_id)?;
                 let employee_name = emp_map
                     .get(&a.employee_id)
-                    .map(|e| e.name.clone())
+                    .map(|e| e.display_name())
                     .or_else(|| a.employee_name.clone())
                     .unwrap_or_else(|| format!("Employee #{}", a.employee_id));
                 Some(FfiScheduleEntry {
@@ -672,4 +712,358 @@ pub fn list_shifts_for_rota(rota_id: i64) -> Result<Vec<FfiShift>, FfiError> {
         .block_on(queries::list_shifts_for_rota(pool, rota_id))
         .map_err(FfiError::from)?;
     Ok(rows.into_iter().map(shift_to_ffi).collect())
+}
+
+// ─── Tests ───────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── parse_date ──
+
+    #[test]
+    fn parse_date_valid() {
+        let d = parse_date("2026-03-23").unwrap();
+        assert_eq!(d, NaiveDate::from_ymd_opt(2026, 3, 23).unwrap());
+    }
+
+    #[test]
+    fn parse_date_invalid() {
+        assert!(parse_date("not-a-date").is_err());
+        assert!(parse_date("2026/03/23").is_err());
+        assert!(parse_date("").is_err());
+    }
+
+    // ── parse_time ──
+
+    #[test]
+    fn parse_time_hhmm() {
+        let t = parse_time("07:00").unwrap();
+        assert_eq!(t, NaiveTime::from_hms_opt(7, 0, 0).unwrap());
+    }
+
+    #[test]
+    fn parse_time_hhmmss() {
+        let t = parse_time("07:00:00").unwrap();
+        assert_eq!(t, NaiveTime::from_hms_opt(7, 0, 0).unwrap());
+    }
+
+    #[test]
+    fn parse_time_invalid() {
+        assert!(parse_time("25:00").is_err());
+        assert!(parse_time("abc").is_err());
+        assert!(parse_time("").is_err());
+    }
+
+    // ── weekday conversions ──
+
+    #[test]
+    fn weekday_roundtrip_all_days() {
+        let days = [
+            Weekday::Mon,
+            Weekday::Tue,
+            Weekday::Wed,
+            Weekday::Thu,
+            Weekday::Fri,
+            Weekday::Sat,
+            Weekday::Sun,
+        ];
+        for day in days {
+            let s = weekday_to_str(day);
+            let parsed = weekday_from_str(s).unwrap();
+            assert_eq!(parsed, day);
+        }
+    }
+
+    #[test]
+    fn weekday_from_str_invalid() {
+        assert!(weekday_from_str("Monday").is_err());
+        assert!(weekday_from_str("").is_err());
+    }
+
+    // ── availability slot conversion ──
+
+    #[test]
+    fn availability_slots_roundtrip() {
+        let mut avail = Availability::default();
+        avail.set(Weekday::Mon, 8, AvailabilityState::Yes);
+        avail.set(Weekday::Wed, 14, AvailabilityState::No);
+        avail.set(Weekday::Fri, 20, AvailabilityState::Maybe);
+
+        let slots = availability_to_slots(&avail);
+        assert_eq!(slots.len(), 3);
+
+        let restored = slots_to_availability(slots).unwrap();
+        assert_eq!(restored.get(Weekday::Mon, 8), AvailabilityState::Yes);
+        assert_eq!(restored.get(Weekday::Wed, 14), AvailabilityState::No);
+        assert_eq!(restored.get(Weekday::Fri, 20), AvailabilityState::Maybe);
+    }
+
+    #[test]
+    fn slots_to_availability_invalid_weekday() {
+        let slots = vec![AvailabilitySlot {
+            weekday: "Blurb".into(),
+            hour: 8,
+            state: "Yes".into(),
+        }];
+        assert!(slots_to_availability(slots).is_err());
+    }
+
+    #[test]
+    fn slots_to_availability_invalid_state() {
+        let slots = vec![AvailabilitySlot {
+            weekday: "Mon".into(),
+            hour: 8,
+            state: "Always".into(),
+        }];
+        assert!(slots_to_availability(slots).is_err());
+    }
+
+    // ── employee conversion ──
+
+    #[test]
+    fn employee_roundtrip() {
+        let emp = Employee {
+            id: 42,
+            first_name: "Alice".into(),
+            last_name: "Smith".into(),
+            nickname: Some("Ally".into()),
+            roles: vec!["Barista".into()],
+            start_date: NaiveDate::from_ymd_opt(2026, 1, 15).unwrap(),
+            target_weekly_hours: 30.0,
+            weekly_hours_deviation: 5.0,
+            max_daily_hours: 8.0,
+            notes: Some("Prefers mornings".into()),
+            bank_details: None,
+            default_availability: Availability::default(),
+            availability: Availability::default(),
+            deleted: false,
+        };
+
+        let ffi = employee_to_ffi(emp.clone());
+        assert_eq!(ffi.display_name, "Ally");
+        assert_eq!(ffi.start_date, "2026-01-15");
+
+        let back = ffi_to_employee(ffi).unwrap();
+        assert_eq!(back.first_name, "Alice");
+        assert_eq!(back.last_name, "Smith");
+        assert_eq!(back.nickname, Some("Ally".into()));
+        assert_eq!(back.roles, vec!["Barista"]);
+        assert_eq!(back.start_date, emp.start_date);
+        assert_eq!(back.target_weekly_hours, 30.0);
+    }
+
+    // ── shift template conversion ──
+
+    #[test]
+    fn shift_template_roundtrip() {
+        let tmpl = ShiftTemplate {
+            id: 10,
+            name: "Morning".into(),
+            weekdays: vec![Weekday::Mon, Weekday::Wed, Weekday::Fri],
+            start_time: NaiveTime::from_hms_opt(7, 0, 0).unwrap(),
+            end_time: NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
+            required_role: "Barista".into(),
+            min_employees: 1,
+            max_employees: 2,
+            deleted: false,
+        };
+
+        let ffi = shift_template_to_ffi(tmpl.clone());
+        assert_eq!(ffi.weekdays, vec!["Mon", "Wed", "Fri"]);
+        assert_eq!(ffi.start_time, "07:00");
+        assert_eq!(ffi.end_time, "12:00");
+
+        let back = ffi_to_shift_template(ffi).unwrap();
+        assert_eq!(back.weekdays, vec![Weekday::Mon, Weekday::Wed, Weekday::Fri]);
+        assert_eq!(back.start_time, tmpl.start_time);
+        assert_eq!(back.end_time, tmpl.end_time);
+    }
+
+    // ── assignment conversion ──
+
+    #[test]
+    fn assignment_roundtrip() {
+        let a = Assignment {
+            id: 5,
+            rota_id: 1,
+            shift_id: 3,
+            employee_id: 7,
+            status: AssignmentStatus::Confirmed,
+            employee_name: Some("Bob".into()),
+        };
+
+        let ffi = assignment_to_ffi(a);
+        assert_eq!(ffi.status, "Confirmed");
+
+        let back = ffi_to_assignment(ffi).unwrap();
+        assert_eq!(back.status, AssignmentStatus::Confirmed);
+        assert_eq!(back.employee_name, Some("Bob".into()));
+    }
+
+    #[test]
+    fn assignment_invalid_status() {
+        let ffi = FfiAssignment {
+            id: 1,
+            rota_id: 1,
+            shift_id: 1,
+            employee_id: 1,
+            status: "InvalidStatus".into(),
+            employee_name: None,
+        };
+        assert!(ffi_to_assignment(ffi).is_err());
+    }
+
+    // ── Full lifecycle test ──
+    // Uses a single test because OnceLock means init_db can only be called once per process.
+
+    #[test]
+    fn full_ffi_lifecycle() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("test_ffi.db");
+        init_db(db_path.to_string_lossy().to_string()).unwrap();
+
+        // Double-init should fail
+        assert!(init_db(db_path.to_string_lossy().to_string()).is_err());
+
+        // ── Roles ──
+        let role_id = create_role("Barista".into()).unwrap();
+        assert!(role_id > 0);
+
+        let roles = list_roles().unwrap();
+        assert_eq!(roles.len(), 1);
+        assert_eq!(roles[0].name, "Barista");
+
+        update_role(role_id, "Coffee Maker".into()).unwrap();
+        let roles = list_roles().unwrap();
+        assert_eq!(roles[0].name, "Coffee Maker");
+        update_role(role_id, "Barista".into()).unwrap();
+
+        // ── Employees ──
+        let avail_slots: Vec<AvailabilitySlot> = (7..12)
+            .map(|h| AvailabilitySlot {
+                weekday: "Mon".into(),
+                hour: h,
+                state: "Yes".into(),
+            })
+            .collect();
+
+        let emp = FfiEmployee {
+            id: 0,
+            first_name: "Alice".into(),
+            last_name: "Smith".into(),
+            nickname: Some("Ally".into()),
+            display_name: String::new(),
+            roles: vec!["Barista".into()],
+            start_date: "2026-01-01".into(),
+            target_weekly_hours: 40.0,
+            weekly_hours_deviation: 6.0,
+            max_daily_hours: 8.0,
+            notes: None,
+            bank_details: None,
+            default_availability: avail_slots.clone(),
+            availability: avail_slots,
+            deleted: false,
+        };
+
+        let emp_id = create_employee(emp).unwrap();
+        let employees = list_employees().unwrap();
+        assert_eq!(employees.len(), 1);
+        assert_eq!(employees[0].display_name, "Ally");
+
+        let fetched = get_employee(emp_id).unwrap().unwrap();
+        assert_eq!(fetched.roles, vec!["Barista"]);
+        assert_eq!(fetched.default_availability.len(), 5);
+
+        // ── Shift Templates ──
+        let tmpl = FfiShiftTemplate {
+            id: 0,
+            name: "Morning".into(),
+            weekdays: vec!["Mon".into()],
+            start_time: "07:00".into(),
+            end_time: "12:00".into(),
+            required_role: "Barista".into(),
+            min_employees: 1,
+            max_employees: 1,
+            deleted: false,
+        };
+
+        let tmpl_id = create_shift_template(tmpl).unwrap();
+        assert!(tmpl_id > 0);
+
+        let templates = list_shift_templates().unwrap();
+        assert_eq!(templates.len(), 1);
+        assert_eq!(templates[0].weekdays, vec!["Mon"]);
+
+        // ── Materialise Week ──
+        let week_start = "2027-06-07"; // far future Monday
+        let rota_id = materialise_week(week_start.into()).unwrap();
+        assert!(rota_id > 0);
+
+        let shifts = list_shifts_for_rota(rota_id).unwrap();
+        assert_eq!(shifts.len(), 1);
+        assert_eq!(shifts[0].date, "2027-06-07");
+
+        // Idempotent
+        let rota_id2 = materialise_week(week_start.into()).unwrap();
+        assert_eq!(rota_id, rota_id2);
+
+        // ── Get Week Schedule (empty) ──
+        let schedule = get_week_schedule(week_start.into()).unwrap().unwrap();
+        assert_eq!(schedule.rota_id, rota_id);
+        assert!(!schedule.finalized);
+        assert_eq!(schedule.shifts.len(), 1);
+        assert!(schedule.entries.is_empty());
+
+        // ── Ad-hoc shift + update + delete ──
+        let adhoc_id = create_ad_hoc_shift(
+            rota_id,
+            "2027-06-08".into(),
+            "14:00".into(),
+            "18:00".into(),
+            "Barista".into(),
+        )
+        .unwrap();
+
+        update_shift_times(adhoc_id, "15:00".into(), "19:00".into()).unwrap();
+        let updated = list_shifts_for_rota(rota_id).unwrap();
+        let adhoc = updated.iter().find(|s| s.id == adhoc_id).unwrap();
+        assert_eq!(adhoc.start_time, "15:00");
+
+        delete_shift(adhoc_id).unwrap();
+        assert_eq!(list_shifts_for_rota(rota_id).unwrap().len(), 1);
+
+        // ── Manual assignment ──
+        let assign = FfiAssignment {
+            id: 0,
+            rota_id,
+            shift_id: shifts[0].id,
+            employee_id: emp_id,
+            status: "Proposed".into(),
+            employee_name: None,
+        };
+        let assign_id = create_assignment(assign).unwrap();
+        update_assignment_status(assign_id, "Confirmed".into()).unwrap();
+
+        let schedule = get_week_schedule(week_start.into()).unwrap().unwrap();
+        assert_eq!(schedule.entries.len(), 1);
+        assert_eq!(schedule.entries[0].employee_name, "Ally");
+        assert_eq!(schedule.entries[0].status, "Confirmed");
+
+        // ── Finalize ──
+        finalize_rota(rota_id).unwrap();
+        let final_schedule = get_week_schedule(week_start.into()).unwrap().unwrap();
+        assert!(final_schedule.finalized);
+
+        // ── Soft delete employee ──
+        delete_employee(emp_id).unwrap();
+        assert!(list_employees().unwrap().is_empty());
+
+        // Assignment snapshot survives
+        let schedule = get_week_schedule(week_start.into()).unwrap().unwrap();
+        assert_eq!(schedule.entries[0].employee_name, "Ally");
+
+        drop(dir);
+    }
 }

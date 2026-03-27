@@ -7,6 +7,14 @@
 ///
 /// `Availability` (HashMap<(Weekday,u8), AvailabilityState>) becomes `Vec<AvailabilitySlot>`.
 
+// ── Role ─────────────────────────────────────────────────────────────────────
+
+#[derive(Clone, uniffi::Record)]
+pub struct FfiRole {
+    pub id: i64,
+    pub name: String,
+}
+
 // ── Availability ─────────────────────────────────────────────────────────────
 
 #[derive(Clone, uniffi::Record)]
@@ -22,7 +30,12 @@ pub struct AvailabilitySlot {
 #[derive(Clone, uniffi::Record)]
 pub struct FfiEmployee {
     pub id: i64,
-    pub name: String,
+    pub first_name: String,
+    pub last_name: String,
+    pub nickname: Option<String>,
+    /// Computed display name: nickname if set, otherwise "first_name last_name".
+    /// This field is ignored when creating/updating employees; Rust recomputes it.
+    pub display_name: String,
     pub roles: Vec<String>,
     pub start_date: String,
     pub target_weekly_hours: f32,

@@ -9,11 +9,17 @@ final class ShiftTemplateViewModel {
     var isLoading = false
     var error: String?
 
+    private let service: AutorotaServiceProtocol
+
+    init(service: AutorotaServiceProtocol = LiveAutorotaService()) {
+        self.service = service
+    }
+
     func load() async {
         isLoading = true
         error = nil
         do {
-            templates = try await listShiftTemplatesAsync()
+            templates = try await service.listShiftTemplates()
         } catch {
             self.error = error.localizedDescription
         }
@@ -22,7 +28,7 @@ final class ShiftTemplateViewModel {
 
     func create(_ template: FfiShiftTemplate) async {
         do {
-            _ = try await createShiftTemplateAsync(template)
+            _ = try await service.createShiftTemplate(template)
             await load()
         } catch {
             self.error = error.localizedDescription
@@ -31,7 +37,7 @@ final class ShiftTemplateViewModel {
 
     func update(_ template: FfiShiftTemplate) async {
         do {
-            try await updateShiftTemplateAsync(template)
+            try await service.updateShiftTemplate(template)
             await load()
         } catch {
             self.error = error.localizedDescription
@@ -40,7 +46,7 @@ final class ShiftTemplateViewModel {
 
     func delete(id: Int64) async {
         do {
-            try await deleteShiftTemplateAsync(id: id)
+            try await service.deleteShiftTemplate(id: id)
             await load()
         } catch {
             self.error = error.localizedDescription

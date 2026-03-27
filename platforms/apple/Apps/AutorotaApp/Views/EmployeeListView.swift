@@ -20,18 +20,14 @@ struct EmployeeListView: View {
                             NavigationLink {
                                 EmployeeDetailView(employee: employee, viewModel: vm)
                             } label: {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(employee.name).font(.headline)
-                                    Text(employee.roles.joined(separator: ", "))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(employee.displayName).font(.headline)
+                                    if !employee.roles.isEmpty {
+                                        HStack(spacing: 4) {
+                                            ForEach(employee.roles, id: \.self) { RoleTag(name: $0) }
+                                        }
+                                    }
                                 }
-                            }
-                        }
-                        .onDelete { offsets in
-                            for i in offsets {
-                                let emp = vm.employees[i]
-                                Task { await vm.delete(id: emp.id) }
                             }
                         }
                     }

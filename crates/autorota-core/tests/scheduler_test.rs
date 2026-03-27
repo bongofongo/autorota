@@ -1,65 +1,11 @@
+mod helpers;
+
 use autorota_core::models::assignment::{Assignment, AssignmentStatus};
-use autorota_core::models::availability::{Availability, AvailabilityState};
-use autorota_core::models::employee::Employee;
-use autorota_core::models::shift::Shift;
+use autorota_core::models::availability::AvailabilityState;
 use autorota_core::scheduler::schedule_pure;
-use chrono::{NaiveDate, NaiveTime, Weekday};
+use chrono::Weekday;
 
-fn date(d: u32) -> NaiveDate {
-    // March 2026: 23=Mon, 24=Tue, ...
-    NaiveDate::from_ymd_opt(2026, 3, d).unwrap()
-}
-
-fn time(h: u32) -> NaiveTime {
-    NaiveTime::from_hms_opt(h, 0, 0).unwrap()
-}
-
-fn week_start() -> NaiveDate {
-    date(23) // Monday
-}
-
-fn make_employee(id: i64, name: &str, role: &str, avail_state: AvailabilityState) -> Employee {
-    let mut avail = Availability::default();
-    for day in [
-        Weekday::Mon,
-        Weekday::Tue,
-        Weekday::Wed,
-        Weekday::Thu,
-        Weekday::Fri,
-    ] {
-        for h in 6..22 {
-            avail.set(day, h, avail_state);
-        }
-    }
-    Employee {
-        id,
-        name: name.to_string(),
-        roles: vec![role.to_string()],
-        start_date: NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
-        target_weekly_hours: 40.0,
-        weekly_hours_deviation: 6.0,
-        max_daily_hours: 8.0,
-        notes: None,
-        bank_details: None,
-        default_availability: avail.clone(),
-        availability: avail,
-        deleted: false,
-    }
-}
-
-fn make_shift(id: i64, date: NaiveDate, start: u32, end: u32, role: &str) -> Shift {
-    Shift {
-        id,
-        template_id: Some(1),
-        rota_id: 1,
-        date,
-        start_time: time(start),
-        end_time: time(end),
-        required_role: role.to_string(),
-        min_employees: 1,
-        max_employees: 1,
-    }
-}
+use helpers::{date, make_employee, make_shift, week_start};
 
 #[test]
 fn single_employee_single_shift() {
@@ -258,4 +204,117 @@ fn hardest_to_fill_assigned_first() {
 
     let barista_assignment = result.assignments.iter().find(|a| a.shift_id == 1).unwrap();
     assert_eq!(barista_assignment.employee_id, 1); // Alice
+}
+
+// ─── New edge-case tests ─────────────────────────────────────
+
+#[test]
+fn empty_inputs_produce_empty_result() {
+    let result = schedule_pure(&[], &[], &[], 1, week_start());
+    assert!(result.assignments.is_empty());
+    assert!(result.warnings.is_empty());
+}
+
+#[test]
+fn all_maybe_still_assigns() {
+    let emp = make_employee(1, "Alice", "barista", AvailabilityState::Maybe);
+    let shift = make_shift(1, date(23), 7, 12, "barista");
+
+    let result = schedule_pure(&[shift], &[emp], &[], 1, week_start());
+
+    assert_eq!(result.assignments.len(), 1);
+    assert!(result.warnings.is_empty());
+}
+
+#[test]
+fn multi_role_employee_fills_different_roles() {
+    let mut emp = make_employee(1, "Alice", "barista", AvailabilityState::Yes);
+    emp.roles.push("cashier".to_string());
+    emp.roles.push("manager".to_string());
+    emp.max_daily_hours = 15.0;
+    emp.target_weekly_hours = 40.0;
+    emp.weekly_hours_deviation = 20.0;
+
+    // Three shifts on different days requiring different roles
+    let s1 = make_shift(1, date(23), 7, 12, "barista");
+    let s2 = make_shift(2, date(24), 7, 12, "cashier");
+    let s3 = make_shift(3, date(25), 7, 12, "manager");
+
+    let result = schedule_pure(&[s1, s2, s3], &[emp], &[], 1, week_start());
+
+    assert_eq!(result.assignments.len(), 3);
+    assert!(result.warnings.is_empty());
+}
+
+#[test]
+fn tiebreak_is_deterministic() {
+    let alice = make_employee(1, "Alice", "barista", AvailabilityState::Yes);
+    let bob = make_employee(2, "Bob", "barista", AvailabilityState::Yes);
+    let shift = make_shift(1, date(23), 7, 12, "barista");
+
+    let result1 = schedule_pure(&[shift.clone()], &[alice.clone(), bob.clone()], &[], 1, week_start());
+    let result2 = schedule_pure(&[shift], &[alice, bob], &[], 1, week_start());
+
+    assert_eq!(result1.assignments[0].employee_id, result2.assignments[0].employee_id);
+}
+
+#[test]
+fn override_counts_toward_hours_budget() {
+    let mut emp = make_employee(1, "Alice", "barista", AvailabilityState::Yes);
+    emp.target_weekly_hours = 8.0;
+    emp.weekly_hours_deviation = 2.0; // max 10h
+
+    let s1 = make_shift(1, date(23), 7, 15, "barista"); // 8h override
+    let s2 = make_shift(2, date(24), 7, 12, "barista"); // 5h, would push to 13h > 10h
+
+    let existing = vec![Assignment {
+        id: 1,
+        rota_id: 1,
+        shift_id: 1,
+        employee_id: 1,
+        status: AssignmentStatus::Overridden,
+        employee_name: Some("Alice".to_string()),
+    }];
+
+    let result = schedule_pure(&[s1, s2], &[emp], &existing, 1, week_start());
+
+    // Override takes 8h. s2 would push to 13h > 10h max, so it shouldn't be assigned.
+    let proposed: Vec<_> = result.assignments.iter().filter(|a| a.status == AssignmentStatus::Proposed).collect();
+    assert!(proposed.is_empty(), "second shift should not be assigned due to weekly budget");
+    assert_eq!(result.warnings.len(), 1);
+}
+
+#[test]
+fn overnight_shift_with_matching_availability() {
+    let mut emp = make_employee(1, "Alice", "barista", AvailabilityState::No);
+    // Set availability for overnight hours on Friday
+    for h in 22..24 {
+        emp.availability.set(Weekday::Fri, h, AvailabilityState::Yes);
+        emp.default_availability.set(Weekday::Fri, h, AvailabilityState::Yes);
+    }
+    for h in 0..6 {
+        emp.availability.set(Weekday::Fri, h, AvailabilityState::Yes);
+        emp.default_availability.set(Weekday::Fri, h, AvailabilityState::Yes);
+    }
+
+    // Friday overnight shift 22:00-02:00
+    let shift = make_shift(1, date(27), 22, 2, "barista"); // date(27) = Friday
+
+    let result = schedule_pure(&[shift], &[emp], &[], 1, week_start());
+
+    assert_eq!(result.assignments.len(), 1);
+    assert!(result.warnings.is_empty());
+}
+
+#[test]
+fn zero_max_capacity_shift_produces_no_assignments() {
+    let emp = make_employee(1, "Alice", "barista", AvailabilityState::Yes);
+    let mut shift = make_shift(1, date(23), 7, 12, "barista");
+    shift.min_employees = 0;
+    shift.max_employees = 0;
+
+    let result = schedule_pure(&[shift], &[emp], &[], 1, week_start());
+
+    assert!(result.assignments.is_empty());
+    assert!(result.warnings.is_empty());
 }

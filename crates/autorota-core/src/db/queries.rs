@@ -4,6 +4,7 @@ use sqlx::SqlitePool;
 use crate::models::assignment::{Assignment, AssignmentStatus};
 use crate::models::availability::Availability;
 use crate::models::employee::Employee;
+use crate::models::role::Role;
 use crate::models::rota::Rota;
 use crate::models::shift::{Shift, ShiftTemplate};
 
@@ -18,10 +19,12 @@ pub async fn insert_employee(pool: &SqlitePool, emp: &Employee) -> Result<i64, s
     let avail = emp.availability.to_json().unwrap_or_default();
 
     let id = sqlx::query_scalar(
-        "INSERT INTO employees (name, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, default_availability, availability)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO employees (first_name, last_name, nickname, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, default_availability, availability)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
-    .bind(&emp.name)
+    .bind(&emp.first_name)
+    .bind(&emp.last_name)
+    .bind(&emp.nickname)
     .bind(&roles_json)
     .bind(emp.start_date.to_string())
     .bind(emp.target_weekly_hours)
@@ -38,8 +41,8 @@ pub async fn insert_employee(pool: &SqlitePool, emp: &Employee) -> Result<i64, s
 }
 
 pub async fn get_employee(pool: &SqlitePool, id: i64) -> Result<Option<Employee>, sqlx::Error> {
-    let row: Option<(i64, String, String, String, f64, f64, f64, Option<String>, Option<String>, String, String, bool)> = sqlx::query_as(
-        "SELECT id, name, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, default_availability, availability, deleted
+    let row: Option<(i64, String, String, Option<String>, String, String, f64, f64, f64, Option<String>, Option<String>, String, String, bool)> = sqlx::query_as(
+        "SELECT id, first_name, last_name, nickname, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, default_availability, availability, deleted
          FROM employees WHERE id = ?",
     )
     .bind(id)
@@ -50,8 +53,8 @@ pub async fn get_employee(pool: &SqlitePool, id: i64) -> Result<Option<Employee>
 }
 
 pub async fn list_employees(pool: &SqlitePool) -> Result<Vec<Employee>, sqlx::Error> {
-    let rows: Vec<(i64, String, String, String, f64, f64, f64, Option<String>, Option<String>, String, String, bool)> = sqlx::query_as(
-        "SELECT id, name, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, default_availability, availability, deleted
+    let rows: Vec<(i64, String, String, Option<String>, String, String, f64, f64, f64, Option<String>, Option<String>, String, String, bool)> = sqlx::query_as(
+        "SELECT id, first_name, last_name, nickname, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, default_availability, availability, deleted
          FROM employees WHERE deleted = 0 ORDER BY start_date",
     )
     .fetch_all(pool)
@@ -62,8 +65,8 @@ pub async fn list_employees(pool: &SqlitePool) -> Result<Vec<Employee>, sqlx::Er
 
 /// List all employees including soft-deleted ones (for historical schedule display).
 pub async fn list_all_employees(pool: &SqlitePool) -> Result<Vec<Employee>, sqlx::Error> {
-    let rows: Vec<(i64, String, String, String, f64, f64, f64, Option<String>, Option<String>, String, String, bool)> = sqlx::query_as(
-        "SELECT id, name, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, default_availability, availability, deleted
+    let rows: Vec<(i64, String, String, Option<String>, String, String, f64, f64, f64, Option<String>, Option<String>, String, String, bool)> = sqlx::query_as(
+        "SELECT id, first_name, last_name, nickname, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, default_availability, availability, deleted
          FROM employees ORDER BY start_date",
     )
     .fetch_all(pool)
@@ -78,10 +81,12 @@ pub async fn update_employee(pool: &SqlitePool, emp: &Employee) -> Result<(), sq
     let avail = emp.availability.to_json().unwrap_or_default();
 
     sqlx::query(
-        "UPDATE employees SET name = ?, roles = ?, start_date = ?, target_weekly_hours = ?, weekly_hours_deviation = ?, max_daily_hours = ?,
+        "UPDATE employees SET first_name = ?, last_name = ?, nickname = ?, roles = ?, start_date = ?, target_weekly_hours = ?, weekly_hours_deviation = ?, max_daily_hours = ?,
          notes = ?, bank_details = ?, default_availability = ?, availability = ? WHERE id = ?",
     )
-    .bind(&emp.name)
+    .bind(&emp.first_name)
+    .bind(&emp.last_name)
+    .bind(&emp.nickname)
     .bind(&roles_json)
     .bind(emp.start_date.to_string())
     .bind(emp.target_weekly_hours)
@@ -111,6 +116,8 @@ fn employee_from_row(
         i64,
         String,
         String,
+        Option<String>,
+        String,
         String,
         f64,
         f64,
@@ -124,7 +131,9 @@ fn employee_from_row(
 ) -> Employee {
     let (
         id,
-        name,
+        first_name,
+        last_name,
+        nickname,
         roles_json,
         start_date_str,
         target_weekly,
@@ -138,7 +147,9 @@ fn employee_from_row(
     ) = row;
     Employee {
         id,
-        name,
+        first_name,
+        last_name,
+        nickname,
         roles: serde_json::from_str(&roles_json).unwrap_or_default(),
         start_date: NaiveDate::parse_from_str(&start_date_str, "%Y-%m-%d")
             .unwrap_or_else(|_| NaiveDate::default()),
@@ -550,4 +561,133 @@ fn assignment_from_row(row: (i64, i64, i64, i64, String, Option<String>)) -> Opt
         status: status_str.parse().ok()?,
         employee_name,
     })
+}
+
+// ─── Roles ──────────────────────────────────────────────────
+
+pub async fn list_roles(pool: &SqlitePool) -> Result<Vec<Role>, sqlx::Error> {
+    let rows: Vec<(i64, String)> =
+        sqlx::query_as("SELECT id, name FROM roles ORDER BY name")
+            .fetch_all(pool)
+            .await?;
+
+    Ok(rows
+        .into_iter()
+        .map(|(id, name)| Role { id, name })
+        .collect())
+}
+
+pub async fn insert_role(pool: &SqlitePool, name: &str) -> Result<i64, sqlx::Error> {
+    let id: i64 =
+        sqlx::query_scalar("INSERT INTO roles (name) VALUES (?) RETURNING id")
+            .bind(name)
+            .fetch_one(pool)
+            .await?;
+
+    Ok(id)
+}
+
+pub async fn update_role(pool: &SqlitePool, id: i64, new_name: &str) -> Result<(), sqlx::Error> {
+    // Get the old name first.
+    let old_name: String =
+        sqlx::query_scalar("SELECT name FROM roles WHERE id = ?")
+            .bind(id)
+            .fetch_one(pool)
+            .await?;
+
+    if old_name == new_name {
+        return Ok(());
+    }
+
+    // Update the role name.
+    sqlx::query("UPDATE roles SET name = ? WHERE id = ?")
+        .bind(new_name)
+        .bind(id)
+        .execute(pool)
+        .await?;
+
+    // Cascade: update shift_templates.required_role
+    sqlx::query("UPDATE shift_templates SET required_role = ? WHERE required_role = ?")
+        .bind(new_name)
+        .bind(&old_name)
+        .execute(pool)
+        .await?;
+
+    // Cascade: update shifts.required_role
+    sqlx::query("UPDATE shifts SET required_role = ? WHERE required_role = ?")
+        .bind(new_name)
+        .bind(&old_name)
+        .execute(pool)
+        .await?;
+
+    // Cascade: update employees.roles JSON arrays.
+    // Load all employees whose roles JSON contains the old name, update in Rust, write back.
+    let rows: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT id, roles FROM employees WHERE roles LIKE '%' || ? || '%'",
+    )
+    .bind(&old_name)
+    .fetch_all(pool)
+    .await?;
+
+    for (emp_id, roles_json) in rows {
+        let mut roles: Vec<String> = serde_json::from_str(&roles_json).unwrap_or_default();
+        for r in &mut roles {
+            if r == &old_name {
+                *r = new_name.to_string();
+            }
+        }
+        let updated_json = serde_json::to_string(&roles).unwrap_or_default();
+        sqlx::query("UPDATE employees SET roles = ? WHERE id = ?")
+            .bind(&updated_json)
+            .bind(emp_id)
+            .execute(pool)
+            .await?;
+    }
+
+    Ok(())
+}
+
+pub async fn delete_role(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
+    // Check if any shift templates reference this role.
+    let role_name: String =
+        sqlx::query_scalar("SELECT name FROM roles WHERE id = ?")
+            .bind(id)
+            .fetch_one(pool)
+            .await?;
+
+    let tmpl_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM shift_templates WHERE required_role = ? AND deleted = 0",
+    )
+    .bind(&role_name)
+    .fetch_one(pool)
+    .await?;
+
+    if tmpl_count > 0 {
+        return Err(sqlx::Error::Protocol(format!(
+            "Cannot delete role '{}': still used by {} shift template(s)",
+            role_name, tmpl_count
+        )));
+    }
+
+    // Check if any employees reference this role.
+    let emp_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM employees WHERE roles LIKE '%' || ? || '%' AND deleted = 0",
+    )
+    .bind(&role_name)
+    .fetch_one(pool)
+    .await?;
+
+    if emp_count > 0 {
+        return Err(sqlx::Error::Protocol(format!(
+            "Cannot delete role '{}': still assigned to {} employee(s)",
+            role_name, emp_count
+        )));
+    }
+
+    sqlx::query("DELETE FROM roles WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+
+    Ok(())
 }

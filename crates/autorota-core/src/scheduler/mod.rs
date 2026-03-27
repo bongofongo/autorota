@@ -221,7 +221,7 @@ pub fn schedule_pure(
         println!(
             "[Scheduler]   Employee id={} name={} roles={:?} daily={}h target_weekly={}h (±{})",
             e.id,
-            e.name,
+            e.display_name(),
             e.roles,
             e.max_daily_hours,
             e.target_weekly_hours,
@@ -240,7 +240,7 @@ pub fn schedule_pure(
             continue;
         }
         if let Some(shift) = shift_map.get(&a.shift_id) {
-            let name = emp_map.get(&a.employee_id).map(|e| e.name.clone());
+            let name = emp_map.get(&a.employee_id).map(|e| e.display_name());
             state.record_assignment(a.employee_id, name, shift, rota_id, AssignmentStatus::Overridden);
         }
     }
@@ -309,7 +309,7 @@ pub fn schedule_pure(
                         let daily = state.employee_daily_hours(e.id, shift.date);
                         let weekly = state.employee_weekly_hours(e.id);
                         let hours = shift.duration_hours();
-                        println!("[Scheduler]     {} ineligible: role={} avail={} already_assigned={} daily={}/{}h weekly={}/{}h shift_hours={}", e.name, has_role, avail, already, daily, e.max_daily_hours, weekly, e.max_weekly_hours(), hours);
+                        println!("[Scheduler]     {} ineligible: role={} avail={} already_assigned={} daily={}/{}h weekly={}/{}h shift_hours={}", e.display_name(), has_role, avail, already, daily, e.max_daily_hours, weekly, e.max_weekly_hours(), hours);
                     }
                     eligible
                 })
@@ -342,9 +342,9 @@ pub fn schedule_pure(
             let winner = candidates[0].0;
             println!(
                 "[Scheduler]     Assigned: {} (score={:?})",
-                winner.name, candidates[0].1
+                winner.display_name(), candidates[0].1
             );
-            state.record_assignment(winner.id, Some(winner.name.clone()), shift, rota_id, AssignmentStatus::Proposed);
+            state.record_assignment(winner.id, Some(winner.display_name()), shift, rota_id, AssignmentStatus::Proposed);
         }
 
         let filled = state.slots_filled(shift.id);

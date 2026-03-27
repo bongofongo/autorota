@@ -27,5 +27,11 @@ let package = Package(
             name: "AutorotaFFI",
             path: "XCFrameworks/AutorotaFFI.xcframework"
         ),
+        // Integration tests (require built XCFramework)
+        .testTarget(
+            name: "AutorotaKitTests",
+            dependencies: ["AutorotaKit"],
+            path: "Tests/AutorotaKitTests"
+        ),
     ]
 )

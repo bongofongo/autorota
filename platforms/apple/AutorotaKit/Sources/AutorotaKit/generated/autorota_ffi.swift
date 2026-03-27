@@ -526,16 +526,6 @@ fileprivate struct FfiConverterString: FfiConverter {
 }
 
 
-/**
- * FFI-safe mirror types for all autorota-core models.
- *
- * Chrono types are flattened to `String`:
- * - NaiveDate  → "YYYY-MM-DD"
- * - NaiveTime  → "HH:MM"
- * - Weekday    → "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat" | "Sun"
- *
- * `Availability` (HashMap<(Weekday,u8), AvailabilityState>) becomes `Vec<AvailabilitySlot>`.
- */
 public struct AvailabilitySlot {
     public var weekday: String
     public var hour: UInt8
@@ -722,7 +712,14 @@ public func FfiConverterTypeFfiAssignment_lower(_ value: FfiAssignment) -> RustB
 
 public struct FfiEmployee {
     public var id: Int64
-    public var name: String
+    public var firstName: String
+    public var lastName: String
+    public var nickname: String?
+    /**
+     * Computed display name: nickname if set, otherwise "first_name last_name".
+     * This field is ignored when creating/updating employees; Rust recomputes it.
+     */
+    public var displayName: String
     public var roles: [String]
     public var startDate: String
     public var targetWeeklyHours: Float
@@ -736,9 +733,16 @@ public struct FfiEmployee {
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(id: Int64, name: String, roles: [String], startDate: String, targetWeeklyHours: Float, weeklyHoursDeviation: Float, maxDailyHours: Float, notes: String?, bankDetails: String?, defaultAvailability: [AvailabilitySlot], availability: [AvailabilitySlot], deleted: Bool) {
+    public init(id: Int64, firstName: String, lastName: String, nickname: String?, 
+        /**
+         * Computed display name: nickname if set, otherwise "first_name last_name".
+         * This field is ignored when creating/updating employees; Rust recomputes it.
+         */displayName: String, roles: [String], startDate: String, targetWeeklyHours: Float, weeklyHoursDeviation: Float, maxDailyHours: Float, notes: String?, bankDetails: String?, defaultAvailability: [AvailabilitySlot], availability: [AvailabilitySlot], deleted: Bool) {
         self.id = id
-        self.name = name
+        self.firstName = firstName
+        self.lastName = lastName
+        self.nickname = nickname
+        self.displayName = displayName
         self.roles = roles
         self.startDate = startDate
         self.targetWeeklyHours = targetWeeklyHours
@@ -759,7 +763,16 @@ extension FfiEmployee: Equatable, Hashable {
         if lhs.id != rhs.id {
             return false
         }
-        if lhs.name != rhs.name {
+        if lhs.firstName != rhs.firstName {
+            return false
+        }
+        if lhs.lastName != rhs.lastName {
+            return false
+        }
+        if lhs.nickname != rhs.nickname {
+            return false
+        }
+        if lhs.displayName != rhs.displayName {
             return false
         }
         if lhs.roles != rhs.roles {
@@ -797,7 +810,10 @@ extension FfiEmployee: Equatable, Hashable {
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(id)
-        hasher.combine(name)
+        hasher.combine(firstName)
+        hasher.combine(lastName)
+        hasher.combine(nickname)
+        hasher.combine(displayName)
         hasher.combine(roles)
         hasher.combine(startDate)
         hasher.combine(targetWeeklyHours)
@@ -820,7 +836,10 @@ public struct FfiConverterTypeFfiEmployee: FfiConverterRustBuffer {
         return
             try FfiEmployee(
                 id: FfiConverterInt64.read(from: &buf), 
-                name: FfiConverterString.read(from: &buf), 
+                firstName: FfiConverterString.read(from: &buf), 
+                lastName: FfiConverterString.read(from: &buf), 
+                nickname: FfiConverterOptionString.read(from: &buf), 
+                displayName: FfiConverterString.read(from: &buf), 
                 roles: FfiConverterSequenceString.read(from: &buf), 
                 startDate: FfiConverterString.read(from: &buf), 
                 targetWeeklyHours: FfiConverterFloat.read(from: &buf), 
@@ -836,7 +855,10 @@ public struct FfiConverterTypeFfiEmployee: FfiConverterRustBuffer {
 
     public static func write(_ value: FfiEmployee, into buf: inout [UInt8]) {
         FfiConverterInt64.write(value.id, into: &buf)
-        FfiConverterString.write(value.name, into: &buf)
+        FfiConverterString.write(value.firstName, into: &buf)
+        FfiConverterString.write(value.lastName, into: &buf)
+        FfiConverterOptionString.write(value.nickname, into: &buf)
+        FfiConverterString.write(value.displayName, into: &buf)
         FfiConverterSequenceString.write(value.roles, into: &buf)
         FfiConverterString.write(value.startDate, into: &buf)
         FfiConverterFloat.write(value.targetWeeklyHours, into: &buf)
@@ -863,6 +885,82 @@ public func FfiConverterTypeFfiEmployee_lift(_ buf: RustBuffer) throws -> FfiEmp
 #endif
 public func FfiConverterTypeFfiEmployee_lower(_ value: FfiEmployee) -> RustBuffer {
     return FfiConverterTypeFfiEmployee.lower(value)
+}
+
+
+/**
+ * FFI-safe mirror types for all autorota-core models.
+ *
+ * Chrono types are flattened to `String`:
+ * - NaiveDate  → "YYYY-MM-DD"
+ * - NaiveTime  → "HH:MM"
+ * - Weekday    → "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat" | "Sun"
+ *
+ * `Availability` (HashMap<(Weekday,u8), AvailabilityState>) becomes `Vec<AvailabilitySlot>`.
+ */
+public struct FfiRole {
+    public var id: Int64
+    public var name: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(id: Int64, name: String) {
+        self.id = id
+        self.name = name
+    }
+}
+
+
+
+extension FfiRole: Equatable, Hashable {
+    public static func ==(lhs: FfiRole, rhs: FfiRole) -> Bool {
+        if lhs.id != rhs.id {
+            return false
+        }
+        if lhs.name != rhs.name {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+        hasher.combine(name)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFfiRole: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiRole {
+        return
+            try FfiRole(
+                id: FfiConverterInt64.read(from: &buf), 
+                name: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FfiRole, into buf: inout [UInt8]) {
+        FfiConverterInt64.write(value.id, into: &buf)
+        FfiConverterString.write(value.name, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiRole_lift(_ buf: RustBuffer) throws -> FfiRole {
+    return try FfiConverterTypeFfiRole.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiRole_lower(_ value: FfiRole) -> RustBuffer {
+    return FfiConverterTypeFfiRole.lower(value)
 }
 
 
@@ -2013,6 +2111,31 @@ fileprivate struct FfiConverterSequenceTypeFfiEmployee: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeFfiRole: FfiConverterRustBuffer {
+    typealias SwiftType = [FfiRole]
+
+    public static func write(_ value: [FfiRole], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeFfiRole.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [FfiRole] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [FfiRole]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeFfiRole.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeFfiScheduleEntry: FfiConverterRustBuffer {
     typealias SwiftType = [FfiScheduleEntry]
 
@@ -2159,6 +2282,13 @@ public func createEmployee(employee: FfiEmployee)throws  -> Int64 {
     )
 })
 }
+public func createRole(name: String)throws  -> Int64 {
+    return try  FfiConverterInt64.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_create_role(
+        FfiConverterString.lower(name),$0
+    )
+})
+}
 public func createRota(weekStart: String)throws  -> Int64 {
     return try  FfiConverterInt64.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_create_rota(
@@ -2181,6 +2311,12 @@ public func deleteAssignment(id: Int64)throws  {try rustCallWithError(FfiConvert
 }
 public func deleteEmployee(id: Int64)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_delete_employee(
+        FfiConverterInt64.lower(id),$0
+    )
+}
+}
+public func deleteRole(id: Int64)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_delete_role(
         FfiConverterInt64.lower(id),$0
     )
 }
@@ -2252,6 +2388,12 @@ public func listEmployees()throws  -> [FfiEmployee] {
     )
 })
 }
+public func listRoles()throws  -> [FfiRole] {
+    return try  FfiConverterSequenceTypeFfiRole.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_list_roles($0
+    )
+})
+}
 public func listShiftTemplates()throws  -> [FfiShiftTemplate] {
     return try  FfiConverterSequenceTypeFfiShiftTemplate.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_list_shift_templates($0
@@ -2314,6 +2456,13 @@ public func updateEmployee(employee: FfiEmployee)throws  {try rustCallWithError(
     )
 }
 }
+public func updateRole(id: Int64, name: String)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_update_role(
+        FfiConverterInt64.lower(id),
+        FfiConverterString.lower(name),$0
+    )
+}
+}
 public func updateShiftTemplate(template: FfiShiftTemplate)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_update_shift_template(
         FfiConverterTypeFfiShiftTemplate.lower(template),$0
@@ -2353,6 +2502,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_autorota_ffi_checksum_func_create_employee() != 3468) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_autorota_ffi_checksum_func_create_role() != 26640) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_autorota_ffi_checksum_func_create_rota() != 14567) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -2363,6 +2515,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_delete_employee() != 58379) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_delete_role() != 30543) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_delete_shift() != 19637) {
@@ -2392,6 +2547,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_autorota_ffi_checksum_func_list_employees() != 41749) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_autorota_ffi_checksum_func_list_roles() != 36816) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_autorota_ffi_checksum_func_list_shift_templates() != 30152) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -2414,6 +2572,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_update_employee() != 9913) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_update_role() != 50775) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_update_shift_template() != 52563) {

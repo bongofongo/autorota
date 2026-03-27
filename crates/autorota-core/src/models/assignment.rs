@@ -42,3 +42,27 @@ pub struct Assignment {
     /// Snapshot of the employee name at the time of assignment.
     pub employee_name: Option<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn status_display_roundtrip() {
+        for status in [
+            AssignmentStatus::Proposed,
+            AssignmentStatus::Confirmed,
+            AssignmentStatus::Overridden,
+        ] {
+            let s = status.to_string();
+            let parsed: AssignmentStatus = s.parse().unwrap();
+            assert_eq!(parsed, status);
+        }
+    }
+
+    #[test]
+    fn status_from_str_invalid() {
+        let result: Result<AssignmentStatus, _> = "Invalid".parse();
+        assert!(result.is_err());
+    }
+}

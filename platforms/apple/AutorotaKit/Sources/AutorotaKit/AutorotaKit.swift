@@ -43,6 +43,30 @@ private extension ISO8601DateFormatter {
 // Call them from a Task.detached or a detached background Task to avoid
 // blocking the main actor. Convenience wrappers below handle that pattern.
 
+public func listRolesAsync() async throws -> [FfiRole] {
+    try await Task.detached(priority: .userInitiated) {
+        try listRoles()
+    }.value
+}
+
+public func createRoleAsync(name: String) async throws -> Int64 {
+    try await Task.detached(priority: .userInitiated) {
+        try createRole(name: name)
+    }.value
+}
+
+public func updateRoleAsync(id: Int64, name: String) async throws {
+    try await Task.detached(priority: .userInitiated) {
+        try updateRole(id: id, name: name)
+    }.value
+}
+
+public func deleteRoleAsync(id: Int64) async throws {
+    try await Task.detached(priority: .userInitiated) {
+        try deleteRole(id: id)
+    }.value
+}
+
 public func listEmployeesAsync() async throws -> [FfiEmployee] {
     try await Task.detached(priority: .userInitiated) {
         try listEmployees()
@@ -130,6 +154,42 @@ public func swapAssignmentsAsync(idA: Int64, idB: Int64) async throws {
 public func deleteAssignmentAsync(id: Int64) async throws {
     try await Task.detached(priority: .userInitiated) {
         try deleteAssignment(id: id)
+    }.value
+}
+
+public func createAssignmentAsync(_ assignment: FfiAssignment) async throws -> Int64 {
+    try await Task.detached(priority: .userInitiated) {
+        try createAssignment(assignment: assignment)
+    }.value
+}
+
+public func moveAssignmentAsync(id: Int64, newShiftId: Int64) async throws {
+    try await Task.detached(priority: .userInitiated) {
+        try moveAssignment(id: id, newShiftId: newShiftId)
+    }.value
+}
+
+public func deleteShiftAsync(id: Int64) async throws {
+    try await Task.detached(priority: .userInitiated) {
+        try deleteShift(id: id)
+    }.value
+}
+
+public func updateShiftTimesAsync(id: Int64, startTime: String, endTime: String) async throws {
+    try await Task.detached(priority: .userInitiated) {
+        try updateShiftTimes(id: id, startTime: startTime, endTime: endTime)
+    }.value
+}
+
+public func createAdHocShiftAsync(rotaId: Int64, date: String, startTime: String, endTime: String, requiredRole: String) async throws -> Int64 {
+    try await Task.detached(priority: .userInitiated) {
+        try createAdHocShift(rotaId: rotaId, date: date, startTime: startTime, endTime: endTime, requiredRole: requiredRole)
+    }.value
+}
+
+public func listShiftsForRotaAsync(rotaId: Int64) async throws -> [FfiShift] {
+    try await Task.detached(priority: .userInitiated) {
+        try listShiftsForRota(rotaId: rotaId)
     }.value
 }
 

@@ -1,3 +1,5 @@
+mod helpers;
+
 use autorota_core::db;
 use autorota_core::db::queries;
 use autorota_core::models::assignment::{Assignment, AssignmentStatus};
@@ -8,9 +10,7 @@ use chrono::{NaiveDate, NaiveTime, Weekday};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::str::FromStr;
 
-async fn test_pool() -> sqlx::SqlitePool {
-    db::connect("sqlite::memory:").await.unwrap()
-}
+use helpers::test_pool;
 
 /// The OLD schema (before weekdays migration) — uses `weekday` singular column
 /// and no ON DELETE CASCADE.
@@ -224,7 +224,7 @@ async fn migration_from_old_schema_with_data() {
 
     let employees = queries::list_employees(&pool).await.unwrap();
     assert_eq!(employees.len(), 1);
-    assert_eq!(employees[0].name, "Alice");
+    assert_eq!(employees[0].first_name, "Alice");
 
     pool.close().await;
     drop(dir);
@@ -241,7 +241,9 @@ async fn employee_crud() {
 
     let emp = Employee {
         id: 0,
-        name: "Alice".to_string(),
+        first_name: "Alice".to_string(),
+        last_name: "Smith".to_string(),
+        nickname: None,
         roles: vec!["barista".to_string(), "cashier".to_string()],
         start_date: NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
         target_weekly_hours: 40.0,
@@ -258,7 +260,9 @@ async fn employee_crud() {
     assert!(id > 0);
 
     let fetched = queries::get_employee(&pool, id).await.unwrap().unwrap();
-    assert_eq!(fetched.name, "Alice");
+    assert_eq!(fetched.first_name, "Alice");
+    assert_eq!(fetched.last_name, "Smith");
+    assert_eq!(fetched.display_name(), "Alice Smith");
     assert_eq!(fetched.roles, vec!["barista", "cashier"]);
     assert_eq!(
         fetched.default_availability.get(Weekday::Mon, 8),
@@ -317,7 +321,9 @@ async fn full_scheduling_flow() {
     // Create employee
     let emp = Employee {
         id: 0,
-        name: "Bob".to_string(),
+        first_name: "Bob".to_string(),
+        last_name: String::new(),
+        nickname: None,
         roles: vec!["barista".to_string()],
         start_date: NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
         target_weekly_hours: 40.0,
@@ -397,4 +403,435 @@ async fn full_scheduling_flow() {
         .unwrap()
         .unwrap();
     assert_eq!(by_week.id, rota_id);
+}
+
+// ─── Role tests ─────────────────────────────────────────────
+
+#[tokio::test]
+async fn role_crud() {
+    let pool = test_pool().await;
+
+    // Insert roles
+    let id1 = queries::insert_role(&pool, "Barista").await.unwrap();
+    let id2 = queries::insert_role(&pool, "Cashier").await.unwrap();
+    assert!(id1 > 0);
+    assert!(id2 > 0);
+
+    // List roles
+    let all = queries::list_roles(&pool).await.unwrap();
+    assert_eq!(all.len(), 2);
+    // Sorted by name: Barista, Cashier
+    assert_eq!(all[0].name, "Barista");
+    assert_eq!(all[1].name, "Cashier");
+
+    // Delete a role that's not in use
+    queries::delete_role(&pool, id2).await.unwrap();
+    let all = queries::list_roles(&pool).await.unwrap();
+    assert_eq!(all.len(), 1);
+    assert_eq!(all[0].name, "Barista");
+}
+
+#[tokio::test]
+async fn role_rename_cascades() {
+    let pool = test_pool().await;
+
+    // Create a role
+    let role_id = queries::insert_role(&pool, "Barista").await.unwrap();
+
+    // Create an employee with that role
+    let emp = Employee {
+        id: 0,
+        first_name: "Alice".to_string(),
+        last_name: String::new(),
+        nickname: None,
+        roles: vec!["Barista".to_string()],
+        start_date: NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+        target_weekly_hours: 30.0,
+        weekly_hours_deviation: 6.0,
+        max_daily_hours: 8.0,
+        notes: None,
+        bank_details: None,
+        default_availability: Availability::default(),
+        availability: Availability::default(),
+        deleted: false,
+    };
+    queries::insert_employee(&pool, &emp).await.unwrap();
+
+    // Create a shift template with that role
+    let tmpl = ShiftTemplate {
+        id: 0,
+        name: "Morning".to_string(),
+        weekdays: vec![Weekday::Mon],
+        start_time: NaiveTime::from_hms_opt(7, 0, 0).unwrap(),
+        end_time: NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
+        required_role: "Barista".to_string(),
+        min_employees: 1,
+        max_employees: 1,
+        deleted: false,
+    };
+    queries::insert_shift_template(&pool, &tmpl).await.unwrap();
+
+    // Rename the role
+    queries::update_role(&pool, role_id, "Coffee Maker").await.unwrap();
+
+    // Verify cascade to employee
+    let employees = queries::list_employees(&pool).await.unwrap();
+    assert_eq!(employees[0].roles, vec!["Coffee Maker"]);
+
+    // Verify cascade to shift template
+    let templates = queries::list_shift_templates(&pool).await.unwrap();
+    assert_eq!(templates[0].required_role, "Coffee Maker");
+
+    // Verify role table itself
+    let roles = queries::list_roles(&pool).await.unwrap();
+    assert_eq!(roles.len(), 1);
+    assert_eq!(roles[0].name, "Coffee Maker");
+}
+
+#[tokio::test]
+async fn role_delete_blocked_when_in_use() {
+    let pool = test_pool().await;
+
+    let role_id = queries::insert_role(&pool, "Barista").await.unwrap();
+
+    // Create an employee using the role
+    let emp = Employee {
+        id: 0,
+        first_name: "Alice".to_string(),
+        last_name: String::new(),
+        nickname: None,
+        roles: vec!["Barista".to_string()],
+        start_date: NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+        target_weekly_hours: 30.0,
+        weekly_hours_deviation: 6.0,
+        max_daily_hours: 8.0,
+        notes: None,
+        bank_details: None,
+        default_availability: Availability::default(),
+        availability: Availability::default(),
+        deleted: false,
+    };
+    queries::insert_employee(&pool, &emp).await.unwrap();
+
+    // Attempt to delete the role — should fail
+    let result = queries::delete_role(&pool, role_id).await;
+    assert!(result.is_err());
+    let err_msg = result.unwrap_err().to_string();
+    assert!(err_msg.contains("still assigned to"), "Expected 'still assigned to' error, got: {err_msg}");
+}
+
+#[tokio::test]
+async fn migration_populates_roles_from_existing_data() {
+    let pool = test_pool().await;
+
+    let emp = Employee {
+        id: 0,
+        first_name: "Alice".to_string(),
+        last_name: String::new(),
+        nickname: None,
+        roles: vec!["Barista".to_string(), "Manager".to_string()],
+        start_date: NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+        target_weekly_hours: 30.0,
+        weekly_hours_deviation: 6.0,
+        max_daily_hours: 8.0,
+        notes: None,
+        bank_details: None,
+        default_availability: Availability::default(),
+        availability: Availability::default(),
+        deleted: false,
+    };
+    queries::insert_employee(&pool, &emp).await.unwrap();
+
+    // Roles table starts empty on a fresh DB
+    let roles = queries::list_roles(&pool).await.unwrap();
+    // Fresh DB — no auto-populated roles (there was no data before migration ran)
+    assert!(roles.is_empty());
+
+    // Now create roles manually
+    queries::insert_role(&pool, "Barista").await.unwrap();
+    queries::insert_role(&pool, "Manager").await.unwrap();
+
+    let roles = queries::list_roles(&pool).await.unwrap();
+    assert_eq!(roles.len(), 2);
+}
+
+// ─── New DB tests ───────────────────────────────────────────
+
+#[tokio::test]
+async fn materialise_shifts_creates_correct_dates() {
+    let pool = test_pool().await;
+
+    let tmpl = ShiftTemplate {
+        id: 0,
+        name: "Multi-day".to_string(),
+        weekdays: vec![Weekday::Mon, Weekday::Wed, Weekday::Fri],
+        start_time: NaiveTime::from_hms_opt(7, 0, 0).unwrap(),
+        end_time: NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
+        required_role: "barista".to_string(),
+        min_employees: 1,
+        max_employees: 1,
+        deleted: false,
+    };
+    queries::insert_shift_template(&pool, &tmpl).await.unwrap();
+
+    let week_start = NaiveDate::from_ymd_opt(2026, 3, 23).unwrap(); // Monday
+    let rota_id = queries::insert_rota(&pool, week_start).await.unwrap();
+
+    let shifts = queries::materialise_shifts(&pool, rota_id, week_start)
+        .await
+        .unwrap();
+
+    assert_eq!(shifts.len(), 3);
+
+    let dates: Vec<NaiveDate> = shifts.iter().map(|s| s.date).collect();
+    assert!(dates.contains(&NaiveDate::from_ymd_opt(2026, 3, 23).unwrap())); // Mon
+    assert!(dates.contains(&NaiveDate::from_ymd_opt(2026, 3, 25).unwrap())); // Wed
+    assert!(dates.contains(&NaiveDate::from_ymd_opt(2026, 3, 27).unwrap())); // Fri
+
+    // All shifts should reference the rota and template
+    for s in &shifts {
+        assert_eq!(s.rota_id, rota_id);
+        assert!(s.template_id.is_some());
+        assert!(s.id > 0);
+    }
+}
+
+#[tokio::test]
+async fn soft_deleted_employee_assignments_survive() {
+    let pool = test_pool().await;
+
+    let emp = Employee {
+        id: 0,
+        first_name: "Alice".to_string(),
+        last_name: String::new(),
+        nickname: None,
+        roles: vec!["barista".to_string()],
+        start_date: NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+        target_weekly_hours: 40.0,
+        weekly_hours_deviation: 6.0,
+        max_daily_hours: 8.0,
+        notes: None,
+        bank_details: None,
+        default_availability: Availability::default(),
+        availability: Availability::default(),
+        deleted: false,
+    };
+    let emp_id = queries::insert_employee(&pool, &emp).await.unwrap();
+
+    // Create rota + shift + assignment
+    let week_start = NaiveDate::from_ymd_opt(2026, 3, 23).unwrap();
+    let rota_id = queries::insert_rota(&pool, week_start).await.unwrap();
+    let shift = Shift {
+        id: 0,
+        template_id: None,
+        rota_id,
+        date: week_start,
+        start_time: NaiveTime::from_hms_opt(7, 0, 0).unwrap(),
+        end_time: NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
+        required_role: "barista".to_string(),
+        min_employees: 1,
+        max_employees: 1,
+    };
+    let shift_id = queries::insert_shift(&pool, &shift).await.unwrap();
+    let assignment = Assignment {
+        id: 0,
+        rota_id,
+        shift_id,
+        employee_id: emp_id,
+        status: AssignmentStatus::Confirmed,
+        employee_name: Some("Alice".to_string()),
+    };
+    queries::insert_assignment(&pool, &assignment).await.unwrap();
+
+    // Soft-delete the employee
+    queries::delete_employee(&pool, emp_id).await.unwrap();
+
+    // Assignment should still exist
+    let assignments = queries::list_assignments_for_rota(&pool, rota_id).await.unwrap();
+    assert_eq!(assignments.len(), 1);
+    assert_eq!(assignments[0].employee_id, emp_id);
+    assert_eq!(assignments[0].employee_name, Some("Alice".to_string()));
+}
+
+#[tokio::test]
+async fn swap_assignment_shifts_exchanges_shift_ids() {
+    let pool = test_pool().await;
+
+    let week_start = NaiveDate::from_ymd_opt(2026, 3, 23).unwrap();
+    let rota_id = queries::insert_rota(&pool, week_start).await.unwrap();
+
+    // Create two shifts
+    let s1 = Shift {
+        id: 0,
+        template_id: None,
+        rota_id,
+        date: week_start,
+        start_time: NaiveTime::from_hms_opt(7, 0, 0).unwrap(),
+        end_time: NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
+        required_role: "barista".to_string(),
+        min_employees: 1,
+        max_employees: 1,
+    };
+    let s2 = Shift {
+        id: 0,
+        template_id: None,
+        rota_id,
+        date: week_start,
+        start_time: NaiveTime::from_hms_opt(13, 0, 0).unwrap(),
+        end_time: NaiveTime::from_hms_opt(18, 0, 0).unwrap(),
+        required_role: "barista".to_string(),
+        min_employees: 1,
+        max_employees: 1,
+    };
+    let shift_id_1 = queries::insert_shift(&pool, &s1).await.unwrap();
+    let shift_id_2 = queries::insert_shift(&pool, &s2).await.unwrap();
+
+    // Create two employees
+    let emp1 = Employee {
+        id: 0,
+        first_name: "Alice".to_string(),
+        last_name: String::new(),
+        nickname: None,
+        roles: vec!["barista".to_string()],
+        start_date: NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
+        target_weekly_hours: 40.0,
+        weekly_hours_deviation: 6.0,
+        max_daily_hours: 8.0,
+        notes: None,
+        bank_details: None,
+        default_availability: Availability::default(),
+        availability: Availability::default(),
+        deleted: false,
+    };
+    let emp2 = Employee { first_name: "Bob".to_string(), ..emp1.clone() };
+    let emp_id_1 = queries::insert_employee(&pool, &emp1).await.unwrap();
+    let emp_id_2 = queries::insert_employee(&pool, &emp2).await.unwrap();
+
+    // Assign: Alice→shift1, Bob→shift2
+    let a1 = Assignment {
+        id: 0,
+        rota_id,
+        shift_id: shift_id_1,
+        employee_id: emp_id_1,
+        status: AssignmentStatus::Confirmed,
+        employee_name: Some("Alice".to_string()),
+    };
+    let a2 = Assignment {
+        id: 0,
+        rota_id,
+        shift_id: shift_id_2,
+        employee_id: emp_id_2,
+        status: AssignmentStatus::Confirmed,
+        employee_name: Some("Bob".to_string()),
+    };
+    let a1_id = queries::insert_assignment(&pool, &a1).await.unwrap();
+    let a2_id = queries::insert_assignment(&pool, &a2).await.unwrap();
+
+    // Swap
+    queries::swap_assignment_shifts(&pool, a1_id, shift_id_1, a2_id, shift_id_2)
+        .await
+        .unwrap();
+
+    // Verify: Alice→shift2, Bob→shift1
+    let assignments = queries::list_assignments_for_rota(&pool, rota_id).await.unwrap();
+    let alice_assign = assignments.iter().find(|a| a.employee_id == emp_id_1).unwrap();
+    let bob_assign = assignments.iter().find(|a| a.employee_id == emp_id_2).unwrap();
+    assert_eq!(alice_assign.shift_id, shift_id_2);
+    assert_eq!(bob_assign.shift_id, shift_id_1);
+}
+
+#[tokio::test]
+async fn update_shift_times_persists() {
+    let pool = test_pool().await;
+
+    let week_start = NaiveDate::from_ymd_opt(2026, 3, 23).unwrap();
+    let rota_id = queries::insert_rota(&pool, week_start).await.unwrap();
+
+    let shift = Shift {
+        id: 0,
+        template_id: None,
+        rota_id,
+        date: week_start,
+        start_time: NaiveTime::from_hms_opt(7, 0, 0).unwrap(),
+        end_time: NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
+        required_role: "barista".to_string(),
+        min_employees: 1,
+        max_employees: 1,
+    };
+    let shift_id = queries::insert_shift(&pool, &shift).await.unwrap();
+
+    // Update times
+    let new_start = NaiveTime::from_hms_opt(8, 30, 0).unwrap();
+    let new_end = NaiveTime::from_hms_opt(14, 0, 0).unwrap();
+    queries::update_shift_times(&pool, shift_id, new_start, new_end)
+        .await
+        .unwrap();
+
+    // Verify
+    let shifts = queries::list_shifts_for_rota(&pool, rota_id).await.unwrap();
+    assert_eq!(shifts.len(), 1);
+    assert_eq!(shifts[0].start_time, new_start);
+    assert_eq!(shifts[0].end_time, new_end);
+}
+
+#[tokio::test]
+async fn delete_shifts_for_rota_preserves_adhoc() {
+    let pool = test_pool().await;
+
+    let week_start = NaiveDate::from_ymd_opt(2026, 3, 23).unwrap();
+    let rota_id = queries::insert_rota(&pool, week_start).await.unwrap();
+
+    // Insert a template so we can create a template-based shift
+    let tmpl = ShiftTemplate {
+        id: 0,
+        name: "Morning".to_string(),
+        weekdays: vec![Weekday::Mon],
+        start_time: NaiveTime::from_hms_opt(7, 0, 0).unwrap(),
+        end_time: NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
+        required_role: "barista".to_string(),
+        min_employees: 1,
+        max_employees: 1,
+        deleted: false,
+    };
+    let tmpl_id = queries::insert_shift_template(&pool, &tmpl).await.unwrap();
+
+    // Template-based shift
+    let template_shift = Shift {
+        id: 0,
+        template_id: Some(tmpl_id),
+        rota_id,
+        date: week_start,
+        start_time: NaiveTime::from_hms_opt(7, 0, 0).unwrap(),
+        end_time: NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
+        required_role: "barista".to_string(),
+        min_employees: 1,
+        max_employees: 1,
+    };
+    queries::insert_shift(&pool, &template_shift).await.unwrap();
+
+    // Ad-hoc shift (no template)
+    let adhoc_shift = Shift {
+        id: 0,
+        template_id: None,
+        rota_id,
+        date: week_start,
+        start_time: NaiveTime::from_hms_opt(14, 0, 0).unwrap(),
+        end_time: NaiveTime::from_hms_opt(18, 0, 0).unwrap(),
+        required_role: "barista".to_string(),
+        min_employees: 1,
+        max_employees: 1,
+    };
+    queries::insert_shift(&pool, &adhoc_shift).await.unwrap();
+
+    // Should have 2 shifts
+    let before = queries::list_shifts_for_rota(&pool, rota_id).await.unwrap();
+    assert_eq!(before.len(), 2);
+
+    // Delete template-based shifts only
+    queries::delete_shifts_for_rota(&pool, rota_id).await.unwrap();
+
+    // Ad-hoc shift should survive
+    let after = queries::list_shifts_for_rota(&pool, rota_id).await.unwrap();
+    assert_eq!(after.len(), 1);
+    assert!(after[0].template_id.is_none());
 }

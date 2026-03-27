@@ -4,7 +4,9 @@ import { invoke } from "@tauri-apps/api/core";
 
 interface Employee {
   id: number;
-  name: string;
+  first_name: string;
+  last_name: string;
+  nickname: string | null;
   roles: string[];
   start_date: string;
   target_weekly_hours: number;
@@ -75,10 +77,22 @@ interface ScheduleResult {
   warnings: ShortfallWarning[];
 }
 
+interface Role {
+  id: number;
+  name: string;
+}
+
+// ─── Helpers ────────────────────────────────────────────────
+
+function displayName(e: Employee): string {
+  return e.nickname?.trim() || `${e.first_name} ${e.last_name}`;
+}
+
 // ─── State ──────────────────────────────────────────────────
 
 let employees: Employee[] = [];
 let shiftTemplates: ShiftTemplate[] = [];
+let roles: Role[] = [];
 let currentView = "employees";
 let selectedWeek = toLocalISODate(getMonday(new Date()));
 let selectedEmployeeId: number | null = null;
@@ -102,6 +116,10 @@ async function fetchEmployees(): Promise<void> {
 
 async function fetchShiftTemplates(): Promise<void> {
   shiftTemplates = await invoke("list_shift_templates");
+}
+
+async function fetchRoles(): Promise<void> {
+  roles = await invoke("list_roles");
 }
 
 function getMonday(d: Date): Date {
@@ -154,7 +172,7 @@ function renderSidebarEmployees() {
   el.innerHTML = employees
     .map(
       (e) =>
-        `<div class="employee-item" data-id="${e.id}">${e.name}</div>`
+        `<div class="employee-item" data-id="${e.id}">${displayName(e)}</div>`
     )
     .join("");
 
@@ -189,7 +207,7 @@ function renderEmployeesView() {
             (e) => `
           <div class="item-row" data-id="${e.id}">
             <div class="item-info">
-              <span class="item-name">${e.name}</span>
+              <span class="item-name">${displayName(e)}</span>
               <span class="item-meta">${e.roles.join(", ")} &middot; ${e.target_weekly_hours}h/wk &middot; Started ${e.start_date}</span>
             </div>
             <div class="kebab-wrap">
@@ -280,13 +298,26 @@ function renderCreateEmployeeView() {
     </div>
     <div class="card">
       <div class="create-form">
-        <div class="form-group">
-          <label>Name *</label>
-          <input id="emp-name" type="text" placeholder="Employee name" />
+        <div class="form-row">
+          <div class="form-group">
+            <label>First Name *</label>
+            <input id="emp-first-name" type="text" placeholder="First name" />
+          </div>
+          <div class="form-group">
+            <label>Last Name *</label>
+            <input id="emp-last-name" type="text" placeholder="Last name" />
+          </div>
         </div>
         <div class="form-group">
-          <label>Roles * (comma-separated)</label>
-          <input id="emp-roles" type="text" placeholder="barista, cashier" />
+          <label>Nickname (optional)</label>
+          <input id="emp-nickname" type="text" placeholder="Display nickname" />
+        </div>
+        <div class="form-group">
+          <label>Roles *</label>
+          <div class="role-tags" id="emp-role-tags">
+            ${roles.map((r) => `<button type="button" class="role-tag" data-role="${r.name}">${r.name}</button>`).join("")}
+          </div>
+          ${roles.length === 0 ? '<p class="empty-state" style="margin:0">No roles defined yet. Add roles in the Templates tab.</p>' : ""}
         </div>
         <div class="form-group">
           <label>Start Date *</label>
@@ -328,9 +359,15 @@ function renderCreateEmployeeView() {
     renderView();
   });
 
+  document.querySelectorAll("#emp-role-tags .role-tag").forEach((tag) => {
+    tag.addEventListener("click", () => tag.classList.toggle("selected"));
+  });
+
   document.getElementById("create-emp-btn")!.addEventListener("click", async () => {
-    const name = (document.getElementById("emp-name") as HTMLInputElement).value.trim();
-    const rolesStr = (document.getElementById("emp-roles") as HTMLInputElement).value.trim();
+    const firstName = (document.getElementById("emp-first-name") as HTMLInputElement).value.trim();
+    const lastName = (document.getElementById("emp-last-name") as HTMLInputElement).value.trim();
+    const nickname = (document.getElementById("emp-nickname") as HTMLInputElement).value.trim() || null;
+    const selectedRoles = Array.from(document.querySelectorAll("#emp-role-tags .role-tag.selected")).map((t) => (t as HTMLElement).dataset.role!);
     const startDate = (document.getElementById("emp-start-date") as HTMLInputElement).value;
     const targetWeekly = parseFloat((document.getElementById("emp-target-weekly") as HTMLInputElement).value);
     const deviation = parseFloat((document.getElementById("emp-deviation") as HTMLInputElement).value);
@@ -338,15 +375,15 @@ function renderCreateEmployeeView() {
     const notes = (document.getElementById("emp-notes") as HTMLTextAreaElement).value.trim() || null;
     const bank = (document.getElementById("emp-bank") as HTMLInputElement).value.trim() || null;
 
-    if (!name || !rolesStr || !startDate) return;
-
-    const roles = parseRoles(rolesStr);
+    if (!firstName || !lastName || selectedRoles.length === 0 || !startDate) return;
 
     await invoke("create_employee", {
       employee: {
         id: 0,
-        name,
-        roles,
+        first_name: firstName,
+        last_name: lastName,
+        nickname,
+        roles: selectedRoles,
         start_date: startDate,
         target_weekly_hours: targetWeekly,
         weekly_hours_deviation: deviation,
@@ -389,13 +426,26 @@ async function renderEditEmployeeView() {
     </div>
     <div class="card">
       <div class="create-form">
-        <div class="form-group">
-          <label>Name *</label>
-          <input id="emp-name" type="text" value="${emp.name}" />
+        <div class="form-row">
+          <div class="form-group">
+            <label>First Name *</label>
+            <input id="emp-first-name" type="text" value="${emp.first_name}" />
+          </div>
+          <div class="form-group">
+            <label>Last Name *</label>
+            <input id="emp-last-name" type="text" value="${emp.last_name}" />
+          </div>
         </div>
         <div class="form-group">
-          <label>Roles * (comma-separated)</label>
-          <input id="emp-roles" type="text" value="${emp.roles.join(", ")}" />
+          <label>Nickname (optional)</label>
+          <input id="emp-nickname" type="text" value="${emp.nickname ?? ""}" placeholder="Display nickname" />
+        </div>
+        <div class="form-group">
+          <label>Roles *</label>
+          <div class="role-tags" id="emp-role-tags">
+            ${roles.map((r) => `<button type="button" class="role-tag${emp.roles.includes(r.name) ? " selected" : ""}" data-role="${r.name}">${r.name}</button>`).join("")}
+          </div>
+          ${roles.length === 0 ? '<p class="empty-state" style="margin:0">No roles defined yet. Add roles in the Templates tab.</p>' : ""}
         </div>
         <div class="form-group">
           <label>Start Date *</label>
@@ -438,9 +488,15 @@ async function renderEditEmployeeView() {
     renderView();
   });
 
+  document.querySelectorAll("#emp-role-tags .role-tag").forEach((tag) => {
+    tag.addEventListener("click", () => tag.classList.toggle("selected"));
+  });
+
   document.getElementById("save-emp-btn")!.addEventListener("click", async () => {
-    const name = (document.getElementById("emp-name") as HTMLInputElement).value.trim();
-    const rolesStr = (document.getElementById("emp-roles") as HTMLInputElement).value.trim();
+    const firstName = (document.getElementById("emp-first-name") as HTMLInputElement).value.trim();
+    const lastName = (document.getElementById("emp-last-name") as HTMLInputElement).value.trim();
+    const nickname = (document.getElementById("emp-nickname") as HTMLInputElement).value.trim() || null;
+    const selectedRoles = Array.from(document.querySelectorAll("#emp-role-tags .role-tag.selected")).map((t) => (t as HTMLElement).dataset.role!);
     const startDate = (document.getElementById("emp-start-date") as HTMLInputElement).value;
     const targetWeekly = parseFloat((document.getElementById("emp-target-weekly") as HTMLInputElement).value);
     const deviation = parseFloat((document.getElementById("emp-deviation") as HTMLInputElement).value);
@@ -448,15 +504,15 @@ async function renderEditEmployeeView() {
     const notes = (document.getElementById("emp-notes") as HTMLTextAreaElement).value.trim() || null;
     const bank = (document.getElementById("emp-bank") as HTMLInputElement).value.trim() || null;
 
-    if (!name || !rolesStr || !startDate) return;
-
-    const roles = parseRoles(rolesStr);
+    if (!firstName || !lastName || selectedRoles.length === 0 || !startDate) return;
 
     await invoke("update_employee", {
       employee: {
         ...emp,
-        name,
-        roles,
+        first_name: firstName,
+        last_name: lastName,
+        nickname,
+        roles: selectedRoles,
         start_date: startDate,
         target_weekly_hours: targetWeekly,
         weekly_hours_deviation: deviation,
@@ -619,7 +675,7 @@ async function renderEmployeeDetailView() {
   content.innerHTML = `
     <div class="detail-header">
       <button class="back-btn" id="back-to-list">&larr; Back</button>
-      <h1>${emp.name}</h1>
+      <h1>${displayName(emp)}</h1>
       <button class="btn-secondary" id="edit-employee-btn">Edit</button>
     </div>
     <div class="card">
@@ -815,7 +871,9 @@ async function renderEditShiftTemplateView() {
           </div>
           <div class="form-group">
             <label>Role</label>
-            <input id="tmpl-role" type="text" value="${tmpl.required_role}" />
+            <select id="tmpl-role">
+              ${roles.map((r) => `<option value="${r.name}"${r.name === tmpl.required_role ? " selected" : ""}>${r.name}</option>`).join("")}
+            </select>
           </div>
           <div class="form-group">
             <label>Min Staff</label>
@@ -845,7 +903,7 @@ async function renderEditShiftTemplateView() {
     const selectedDays = checked.map((cb) => cb.value);
     const startVal = (document.getElementById("tmpl-start") as HTMLInputElement).value;
     const endVal = (document.getElementById("tmpl-end") as HTMLInputElement).value;
-    const role = (document.getElementById("tmpl-role") as HTMLInputElement).value.trim();
+    const role = (document.getElementById("tmpl-role") as HTMLSelectElement).value;
     const minEmp = parseInt((document.getElementById("tmpl-min") as HTMLInputElement).value);
     const maxEmp = parseInt((document.getElementById("tmpl-max") as HTMLInputElement).value);
 
@@ -858,7 +916,7 @@ async function renderEditShiftTemplateView() {
         weekdays: selectedDays,
         start_time: startVal + ":00",
         end_time: endVal + ":00",
-        required_role: toTitleCase(role),
+        required_role: role,
         min_employees: minEmp,
         max_employees: maxEmp,
       },
@@ -905,7 +963,10 @@ function renderCreateShiftTemplateView() {
           </div>
           <div class="form-group">
             <label>Role</label>
-            <input id="tmpl-role" type="text" placeholder="Barista" />
+            <select id="tmpl-role">
+              ${roles.length === 0 ? '<option value="">No roles – add one first</option>' : ""}
+              ${roles.map((r) => `<option value="${r.name}">${r.name}</option>`).join("")}
+            </select>
           </div>
           <div class="form-group">
             <label>Min Staff</label>
@@ -934,7 +995,7 @@ function renderCreateShiftTemplateView() {
     const selectedDays = checked.map((cb) => cb.value);
     const startVal = (document.getElementById("tmpl-start") as HTMLInputElement).value;
     const endVal = (document.getElementById("tmpl-end") as HTMLInputElement).value;
-    const role = (document.getElementById("tmpl-role") as HTMLInputElement).value.trim();
+    const role = (document.getElementById("tmpl-role") as HTMLSelectElement).value;
     const minEmp = parseInt((document.getElementById("tmpl-min") as HTMLInputElement).value);
     const maxEmp = parseInt((document.getElementById("tmpl-max") as HTMLInputElement).value);
 
@@ -947,7 +1008,7 @@ function renderCreateShiftTemplateView() {
         weekdays: selectedDays,
         start_time: startVal + ":00",
         end_time: endVal + ":00",
-        required_role: toTitleCase(role),
+        required_role: role,
         min_employees: minEmp,
         max_employees: maxEmp,
       },
@@ -965,7 +1026,35 @@ function renderShiftsView() {
   const content = document.getElementById("content")!;
 
   content.innerHTML = `
-    <h1>Shift Templates</h1>
+    <h1>Roles</h1>
+    <div class="card">
+      <div class="item-list">
+        ${roles.length === 0 ? '<p class="empty-state">No roles yet. Add one below.</p>' : ""}
+        ${roles
+          .map(
+            (r) => `
+          <div class="item-row role-row" data-id="${r.id}">
+            <div class="item-info">
+              <span class="item-name role-name-display" data-id="${r.id}">${r.name}</span>
+            </div>
+            <div class="kebab-wrap">
+              <button class="kebab-btn role-kebab-btn" data-id="${r.id}" title="More options">&#8942;</button>
+              <div class="kebab-dropdown" id="role-kebab-${r.id}">
+                <button class="kebab-item rename-role" data-id="${r.id}">Rename</button>
+                <button class="kebab-item kebab-delete delete-role" data-id="${r.id}">Delete</button>
+              </div>
+            </div>
+          </div>`
+          )
+          .join("")}
+      </div>
+      <div class="add-role-row" style="display:flex;gap:0.5rem;padding:0.75rem 1rem 0.5rem;">
+        <input id="new-role-input" type="text" placeholder="New role name" style="flex:1;" />
+        <button class="btn-primary" id="add-role-btn">Add Role</button>
+      </div>
+    </div>
+
+    <h1 style="margin-top:2rem;">Shift Templates</h1>
     <div class="card">
       <button class="btn-add-item" id="add-tmpl-btn">+</button>
       <div class="item-list">
@@ -1045,6 +1134,85 @@ function renderShiftsView() {
       }
       await fetchShiftTemplates();
       renderShiftsView();
+    });
+  });
+
+  // ── Role management ────────────────────────────────────────
+  document.getElementById("add-role-btn")!.addEventListener("click", async () => {
+    const input = document.getElementById("new-role-input") as HTMLInputElement;
+    const name = input.value.trim();
+    if (!name) return;
+    try {
+      await invoke("create_role", { name });
+      await fetchRoles();
+      renderShiftsView();
+    } catch (err) {
+      alert(`Failed to create role: ${err}`);
+    }
+  });
+
+  // Enter key on role input
+  document.getElementById("new-role-input")!.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("add-role-btn")!.click();
+  });
+
+  document.querySelectorAll(".role-kebab-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const id = (btn as HTMLElement).dataset.id!;
+      const dropdown = document.getElementById(`role-kebab-${id}`)!;
+      const isOpen = dropdown.classList.contains("open");
+      document.querySelectorAll(".kebab-dropdown.open").forEach((d) => d.classList.remove("open"));
+      if (!isOpen) dropdown.classList.add("open");
+    });
+  });
+
+  document.querySelectorAll(".rename-role").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const id = parseInt((btn as HTMLElement).dataset.id!);
+      const role = roles.find((r) => r.id === id);
+      if (!role) return;
+      const nameEl = document.querySelector(`.role-name-display[data-id="${id}"]`) as HTMLElement;
+      if (!nameEl) return;
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = role.name;
+      input.className = "inline-edit-input";
+      nameEl.replaceWith(input);
+      input.focus();
+      input.select();
+
+      const save = async () => {
+        const newName = input.value.trim();
+        if (newName && newName !== role.name) {
+          try {
+            await invoke("update_role", { id, name: newName });
+            await fetchRoles();
+            await fetchShiftTemplates();
+            await fetchEmployees();
+          } catch (err) {
+            alert(`Failed to rename role: ${err}`);
+          }
+        }
+        renderShiftsView();
+      };
+      input.addEventListener("blur", save);
+      input.addEventListener("keydown", (ev) => { if (ev.key === "Enter") input.blur(); });
+    });
+  });
+
+  document.querySelectorAll(".delete-role").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const id = parseInt((btn as HTMLElement).dataset.id!);
+      try {
+        await invoke("delete_role", { id });
+        await fetchRoles();
+        renderShiftsView();
+      } catch (err) {
+        alert(`${err}`);
+      }
     });
   });
 }
@@ -1373,7 +1541,7 @@ function renderRotaGrid(weekdays: string[], schedule: WeekSchedule | null): stri
                   actions += `<span class="edit-confirm-btn" data-assignment-id="${e.assignmentId}" title="Confirm">&#x2713;</span>`;
                 }
               }
-              return `<div class="rota-employee ${cls}${canInteract ? " swappable" : ""}"${swappable}><span class="rota-employee-name">${e.name}</span>${actions}</div>`;
+              return `<div class="rota-employee ${cls}${canInteract ? " swappable" : ""}"${swappable}><span class="rota-employee-name">${displayName(e)}</span>${actions}</div>`;
             }).join("")
           : "";
 
@@ -1556,7 +1724,7 @@ function attachRotaInteractiveListeners(schedule: WeekSchedule | null) {
         for (const emp of available) {
           const item = document.createElement("div");
           item.className = "employee-picker-item";
-          item.textContent = emp.name;
+          item.textContent = displayName(emp);
           item.addEventListener("click", async () => {
             picker.remove();
             try {
@@ -1567,7 +1735,7 @@ function attachRotaInteractiveListeners(schedule: WeekSchedule | null) {
                   shift_id: shiftId,
                   employee_id: emp.id,
                   status: "Overridden",
-                  employee_name: emp.name,
+                  employee_name: displayName(emp),
                 },
               });
               await renderRotaView();
@@ -1670,9 +1838,8 @@ function attachRotaInteractiveListeners(schedule: WeekSchedule | null) {
         const date = btn.dataset.date!;
         const rotaId = parseInt(btn.dataset.rotaId!);
 
-        const roles = [...new Set(shiftTemplates.map((t) => t.required_role))];
         const roleOptions = roles.length > 0
-          ? roles.map((r) => `<option value="${r}">${r}</option>`).join("")
+          ? roles.map((r) => `<option value="${r.name}">${r.name}</option>`).join("")
           : `<option value="General">General</option>`;
 
         const form = document.createElement("div");
@@ -1757,7 +1924,10 @@ function setupNav() {
         document.getElementById("sidebar")!.classList.add("collapsed");
       }
 
-      if (currentView === "shifts") await fetchShiftTemplates();
+      if (currentView === "shifts") {
+        await fetchShiftTemplates();
+        await fetchRoles();
+      }
       renderView();
     });
   });
@@ -1830,12 +2000,27 @@ function setupSidebar() {
   });
 }
 
+// ─── Global focus management ────────────────────────────────
+
+// WKWebView (and some other webviews) don't blur inputs when clicking outside them.
+// This ensures tapping anywhere outside an active input dismisses it.
+document.addEventListener("click", (e) => {
+  const active = document.activeElement;
+  if (
+    (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) &&
+    e.target !== active
+  ) {
+    active.blur();
+  }
+});
+
 // ─── Boot ───────────────────────────────────────────────────
 
 async function main() {
   try {
     await initDb();
     await fetchEmployees();
+    await fetchRoles();
     setupSidebar();
     setupWeekNav();
     setupNav();

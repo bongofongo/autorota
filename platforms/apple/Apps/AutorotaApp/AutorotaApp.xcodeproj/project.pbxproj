@@ -17,7 +17,20 @@
 		5B9675282F72075A00205001 /* EmployeeDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B96751C2F72075A00205001 /* EmployeeDetailView.swift */; };
 		5B9675292F72075A00205001 /* AvailabilityGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B96751A2F72075A00205001 /* AvailabilityGridView.swift */; };
 		5B96752A2F72075A00205001 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B96751B2F72075A00205001 /* ContentView.swift */; };
+		5B9675302F72075A00205001 /* RoleViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B9675312F72075A00205001 /* RoleViewModel.swift */; };
+		CC0001012F80000000205001 /* AutorotaServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0001032F80000000205001 /* AutorotaServiceProtocol.swift */; };
+		CC0001022F80000000205001 /* LiveAutorotaService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0001042F80000000205001 /* LiveAutorotaService.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		CC0002012F80000000205001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5B9674FC2F7205E900205001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5B9675032F7205E900205001;
+			remoteInfo = AutorotaApp;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		5B9675042F7205E900205001 /* AutorotaApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AutorotaApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -30,12 +43,21 @@
 		5B96751D2F72075A00205001 /* EmployeeListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmployeeListView.swift; sourceTree = "<group>"; };
 		5B96751E2F72075A00205001 /* RotaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RotaView.swift; sourceTree = "<group>"; };
 		5B96751F2F72075A00205001 /* ShiftTemplateListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiftTemplateListView.swift; sourceTree = "<group>"; };
+		5B9675312F72075A00205001 /* RoleViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoleViewModel.swift; sourceTree = "<group>"; };
+		CC0001032F80000000205001 /* AutorotaServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutorotaServiceProtocol.swift; sourceTree = "<group>"; };
+		CC0001042F80000000205001 /* LiveAutorotaService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveAutorotaService.swift; sourceTree = "<group>"; };
+		CC0002052F80000000205001 /* AutorotaAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AutorotaAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		5B9675062F7205E900205001 /* AutorotaApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = AutorotaApp;
+			sourceTree = "<group>";
+		};
+		CC0002062F80000000205001 /* AutorotaAppTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AutorotaAppTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -49,6 +71,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CC0002072F80000000205001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -56,7 +85,9 @@
 			isa = PBXGroup;
 			children = (
 				5B9675062F7205E900205001 /* AutorotaApp */,
+				CC0002062F80000000205001 /* AutorotaAppTests */,
 				5B9675052F7205E900205001 /* Products */,
+				CC0001052F80000000205001 /* Services */,
 				5B9675192F72075A00205001 /* ViewModels */,
 				5B9675202F72075A00205001 /* Views */,
 			);
@@ -66,6 +97,7 @@
 			isa = PBXGroup;
 			children = (
 				5B9675042F7205E900205001 /* AutorotaApp.app */,
+				CC0002052F80000000205001 /* AutorotaAppTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -74,6 +106,7 @@
 			isa = PBXGroup;
 			children = (
 				5B9675162F72075A00205001 /* EmployeeViewModel.swift */,
+				5B9675312F72075A00205001 /* RoleViewModel.swift */,
 				5B9675172F72075A00205001 /* RotaViewModel.swift */,
 				5B9675182F72075A00205001 /* ShiftTemplateViewModel.swift */,
 			);
@@ -91,6 +124,15 @@
 				5B96751F2F72075A00205001 /* ShiftTemplateListView.swift */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		CC0001052F80000000205001 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				CC0001032F80000000205001 /* AutorotaServiceProtocol.swift */,
+				CC0001042F80000000205001 /* LiveAutorotaService.swift */,
+			);
+			path = Services;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -119,6 +161,27 @@
 			productReference = 5B9675042F7205E900205001 /* AutorotaApp.app */;
 			productType = "com.apple.product-type.application";
 		};
+		CC0002082F80000000205001 /* AutorotaAppTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CC0002092F80000000205001 /* Build configuration list for PBXNativeTarget "AutorotaAppTests" */;
+			buildPhases = (
+				CC00020A2F80000000205001 /* Sources */,
+				CC0002072F80000000205001 /* Frameworks */,
+				CC00020B2F80000000205001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				CC0002022F80000000205001 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				CC0002062F80000000205001 /* AutorotaAppTests */,
+			);
+			name = AutorotaAppTests;
+			productName = AutorotaAppTests;
+			productReference = CC0002052F80000000205001 /* AutorotaAppTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -131,6 +194,10 @@
 				TargetAttributes = {
 					5B9675032F7205E900205001 = {
 						CreatedOnToolsVersion = 26.2;
+					};
+					CC0002082F80000000205001 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 5B9675032F7205E900205001;
 					};
 				};
 			};
@@ -152,12 +219,20 @@
 			projectRoot = "";
 			targets = (
 				5B9675032F7205E900205001 /* AutorotaApp */,
+				CC0002082F80000000205001 /* AutorotaAppTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		5B9675022F7205E900205001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CC00020B2F80000000205001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -177,13 +252,31 @@
 				5B9675252F72075A00205001 /* RotaViewModel.swift in Sources */,
 				5B9675262F72075A00205001 /* ShiftTemplateViewModel.swift in Sources */,
 				5B9675272F72075A00205001 /* EmployeeViewModel.swift in Sources */,
+				5B9675302F72075A00205001 /* RoleViewModel.swift in Sources */,
 				5B9675282F72075A00205001 /* EmployeeDetailView.swift in Sources */,
 				5B9675292F72075A00205001 /* AvailabilityGridView.swift in Sources */,
 				5B96752A2F72075A00205001 /* ContentView.swift in Sources */,
+				CC0001012F80000000205001 /* AutorotaServiceProtocol.swift in Sources */,
+				CC0001022F80000000205001 /* LiveAutorotaService.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CC00020A2F80000000205001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		CC0002022F80000000205001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5B9675032F7205E900205001 /* AutorotaApp */;
+			targetProxy = CC0002012F80000000205001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		5B96750D2F7205EA00205001 /* Debug */ = {
@@ -307,6 +400,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 34VGHNCG6J;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -331,14 +425,13 @@
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
-				XROS_DEPLOYMENT_TARGET = 26.2;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
@@ -349,6 +442,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 34VGHNCG6J;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -373,13 +467,66 @@
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		CC00020C2F80000000205001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 34VGHNCG6J;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = Fongo.AutorotaAppTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AutorotaApp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/AutorotaApp";
+				XROS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Debug;
+		};
+		CC00020D2F80000000205001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 34VGHNCG6J;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = Fongo.AutorotaAppTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AutorotaApp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/AutorotaApp";
 				XROS_DEPLOYMENT_TARGET = 26.2;
 			};
 			name = Release;
@@ -401,6 +548,15 @@
 			buildConfigurations = (
 				5B9675102F7205EA00205001 /* Debug */,
 				5B9675112F7205EA00205001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CC0002092F80000000205001 /* Build configuration list for PBXNativeTarget "AutorotaAppTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CC00020C2F80000000205001 /* Debug */,
+				CC00020D2F80000000205001 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

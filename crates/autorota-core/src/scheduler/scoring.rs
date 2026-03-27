@@ -49,7 +49,9 @@ mod tests {
         }
         Employee {
             id: 1,
-            name: "Test".to_string(),
+            first_name: "Test".to_string(),
+            last_name: String::new(),
+            nickname: None,
             roles: vec!["barista".to_string()],
             start_date: NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
             target_weekly_hours: target_weekly,

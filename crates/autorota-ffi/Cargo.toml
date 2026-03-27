@@ -17,5 +17,8 @@ sqlx.workspace = true
 chrono.workspace = true
 thiserror = "2"
 
+[dev-dependencies]
+tempfile = "3"
+
 # uniffi-bindgen is installed separately: cargo install uniffi-bindgen --version 0.28.3
 # Run: uniffi-bindgen generate --library target/.../libautorota_ffi.dylib --language swift --out-dir ...

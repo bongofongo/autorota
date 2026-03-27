@@ -83,5 +83,46 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         sqlx::raw_sql(m5).execute(pool).await?;
     }
 
+    // Migration 006: create roles master table and populate from existing data.
+    let has_roles_table: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='roles'",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    if !has_roles_table {
+        let m6 = include_str!("../../migrations/006_roles_table.sql");
+        sqlx::raw_sql(m6).execute(pool).await?;
+
+        // Auto-populate from existing shift_templates.required_role values.
+        sqlx::raw_sql(
+            "INSERT OR IGNORE INTO roles (name)
+             SELECT DISTINCT required_role FROM shift_templates WHERE required_role != '' AND deleted = 0",
+        )
+        .execute(pool)
+        .await?;
+
+        // Auto-populate from existing employees.roles JSON arrays.
+        sqlx::raw_sql(
+            "INSERT OR IGNORE INTO roles (name)
+             SELECT DISTINCT j.value FROM employees, json_each(employees.roles) AS j
+             WHERE j.value != '' AND employees.deleted = 0",
+        )
+        .execute(pool)
+        .await?;
+    }
+
+    // Migration 007: split 'name' column into first_name, last_name, nickname.
+    let has_first_name: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) > 0 FROM pragma_table_info('employees') WHERE name = 'first_name'",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    if !has_first_name {
+        let m7 = include_str!("../../migrations/007_employee_name_split.sql");
+        sqlx::raw_sql(m7).execute(pool).await?;
+    }
+
     Ok(())
 }

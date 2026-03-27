@@ -3,6 +3,7 @@ use autorota_core::db::queries;
 use autorota_core::models::assignment::{Assignment, AssignmentStatus};
 use autorota_core::models::employee::Employee;
 use autorota_core::models::rota::Rota;
+use autorota_core::models::role::Role;
 use autorota_core::models::shift::ShiftTemplate;
 use autorota_core::scheduler;
 use autorota_core::scheduler::ScheduleResult;
@@ -78,6 +79,40 @@ async fn update_employee(state: State<'_, AppState>, employee: Employee) -> Resu
 async fn delete_employee(state: State<'_, AppState>, id: i64) -> Result<(), String> {
     let pool = get_pool(&state).await?;
     queries::delete_employee(&pool, id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ─── Roles ──────────────────────────────────────────────────
+
+#[tauri::command]
+async fn list_roles(state: State<'_, AppState>) -> Result<Vec<Role>, String> {
+    let pool = get_pool(&state).await?;
+    queries::list_roles(&pool)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn create_role(state: State<'_, AppState>, name: String) -> Result<i64, String> {
+    let pool = get_pool(&state).await?;
+    queries::insert_role(&pool, &name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn update_role(state: State<'_, AppState>, id: i64, name: String) -> Result<(), String> {
+    let pool = get_pool(&state).await?;
+    queries::update_role(&pool, id, &name)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn delete_role(state: State<'_, AppState>, id: i64) -> Result<(), String> {
+    let pool = get_pool(&state).await?;
+    queries::delete_role(&pool, id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -177,7 +212,7 @@ async fn create_assignment(
             .await
             .map_err(|e| e.to_string())?
         {
-            assignment.employee_name = Some(emp.name);
+            assignment.employee_name = Some(emp.display_name());
         }
     }
     queries::insert_assignment(&pool, &assignment)
@@ -490,7 +525,7 @@ async fn get_week_schedule(
             // Resolve employee name: prefer live employee data, fall back to snapshot
             let employee_name = emp_map
                 .get(&a.employee_id)
-                .map(|e| e.name.clone())
+                .map(|e| e.display_name())
                 .or_else(|| a.employee_name.clone())
                 .unwrap_or_else(|| format!("Employee #{}", a.employee_id));
             Some(ScheduleEntry {
@@ -578,6 +613,10 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             init_db,
+            list_roles,
+            create_role,
+            update_role,
+            delete_role,
             list_employees,
             get_employee,
             create_employee,

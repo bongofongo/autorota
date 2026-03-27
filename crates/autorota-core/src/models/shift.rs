@@ -55,3 +55,54 @@ impl Shift {
         self.end_time.hour() as u8
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_shift(start: (u32, u32), end: (u32, u32), date: (i32, u32, u32)) -> Shift {
+        Shift {
+            id: 1,
+            template_id: Some(1),
+            rota_id: 1,
+            date: NaiveDate::from_ymd_opt(date.0, date.1, date.2).unwrap(),
+            start_time: NaiveTime::from_hms_opt(start.0, start.1, 0).unwrap(),
+            end_time: NaiveTime::from_hms_opt(end.0, end.1, 0).unwrap(),
+            required_role: "Barista".into(),
+            min_employees: 1,
+            max_employees: 1,
+        }
+    }
+
+    #[test]
+    fn duration_hours_normal() {
+        let s = make_shift((7, 0), (12, 0), (2026, 3, 23));
+        assert_eq!(s.duration_hours(), 5.0);
+    }
+
+    #[test]
+    fn duration_hours_overnight() {
+        let s = make_shift((22, 0), (6, 0), (2026, 3, 23));
+        assert_eq!(s.duration_hours(), 8.0);
+    }
+
+    #[test]
+    fn duration_hours_half() {
+        let s = make_shift((9, 0), (13, 30), (2026, 3, 23));
+        assert_eq!(s.duration_hours(), 4.5);
+    }
+
+    #[test]
+    fn weekday_returns_correct_day() {
+        // 2026-03-23 is a Monday
+        let s = make_shift((7, 0), (12, 0), (2026, 3, 23));
+        assert_eq!(s.weekday(), Weekday::Mon);
+    }
+
+    #[test]
+    fn start_and_end_hour() {
+        let s = make_shift((7, 0), (15, 0), (2026, 3, 23));
+        assert_eq!(s.start_hour(), 7);
+        assert_eq!(s.end_hour(), 15);
+    }
+}

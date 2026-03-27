@@ -1,11 +1,10 @@
 import Foundation
-import Observation
 import AutorotaKit
 
 @Observable
-final class EmployeeViewModel {
+final class RoleViewModel {
 
-    var employees: [FfiEmployee] = []
+    var roles: [FfiRole] = []
     var isLoading = false
     var error: String?
 
@@ -19,25 +18,25 @@ final class EmployeeViewModel {
         isLoading = true
         error = nil
         do {
-            employees = try await service.listEmployees()
+            roles = try await service.listRoles()
         } catch {
             self.error = error.localizedDescription
         }
         isLoading = false
     }
 
-    func create(_ employee: FfiEmployee) async {
+    func create(name: String) async {
         do {
-            _ = try await service.createEmployee(employee)
+            _ = try await service.createRole(name: name)
             await load()
         } catch {
             self.error = error.localizedDescription
         }
     }
 
-    func update(_ employee: FfiEmployee) async {
+    func update(id: Int64, name: String) async {
         do {
-            try await service.updateEmployee(employee)
+            try await service.updateRole(id: id, name: name)
             await load()
         } catch {
             self.error = error.localizedDescription
@@ -46,7 +45,7 @@ final class EmployeeViewModel {
 
     func delete(id: Int64) async {
         do {
-            try await service.deleteEmployee(id: id)
+            try await service.deleteRole(id: id)
             await load()
         } catch {
             self.error = error.localizedDescription

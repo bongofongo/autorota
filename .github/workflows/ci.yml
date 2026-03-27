@@ -1,0 +1,138 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs for the same branch on new push
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  # ─── Rust: fmt + clippy + tests ─────────────────────────────────────────────
+  rust:
+    name: Rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Check formatting
+        run: cargo fmt --check --all
+
+      - name: Clippy
+        run: cargo clippy --workspace -- -D warnings
+
+      - name: Unit tests
+        run: cargo test --lib --workspace
+
+      - name: Integration tests
+        run: cargo test --test '*' -p autorota-core
+
+  # ─── Swift: ViewModel unit tests (mock service, no live FFI) ────────────────
+  # NOTE: Requires Xcode 26+ (Swift 6.2 / iOS 26 SDK).
+  #       Update the xcode-version input when Xcode 26 is available on hosted runners.
+  swift-app-tests:
+    name: Swift ViewModel — ${{ matrix.platform }}
+    runs-on: macos-15
+    needs: rust
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macOS
+            destination: platform=macOS
+          - platform: iOS
+            destination: platform=iOS Simulator,name=iPhone 17
+          - platform: iPadOS
+            destination: platform=iOS Simulator,name=iPad Pro 13-inch (M5)
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (Apple targets)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: >-
+            aarch64-apple-darwin
+            x86_64-apple-darwin
+            aarch64-apple-ios
+            aarch64-apple-ios-sim
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Select Xcode
+        run: sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+
+      - name: Build XCFramework
+        run: bash scripts/build_xcframework.sh
+
+      - name: Test — ${{ matrix.platform }}
+        run: |
+          xcodebuild test \
+            -project platforms/apple/Apps/AutorotaApp/AutorotaApp.xcodeproj \
+            -scheme AutorotaApp \
+            -destination '${{ matrix.destination }}'
+
+  # ─── Swift: AutorotaKit SPM integration tests (real FFI) ─────────────────────
+  swift-package-tests:
+    name: Swift Package Integration
+    runs-on: macos-15
+    needs: rust
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (Apple targets)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: >-
+            aarch64-apple-darwin
+            x86_64-apple-darwin
+            aarch64-apple-ios
+            aarch64-apple-ios-sim
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Select Xcode
+        run: sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+
+      - name: Build XCFramework
+        run: bash scripts/build_xcframework.sh
+
+      - name: Test AutorotaKit package
+        run: cd platforms/apple/AutorotaKit && swift test

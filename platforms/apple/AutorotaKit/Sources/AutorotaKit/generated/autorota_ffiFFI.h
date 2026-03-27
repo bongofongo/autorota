@@ -266,6 +266,11 @@ int64_t uniffi_autorota_ffi_fn_func_create_assignment(RustBuffer assignment, Rus
 int64_t uniffi_autorota_ffi_fn_func_create_employee(RustBuffer employee, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_CREATE_ROLE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_CREATE_ROLE
+int64_t uniffi_autorota_ffi_fn_func_create_role(RustBuffer name, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_CREATE_ROTA
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_CREATE_ROTA
 int64_t uniffi_autorota_ffi_fn_func_create_rota(RustBuffer week_start, RustCallStatus *_Nonnull out_status
@@ -284,6 +289,11 @@ void uniffi_autorota_ffi_fn_func_delete_assignment(int64_t id, RustCallStatus *_
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_DELETE_EMPLOYEE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_DELETE_EMPLOYEE
 void uniffi_autorota_ffi_fn_func_delete_employee(int64_t id, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_DELETE_ROLE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_DELETE_ROLE
+void uniffi_autorota_ffi_fn_func_delete_role(int64_t id, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_DELETE_SHIFT
@@ -332,6 +342,12 @@ RustBuffer uniffi_autorota_ffi_fn_func_list_employees(RustCallStatus *_Nonnull o
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LIST_ROLES
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LIST_ROLES
+RustBuffer uniffi_autorota_ffi_fn_func_list_roles(RustCallStatus *_Nonnull out_status
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LIST_SHIFT_TEMPLATES
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LIST_SHIFT_TEMPLATES
 RustBuffer uniffi_autorota_ffi_fn_func_list_shift_templates(RustCallStatus *_Nonnull out_status
@@ -371,6 +387,11 @@ void uniffi_autorota_ffi_fn_func_update_assignment_status(int64_t id, RustBuffer
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_UPDATE_EMPLOYEE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_UPDATE_EMPLOYEE
 void uniffi_autorota_ffi_fn_func_update_employee(RustBuffer employee, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_UPDATE_ROLE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_UPDATE_ROLE
+void uniffi_autorota_ffi_fn_func_update_role(int64_t id, RustBuffer name, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_UPDATE_SHIFT_TEMPLATE
@@ -681,6 +702,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_create_employee(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_CREATE_ROLE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_CREATE_ROLE
+uint16_t uniffi_autorota_ffi_checksum_func_create_role(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_CREATE_ROTA
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_CREATE_ROTA
 uint16_t uniffi_autorota_ffi_checksum_func_create_rota(void
@@ -702,6 +729,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_delete_assignment(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_DELETE_EMPLOYEE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_DELETE_EMPLOYEE
 uint16_t uniffi_autorota_ffi_checksum_func_delete_employee(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_DELETE_ROLE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_DELETE_ROLE
+uint16_t uniffi_autorota_ffi_checksum_func_delete_role(void
     
 );
 #endif
@@ -759,6 +792,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_list_employees(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_ROLES
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_ROLES
+uint16_t uniffi_autorota_ffi_checksum_func_list_roles(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_SHIFT_TEMPLATES
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_SHIFT_TEMPLATES
 uint16_t uniffi_autorota_ffi_checksum_func_list_shift_templates(void
@@ -804,6 +843,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_update_assignment_status(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_UPDATE_EMPLOYEE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_UPDATE_EMPLOYEE
 uint16_t uniffi_autorota_ffi_checksum_func_update_employee(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_UPDATE_ROLE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_UPDATE_ROLE
+uint16_t uniffi_autorota_ffi_checksum_func_update_role(void
     
 );
 #endif

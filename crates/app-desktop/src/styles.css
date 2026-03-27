@@ -1152,3 +1152,36 @@ details.avail-section[open] > summary::before {
   background: rgba(52, 152, 219, 0.2);
   color: #2980b9;
 }
+
+/* ── Role tag picker ──────────────────────────────────────── */
+.role-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.role-tag {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  border: 1.5px solid #bdc3c7;
+  background: #fff;
+  color: #555;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.role-tag:hover {
+  border-color: #3498db;
+}
+.role-tag.selected {
+  background: #3498db;
+  border-color: #3498db;
+  color: #fff;
+}
+.inline-edit-input {
+  font-size: 0.95rem;
+  padding: 0.15rem 0.4rem;
+  border: 1px solid #3498db;
+  border-radius: 4px;
+  outline: none;
+}
