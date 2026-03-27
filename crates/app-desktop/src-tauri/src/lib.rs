@@ -1,14 +1,17 @@
 use autorota_core::db;
 use autorota_core::db::queries;
 use autorota_core::models::assignment::{Assignment, AssignmentStatus};
+use autorota_core::models::availability::AvailabilityState;
 use autorota_core::models::employee::Employee;
+use autorota_core::models::overrides::{DayAvailability, EmployeeAvailabilityOverride, ShiftTemplateOverride};
 use autorota_core::models::rota::Rota;
 use autorota_core::models::role::Role;
 use autorota_core::models::shift::ShiftTemplate;
 use autorota_core::scheduler;
 use autorota_core::scheduler::ScheduleResult;
-use chrono::{Datelike, Local, NaiveDate};
+use chrono::{Datelike, Local, NaiveDate, NaiveTime};
 use sqlx::SqlitePool;
+use std::collections::HashMap;
 use tauri::{AppHandle, Manager, State};
 use tokio::sync::Mutex;
 
@@ -603,6 +606,241 @@ struct WeekSchedule {
     shifts: Vec<ShiftInfo>,
 }
 
+// ─── Override DTOs ───────────────────────────────────────────
+// Thin structs that use String/HashMap so Tauri's JSON layer
+// handles chrono types without relying on chrono's serde impl.
+
+#[derive(serde::Deserialize, serde::Serialize, Clone)]
+struct TauriEmployeeAvailabilityOverride {
+    id: i64,
+    employee_id: i64,
+    date: String,
+    /// {"8":"Yes","9":"Maybe",...}
+    availability: HashMap<String, String>,
+    notes: Option<String>,
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Clone)]
+struct TauriShiftTemplateOverride {
+    id: i64,
+    template_id: i64,
+    date: String,
+    cancelled: bool,
+    start_time: Option<String>,
+    end_time: Option<String>,
+    min_employees: Option<u32>,
+    max_employees: Option<u32>,
+    notes: Option<String>,
+}
+
+fn tauri_to_employee_avail_override(
+    dto: TauriEmployeeAvailabilityOverride,
+) -> Result<EmployeeAvailabilityOverride, String> {
+    let date = NaiveDate::parse_from_str(&dto.date, "%Y-%m-%d")
+        .map_err(|e| format!("invalid date '{}': {e}", dto.date))?;
+    let mut avail = DayAvailability::default();
+    for (hour_str, state_str) in dto.availability {
+        let hour: u8 = hour_str.parse().map_err(|_| format!("invalid hour key: {hour_str}"))?;
+        let state: AvailabilityState = state_str
+            .parse()
+            .map_err(|e| format!("invalid state '{state_str}': {e}"))?;
+        avail.set(hour, state);
+    }
+    Ok(EmployeeAvailabilityOverride {
+        id: dto.id,
+        employee_id: dto.employee_id,
+        date,
+        availability: avail,
+        notes: dto.notes,
+    })
+}
+
+fn employee_avail_override_to_tauri(
+    ovr: EmployeeAvailabilityOverride,
+) -> TauriEmployeeAvailabilityOverride {
+    let avail_map: HashMap<String, String> = ovr
+        .availability
+        .0
+        .into_iter()
+        .map(|(h, s)| (h.to_string(), s.to_string()))
+        .collect();
+    TauriEmployeeAvailabilityOverride {
+        id: ovr.id,
+        employee_id: ovr.employee_id,
+        date: ovr.date.to_string(),
+        availability: avail_map,
+        notes: ovr.notes,
+    }
+}
+
+fn parse_optional_time(s: Option<&str>) -> Result<Option<NaiveTime>, String> {
+    match s {
+        None => Ok(None),
+        Some(t) => NaiveTime::parse_from_str(t, "%H:%M")
+            .or_else(|_| NaiveTime::parse_from_str(t, "%H:%M:%S"))
+            .map(Some)
+            .map_err(|e| format!("invalid time '{t}': {e}")),
+    }
+}
+
+fn tauri_to_shift_template_override(
+    dto: TauriShiftTemplateOverride,
+) -> Result<ShiftTemplateOverride, String> {
+    let date = NaiveDate::parse_from_str(&dto.date, "%Y-%m-%d")
+        .map_err(|e| format!("invalid date '{}': {e}", dto.date))?;
+    Ok(ShiftTemplateOverride {
+        id: dto.id,
+        template_id: dto.template_id,
+        date,
+        cancelled: dto.cancelled,
+        start_time: parse_optional_time(dto.start_time.as_deref())?,
+        end_time: parse_optional_time(dto.end_time.as_deref())?,
+        min_employees: dto.min_employees,
+        max_employees: dto.max_employees,
+        notes: dto.notes,
+    })
+}
+
+fn shift_template_override_to_tauri(ovr: ShiftTemplateOverride) -> TauriShiftTemplateOverride {
+    TauriShiftTemplateOverride {
+        id: ovr.id,
+        template_id: ovr.template_id,
+        date: ovr.date.to_string(),
+        cancelled: ovr.cancelled,
+        start_time: ovr.start_time.map(|t| t.format("%H:%M").to_string()),
+        end_time: ovr.end_time.map(|t| t.format("%H:%M").to_string()),
+        min_employees: ovr.min_employees,
+        max_employees: ovr.max_employees,
+        notes: ovr.notes,
+    }
+}
+
+// ─── Employee Availability Override commands ──────────────────
+
+#[tauri::command]
+async fn upsert_employee_availability_override(
+    state: State<'_, AppState>,
+    override_: TauriEmployeeAvailabilityOverride,
+) -> Result<i64, String> {
+    let pool = get_pool(&state).await?;
+    let ovr = tauri_to_employee_avail_override(override_)?;
+    queries::upsert_employee_availability_override(&pool, &ovr)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_employee_availability_override(
+    state: State<'_, AppState>,
+    employee_id: i64,
+    date: String,
+) -> Result<Option<TauriEmployeeAvailabilityOverride>, String> {
+    let pool = get_pool(&state).await?;
+    let d = NaiveDate::parse_from_str(&date, "%Y-%m-%d")
+        .map_err(|e| format!("invalid date '{date}': {e}"))?;
+    queries::get_employee_availability_override(&pool, employee_id, d)
+        .await
+        .map(|opt| opt.map(employee_avail_override_to_tauri))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn list_employee_availability_overrides(
+    state: State<'_, AppState>,
+    employee_id: i64,
+) -> Result<Vec<TauriEmployeeAvailabilityOverride>, String> {
+    let pool = get_pool(&state).await?;
+    queries::list_employee_availability_overrides_for_employee(&pool, employee_id)
+        .await
+        .map(|v| v.into_iter().map(employee_avail_override_to_tauri).collect())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn list_all_employee_availability_overrides(
+    state: State<'_, AppState>,
+) -> Result<Vec<TauriEmployeeAvailabilityOverride>, String> {
+    let pool = get_pool(&state).await?;
+    queries::list_all_employee_availability_overrides(&pool)
+        .await
+        .map(|v| v.into_iter().map(employee_avail_override_to_tauri).collect())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn delete_employee_availability_override(
+    state: State<'_, AppState>,
+    id: i64,
+) -> Result<(), String> {
+    let pool = get_pool(&state).await?;
+    queries::delete_employee_availability_override(&pool, id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// ─── Shift Template Override commands ────────────────────────
+
+#[tauri::command]
+async fn upsert_shift_template_override(
+    state: State<'_, AppState>,
+    override_: TauriShiftTemplateOverride,
+) -> Result<i64, String> {
+    let pool = get_pool(&state).await?;
+    let ovr = tauri_to_shift_template_override(override_)?;
+    queries::upsert_shift_template_override(&pool, &ovr)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_shift_template_override(
+    state: State<'_, AppState>,
+    template_id: i64,
+    date: String,
+) -> Result<Option<TauriShiftTemplateOverride>, String> {
+    let pool = get_pool(&state).await?;
+    let d = NaiveDate::parse_from_str(&date, "%Y-%m-%d")
+        .map_err(|e| format!("invalid date '{date}': {e}"))?;
+    queries::get_shift_template_override(&pool, template_id, d)
+        .await
+        .map(|opt| opt.map(shift_template_override_to_tauri))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn list_shift_template_overrides_for_template(
+    state: State<'_, AppState>,
+    template_id: i64,
+) -> Result<Vec<TauriShiftTemplateOverride>, String> {
+    let pool = get_pool(&state).await?;
+    queries::list_shift_template_overrides_for_template(&pool, template_id)
+        .await
+        .map(|v| v.into_iter().map(shift_template_override_to_tauri).collect())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn list_all_shift_template_overrides(
+    state: State<'_, AppState>,
+) -> Result<Vec<TauriShiftTemplateOverride>, String> {
+    let pool = get_pool(&state).await?;
+    queries::list_all_shift_template_overrides(&pool)
+        .await
+        .map(|v| v.into_iter().map(shift_template_override_to_tauri).collect())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn delete_shift_template_override(
+    state: State<'_, AppState>,
+    id: i64,
+) -> Result<(), String> {
+    let pool = get_pool(&state).await?;
+    queries::delete_shift_template_override(&pool, id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 // ─── App entry ───────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -641,6 +879,16 @@ pub fn run() {
             materialise_week,
             run_schedule,
             get_week_schedule,
+            upsert_employee_availability_override,
+            get_employee_availability_override,
+            list_employee_availability_overrides,
+            list_all_employee_availability_overrides,
+            delete_employee_availability_override,
+            upsert_shift_template_override,
+            get_shift_template_override,
+            list_shift_template_overrides_for_template,
+            list_all_shift_template_overrides,
+            delete_shift_template_override,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

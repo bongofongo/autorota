@@ -4,6 +4,7 @@ pub mod tiebreak;
 use crate::models::assignment::{Assignment, AssignmentStatus};
 use crate::models::availability::AvailabilityState;
 use crate::models::employee::Employee;
+use crate::models::overrides::EmployeeAvailabilityOverride;
 use crate::models::shift::Shift;
 use chrono::NaiveDate;
 use std::collections::HashMap;
@@ -121,17 +122,22 @@ fn is_eligible(
     shift: &Shift,
     state: &SchedulerState,
     all_shifts: &HashMap<i64, &Shift>,
+    avail_override_map: &HashMap<(i64, NaiveDate), &EmployeeAvailabilityOverride>,
 ) -> bool {
     // Must have the required role
     if !employee.has_role(&shift.required_role) {
         return false;
     }
 
-    // Must not have No availability for any hour of the shift
-    let avail =
+    // Must not have No availability for any hour of the shift.
+    // Use date-specific override when present, otherwise fall back to weekly availability.
+    let avail = if let Some(ovr) = avail_override_map.get(&(employee.id, shift.date)) {
+        ovr.availability.for_window(shift.start_hour(), shift.end_hour())
+    } else {
         employee
             .availability
-            .for_window(shift.weekday(), shift.start_hour(), shift.end_hour());
+            .for_window(shift.weekday(), shift.start_hour(), shift.end_hour())
+    };
     if avail == AvailabilityState::No {
         return false;
     }
@@ -190,10 +196,15 @@ fn has_time_overlap(
 
 /// Pure function implementing the two-pass scheduling algorithm.
 /// Takes all data as arguments — no DB access, easy to test.
+///
+/// `avail_overrides` — date-specific availability overrides for employees.
+/// When a shift falls on a date that has an override for a given employee,
+/// the override's `DayAvailability` is used instead of the weekly availability map.
 pub fn schedule_pure(
     shifts: &[Shift],
     employees: &[Employee],
     existing_assignments: &[Assignment],
+    avail_overrides: &[EmployeeAvailabilityOverride],
     rota_id: i64,
     week_start: NaiveDate,
 ) -> ScheduleResult {
@@ -231,6 +242,9 @@ pub fn schedule_pure(
 
     let shift_map: HashMap<i64, &Shift> = shifts.iter().map(|s| (s.id, s)).collect();
     let emp_map: HashMap<i64, &Employee> = employees.iter().map(|e| (e.id, e)).collect();
+    // Build a (employee_id, date) → override lookup for O(1) access during scheduling.
+    let avail_override_map: HashMap<(i64, NaiveDate), &EmployeeAvailabilityOverride> =
+        avail_overrides.iter().map(|o| ((o.employee_id, o.date), o)).collect();
     let mut state = SchedulerState::new();
     let mut warnings = Vec::new();
 
@@ -260,7 +274,7 @@ pub fn schedule_pure(
         .map(|s| {
             let eligible_count = employees
                 .iter()
-                .filter(|e| is_eligible(e, s, &state, &shift_map))
+                .filter(|e| is_eligible(e, s, &state, &shift_map, &avail_override_map))
                 .count();
             (s.id, eligible_count)
         })
@@ -300,11 +314,15 @@ pub fn schedule_pure(
             let mut candidates: Vec<(&Employee, (u8, i32, i32), u64)> = employees
                 .iter()
                 .filter(|e| {
-                    let eligible = is_eligible(e, shift, &state, &shift_map);
+                    let eligible = is_eligible(e, shift, &state, &shift_map, &avail_override_map);
                     if !eligible {
                         // Log why each employee is ineligible
                         let has_role = e.has_role(&shift.required_role);
-                        let avail = e.availability.for_window(shift.weekday(), shift.start_hour(), shift.end_hour());
+                        let avail = if let Some(ovr) = avail_override_map.get(&(e.id, shift.date)) {
+                            ovr.availability.for_window(shift.start_hour(), shift.end_hour())
+                        } else {
+                            e.availability.for_window(shift.weekday(), shift.start_hour(), shift.end_hour())
+                        };
                         let already = state.is_assigned_to_shift(e.id, shift.id);
                         let daily = state.employee_daily_hours(e.id, shift.date);
                         let weekly = state.employee_weekly_hours(e.id);
@@ -316,7 +334,8 @@ pub fn schedule_pure(
                 .map(|e| {
                     let weekly = state.employee_weekly_hours(e.id);
                     let daily = state.employee_daily_hours(e.id, shift.date);
-                    let score = scoring::score_employee(e, shift, weekly, daily);
+                    let day_avail = avail_override_map.get(&(e.id, shift.date)).map(|o| &o.availability);
+                    let score = scoring::score_employee(e, shift, weekly, daily, day_avail);
                     let tb = tiebreak::tiebreak_key(e.id, &week_start);
                     (e, score, tb)
                 })
@@ -392,8 +411,9 @@ pub async fn schedule(
     let shifts = queries::list_shifts_for_rota(pool, rota_id).await?;
     let employees = queries::list_employees(pool).await?;
     let existing = queries::list_assignments_for_rota(pool, rota_id).await?;
+    let avail_overrides = queries::list_all_employee_availability_overrides(pool).await?;
 
-    let result = schedule_pure(&shifts, &employees, &existing, rota_id, rota.week_start);
+    let result = schedule_pure(&shifts, &employees, &existing, &avail_overrides, rota_id, rota.week_start);
 
     // Persist only newly generated assignments (not the existing overrides)
     for assignment in &result.assignments {

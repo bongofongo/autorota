@@ -1185,3 +1185,125 @@ details.avail-section[open] > summary::before {
   border-radius: 4px;
   outline: none;
 }
+
+/* ─── Overrides ─────────────────────────────────────────────── */
+.section-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+.section-header-row h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+.overrides-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.overrides-table th,
+.overrides-table td {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--border, #e0e0e0);
+}
+.overrides-table th {
+  font-weight: 600;
+  color: var(--text-muted, #666);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.btn-sm {
+  padding: 0.2rem 0.55rem;
+  font-size: 0.8rem;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+}
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-right: 4px;
+}
+.badge-danger {
+  background: #fde8e8;
+  color: #c0392b;
+}
+.override-form {
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border, #e0e0e0);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 0.5rem;
+}
+.override-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+.override-form select,
+.override-form input[type="date"],
+.override-form input[type="time"],
+.override-form input[type="text"],
+.override-form input[type="number"] {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 5px;
+  font-size: 0.9rem;
+}
+.override-form .checkbox-label {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+.form-section-label {
+  font-size: 0.85rem;
+  color: var(--text-muted, #666);
+  margin-bottom: 0.4rem;
+}
+.form-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+/* Single-day availability grid */
+.day-avail-grid {
+  display: grid;
+  grid-template-columns: 60px 80px;
+  gap: 2px;
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 0.5rem;
+}
+.day-avail-header {
+  font-weight: 600;
+  font-size: 0.75rem;
+  color: var(--text-muted, #666);
+  padding: 2px 4px;
+  text-transform: uppercase;
+}
+.day-avail-label {
+  font-size: 0.78rem;
+  color: var(--text-muted, #666);
+  padding: 2px 4px;
+  display: flex;
+  align-items: center;
+}
+.day-avail-cell {
+  height: 22px;
+  border-radius: 3px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.day-avail-cell.state-yes     { background: rgba(39,174,96,0.55); }
+.day-avail-cell.state-no      { background: rgba(231,76,60,0.45); }
+.day-avail-cell.state-maybe   { background: rgba(243,156,18,0.3); }
+.day-avail-cell:hover { border-color: #3498db; }

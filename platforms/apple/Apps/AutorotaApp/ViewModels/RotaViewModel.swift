@@ -17,6 +17,12 @@ final class RotaViewModel {
 
     var selectedWeekStart: String = currentWeekStart()
 
+    // Generate confirmation (shown when Generate is tapped on a past/current week with no schedule)
+    var showGenerateConfirmation = false
+
+    // Delete schedule confirmation
+    var showDeleteScheduleConfirmation = false
+
     // Edit mode
     var isEditMode = false
     var employees: [FfiEmployee] = []
@@ -63,12 +69,58 @@ final class RotaViewModel {
     }
 
     func runSchedule() async {
+        // For past/current weeks with no existing schedule, let the user choose
+        // how to create one rather than hitting the FFI guard with an error.
+        if weekCategory != .future && schedule == nil {
+            showGenerateConfirmation = true
+            return
+        }
         isScheduling = true
         error = nil
         warnings = []
         do {
             let result = try await service.runSchedule(weekStart: selectedWeekStart)
             warnings = result.warnings
+            await loadSchedule()
+        } catch {
+            self.error = error.localizedDescription
+        }
+        isScheduling = false
+    }
+
+    /// Create a schedule for the current week by materialising all shifts from
+    /// templates, leaving every shift unassigned. For past/current weeks only.
+    func createFromTemplate() async {
+        isScheduling = true
+        error = nil
+        do {
+            _ = try await service.materialiseWeek(weekStart: selectedWeekStart)
+            await loadSchedule()
+        } catch {
+            self.error = error.localizedDescription
+        }
+        isScheduling = false
+    }
+
+    /// Delete the entire schedule for the selected week, including all shifts
+    /// and assignments. Only available for past/current weeks in edit mode.
+    func deleteSchedule() async {
+        do {
+            try await service.deleteWeek(weekStart: selectedWeekStart)
+            schedule = nil
+            exitEditMode()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    /// Create a completely blank schedule for the current week with no shifts
+    /// and no assignments. For past/current weeks only.
+    func createEmpty() async {
+        isScheduling = true
+        error = nil
+        do {
+            _ = try await service.createEmptyWeek(weekStart: selectedWeekStart)
             await loadSchedule()
         } catch {
             self.error = error.localizedDescription
@@ -105,6 +157,8 @@ final class RotaViewModel {
     func resetModes() {
         isEditMode = false
         pastUnlocked = false
+        showGenerateConfirmation = false
+        showDeleteScheduleConfirmation = false
         cancelSwap()
     }
 
@@ -239,6 +293,21 @@ final class RotaViewModel {
     }
 
     // MARK: - Derived helpers
+
+    /// Human-readable date range for the selected week, e.g. "Mar 23 – Mar 29, 2026".
+    var weekDateRangeLabel: String {
+        let parseFmt = DateFormatter()
+        parseFmt.dateFormat = "yyyy-MM-dd"
+        parseFmt.locale = Locale(identifier: "en_US_POSIX")
+        guard let monday = parseFmt.date(from: selectedWeekStart) else { return selectedWeekStart }
+        let cal = Calendar(identifier: .iso8601)
+        let sunday = cal.date(byAdding: .day, value: 6, to: monday)!
+        let displayFmt = DateFormatter()
+        displayFmt.dateFormat = "MMM d"
+        let yearFmt = DateFormatter()
+        yearFmt.dateFormat = "yyyy"
+        return "\(displayFmt.string(from: monday)) – \(displayFmt.string(from: sunday)), \(yearFmt.string(from: sunday))"
+    }
 
     /// Shifts grouped by weekday for display.
     var shiftsByDay: [(weekday: String, shifts: [FfiShiftInfo])] {

@@ -5,7 +5,10 @@ python_summary.txt
 
 # XCFramework binaries (built by scripts/build_xcframework.sh — do not commit)
 platforms/apple/AutorotaKit/XCFrameworks/
+platforms/apple/AutorotaKit/.build/
 # Xcode derived data
 *.xcuserstate
 xcuserdata/
 DerivedData/
+
+crates/app-desktop/dist/

@@ -606,6 +606,81 @@ public func FfiConverterTypeAvailabilitySlot_lower(_ value: AvailabilitySlot) ->
 }
 
 
+/**
+ * A single hour slot in a `DayAvailability` override (no weekday — the date carries that).
+ */
+public struct DayAvailabilitySlot {
+    public var hour: UInt8
+    /**
+     * "Yes" | "Maybe" | "No"
+     */
+    public var state: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(hour: UInt8, 
+        /**
+         * "Yes" | "Maybe" | "No"
+         */state: String) {
+        self.hour = hour
+        self.state = state
+    }
+}
+
+
+
+extension DayAvailabilitySlot: Equatable, Hashable {
+    public static func ==(lhs: DayAvailabilitySlot, rhs: DayAvailabilitySlot) -> Bool {
+        if lhs.hour != rhs.hour {
+            return false
+        }
+        if lhs.state != rhs.state {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(hour)
+        hasher.combine(state)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeDayAvailabilitySlot: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DayAvailabilitySlot {
+        return
+            try DayAvailabilitySlot(
+                hour: FfiConverterUInt8.read(from: &buf), 
+                state: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: DayAvailabilitySlot, into buf: inout [UInt8]) {
+        FfiConverterUInt8.write(value.hour, into: &buf)
+        FfiConverterString.write(value.state, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDayAvailabilitySlot_lift(_ buf: RustBuffer) throws -> DayAvailabilitySlot {
+    return try FfiConverterTypeDayAvailabilitySlot.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDayAvailabilitySlot_lower(_ value: DayAvailabilitySlot) -> RustBuffer {
+    return FfiConverterTypeDayAvailabilitySlot.lower(value)
+}
+
+
 public struct FfiAssignment {
     public var id: Int64
     public var rotaId: Int64
@@ -885,6 +960,105 @@ public func FfiConverterTypeFfiEmployee_lift(_ buf: RustBuffer) throws -> FfiEmp
 #endif
 public func FfiConverterTypeFfiEmployee_lower(_ value: FfiEmployee) -> RustBuffer {
     return FfiConverterTypeFfiEmployee.lower(value)
+}
+
+
+/**
+ * Date-specific availability override for one employee on one calendar date.
+ */
+public struct FfiEmployeeAvailabilityOverride {
+    public var id: Int64
+    public var employeeId: Int64
+    /**
+     * "YYYY-MM-DD"
+     */
+    public var date: String
+    public var availability: [DayAvailabilitySlot]
+    public var notes: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(id: Int64, employeeId: Int64, 
+        /**
+         * "YYYY-MM-DD"
+         */date: String, availability: [DayAvailabilitySlot], notes: String?) {
+        self.id = id
+        self.employeeId = employeeId
+        self.date = date
+        self.availability = availability
+        self.notes = notes
+    }
+}
+
+
+
+extension FfiEmployeeAvailabilityOverride: Equatable, Hashable {
+    public static func ==(lhs: FfiEmployeeAvailabilityOverride, rhs: FfiEmployeeAvailabilityOverride) -> Bool {
+        if lhs.id != rhs.id {
+            return false
+        }
+        if lhs.employeeId != rhs.employeeId {
+            return false
+        }
+        if lhs.date != rhs.date {
+            return false
+        }
+        if lhs.availability != rhs.availability {
+            return false
+        }
+        if lhs.notes != rhs.notes {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+        hasher.combine(employeeId)
+        hasher.combine(date)
+        hasher.combine(availability)
+        hasher.combine(notes)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFfiEmployeeAvailabilityOverride: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiEmployeeAvailabilityOverride {
+        return
+            try FfiEmployeeAvailabilityOverride(
+                id: FfiConverterInt64.read(from: &buf), 
+                employeeId: FfiConverterInt64.read(from: &buf), 
+                date: FfiConverterString.read(from: &buf), 
+                availability: FfiConverterSequenceTypeDayAvailabilitySlot.read(from: &buf), 
+                notes: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FfiEmployeeAvailabilityOverride, into buf: inout [UInt8]) {
+        FfiConverterInt64.write(value.id, into: &buf)
+        FfiConverterInt64.write(value.employeeId, into: &buf)
+        FfiConverterString.write(value.date, into: &buf)
+        FfiConverterSequenceTypeDayAvailabilitySlot.write(value.availability, into: &buf)
+        FfiConverterOptionString.write(value.notes, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiEmployeeAvailabilityOverride_lift(_ buf: RustBuffer) throws -> FfiEmployeeAvailabilityOverride {
+    return try FfiConverterTypeFfiEmployeeAvailabilityOverride.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiEmployeeAvailabilityOverride_lower(_ value: FfiEmployeeAvailabilityOverride) -> RustBuffer {
+    return FfiConverterTypeFfiEmployeeAvailabilityOverride.lower(value)
 }
 
 
@@ -1608,6 +1782,149 @@ public func FfiConverterTypeFfiShiftTemplate_lower(_ value: FfiShiftTemplate) ->
 }
 
 
+/**
+ * Date-specific modification to a recurring shift template on one calendar date.
+ */
+public struct FfiShiftTemplateOverride {
+    public var id: Int64
+    public var templateId: Int64
+    /**
+     * "YYYY-MM-DD"
+     */
+    public var date: String
+    public var cancelled: Bool
+    /**
+     * "HH:MM" or None (use template value)
+     */
+    public var startTime: String?
+    /**
+     * "HH:MM" or None (use template value)
+     */
+    public var endTime: String?
+    public var minEmployees: UInt32?
+    public var maxEmployees: UInt32?
+    public var notes: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(id: Int64, templateId: Int64, 
+        /**
+         * "YYYY-MM-DD"
+         */date: String, cancelled: Bool, 
+        /**
+         * "HH:MM" or None (use template value)
+         */startTime: String?, 
+        /**
+         * "HH:MM" or None (use template value)
+         */endTime: String?, minEmployees: UInt32?, maxEmployees: UInt32?, notes: String?) {
+        self.id = id
+        self.templateId = templateId
+        self.date = date
+        self.cancelled = cancelled
+        self.startTime = startTime
+        self.endTime = endTime
+        self.minEmployees = minEmployees
+        self.maxEmployees = maxEmployees
+        self.notes = notes
+    }
+}
+
+
+
+extension FfiShiftTemplateOverride: Equatable, Hashable {
+    public static func ==(lhs: FfiShiftTemplateOverride, rhs: FfiShiftTemplateOverride) -> Bool {
+        if lhs.id != rhs.id {
+            return false
+        }
+        if lhs.templateId != rhs.templateId {
+            return false
+        }
+        if lhs.date != rhs.date {
+            return false
+        }
+        if lhs.cancelled != rhs.cancelled {
+            return false
+        }
+        if lhs.startTime != rhs.startTime {
+            return false
+        }
+        if lhs.endTime != rhs.endTime {
+            return false
+        }
+        if lhs.minEmployees != rhs.minEmployees {
+            return false
+        }
+        if lhs.maxEmployees != rhs.maxEmployees {
+            return false
+        }
+        if lhs.notes != rhs.notes {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+        hasher.combine(templateId)
+        hasher.combine(date)
+        hasher.combine(cancelled)
+        hasher.combine(startTime)
+        hasher.combine(endTime)
+        hasher.combine(minEmployees)
+        hasher.combine(maxEmployees)
+        hasher.combine(notes)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFfiShiftTemplateOverride: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiShiftTemplateOverride {
+        return
+            try FfiShiftTemplateOverride(
+                id: FfiConverterInt64.read(from: &buf), 
+                templateId: FfiConverterInt64.read(from: &buf), 
+                date: FfiConverterString.read(from: &buf), 
+                cancelled: FfiConverterBool.read(from: &buf), 
+                startTime: FfiConverterOptionString.read(from: &buf), 
+                endTime: FfiConverterOptionString.read(from: &buf), 
+                minEmployees: FfiConverterOptionUInt32.read(from: &buf), 
+                maxEmployees: FfiConverterOptionUInt32.read(from: &buf), 
+                notes: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FfiShiftTemplateOverride, into buf: inout [UInt8]) {
+        FfiConverterInt64.write(value.id, into: &buf)
+        FfiConverterInt64.write(value.templateId, into: &buf)
+        FfiConverterString.write(value.date, into: &buf)
+        FfiConverterBool.write(value.cancelled, into: &buf)
+        FfiConverterOptionString.write(value.startTime, into: &buf)
+        FfiConverterOptionString.write(value.endTime, into: &buf)
+        FfiConverterOptionUInt32.write(value.minEmployees, into: &buf)
+        FfiConverterOptionUInt32.write(value.maxEmployees, into: &buf)
+        FfiConverterOptionString.write(value.notes, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiShiftTemplateOverride_lift(_ buf: RustBuffer) throws -> FfiShiftTemplateOverride {
+    return try FfiConverterTypeFfiShiftTemplateOverride.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiShiftTemplateOverride_lower(_ value: FfiShiftTemplateOverride) -> RustBuffer {
+    return FfiConverterTypeFfiShiftTemplateOverride.lower(value)
+}
+
+
 public struct FfiShortfallWarning {
     public var shiftId: Int64
     public var needed: UInt32
@@ -1891,6 +2208,30 @@ extension FfiError: Foundation.LocalizedError {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionUInt32: FfiConverterRustBuffer {
+    typealias SwiftType = UInt32?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterUInt32.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterUInt32.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionInt64: FfiConverterRustBuffer {
     typealias SwiftType = Int64?
 
@@ -1963,6 +2304,30 @@ fileprivate struct FfiConverterOptionTypeFfiEmployee: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeFfiEmployeeAvailabilityOverride: FfiConverterRustBuffer {
+    typealias SwiftType = FfiEmployeeAvailabilityOverride?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeFfiEmployeeAvailabilityOverride.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeFfiEmployeeAvailabilityOverride.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeFfiRota: FfiConverterRustBuffer {
     typealias SwiftType = FfiRota?
 
@@ -1979,6 +2344,30 @@ fileprivate struct FfiConverterOptionTypeFfiRota: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeFfiRota.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeFfiShiftTemplateOverride: FfiConverterRustBuffer {
+    typealias SwiftType = FfiShiftTemplateOverride?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeFfiShiftTemplateOverride.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeFfiShiftTemplateOverride.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }
@@ -2061,6 +2450,31 @@ fileprivate struct FfiConverterSequenceTypeAvailabilitySlot: FfiConverterRustBuf
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeDayAvailabilitySlot: FfiConverterRustBuffer {
+    typealias SwiftType = [DayAvailabilitySlot]
+
+    public static func write(_ value: [DayAvailabilitySlot], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeDayAvailabilitySlot.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [DayAvailabilitySlot] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [DayAvailabilitySlot]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeDayAvailabilitySlot.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeFfiAssignment: FfiConverterRustBuffer {
     typealias SwiftType = [FfiAssignment]
 
@@ -2103,6 +2517,31 @@ fileprivate struct FfiConverterSequenceTypeFfiEmployee: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeFfiEmployee.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeFfiEmployeeAvailabilityOverride: FfiConverterRustBuffer {
+    typealias SwiftType = [FfiEmployeeAvailabilityOverride]
+
+    public static func write(_ value: [FfiEmployeeAvailabilityOverride], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeFfiEmployeeAvailabilityOverride.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [FfiEmployeeAvailabilityOverride] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [FfiEmployeeAvailabilityOverride]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeFfiEmployeeAvailabilityOverride.read(from: &buf))
         }
         return seq
     }
@@ -2236,6 +2675,31 @@ fileprivate struct FfiConverterSequenceTypeFfiShiftTemplate: FfiConverterRustBuf
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeFfiShiftTemplateOverride: FfiConverterRustBuffer {
+    typealias SwiftType = [FfiShiftTemplateOverride]
+
+    public static func write(_ value: [FfiShiftTemplateOverride], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeFfiShiftTemplateOverride.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [FfiShiftTemplateOverride] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [FfiShiftTemplateOverride]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeFfiShiftTemplateOverride.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeFfiShortfallWarning: FfiConverterRustBuffer {
     typealias SwiftType = [FfiShortfallWarning]
 
@@ -2282,6 +2746,17 @@ public func createEmployee(employee: FfiEmployee)throws  -> Int64 {
     )
 })
 }
+/**
+ * Create an empty rota record for the given week with no shifts and no assignments.
+ * Returns the rota id. Safe to call multiple times (returns existing id if one already exists).
+ */
+public func createEmptyWeek(weekStart: String)throws  -> Int64 {
+    return try  FfiConverterInt64.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_create_empty_week(
+        FfiConverterString.lower(weekStart),$0
+    )
+})
+}
 public func createRole(name: String)throws  -> Int64 {
     return try  FfiConverterInt64.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_create_role(
@@ -2315,6 +2790,12 @@ public func deleteEmployee(id: Int64)throws  {try rustCallWithError(FfiConverter
     )
 }
 }
+public func deleteEmployeeAvailabilityOverride(id: Int64)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_delete_employee_availability_override(
+        FfiConverterInt64.lower(id),$0
+    )
+}
+}
 public func deleteRole(id: Int64)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_delete_role(
         FfiConverterInt64.lower(id),$0
@@ -2333,6 +2814,22 @@ public func deleteShiftTemplate(id: Int64)throws  {try rustCallWithError(FfiConv
     )
 }
 }
+public func deleteShiftTemplateOverride(id: Int64)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_delete_shift_template_override(
+        FfiConverterInt64.lower(id),$0
+    )
+}
+}
+/**
+ * Delete the rota for the given week along with all its shifts and assignments.
+ * No-ops silently if no rota exists for that week.
+ */
+public func deleteWeek(weekStart: String)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_delete_week(
+        FfiConverterString.lower(weekStart),$0
+    )
+}
+}
 public func finalizeRota(id: Int64)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_finalize_rota(
         FfiConverterInt64.lower(id),$0
@@ -2343,6 +2840,14 @@ public func getEmployee(id: Int64)throws  -> FfiEmployee? {
     return try  FfiConverterOptionTypeFfiEmployee.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_get_employee(
         FfiConverterInt64.lower(id),$0
+    )
+})
+}
+public func getEmployeeAvailabilityOverride(employeeId: Int64, date: String)throws  -> FfiEmployeeAvailabilityOverride? {
+    return try  FfiConverterOptionTypeFfiEmployeeAvailabilityOverride.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_get_employee_availability_override(
+        FfiConverterInt64.lower(employeeId),
+        FfiConverterString.lower(date),$0
     )
 })
 }
@@ -2357,6 +2862,14 @@ public func getRotaByWeek(weekStart: String)throws  -> FfiRota? {
     return try  FfiConverterOptionTypeFfiRota.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_get_rota_by_week(
         FfiConverterString.lower(weekStart),$0
+    )
+})
+}
+public func getShiftTemplateOverride(templateId: Int64, date: String)throws  -> FfiShiftTemplateOverride? {
+    return try  FfiConverterOptionTypeFfiShiftTemplateOverride.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_get_shift_template_override(
+        FfiConverterInt64.lower(templateId),
+        FfiConverterString.lower(date),$0
     )
 })
 }
@@ -2382,6 +2895,25 @@ public func initDb(dbPath: String)throws  {try rustCallWithError(FfiConverterTyp
     )
 }
 }
+public func listAllEmployeeAvailabilityOverrides()throws  -> [FfiEmployeeAvailabilityOverride] {
+    return try  FfiConverterSequenceTypeFfiEmployeeAvailabilityOverride.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_list_all_employee_availability_overrides($0
+    )
+})
+}
+public func listAllShiftTemplateOverrides()throws  -> [FfiShiftTemplateOverride] {
+    return try  FfiConverterSequenceTypeFfiShiftTemplateOverride.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_list_all_shift_template_overrides($0
+    )
+})
+}
+public func listEmployeeAvailabilityOverrides(employeeId: Int64)throws  -> [FfiEmployeeAvailabilityOverride] {
+    return try  FfiConverterSequenceTypeFfiEmployeeAvailabilityOverride.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_list_employee_availability_overrides(
+        FfiConverterInt64.lower(employeeId),$0
+    )
+})
+}
 public func listEmployees()throws  -> [FfiEmployee] {
     return try  FfiConverterSequenceTypeFfiEmployee.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_list_employees($0
@@ -2391,6 +2923,13 @@ public func listEmployees()throws  -> [FfiEmployee] {
 public func listRoles()throws  -> [FfiRole] {
     return try  FfiConverterSequenceTypeFfiRole.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_list_roles($0
+    )
+})
+}
+public func listShiftTemplateOverridesForTemplate(templateId: Int64)throws  -> [FfiShiftTemplateOverride] {
+    return try  FfiConverterSequenceTypeFfiShiftTemplateOverride.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_list_shift_template_overrides_for_template(
+        FfiConverterInt64.lower(templateId),$0
     )
 })
 }
@@ -2477,6 +3016,20 @@ public func updateShiftTimes(id: Int64, startTime: String, endTime: String)throw
     )
 }
 }
+public func upsertEmployeeAvailabilityOverride(override: FfiEmployeeAvailabilityOverride)throws  -> Int64 {
+    return try  FfiConverterInt64.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_upsert_employee_availability_override(
+        FfiConverterTypeFfiEmployeeAvailabilityOverride.lower(override),$0
+    )
+})
+}
+public func upsertShiftTemplateOverride(override: FfiShiftTemplateOverride)throws  -> Int64 {
+    return try  FfiConverterInt64.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_upsert_shift_template_override(
+        FfiConverterTypeFfiShiftTemplateOverride.lower(override),$0
+    )
+})
+}
 
 private enum InitializationResult {
     case ok
@@ -2502,6 +3055,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_autorota_ffi_checksum_func_create_employee() != 3468) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_autorota_ffi_checksum_func_create_empty_week() != 37139) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_autorota_ffi_checksum_func_create_role() != 26640) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -2517,6 +3073,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_autorota_ffi_checksum_func_delete_employee() != 58379) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_autorota_ffi_checksum_func_delete_employee_availability_override() != 38462) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_autorota_ffi_checksum_func_delete_role() != 30543) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -2526,10 +3085,19 @@ private var initializationResult: InitializationResult = {
     if (uniffi_autorota_ffi_checksum_func_delete_shift_template() != 36648) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_autorota_ffi_checksum_func_delete_shift_template_override() != 37085) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_delete_week() != 24828) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_autorota_ffi_checksum_func_finalize_rota() != 14644) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_get_employee() != 21114) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_get_employee_availability_override() != 39578) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_get_rota() != 30703) {
@@ -2538,16 +3106,31 @@ private var initializationResult: InitializationResult = {
     if (uniffi_autorota_ffi_checksum_func_get_rota_by_week() != 22255) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_autorota_ffi_checksum_func_get_shift_template_override() != 29428) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_autorota_ffi_checksum_func_get_week_schedule() != 63555) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_init_db() != 56955) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_autorota_ffi_checksum_func_list_all_employee_availability_overrides() != 51272) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_list_all_shift_template_overrides() != 9399) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_list_employee_availability_overrides() != 21172) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_autorota_ffi_checksum_func_list_employees() != 41749) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_list_roles() != 36816) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_list_shift_template_overrides_for_template() != 12314) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_list_shift_templates() != 30152) {
@@ -2581,6 +3164,12 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_update_shift_times() != 60886) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_upsert_employee_availability_override() != 224) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_upsert_shift_template_override() != 22933) {
         return InitializationResult.apiChecksumMismatch
     }
 

@@ -26,6 +26,8 @@ protocol AutorotaServiceProtocol: Sendable {
     func getWeekSchedule(weekStart: String) async throws -> FfiWeekSchedule?
     func runSchedule(weekStart: String) async throws -> FfiScheduleResult
     func materialiseWeek(weekStart: String) async throws -> Int64
+    func createEmptyWeek(weekStart: String) async throws -> Int64
+    func deleteWeek(weekStart: String) async throws
     func finalizeRota(id: Int64) async throws
 
     // Assignments
@@ -40,4 +42,16 @@ protocol AutorotaServiceProtocol: Sendable {
     func updateShiftTimes(id: Int64, startTime: String, endTime: String) async throws
     func createAdHocShift(rotaId: Int64, date: String, startTime: String, endTime: String, requiredRole: String) async throws -> Int64
     func listShiftsForRota(rotaId: Int64) async throws -> [FfiShift]
+
+    // Overrides
+    func upsertEmployeeAvailabilityOverride(_ o: FfiEmployeeAvailabilityOverride) async throws -> Int64
+    func getEmployeeAvailabilityOverride(employeeId: Int64, date: String) async throws -> FfiEmployeeAvailabilityOverride?
+    func listEmployeeAvailabilityOverrides(employeeId: Int64) async throws -> [FfiEmployeeAvailabilityOverride]
+    func listAllEmployeeAvailabilityOverrides() async throws -> [FfiEmployeeAvailabilityOverride]
+    func deleteEmployeeAvailabilityOverride(id: Int64) async throws
+    func upsertShiftTemplateOverride(_ o: FfiShiftTemplateOverride) async throws -> Int64
+    func getShiftTemplateOverride(templateId: Int64, date: String) async throws -> FfiShiftTemplateOverride?
+    func listShiftTemplateOverridesForTemplate(templateId: Int64) async throws -> [FfiShiftTemplateOverride]
+    func listAllShiftTemplateOverrides() async throws -> [FfiShiftTemplateOverride]
+    func deleteShiftTemplateOverride(id: Int64) async throws
 }

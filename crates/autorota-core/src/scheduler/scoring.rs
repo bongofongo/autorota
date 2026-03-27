@@ -1,5 +1,6 @@
 use crate::models::availability::AvailabilityState;
 use crate::models::employee::Employee;
+use crate::models::overrides::DayAvailability;
 use crate::models::shift::Shift;
 
 /// Composite score for ranking an employee against a shift.
@@ -9,16 +10,23 @@ use crate::models::shift::Shift;
 ///   3. Daily budget remaining — more slack ranks higher
 ///
 /// Higher tuple value = better candidate.
+///
+/// `day_avail_override` — when `Some`, uses the date-specific `DayAvailability` instead of
+/// the employee's weekly availability map for the availability rank.
 pub fn score_employee(
     employee: &Employee,
     shift: &Shift,
     weekly_hours: f32,
     daily_hours: f32,
+    day_avail_override: Option<&DayAvailability>,
 ) -> (u8, i32, i32) {
-    let avail =
+    let avail = if let Some(day_avail) = day_avail_override {
+        day_avail.for_window(shift.start_hour(), shift.end_hour())
+    } else {
         employee
             .availability
-            .for_window(shift.weekday(), shift.start_hour(), shift.end_hour());
+            .for_window(shift.weekday(), shift.start_hour(), shift.end_hour())
+    };
 
     let availability_rank = match avail {
         AvailabilityState::Yes => 2,
@@ -84,14 +92,14 @@ mod tests {
         let mut emp = make_employee(8.0, 40.0);
         let shift = make_shift();
 
-        let score_yes = score_employee(&emp, &shift, 0.0, 0.0);
+        let score_yes = score_employee(&emp, &shift, 0.0, 0.0, None);
 
         // Change availability to Maybe
         for h in 6..18 {
             emp.availability
                 .set(Weekday::Mon, h, AvailabilityState::Maybe);
         }
-        let score_maybe = score_employee(&emp, &shift, 0.0, 0.0);
+        let score_maybe = score_employee(&emp, &shift, 0.0, 0.0, None);
 
         assert!(score_yes > score_maybe);
     }
@@ -101,8 +109,8 @@ mod tests {
         let emp = make_employee(8.0, 40.0);
         let shift = make_shift();
 
-        let score_fresh = score_employee(&emp, &shift, 0.0, 0.0);
-        let score_busy = score_employee(&emp, &shift, 20.0, 0.0);
+        let score_fresh = score_employee(&emp, &shift, 0.0, 0.0, None);
+        let score_busy = score_employee(&emp, &shift, 20.0, 0.0, None);
 
         assert!(score_fresh > score_busy);
     }

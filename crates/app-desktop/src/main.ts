@@ -82,6 +82,27 @@ interface Role {
   name: string;
 }
 
+interface EmployeeAvailabilityOverride {
+  id: number;
+  employee_id: number;
+  date: string;
+  /** {"8":"Yes","9":"Maybe",...} */
+  availability: Record<string, string>;
+  notes: string | null;
+}
+
+interface ShiftTemplateOverride {
+  id: number;
+  template_id: number;
+  date: string;
+  cancelled: boolean;
+  start_time: string | null;
+  end_time: string | null;
+  min_employees: number | null;
+  max_employees: number | null;
+  notes: string | null;
+}
+
 // ─── Helpers ────────────────────────────────────────────────
 
 function displayName(e: Employee): string {
@@ -93,6 +114,8 @@ function displayName(e: Employee): string {
 let employees: Employee[] = [];
 let shiftTemplates: ShiftTemplate[] = [];
 let roles: Role[] = [];
+let allEmployeeAvailOverrides: EmployeeAvailabilityOverride[] = [];
+let allShiftTemplateOverrides: ShiftTemplateOverride[] = [];
 let currentView = "employees";
 let selectedWeek = toLocalISODate(getMonday(new Date()));
 let selectedEmployeeId: number | null = null;
@@ -120,6 +143,17 @@ async function fetchShiftTemplates(): Promise<void> {
 
 async function fetchRoles(): Promise<void> {
   roles = await invoke("list_roles");
+}
+
+async function fetchAllOverrides(): Promise<void> {
+  [allEmployeeAvailOverrides, allShiftTemplateOverrides] = await Promise.all([
+    invoke<EmployeeAvailabilityOverride[]>("list_all_employee_availability_overrides"),
+    invoke<ShiftTemplateOverride[]>("list_all_shift_template_overrides"),
+  ]);
+}
+
+async function fetchEmployeeOverrides(employeeId: number): Promise<EmployeeAvailabilityOverride[]> {
+  return invoke<EmployeeAvailabilityOverride[]>("list_employee_availability_overrides", { employeeId });
 }
 
 function getMonday(d: Date): Date {
@@ -710,6 +744,11 @@ async function renderEmployeeDetailView() {
       <div class="avail-grid-wrap" id="week-avail-wrap">${buildGridHTML(emp.availability)}</div>
       ${legend}
     </details>
+    <details class="card avail-section" id="date-overrides-section">
+      <summary>Date-Specific Availability Overrides</summary>
+      <div id="date-ovr-list">Loading...</div>
+      <div id="date-ovr-form-wrap"></div>
+    </details>
   `;
 
   // ─── Back button ───────────────────────────────────────
@@ -816,6 +855,94 @@ async function renderEmployeeDetailView() {
     document.removeEventListener("keydown", handleAvailKeydown);
     document.removeEventListener("mousedown", handleOutsideClick);
   };
+
+  // ─── Date-Specific Availability Overrides section ──────
+  const empId = emp.id;
+
+  async function refreshDateOvrList(): Promise<void> {
+    const overrides = await fetchEmployeeOverrides(empId);
+    const listEl = document.getElementById("date-ovr-list")!;
+    if (overrides.length === 0) {
+      listEl.innerHTML = `<p style="color:var(--text-muted)">No date overrides set.</p>`;
+    } else {
+      listEl.innerHTML = `<table class="overrides-table">
+        <thead><tr><th>Date</th><th>Notes</th><th>Actions</th></tr></thead>
+        <tbody>${overrides.map((o) => `
+          <tr>
+            <td>${o.date}</td>
+            <td>${o.notes || "—"}</td>
+            <td>
+              <button class="btn-secondary btn-sm date-ovr-edit-btn" data-ovr='${JSON.stringify(o)}'>Edit</button>
+              <button class="btn-danger btn-sm date-ovr-del-btn" data-id="${o.id}">Delete</button>
+            </td>
+          </tr>`).join("")}
+        </tbody>
+      </table>`;
+    }
+    // Add button
+    listEl.insertAdjacentHTML("beforeend", `<button class="btn-primary" id="date-ovr-add-btn" style="margin-top:8px">+ Add Date Override</button>`);
+    wireDateOvrButtons();
+  }
+
+  function showDateOvrForm(existing?: EmployeeAvailabilityOverride): void {
+    const wrap = document.getElementById("date-ovr-form-wrap")!;
+    const preselectedDate = existing?.date ?? todayISO();
+    const preselectedAvail = existing?.availability ?? {};
+    const preselectedNotes = existing?.notes ?? "";
+
+    wrap.innerHTML = `
+      <div class="override-form" style="margin-top:8px">
+        <label>Date <input type="date" id="date-ovr-date" value="${preselectedDate}" /></label>
+        <div class="form-section-label">Availability for this day <small>(click to cycle: Maybe → No → Yes)</small></div>
+        <div id="date-ovr-grid-wrap">${buildDayAvailGridHTML(preselectedAvail)}</div>
+        <label>Notes <input type="text" id="date-ovr-notes" value="${preselectedNotes}" placeholder="Optional" /></label>
+        <div class="form-actions">
+          <button class="btn-primary" id="date-ovr-save">Save</button>
+          <button class="btn-secondary" id="date-ovr-cancel">Cancel</button>
+        </div>
+      </div>
+    `;
+    const gridWrap = document.getElementById("date-ovr-grid-wrap")!;
+    wireDayAvailGrid(gridWrap);
+
+    document.getElementById("date-ovr-cancel")!.addEventListener("click", () => {
+      wrap.innerHTML = "";
+    });
+
+    document.getElementById("date-ovr-save")!.addEventListener("click", async () => {
+      const date = (document.getElementById("date-ovr-date") as HTMLInputElement).value;
+      const notes = (document.getElementById("date-ovr-notes") as HTMLInputElement).value.trim() || null;
+      const availability = readDayAvailGrid(gridWrap);
+      await invoke("upsert_employee_availability_override", {
+        override_: { id: existing?.id ?? 0, employee_id: empId, date, availability, notes },
+      });
+      wrap.innerHTML = "";
+      await refreshDateOvrList();
+    });
+  }
+
+  function wireDateOvrButtons(): void {
+    document.getElementById("date-ovr-add-btn")?.addEventListener("click", () => showDateOvrForm());
+    document.querySelectorAll<HTMLElement>(".date-ovr-del-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = parseInt(btn.dataset.id!);
+        await invoke("delete_employee_availability_override", { id });
+        await refreshDateOvrList();
+      });
+    });
+    document.querySelectorAll<HTMLElement>(".date-ovr-edit-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const ovr = JSON.parse(btn.dataset.ovr!) as EmployeeAvailabilityOverride;
+        showDateOvrForm(ovr);
+      });
+    });
+  }
+
+  // Lazy-load when section is opened
+  const dateOvrSection = document.getElementById("date-overrides-section") as HTMLDetailsElement;
+  dateOvrSection.addEventListener("toggle", () => {
+    if (dateOvrSection.open) refreshDateOvrList();
+  });
 }
 
 const DAY_LETTERS: Record<string, string> = {
@@ -1907,7 +2034,323 @@ async function renderView() {
     case "rota":
       await renderRotaView();
       break;
+    case "overrides":
+      await renderOverridesView();
+      break;
   }
+}
+
+// ─── Overrides View ──────────────────────────────────────────
+
+/** Build a single-column availability grid for a specific date's hours. */
+function buildDayAvailGridHTML(avail: Record<string, string>): string {
+  const hours = Array.from({ length: 24 }, (_, i) => i);
+  return `<div class="day-avail-grid">
+    <div class="day-avail-header">Hour</div>
+    <div class="day-avail-header">State</div>
+    ${hours.map((h) => {
+      const state = avail[String(h)] || "Maybe";
+      const label = `${h.toString().padStart(2, "0")}:00`;
+      return `<div class="day-avail-label">${label}</div>
+              <div class="day-avail-cell" data-hour="${h}" data-state="${state}"></div>`;
+    }).join("")}
+  </div>`;
+}
+
+function readDayAvailGrid(wrap: HTMLElement): Record<string, string> {
+  const result: Record<string, string> = {};
+  wrap.querySelectorAll<HTMLElement>(".day-avail-cell").forEach((cell) => {
+    const hour = cell.dataset.hour!;
+    const state = cell.dataset.state!;
+    if (state !== "Maybe") result[hour] = state;
+  });
+  return result;
+}
+
+function wireDayAvailGrid(wrap: HTMLElement): void {
+  wrap.querySelectorAll<HTMLElement>(".day-avail-cell").forEach((cell) => {
+    cell.addEventListener("click", () => {
+      const states = ["Maybe", "No", "Yes"];
+      const cur = cell.dataset.state || "Maybe";
+      const next = states[(states.indexOf(cur) + 1) % states.length];
+      cell.dataset.state = next;
+      cell.className = `day-avail-cell state-${next.toLowerCase()}`;
+    });
+    cell.className = `day-avail-cell state-${(cell.dataset.state || "Maybe").toLowerCase()}`;
+  });
+}
+
+async function renderOverridesView(): Promise<void> {
+  const content = document.getElementById("content")!;
+  await fetchAllOverrides();
+  await fetchShiftTemplates();
+
+  function empName(id: number): string {
+    const e = employees.find((x) => x.id === id);
+    return e ? displayName(e) : `Employee #${id}`;
+  }
+  function tmplName(id: number): string {
+    const t = shiftTemplates.find((x) => x.id === id);
+    return t ? t.name : `Template #${id}`;
+  }
+
+  function renderEmpOverrideRows(): string {
+    if (allEmployeeAvailOverrides.length === 0) {
+      return `<tr><td colspan="4" style="color:var(--text-muted);text-align:center">No employee availability overrides</td></tr>`;
+    }
+    return allEmployeeAvailOverrides.map((o) => `
+      <tr>
+        <td>${empName(o.employee_id)}</td>
+        <td>${o.date}</td>
+        <td>${o.notes || "—"}</td>
+        <td>
+          <button class="btn-secondary btn-sm edit-emp-ovr-btn" data-id="${o.id}">Edit</button>
+          <button class="btn-danger btn-sm del-emp-ovr-btn" data-id="${o.id}">Delete</button>
+        </td>
+      </tr>`).join("");
+  }
+
+  function renderTmplOverrideRows(): string {
+    if (allShiftTemplateOverrides.length === 0) {
+      return `<tr><td colspan="5" style="color:var(--text-muted);text-align:center">No shift template overrides</td></tr>`;
+    }
+    return allShiftTemplateOverrides.map((o) => {
+      const cancelledBadge = o.cancelled ? `<span class="badge badge-danger">CANCELLED</span>` : "";
+      const times = (!o.cancelled && (o.start_time || o.end_time))
+        ? `${o.start_time?.slice(0, 5) ?? "—"}–${o.end_time?.slice(0, 5) ?? "—"}`
+        : "—";
+      return `<tr>
+        <td>${tmplName(o.template_id)}</td>
+        <td>${o.date}</td>
+        <td>${cancelledBadge}${!o.cancelled ? times : ""}</td>
+        <td>${o.notes || "—"}</td>
+        <td>
+          <button class="btn-secondary btn-sm edit-tmpl-ovr-btn" data-id="${o.id}">Edit</button>
+          <button class="btn-danger btn-sm del-tmpl-ovr-btn" data-id="${o.id}">Delete</button>
+        </td>
+      </tr>`;
+    }).join("");
+  }
+
+  content.innerHTML = `
+    <div class="detail-header"><h1>Overrides</h1></div>
+
+    <div class="card">
+      <div class="section-header-row">
+        <h2>Employee Availability Overrides</h2>
+        <button class="btn-primary" id="add-emp-ovr-btn">+ Add</button>
+      </div>
+      <table class="overrides-table">
+        <thead><tr><th>Employee</th><th>Date</th><th>Notes</th><th>Actions</th></tr></thead>
+        <tbody id="emp-ovr-tbody">${renderEmpOverrideRows()}</tbody>
+      </table>
+    </div>
+
+    <div id="emp-ovr-form-wrap"></div>
+
+    <div class="card">
+      <div class="section-header-row">
+        <h2>Shift Template Overrides</h2>
+        <button class="btn-primary" id="add-tmpl-ovr-btn">+ Add</button>
+      </div>
+      <table class="overrides-table">
+        <thead><tr><th>Template</th><th>Date</th><th>Change</th><th>Notes</th><th>Actions</th></tr></thead>
+        <tbody id="tmpl-ovr-tbody">${renderTmplOverrideRows()}</tbody>
+      </table>
+    </div>
+
+    <div id="tmpl-ovr-form-wrap"></div>
+  `;
+
+  // ─── Employee override form helpers ─────────────────────
+
+  function showEmpOvrForm(existing?: EmployeeAvailabilityOverride): void {
+    const wrap = document.getElementById("emp-ovr-form-wrap")!;
+    const preselectedEmpId = existing?.employee_id ?? (employees[0]?.id ?? 0);
+    const preselectedDate = existing?.date ?? todayISO();
+    const preselectedAvail = existing?.availability ?? {};
+    const preselectedNotes = existing?.notes ?? "";
+
+    wrap.innerHTML = `
+      <div class="card override-form">
+        <h3>${existing ? "Edit" : "Add"} Employee Availability Override</h3>
+        <label>Employee
+          <select id="emp-ovr-emp-sel">
+            ${employees.map((e) => `<option value="${e.id}" ${e.id === preselectedEmpId ? "selected" : ""}>${displayName(e)}</option>`).join("")}
+          </select>
+        </label>
+        <label>Date <input type="date" id="emp-ovr-date" value="${preselectedDate}" /></label>
+        <div class="form-section-label">Availability for this day <small>(click to cycle: Maybe → No → Yes)</small></div>
+        <div id="emp-ovr-grid-wrap">${buildDayAvailGridHTML(preselectedAvail)}</div>
+        <label>Notes <input type="text" id="emp-ovr-notes" value="${preselectedNotes}" placeholder="Optional" /></label>
+        <div class="form-actions">
+          <button class="btn-primary" id="emp-ovr-save">Save</button>
+          <button class="btn-secondary" id="emp-ovr-cancel">Cancel</button>
+        </div>
+      </div>
+    `;
+
+    const gridWrap = document.getElementById("emp-ovr-grid-wrap")!;
+    wireDayAvailGrid(gridWrap);
+
+    document.getElementById("emp-ovr-cancel")!.addEventListener("click", () => {
+      wrap.innerHTML = "";
+    });
+
+    document.getElementById("emp-ovr-save")!.addEventListener("click", async () => {
+      const employeeId = parseInt((document.getElementById("emp-ovr-emp-sel") as HTMLSelectElement).value);
+      const date = (document.getElementById("emp-ovr-date") as HTMLInputElement).value;
+      const notes = (document.getElementById("emp-ovr-notes") as HTMLInputElement).value.trim() || null;
+      const availability = readDayAvailGrid(gridWrap);
+      await invoke("upsert_employee_availability_override", {
+        override_: { id: existing?.id ?? 0, employee_id: employeeId, date, availability, notes },
+      });
+      wrap.innerHTML = "";
+      await fetchAllOverrides();
+      document.getElementById("emp-ovr-tbody")!.innerHTML = renderEmpOverrideRows();
+      rewireEmpOvrButtons();
+    });
+  }
+
+  function rewireEmpOvrButtons(): void {
+    document.querySelectorAll<HTMLElement>(".del-emp-ovr-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = parseInt(btn.dataset.id!);
+        await invoke("delete_employee_availability_override", { id });
+        await fetchAllOverrides();
+        document.getElementById("emp-ovr-tbody")!.innerHTML = renderEmpOverrideRows();
+        rewireEmpOvrButtons();
+      });
+    });
+    document.querySelectorAll<HTMLElement>(".edit-emp-ovr-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = parseInt(btn.dataset.id!);
+        const ovr = allEmployeeAvailOverrides.find((o) => o.id === id);
+        if (ovr) showEmpOvrForm(ovr);
+      });
+    });
+  }
+
+  document.getElementById("add-emp-ovr-btn")!.addEventListener("click", () => showEmpOvrForm());
+  rewireEmpOvrButtons();
+
+  // ─── Template override form helpers ─────────────────────
+
+  function showTmplOvrForm(existing?: ShiftTemplateOverride): void {
+    const wrap = document.getElementById("tmpl-ovr-form-wrap")!;
+    const preselectedTmplId = existing?.template_id ?? (shiftTemplates[0]?.id ?? 0);
+    const preselectedDate = existing?.date ?? todayISO();
+    const isCancelled = existing?.cancelled ?? false;
+    const preselectedNotes = existing?.notes ?? "";
+
+    wrap.innerHTML = `
+      <div class="card override-form">
+        <h3>${existing ? "Edit" : "Add"} Shift Template Override</h3>
+        <label>Shift Template
+          <select id="tmpl-ovr-tmpl-sel">
+            ${shiftTemplates.map((t) => `<option value="${t.id}" ${t.id === preselectedTmplId ? "selected" : ""}>${t.name}</option>`).join("")}
+          </select>
+        </label>
+        <label>Date <input type="date" id="tmpl-ovr-date" value="${preselectedDate}" /></label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="tmpl-ovr-cancelled" ${isCancelled ? "checked" : ""} />
+          Cancel this shift (do not run on this date)
+        </label>
+        <div id="tmpl-ovr-fields" ${isCancelled ? 'style="display:none"' : ""}>
+          <label>Override Start Time (leave blank to use template)
+            <input type="time" id="tmpl-ovr-start" value="${existing?.start_time?.slice(0, 5) ?? ""}" />
+          </label>
+          <label>Override End Time (leave blank to use template)
+            <input type="time" id="tmpl-ovr-end" value="${existing?.end_time?.slice(0, 5) ?? ""}" />
+          </label>
+          <label>Override Min Staff (0 = use template)
+            <input type="number" id="tmpl-ovr-min" min="0" max="20" value="${existing?.min_employees ?? ""}" placeholder="Use template" />
+          </label>
+          <label>Override Max Staff (0 = use template)
+            <input type="number" id="tmpl-ovr-max" min="0" max="20" value="${existing?.max_employees ?? ""}" placeholder="Use template" />
+          </label>
+        </div>
+        <label>Notes <input type="text" id="tmpl-ovr-notes" value="${preselectedNotes}" placeholder="Optional" /></label>
+        <div class="form-actions">
+          <button class="btn-primary" id="tmpl-ovr-save">Save</button>
+          <button class="btn-secondary" id="tmpl-ovr-cancel">Cancel</button>
+        </div>
+      </div>
+    `;
+
+    const cancelledCheckbox = document.getElementById("tmpl-ovr-cancelled") as HTMLInputElement;
+    const fieldsDiv = document.getElementById("tmpl-ovr-fields")!;
+    cancelledCheckbox.addEventListener("change", () => {
+      fieldsDiv.style.display = cancelledCheckbox.checked ? "none" : "";
+    });
+
+    document.getElementById("tmpl-ovr-cancel")!.addEventListener("click", () => {
+      wrap.innerHTML = "";
+    });
+
+    document.getElementById("tmpl-ovr-save")!.addEventListener("click", async () => {
+      const templateId = parseInt((document.getElementById("tmpl-ovr-tmpl-sel") as HTMLSelectElement).value);
+      const date = (document.getElementById("tmpl-ovr-date") as HTMLInputElement).value;
+      const cancelled = (document.getElementById("tmpl-ovr-cancelled") as HTMLInputElement).checked;
+      const notes = (document.getElementById("tmpl-ovr-notes") as HTMLInputElement).value.trim() || null;
+
+      let start_time: string | null = null;
+      let end_time: string | null = null;
+      let min_employees: number | null = null;
+      let max_employees: number | null = null;
+
+      if (!cancelled) {
+        const startVal = (document.getElementById("tmpl-ovr-start") as HTMLInputElement).value;
+        const endVal = (document.getElementById("tmpl-ovr-end") as HTMLInputElement).value;
+        const minVal = (document.getElementById("tmpl-ovr-min") as HTMLInputElement).value;
+        const maxVal = (document.getElementById("tmpl-ovr-max") as HTMLInputElement).value;
+        start_time = startVal || null;
+        end_time = endVal || null;
+        min_employees = minVal ? parseInt(minVal) : null;
+        max_employees = maxVal ? parseInt(maxVal) : null;
+      }
+
+      await invoke("upsert_shift_template_override", {
+        override_: {
+          id: existing?.id ?? 0,
+          template_id: templateId,
+          date,
+          cancelled,
+          start_time,
+          end_time,
+          min_employees,
+          max_employees,
+          notes,
+        },
+      });
+      wrap.innerHTML = "";
+      await fetchAllOverrides();
+      document.getElementById("tmpl-ovr-tbody")!.innerHTML = renderTmplOverrideRows();
+      rewireTmplOvrButtons();
+    });
+  }
+
+  function rewireTmplOvrButtons(): void {
+    document.querySelectorAll<HTMLElement>(".del-tmpl-ovr-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = parseInt(btn.dataset.id!);
+        await invoke("delete_shift_template_override", { id });
+        await fetchAllOverrides();
+        document.getElementById("tmpl-ovr-tbody")!.innerHTML = renderTmplOverrideRows();
+        rewireTmplOvrButtons();
+      });
+    });
+    document.querySelectorAll<HTMLElement>(".edit-tmpl-ovr-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = parseInt(btn.dataset.id!);
+        const ovr = allShiftTemplateOverrides.find((o) => o.id === id);
+        if (ovr) showTmplOvrForm(ovr);
+      });
+    });
+  }
+
+  document.getElementById("add-tmpl-ovr-btn")!.addEventListener("click", () => showTmplOvrForm());
+  rewireTmplOvrButtons();
 }
 
 // ─── Navigation ─────────────────────────────────────────────

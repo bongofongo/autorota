@@ -133,6 +133,18 @@ public func materialiseWeekAsync(weekStart: String) async throws -> Int64 {
     }.value
 }
 
+public func createEmptyWeekAsync(weekStart: String) async throws -> Int64 {
+    try await Task.detached(priority: .userInitiated) {
+        try createEmptyWeek(weekStart: weekStart)
+    }.value
+}
+
+public func deleteWeekAsync(weekStart: String) async throws {
+    try await Task.detached(priority: .userInitiated) {
+        try deleteWeek(weekStart: weekStart)
+    }.value
+}
+
 public func finalizeRotaAsync(id: Int64) async throws {
     try await Task.detached(priority: .userInitiated) {
         try finalizeRota(id: id)
@@ -190,6 +202,68 @@ public func createAdHocShiftAsync(rotaId: Int64, date: String, startTime: String
 public func listShiftsForRotaAsync(rotaId: Int64) async throws -> [FfiShift] {
     try await Task.detached(priority: .userInitiated) {
         try listShiftsForRota(rotaId: rotaId)
+    }.value
+}
+
+// MARK: - Override async wrappers
+
+public func upsertEmployeeAvailabilityOverrideAsync(override_: FfiEmployeeAvailabilityOverride) async throws -> Int64 {
+    try await Task.detached(priority: .userInitiated) {
+        try upsertEmployeeAvailabilityOverride(override: override_)
+    }.value
+}
+
+public func getEmployeeAvailabilityOverrideAsync(employeeId: Int64, date: String) async throws -> FfiEmployeeAvailabilityOverride? {
+    try await Task.detached(priority: .userInitiated) {
+        try getEmployeeAvailabilityOverride(employeeId: employeeId, date: date)
+    }.value
+}
+
+public func listEmployeeAvailabilityOverridesAsync(employeeId: Int64) async throws -> [FfiEmployeeAvailabilityOverride] {
+    try await Task.detached(priority: .userInitiated) {
+        try listEmployeeAvailabilityOverrides(employeeId: employeeId)
+    }.value
+}
+
+public func listAllEmployeeAvailabilityOverridesAsync() async throws -> [FfiEmployeeAvailabilityOverride] {
+    try await Task.detached(priority: .userInitiated) {
+        try listAllEmployeeAvailabilityOverrides()
+    }.value
+}
+
+public func deleteEmployeeAvailabilityOverrideAsync(id: Int64) async throws {
+    try await Task.detached(priority: .userInitiated) {
+        try deleteEmployeeAvailabilityOverride(id: id)
+    }.value
+}
+
+public func upsertShiftTemplateOverrideAsync(override_: FfiShiftTemplateOverride) async throws -> Int64 {
+    try await Task.detached(priority: .userInitiated) {
+        try upsertShiftTemplateOverride(override: override_)
+    }.value
+}
+
+public func getShiftTemplateOverrideAsync(templateId: Int64, date: String) async throws -> FfiShiftTemplateOverride? {
+    try await Task.detached(priority: .userInitiated) {
+        try getShiftTemplateOverride(templateId: templateId, date: date)
+    }.value
+}
+
+public func listShiftTemplateOverridesForTemplateAsync(templateId: Int64) async throws -> [FfiShiftTemplateOverride] {
+    try await Task.detached(priority: .userInitiated) {
+        try listShiftTemplateOverridesForTemplate(templateId: templateId)
+    }.value
+}
+
+public func listAllShiftTemplateOverridesAsync() async throws -> [FfiShiftTemplateOverride] {
+    try await Task.detached(priority: .userInitiated) {
+        try listAllShiftTemplateOverrides()
+    }.value
+}
+
+public func deleteShiftTemplateOverrideAsync(id: Int64) async throws {
+    try await Task.detached(priority: .userInitiated) {
+        try deleteShiftTemplateOverride(id: id)
     }.value
 }
 

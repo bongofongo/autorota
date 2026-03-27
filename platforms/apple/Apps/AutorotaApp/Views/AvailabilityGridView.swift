@@ -11,12 +11,19 @@ struct AvailabilityGridView: View {
     var visibleHourStart: Int = 6
     var visibleHourEnd: Int = 22
     var showRangePicker: Bool = false
+    /// When set, only show columns for the specified weekday(s). Pass a single weekday to render a single-day column.
+    var limitToWeekdays: [String]? = nil
     var onChange: (([AvailabilitySlot]) -> Void)?
     var onVisibleRangeChange: ((Int, Int) -> Void)?
     var onSelectionModeChange: ((Bool) -> Void)?
     var onReset: (() -> Void)?
 
     private static let weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+    private var displayedWeekdays: [String] {
+        guard let limit = limitToWeekdays else { return Self.weekdays }
+        return Self.weekdays.filter { limit.contains($0) }
+    }
     private static let allHours = Array(0...23)
     private static let hourLabelWidth: CGFloat = 30
     private static let spacing: CGFloat = 2
@@ -100,7 +107,7 @@ struct AvailabilityGridView: View {
             // Header row
             HStack(spacing: Self.spacing) {
                 Text("").frame(width: Self.hourLabelWidth)
-                ForEach(Self.weekdays, id: \.self) { day in
+                ForEach(displayedWeekdays, id: \.self) { day in
                     Text(day)
                         .font(.caption2.bold())
                         .frame(width: cellWidth)
@@ -117,7 +124,7 @@ struct AvailabilityGridView: View {
                         .foregroundStyle(.secondary)
                         .frame(width: Self.hourLabelWidth, alignment: .trailing)
 
-                    ForEach(Self.weekdays, id: \.self) { day in
+                    ForEach(displayedWeekdays, id: \.self) { day in
                         let key = "\(day):\(hour)"
                         let state = inRange ? (lookup[key] ?? "Maybe") : "No"
                         CellView(
@@ -232,7 +239,7 @@ struct AvailabilityGridView: View {
         let col = Int(adjustedX / (cellWidth + Self.spacing))
         let row = Int(adjustedY / (Self.rowHeight + Self.spacing))
 
-        let clampedCol = max(0, min(Self.weekdays.count - 1, col))
+        let clampedCol = max(0, min(displayedWeekdays.count - 1, col))
         let clampedRow = max(0, min(displayedHours.count - 1, row))
         return (clampedCol, clampedRow)
     }
@@ -265,7 +272,7 @@ struct AvailabilityGridView: View {
             let hour = displayedHours[rowIdx]
             guard hour >= visibleHourStart && hour <= visibleHourEnd else { continue }
             for col in rect.minCol...rect.maxCol {
-                let day = Self.weekdays[col]
+                let day = displayedWeekdays[col]
                 let key = "\(day):\(hour)"
                 let state = lookup[key] ?? "Maybe"
                 stateCounts[state, default: 0] += 1
@@ -322,7 +329,7 @@ struct AvailabilityGridView: View {
     }
 
     private func cellWidth(for totalWidth: CGFloat) -> CGFloat {
-        let count = CGFloat(Self.weekdays.count)
+        let count = CGFloat(displayedWeekdays.count)
         let totalSpacing = Self.spacing * count
         let available = totalWidth - Self.hourLabelWidth - totalSpacing
         return max(20, available / count)

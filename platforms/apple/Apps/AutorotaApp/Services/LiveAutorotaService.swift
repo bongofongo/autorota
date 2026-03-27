@@ -20,6 +20,8 @@ struct LiveAutorotaService: AutorotaServiceProtocol {
     func getWeekSchedule(weekStart: String) async throws -> FfiWeekSchedule? { try await getWeekScheduleAsync(weekStart: weekStart) }
     func runSchedule(weekStart: String) async throws -> FfiScheduleResult { try await runScheduleAsync(weekStart: weekStart) }
     func materialiseWeek(weekStart: String) async throws -> Int64 { try await materialiseWeekAsync(weekStart: weekStart) }
+    func createEmptyWeek(weekStart: String) async throws -> Int64 { try await createEmptyWeekAsync(weekStart: weekStart) }
+    func deleteWeek(weekStart: String) async throws { try await deleteWeekAsync(weekStart: weekStart) }
     func finalizeRota(id: Int64) async throws { try await finalizeRotaAsync(id: id) }
 
     func createAssignment(_ assignment: FfiAssignment) async throws -> Int64 { try await createAssignmentAsync(assignment) }
@@ -32,4 +34,15 @@ struct LiveAutorotaService: AutorotaServiceProtocol {
     func updateShiftTimes(id: Int64, startTime: String, endTime: String) async throws { try await updateShiftTimesAsync(id: id, startTime: startTime, endTime: endTime) }
     func createAdHocShift(rotaId: Int64, date: String, startTime: String, endTime: String, requiredRole: String) async throws -> Int64 { try await createAdHocShiftAsync(rotaId: rotaId, date: date, startTime: startTime, endTime: endTime, requiredRole: requiredRole) }
     func listShiftsForRota(rotaId: Int64) async throws -> [FfiShift] { try await listShiftsForRotaAsync(rotaId: rotaId) }
+
+    func upsertEmployeeAvailabilityOverride(_ o: FfiEmployeeAvailabilityOverride) async throws -> Int64 { try await upsertEmployeeAvailabilityOverrideAsync(override_: o) }
+    func getEmployeeAvailabilityOverride(employeeId: Int64, date: String) async throws -> FfiEmployeeAvailabilityOverride? { try await getEmployeeAvailabilityOverrideAsync(employeeId: employeeId, date: date) }
+    func listEmployeeAvailabilityOverrides(employeeId: Int64) async throws -> [FfiEmployeeAvailabilityOverride] { try await listEmployeeAvailabilityOverridesAsync(employeeId: employeeId) }
+    func listAllEmployeeAvailabilityOverrides() async throws -> [FfiEmployeeAvailabilityOverride] { try await listAllEmployeeAvailabilityOverridesAsync() }
+    func deleteEmployeeAvailabilityOverride(id: Int64) async throws { try await deleteEmployeeAvailabilityOverrideAsync(id: id) }
+    func upsertShiftTemplateOverride(_ o: FfiShiftTemplateOverride) async throws -> Int64 { try await upsertShiftTemplateOverrideAsync(override_: o) }
+    func getShiftTemplateOverride(templateId: Int64, date: String) async throws -> FfiShiftTemplateOverride? { try await getShiftTemplateOverrideAsync(templateId: templateId, date: date) }
+    func listShiftTemplateOverridesForTemplate(templateId: Int64) async throws -> [FfiShiftTemplateOverride] { try await listShiftTemplateOverridesForTemplateAsync(templateId: templateId) }
+    func listAllShiftTemplateOverrides() async throws -> [FfiShiftTemplateOverride] { try await listAllShiftTemplateOverridesAsync() }
+    func deleteShiftTemplateOverride(id: Int64) async throws { try await deleteShiftTemplateOverrideAsync(id: id) }
 }

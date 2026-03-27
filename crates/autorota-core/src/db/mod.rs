@@ -124,5 +124,17 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         sqlx::raw_sql(m7).execute(pool).await?;
     }
 
+    // Migration 008: employee availability overrides + shift template overrides.
+    let has_overrides: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='employee_availability_overrides'",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    if !has_overrides {
+        let m8 = include_str!("../../migrations/008_overrides.sql");
+        sqlx::raw_sql(m8).execute(pool).await?;
+    }
+
     Ok(())
 }

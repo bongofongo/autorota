@@ -266,6 +266,11 @@ int64_t uniffi_autorota_ffi_fn_func_create_assignment(RustBuffer assignment, Rus
 int64_t uniffi_autorota_ffi_fn_func_create_employee(RustBuffer employee, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_CREATE_EMPTY_WEEK
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_CREATE_EMPTY_WEEK
+int64_t uniffi_autorota_ffi_fn_func_create_empty_week(RustBuffer week_start, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_CREATE_ROLE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_CREATE_ROLE
 int64_t uniffi_autorota_ffi_fn_func_create_role(RustBuffer name, RustCallStatus *_Nonnull out_status
@@ -291,6 +296,11 @@ void uniffi_autorota_ffi_fn_func_delete_assignment(int64_t id, RustCallStatus *_
 void uniffi_autorota_ffi_fn_func_delete_employee(int64_t id, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_DELETE_EMPLOYEE_AVAILABILITY_OVERRIDE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_DELETE_EMPLOYEE_AVAILABILITY_OVERRIDE
+void uniffi_autorota_ffi_fn_func_delete_employee_availability_override(int64_t id, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_DELETE_ROLE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_DELETE_ROLE
 void uniffi_autorota_ffi_fn_func_delete_role(int64_t id, RustCallStatus *_Nonnull out_status
@@ -306,6 +316,16 @@ void uniffi_autorota_ffi_fn_func_delete_shift(int64_t id, RustCallStatus *_Nonnu
 void uniffi_autorota_ffi_fn_func_delete_shift_template(int64_t id, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_DELETE_SHIFT_TEMPLATE_OVERRIDE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_DELETE_SHIFT_TEMPLATE_OVERRIDE
+void uniffi_autorota_ffi_fn_func_delete_shift_template_override(int64_t id, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_DELETE_WEEK
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_DELETE_WEEK
+void uniffi_autorota_ffi_fn_func_delete_week(RustBuffer week_start, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_FINALIZE_ROTA
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_FINALIZE_ROTA
 void uniffi_autorota_ffi_fn_func_finalize_rota(int64_t id, RustCallStatus *_Nonnull out_status
@@ -314,6 +334,11 @@ void uniffi_autorota_ffi_fn_func_finalize_rota(int64_t id, RustCallStatus *_Nonn
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_EMPLOYEE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_EMPLOYEE
 RustBuffer uniffi_autorota_ffi_fn_func_get_employee(int64_t id, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_EMPLOYEE_AVAILABILITY_OVERRIDE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_EMPLOYEE_AVAILABILITY_OVERRIDE
+RustBuffer uniffi_autorota_ffi_fn_func_get_employee_availability_override(int64_t employee_id, RustBuffer date, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_ROTA
@@ -326,6 +351,11 @@ RustBuffer uniffi_autorota_ffi_fn_func_get_rota(int64_t id, RustCallStatus *_Non
 RustBuffer uniffi_autorota_ffi_fn_func_get_rota_by_week(RustBuffer week_start, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_SHIFT_TEMPLATE_OVERRIDE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_SHIFT_TEMPLATE_OVERRIDE
+RustBuffer uniffi_autorota_ffi_fn_func_get_shift_template_override(int64_t template_id, RustBuffer date, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_WEEK_SCHEDULE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_WEEK_SCHEDULE
 RustBuffer uniffi_autorota_ffi_fn_func_get_week_schedule(RustBuffer week_start, RustCallStatus *_Nonnull out_status
@@ -334,6 +364,23 @@ RustBuffer uniffi_autorota_ffi_fn_func_get_week_schedule(RustBuffer week_start, 
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_INIT_DB
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_INIT_DB
 void uniffi_autorota_ffi_fn_func_init_db(RustBuffer db_path, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LIST_ALL_EMPLOYEE_AVAILABILITY_OVERRIDES
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LIST_ALL_EMPLOYEE_AVAILABILITY_OVERRIDES
+RustBuffer uniffi_autorota_ffi_fn_func_list_all_employee_availability_overrides(RustCallStatus *_Nonnull out_status
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LIST_ALL_SHIFT_TEMPLATE_OVERRIDES
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LIST_ALL_SHIFT_TEMPLATE_OVERRIDES
+RustBuffer uniffi_autorota_ffi_fn_func_list_all_shift_template_overrides(RustCallStatus *_Nonnull out_status
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LIST_EMPLOYEE_AVAILABILITY_OVERRIDES
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LIST_EMPLOYEE_AVAILABILITY_OVERRIDES
+RustBuffer uniffi_autorota_ffi_fn_func_list_employee_availability_overrides(int64_t employee_id, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LIST_EMPLOYEES
@@ -346,6 +393,11 @@ RustBuffer uniffi_autorota_ffi_fn_func_list_employees(RustCallStatus *_Nonnull o
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LIST_ROLES
 RustBuffer uniffi_autorota_ffi_fn_func_list_roles(RustCallStatus *_Nonnull out_status
     
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LIST_SHIFT_TEMPLATE_OVERRIDES_FOR_TEMPLATE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LIST_SHIFT_TEMPLATE_OVERRIDES_FOR_TEMPLATE
+RustBuffer uniffi_autorota_ffi_fn_func_list_shift_template_overrides_for_template(int64_t template_id, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LIST_SHIFT_TEMPLATES
@@ -402,6 +454,16 @@ void uniffi_autorota_ffi_fn_func_update_shift_template(RustBuffer template, Rust
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_UPDATE_SHIFT_TIMES
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_UPDATE_SHIFT_TIMES
 void uniffi_autorota_ffi_fn_func_update_shift_times(int64_t id, RustBuffer start_time, RustBuffer end_time, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_UPSERT_EMPLOYEE_AVAILABILITY_OVERRIDE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_UPSERT_EMPLOYEE_AVAILABILITY_OVERRIDE
+int64_t uniffi_autorota_ffi_fn_func_upsert_employee_availability_override(RustBuffer override_, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_UPSERT_SHIFT_TEMPLATE_OVERRIDE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_UPSERT_SHIFT_TEMPLATE_OVERRIDE
+int64_t uniffi_autorota_ffi_fn_func_upsert_shift_template_override(RustBuffer override_, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_FFI_AUTOROTA_FFI_RUSTBUFFER_ALLOC
@@ -702,6 +764,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_create_employee(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_CREATE_EMPTY_WEEK
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_CREATE_EMPTY_WEEK
+uint16_t uniffi_autorota_ffi_checksum_func_create_empty_week(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_CREATE_ROLE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_CREATE_ROLE
 uint16_t uniffi_autorota_ffi_checksum_func_create_role(void
@@ -732,6 +800,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_delete_employee(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_DELETE_EMPLOYEE_AVAILABILITY_OVERRIDE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_DELETE_EMPLOYEE_AVAILABILITY_OVERRIDE
+uint16_t uniffi_autorota_ffi_checksum_func_delete_employee_availability_override(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_DELETE_ROLE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_DELETE_ROLE
 uint16_t uniffi_autorota_ffi_checksum_func_delete_role(void
@@ -750,6 +824,18 @@ uint16_t uniffi_autorota_ffi_checksum_func_delete_shift_template(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_DELETE_SHIFT_TEMPLATE_OVERRIDE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_DELETE_SHIFT_TEMPLATE_OVERRIDE
+uint16_t uniffi_autorota_ffi_checksum_func_delete_shift_template_override(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_DELETE_WEEK
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_DELETE_WEEK
+uint16_t uniffi_autorota_ffi_checksum_func_delete_week(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_FINALIZE_ROTA
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_FINALIZE_ROTA
 uint16_t uniffi_autorota_ffi_checksum_func_finalize_rota(void
@@ -759,6 +845,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_finalize_rota(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_EMPLOYEE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_EMPLOYEE
 uint16_t uniffi_autorota_ffi_checksum_func_get_employee(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_EMPLOYEE_AVAILABILITY_OVERRIDE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_EMPLOYEE_AVAILABILITY_OVERRIDE
+uint16_t uniffi_autorota_ffi_checksum_func_get_employee_availability_override(void
     
 );
 #endif
@@ -774,6 +866,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_get_rota_by_week(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_SHIFT_TEMPLATE_OVERRIDE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_SHIFT_TEMPLATE_OVERRIDE
+uint16_t uniffi_autorota_ffi_checksum_func_get_shift_template_override(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_WEEK_SCHEDULE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_WEEK_SCHEDULE
 uint16_t uniffi_autorota_ffi_checksum_func_get_week_schedule(void
@@ -786,6 +884,24 @@ uint16_t uniffi_autorota_ffi_checksum_func_init_db(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_ALL_EMPLOYEE_AVAILABILITY_OVERRIDES
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_ALL_EMPLOYEE_AVAILABILITY_OVERRIDES
+uint16_t uniffi_autorota_ffi_checksum_func_list_all_employee_availability_overrides(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_ALL_SHIFT_TEMPLATE_OVERRIDES
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_ALL_SHIFT_TEMPLATE_OVERRIDES
+uint16_t uniffi_autorota_ffi_checksum_func_list_all_shift_template_overrides(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_EMPLOYEE_AVAILABILITY_OVERRIDES
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_EMPLOYEE_AVAILABILITY_OVERRIDES
+uint16_t uniffi_autorota_ffi_checksum_func_list_employee_availability_overrides(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_EMPLOYEES
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_EMPLOYEES
 uint16_t uniffi_autorota_ffi_checksum_func_list_employees(void
@@ -795,6 +911,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_list_employees(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_ROLES
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_ROLES
 uint16_t uniffi_autorota_ffi_checksum_func_list_roles(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_SHIFT_TEMPLATE_OVERRIDES_FOR_TEMPLATE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_SHIFT_TEMPLATE_OVERRIDES_FOR_TEMPLATE
+uint16_t uniffi_autorota_ffi_checksum_func_list_shift_template_overrides_for_template(void
     
 );
 #endif
@@ -861,6 +983,18 @@ uint16_t uniffi_autorota_ffi_checksum_func_update_shift_template(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_UPDATE_SHIFT_TIMES
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_UPDATE_SHIFT_TIMES
 uint16_t uniffi_autorota_ffi_checksum_func_update_shift_times(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_UPSERT_EMPLOYEE_AVAILABILITY_OVERRIDE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_UPSERT_EMPLOYEE_AVAILABILITY_OVERRIDE
+uint16_t uniffi_autorota_ffi_checksum_func_upsert_employee_availability_override(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_UPSERT_SHIFT_TEMPLATE_OVERRIDE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_UPSERT_SHIFT_TEMPLATE_OVERRIDE
+uint16_t uniffi_autorota_ffi_checksum_func_upsert_shift_template_override(void
     
 );
 #endif

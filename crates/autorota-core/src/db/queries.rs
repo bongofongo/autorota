@@ -4,6 +4,7 @@ use sqlx::SqlitePool;
 use crate::models::assignment::{Assignment, AssignmentStatus};
 use crate::models::availability::Availability;
 use crate::models::employee::Employee;
+use crate::models::overrides::{DayAvailability, EmployeeAvailabilityOverride, ShiftTemplateOverride};
 use crate::models::role::Role;
 use crate::models::rota::Rota;
 use crate::models::shift::{Shift, ShiftTemplate};
@@ -271,6 +272,10 @@ fn shift_template_from_row(row: ShiftTemplateRow) -> Option<ShiftTemplate> {
 /// Materialise concrete Shift rows from all templates for a given rota/week.
 /// For each template and each of its weekdays, compute the date within the week
 /// starting at `week_start` (which must be a Monday).
+///
+/// Respects `ShiftTemplateOverride` records: if an override for a template+date has
+/// `cancelled = true`, that shift is skipped; otherwise any non-None override fields
+/// replace the corresponding template values.
 pub async fn materialise_shifts(
     pool: &SqlitePool,
     rota_id: i64,
@@ -283,6 +288,31 @@ pub async fn materialise_shifts(
         for &weekday in &tmpl.weekdays {
             let days_offset = weekday.num_days_from_monday();
             let shift_date = week_start + chrono::Duration::days(days_offset as i64);
+
+            // Check for a date-specific override on this template+date.
+            if let Some(ovr) = get_shift_template_override(pool, tmpl.id, shift_date).await? {
+                if ovr.cancelled {
+                    continue;
+                }
+                let start_time = ovr.start_time.unwrap_or(tmpl.start_time);
+                let end_time = ovr.end_time.unwrap_or(tmpl.end_time);
+                let min_employees = ovr.min_employees.unwrap_or(tmpl.min_employees);
+                let max_employees = ovr.max_employees.unwrap_or(tmpl.max_employees);
+                let shift = crate::models::shift::Shift {
+                    id: 0,
+                    template_id: Some(tmpl.id),
+                    rota_id,
+                    date: shift_date,
+                    start_time,
+                    end_time,
+                    required_role: tmpl.required_role.clone(),
+                    min_employees,
+                    max_employees,
+                };
+                let id = insert_shift(pool, &shift).await?;
+                shifts.push(crate::models::shift::Shift { id, ..shift });
+                continue;
+            }
 
             let shift = crate::models::shift::Shift {
                 id: 0,
@@ -353,6 +383,20 @@ pub async fn get_rota_by_week(
         Some((id,)) => get_rota(pool, id).await,
         None => Ok(None),
     }
+}
+
+/// Delete a rota and all its data. Deletes all shifts first (which cascades
+/// to assignments via the ON DELETE CASCADE FK), then removes the rota row.
+pub async fn delete_rota(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM shifts WHERE rota_id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    sqlx::query("DELETE FROM rotas WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
 }
 
 pub async fn finalize_rota(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
@@ -690,4 +734,197 @@ pub async fn delete_role(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> 
         .await?;
 
     Ok(())
+}
+
+// ─── Employee Availability Overrides ─────────────────────────
+
+/// Insert or replace an employee availability override (one per employee+date).
+pub async fn upsert_employee_availability_override(
+    pool: &SqlitePool,
+    ovr: &EmployeeAvailabilityOverride,
+) -> Result<i64, sqlx::Error> {
+    let avail_json = ovr.availability.to_json().unwrap_or_default();
+    let id: i64 = sqlx::query_scalar(
+        "INSERT INTO employee_availability_overrides (employee_id, date, availability, notes)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(employee_id, date) DO UPDATE SET availability = excluded.availability, notes = excluded.notes
+         RETURNING id",
+    )
+    .bind(ovr.employee_id)
+    .bind(ovr.date.to_string())
+    .bind(&avail_json)
+    .bind(&ovr.notes)
+    .fetch_one(pool)
+    .await?;
+    Ok(id)
+}
+
+pub async fn get_employee_availability_override(
+    pool: &SqlitePool,
+    employee_id: i64,
+    date: NaiveDate,
+) -> Result<Option<EmployeeAvailabilityOverride>, sqlx::Error> {
+    let row: Option<(i64, i64, String, String, Option<String>)> = sqlx::query_as(
+        "SELECT id, employee_id, date, availability, notes
+         FROM employee_availability_overrides WHERE employee_id = ? AND date = ?",
+    )
+    .bind(employee_id)
+    .bind(date.to_string())
+    .fetch_optional(pool)
+    .await?;
+    Ok(row.and_then(employee_avail_override_from_row))
+}
+
+pub async fn list_employee_availability_overrides_for_employee(
+    pool: &SqlitePool,
+    employee_id: i64,
+) -> Result<Vec<EmployeeAvailabilityOverride>, sqlx::Error> {
+    let rows: Vec<(i64, i64, String, String, Option<String>)> = sqlx::query_as(
+        "SELECT id, employee_id, date, availability, notes
+         FROM employee_availability_overrides WHERE employee_id = ? ORDER BY date",
+    )
+    .bind(employee_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows.into_iter().filter_map(employee_avail_override_from_row).collect())
+}
+
+pub async fn list_all_employee_availability_overrides(
+    pool: &SqlitePool,
+) -> Result<Vec<EmployeeAvailabilityOverride>, sqlx::Error> {
+    let rows: Vec<(i64, i64, String, String, Option<String>)> = sqlx::query_as(
+        "SELECT id, employee_id, date, availability, notes
+         FROM employee_availability_overrides ORDER BY date, employee_id",
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(rows.into_iter().filter_map(employee_avail_override_from_row).collect())
+}
+
+pub async fn delete_employee_availability_override(
+    pool: &SqlitePool,
+    id: i64,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM employee_availability_overrides WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+fn employee_avail_override_from_row(
+    row: (i64, i64, String, String, Option<String>),
+) -> Option<EmployeeAvailabilityOverride> {
+    let (id, employee_id, date_str, avail_json, notes) = row;
+    Some(EmployeeAvailabilityOverride {
+        id,
+        employee_id,
+        date: NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").ok()?,
+        availability: DayAvailability::from_json(&avail_json).unwrap_or_default(),
+        notes,
+    })
+}
+
+// ─── Shift Template Overrides ─────────────────────────────────
+
+/// Insert or replace a shift template override (one per template+date).
+pub async fn upsert_shift_template_override(
+    pool: &SqlitePool,
+    ovr: &ShiftTemplateOverride,
+) -> Result<i64, sqlx::Error> {
+    let start_str = ovr.start_time.map(|t| t.format("%H:%M:%S").to_string());
+    let end_str = ovr.end_time.map(|t| t.format("%H:%M:%S").to_string());
+    let id: i64 = sqlx::query_scalar(
+        "INSERT INTO shift_template_overrides (template_id, date, cancelled, start_time, end_time, min_employees, max_employees, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(template_id, date) DO UPDATE SET
+           cancelled = excluded.cancelled,
+           start_time = excluded.start_time,
+           end_time = excluded.end_time,
+           min_employees = excluded.min_employees,
+           max_employees = excluded.max_employees,
+           notes = excluded.notes
+         RETURNING id",
+    )
+    .bind(ovr.template_id)
+    .bind(ovr.date.to_string())
+    .bind(ovr.cancelled as i64)
+    .bind(&start_str)
+    .bind(&end_str)
+    .bind(ovr.min_employees.map(|v| v as i64))
+    .bind(ovr.max_employees.map(|v| v as i64))
+    .bind(&ovr.notes)
+    .fetch_one(pool)
+    .await?;
+    Ok(id)
+}
+
+pub async fn get_shift_template_override(
+    pool: &SqlitePool,
+    template_id: i64,
+    date: NaiveDate,
+) -> Result<Option<ShiftTemplateOverride>, sqlx::Error> {
+    let row: Option<(i64, i64, String, i64, Option<String>, Option<String>, Option<i64>, Option<i64>, Option<String>)> = sqlx::query_as(
+        "SELECT id, template_id, date, cancelled, start_time, end_time, min_employees, max_employees, notes
+         FROM shift_template_overrides WHERE template_id = ? AND date = ?",
+    )
+    .bind(template_id)
+    .bind(date.to_string())
+    .fetch_optional(pool)
+    .await?;
+    Ok(row.and_then(shift_template_override_from_row))
+}
+
+pub async fn list_shift_template_overrides_for_template(
+    pool: &SqlitePool,
+    template_id: i64,
+) -> Result<Vec<ShiftTemplateOverride>, sqlx::Error> {
+    let rows: Vec<(i64, i64, String, i64, Option<String>, Option<String>, Option<i64>, Option<i64>, Option<String>)> = sqlx::query_as(
+        "SELECT id, template_id, date, cancelled, start_time, end_time, min_employees, max_employees, notes
+         FROM shift_template_overrides WHERE template_id = ? ORDER BY date",
+    )
+    .bind(template_id)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows.into_iter().filter_map(shift_template_override_from_row).collect())
+}
+
+pub async fn list_all_shift_template_overrides(
+    pool: &SqlitePool,
+) -> Result<Vec<ShiftTemplateOverride>, sqlx::Error> {
+    let rows: Vec<(i64, i64, String, i64, Option<String>, Option<String>, Option<i64>, Option<i64>, Option<String>)> = sqlx::query_as(
+        "SELECT id, template_id, date, cancelled, start_time, end_time, min_employees, max_employees, notes
+         FROM shift_template_overrides ORDER BY date, template_id",
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(rows.into_iter().filter_map(shift_template_override_from_row).collect())
+}
+
+pub async fn delete_shift_template_override(
+    pool: &SqlitePool,
+    id: i64,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM shift_template_overrides WHERE id = ?")
+        .bind(id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+fn shift_template_override_from_row(
+    row: (i64, i64, String, i64, Option<String>, Option<String>, Option<i64>, Option<i64>, Option<String>),
+) -> Option<ShiftTemplateOverride> {
+    let (id, template_id, date_str, cancelled, start_str, end_str, min_emp, max_emp, notes) = row;
+    Some(ShiftTemplateOverride {
+        id,
+        template_id,
+        date: NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").ok()?,
+        cancelled: cancelled != 0,
+        start_time: start_str.as_deref().and_then(|s| NaiveTime::parse_from_str(s, "%H:%M:%S").ok()),
+        end_time: end_str.as_deref().and_then(|s| NaiveTime::parse_from_str(s, "%H:%M:%S").ok()),
+        min_employees: min_emp.map(|v| v as u32),
+        max_employees: max_emp.map(|v| v as u32),
+        notes,
+    })
 }

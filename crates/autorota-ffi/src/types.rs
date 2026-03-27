@@ -157,3 +157,41 @@ pub struct FfiScheduleResult {
     pub assignments: Vec<FfiAssignment>,
     pub warnings: Vec<FfiShortfallWarning>,
 }
+
+// ── Overrides ─────────────────────────────────────────────────────────────────
+
+/// A single hour slot in a `DayAvailability` override (no weekday — the date carries that).
+#[derive(Clone, uniffi::Record)]
+pub struct DayAvailabilitySlot {
+    pub hour: u8,
+    /// "Yes" | "Maybe" | "No"
+    pub state: String,
+}
+
+/// Date-specific availability override for one employee on one calendar date.
+#[derive(Clone, uniffi::Record)]
+pub struct FfiEmployeeAvailabilityOverride {
+    pub id: i64,
+    pub employee_id: i64,
+    /// "YYYY-MM-DD"
+    pub date: String,
+    pub availability: Vec<DayAvailabilitySlot>,
+    pub notes: Option<String>,
+}
+
+/// Date-specific modification to a recurring shift template on one calendar date.
+#[derive(Clone, uniffi::Record)]
+pub struct FfiShiftTemplateOverride {
+    pub id: i64,
+    pub template_id: i64,
+    /// "YYYY-MM-DD"
+    pub date: String,
+    pub cancelled: bool,
+    /// "HH:MM" or None (use template value)
+    pub start_time: Option<String>,
+    /// "HH:MM" or None (use template value)
+    pub end_time: Option<String>,
+    pub min_employees: Option<u32>,
+    pub max_employees: Option<u32>,
+    pub notes: Option<String>,
+}

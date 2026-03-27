@@ -254,11 +254,164 @@ struct RotaViewModelTests {
         mock.stubbedScheduleResult = FfiScheduleResult(assignments: [], warnings: [warning])
         mock.stubbedWeekSchedule = makeSchedule()
         let vm = RotaViewModel(service: mock)
+        vm.selectedWeekStart = "2099-01-07" // future week bypasses confirmation gate
 
         await vm.runSchedule()
 
         #expect(vm.warnings.count == 1)
         #expect(vm.isScheduling == false)
+    }
+
+    // MARK: - Generate confirmation dialog
+
+    @Test func generateOnPastWeekWithoutScheduleShowsConfirmation() async {
+        let mock = MockAutorotaService()
+        let vm = RotaViewModel(service: mock)
+        vm.selectedWeekStart = "2020-01-06" // past week
+        vm.schedule = nil
+
+        await vm.runSchedule()
+
+        #expect(vm.showGenerateConfirmation == true)
+        #expect(!mock.callLog.contains { $0.hasPrefix("runSchedule") })
+    }
+
+    @Test func generateOnCurrentWeekWithoutScheduleShowsConfirmation() async {
+        let mock = MockAutorotaService()
+        let vm = RotaViewModel(service: mock)
+        vm.selectedWeekStart = currentWeekStart()
+        vm.schedule = nil
+
+        await vm.runSchedule()
+
+        #expect(vm.showGenerateConfirmation == true)
+        #expect(!mock.callLog.contains { $0.hasPrefix("runSchedule") })
+    }
+
+    @Test func generateOnFutureWeekRunsScheduleNormally() async {
+        let mock = MockAutorotaService()
+        mock.stubbedScheduleResult = FfiScheduleResult(assignments: [], warnings: [])
+        mock.stubbedWeekSchedule = makeSchedule()
+        let vm = RotaViewModel(service: mock)
+        vm.selectedWeekStart = "2099-01-07" // future week
+
+        await vm.runSchedule()
+
+        #expect(vm.showGenerateConfirmation == false)
+        #expect(mock.callLog.contains { $0.hasPrefix("runSchedule") })
+    }
+
+    @Test func generateOnPastWeekWithExistingScheduleRunsScheduleNormally() async {
+        let mock = MockAutorotaService()
+        mock.stubbedScheduleResult = FfiScheduleResult(assignments: [], warnings: [])
+        mock.stubbedWeekSchedule = makeSchedule()
+        let vm = RotaViewModel(service: mock)
+        vm.selectedWeekStart = "2020-01-06" // past week
+        vm.schedule = makeSchedule()         // schedule already exists
+
+        await vm.runSchedule()
+
+        #expect(vm.showGenerateConfirmation == false)
+        #expect(mock.callLog.contains { $0.hasPrefix("runSchedule") })
+    }
+
+    @Test func createFromTemplateCallsMaterialiseWeekAndReloads() async {
+        let mock = MockAutorotaService()
+        mock.stubbedWeekSchedule = makeSchedule()
+        let vm = RotaViewModel(service: mock)
+        vm.selectedWeekStart = "2020-01-06"
+
+        await vm.createFromTemplate()
+
+        #expect(mock.callLog.contains { $0.hasPrefix("materialiseWeek") })
+        #expect(mock.callLog.contains { $0.hasPrefix("getWeekSchedule") })
+        #expect(vm.schedule != nil)
+        #expect(vm.isScheduling == false)
+    }
+
+    @Test func createEmptyCallsCreateEmptyWeekAndReloads() async {
+        let mock = MockAutorotaService()
+        mock.stubbedWeekSchedule = makeSchedule()
+        let vm = RotaViewModel(service: mock)
+        vm.selectedWeekStart = "2020-01-06"
+
+        await vm.createEmpty()
+
+        #expect(mock.callLog.contains { $0.hasPrefix("createEmptyWeek") })
+        #expect(mock.callLog.contains { $0.hasPrefix("getWeekSchedule") })
+        #expect(vm.schedule != nil)
+        #expect(vm.isScheduling == false)
+    }
+
+    @Test func createFromTemplateErrorSetsError() async {
+        let mock = MockAutorotaService()
+        mock.errorToThrow = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "template error"])
+        let vm = RotaViewModel(service: mock)
+
+        await vm.createFromTemplate()
+
+        #expect(vm.error == "template error")
+        #expect(vm.isScheduling == false)
+    }
+
+    @Test func createEmptyErrorSetsError() async {
+        let mock = MockAutorotaService()
+        mock.errorToThrow = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "empty error"])
+        let vm = RotaViewModel(service: mock)
+
+        await vm.createEmpty()
+
+        #expect(vm.error == "empty error")
+        #expect(vm.isScheduling == false)
+    }
+
+    @Test func resetModesResetsConfirmationFlag() {
+        let mock = MockAutorotaService()
+        let vm = RotaViewModel(service: mock)
+        vm.showGenerateConfirmation = true
+
+        vm.resetModes()
+
+        #expect(vm.showGenerateConfirmation == false)
+    }
+
+    // MARK: - Delete schedule
+
+    @Test func deleteScheduleCallsServiceClearsScheduleAndExitsEditMode() async {
+        let mock = MockAutorotaService()
+        let vm = RotaViewModel(service: mock)
+        vm.selectedWeekStart = "2020-01-06"
+        vm.schedule = makeSchedule()
+        vm.isEditMode = true
+
+        await vm.deleteSchedule()
+
+        #expect(mock.callLog.contains { $0.hasPrefix("deleteWeek") })
+        #expect(vm.schedule == nil)
+        #expect(vm.isEditMode == false)
+    }
+
+    @Test func deleteScheduleErrorSetsError() async {
+        let mock = MockAutorotaService()
+        mock.errorToThrow = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "delete error"])
+        let vm = RotaViewModel(service: mock)
+        vm.schedule = makeSchedule()
+        vm.isEditMode = true
+
+        await vm.deleteSchedule()
+
+        #expect(vm.error == "delete error")
+        #expect(vm.isEditMode == true)
+    }
+
+    @Test func resetModesResetsDeleteConfirmationFlag() {
+        let mock = MockAutorotaService()
+        let vm = RotaViewModel(service: mock)
+        vm.showDeleteScheduleConfirmation = true
+
+        vm.resetModes()
+
+        #expect(vm.showDeleteScheduleConfirmation == false)
     }
 
     // MARK: - allWeekdays

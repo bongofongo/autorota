@@ -112,6 +112,17 @@ final class MockAutorotaService: AutorotaServiceProtocol, @unchecked Sendable {
         return 1
     }
 
+    func createEmptyWeek(weekStart: String) async throws -> Int64 {
+        callLog.append("createEmptyWeek:\(weekStart)")
+        if let e = errorToThrow { throw e }
+        return 1
+    }
+
+    func deleteWeek(weekStart: String) async throws {
+        callLog.append("deleteWeek:\(weekStart)")
+        if let e = errorToThrow { throw e }
+    }
+
     func finalizeRota(id: Int64) async throws {
         callLog.append("finalizeRota:\(id)")
         if let e = errorToThrow { throw e }
@@ -167,5 +178,65 @@ final class MockAutorotaService: AutorotaServiceProtocol, @unchecked Sendable {
         callLog.append("listShiftsForRota:\(rotaId)")
         if let e = errorToThrow { throw e }
         return stubbedShifts
+    }
+
+    // MARK: - Overrides
+
+    func upsertEmployeeAvailabilityOverride(_ o: FfiEmployeeAvailabilityOverride) async throws -> Int64 {
+        callLog.append("upsertEmployeeAvailabilityOverride")
+        if let e = errorToThrow { throw e }
+        return 1
+    }
+
+    func getEmployeeAvailabilityOverride(employeeId: Int64, date: String) async throws -> FfiEmployeeAvailabilityOverride? {
+        callLog.append("getEmployeeAvailabilityOverride:\(employeeId):\(date)")
+        if let e = errorToThrow { throw e }
+        return nil
+    }
+
+    func listEmployeeAvailabilityOverrides(employeeId: Int64) async throws -> [FfiEmployeeAvailabilityOverride] {
+        callLog.append("listEmployeeAvailabilityOverrides:\(employeeId)")
+        if let e = errorToThrow { throw e }
+        return []
+    }
+
+    func listAllEmployeeAvailabilityOverrides() async throws -> [FfiEmployeeAvailabilityOverride] {
+        callLog.append("listAllEmployeeAvailabilityOverrides")
+        if let e = errorToThrow { throw e }
+        return []
+    }
+
+    func deleteEmployeeAvailabilityOverride(id: Int64) async throws {
+        callLog.append("deleteEmployeeAvailabilityOverride:\(id)")
+        if let e = errorToThrow { throw e }
+    }
+
+    func upsertShiftTemplateOverride(_ o: FfiShiftTemplateOverride) async throws -> Int64 {
+        callLog.append("upsertShiftTemplateOverride")
+        if let e = errorToThrow { throw e }
+        return 1
+    }
+
+    func getShiftTemplateOverride(templateId: Int64, date: String) async throws -> FfiShiftTemplateOverride? {
+        callLog.append("getShiftTemplateOverride:\(templateId):\(date)")
+        if let e = errorToThrow { throw e }
+        return nil
+    }
+
+    func listShiftTemplateOverridesForTemplate(templateId: Int64) async throws -> [FfiShiftTemplateOverride] {
+        callLog.append("listShiftTemplateOverridesForTemplate:\(templateId)")
+        if let e = errorToThrow { throw e }
+        return []
+    }
+
+    func listAllShiftTemplateOverrides() async throws -> [FfiShiftTemplateOverride] {
+        callLog.append("listAllShiftTemplateOverrides")
+        if let e = errorToThrow { throw e }
+        return []
+    }
+
+    func deleteShiftTemplateOverride(id: Int64) async throws {
+        callLog.append("deleteShiftTemplateOverride:\(id)")
+        if let e = errorToThrow { throw e }
     }
 }

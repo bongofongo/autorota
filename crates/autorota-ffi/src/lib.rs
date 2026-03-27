@@ -7,6 +7,7 @@ use autorota_core::db::{self, queries};
 use autorota_core::models::assignment::{Assignment, AssignmentStatus};
 use autorota_core::models::availability::{Availability, AvailabilityState};
 use autorota_core::models::employee::Employee;
+use autorota_core::models::overrides::{DayAvailability, EmployeeAvailabilityOverride, ShiftTemplateOverride};
 use autorota_core::models::rota::Rota;
 use autorota_core::models::shift::{Shift, ShiftTemplate};
 use chrono::{Datelike, Local, NaiveDate, NaiveTime, Weekday};
@@ -565,6 +566,36 @@ pub fn materialise_week(week_start: String) -> Result<i64, FfiError> {
     result.map_err(|e| FfiError::Db { msg: e.to_string() })
 }
 
+/// Create an empty rota record for the given week with no shifts and no assignments.
+/// Returns the rota id. Safe to call multiple times (returns existing id if one already exists).
+#[uniffi::export]
+pub fn create_empty_week(week_start: String) -> Result<i64, FfiError> {
+    let pool = pool()?;
+    let date = parse_date(&week_start)?;
+    let result: Result<i64, sqlx::Error> = rt().block_on(async move {
+        match queries::get_rota_by_week(pool, date).await? {
+            Some(existing) => Ok(existing.id),
+            None => queries::insert_rota(pool, date).await,
+        }
+    });
+    result.map_err(|e| FfiError::Db { msg: e.to_string() })
+}
+
+/// Delete the rota for the given week along with all its shifts and assignments.
+/// No-ops silently if no rota exists for that week.
+#[uniffi::export]
+pub fn delete_week(week_start: String) -> Result<(), FfiError> {
+    let pool = pool()?;
+    let date = parse_date(&week_start)?;
+    let result: Result<(), sqlx::Error> = rt().block_on(async move {
+        if let Some(rota) = queries::get_rota_by_week(pool, date).await? {
+            queries::delete_rota(pool, rota.id).await?;
+        }
+        Ok(())
+    });
+    result.map_err(|e| FfiError::Db { msg: e.to_string() })
+}
+
 /// Create/update a rota for the given week, re-materialise shifts, run the
 /// scheduler, persist proposed assignments, and return the result.
 #[uniffi::export]
@@ -1066,4 +1097,179 @@ mod tests {
 
         drop(dir);
     }
+}
+
+// ── Override conversions ──────────────────────────────────────────────────────
+
+fn day_availability_to_slots(avail: &DayAvailability) -> Vec<DayAvailabilitySlot> {
+    avail
+        .0
+        .iter()
+        .map(|(&hour, &state)| DayAvailabilitySlot {
+            hour,
+            state: state.to_string(),
+        })
+        .collect()
+}
+
+fn slots_to_day_availability(slots: Vec<DayAvailabilitySlot>) -> Result<DayAvailability, FfiError> {
+    let mut avail = DayAvailability::default();
+    for s in slots {
+        let state = s
+            .state
+            .parse::<AvailabilityState>()
+            .map_err(|e| FfiError::InvalidArgument { msg: e })?;
+        avail.set(s.hour, state);
+    }
+    Ok(avail)
+}
+
+fn employee_avail_override_to_ffi(o: EmployeeAvailabilityOverride) -> FfiEmployeeAvailabilityOverride {
+    FfiEmployeeAvailabilityOverride {
+        id: o.id,
+        employee_id: o.employee_id,
+        date: o.date.to_string(),
+        availability: day_availability_to_slots(&o.availability),
+        notes: o.notes,
+    }
+}
+
+fn ffi_to_employee_avail_override(
+    o: FfiEmployeeAvailabilityOverride,
+) -> Result<EmployeeAvailabilityOverride, FfiError> {
+    Ok(EmployeeAvailabilityOverride {
+        id: o.id,
+        employee_id: o.employee_id,
+        date: parse_date(&o.date)?,
+        availability: slots_to_day_availability(o.availability)?,
+        notes: o.notes,
+    })
+}
+
+fn shift_template_override_to_ffi(o: ShiftTemplateOverride) -> FfiShiftTemplateOverride {
+    FfiShiftTemplateOverride {
+        id: o.id,
+        template_id: o.template_id,
+        date: o.date.to_string(),
+        cancelled: o.cancelled,
+        start_time: o.start_time.map(|t| t.format("%H:%M").to_string()),
+        end_time: o.end_time.map(|t| t.format("%H:%M").to_string()),
+        min_employees: o.min_employees,
+        max_employees: o.max_employees,
+        notes: o.notes,
+    }
+}
+
+fn ffi_to_shift_template_override(
+    o: FfiShiftTemplateOverride,
+) -> Result<ShiftTemplateOverride, FfiError> {
+    Ok(ShiftTemplateOverride {
+        id: o.id,
+        template_id: o.template_id,
+        date: parse_date(&o.date)?,
+        cancelled: o.cancelled,
+        start_time: o.start_time.as_deref().map(parse_time).transpose()?,
+        end_time: o.end_time.as_deref().map(parse_time).transpose()?,
+        min_employees: o.min_employees,
+        max_employees: o.max_employees,
+        notes: o.notes,
+    })
+}
+
+// ── Employee Availability Override exports ────────────────────────────────────
+
+#[uniffi::export]
+pub fn upsert_employee_availability_override(
+    override_: FfiEmployeeAvailabilityOverride,
+) -> Result<i64, FfiError> {
+    let pool = pool()?;
+    let ovr = ffi_to_employee_avail_override(override_)?;
+    rt().block_on(queries::upsert_employee_availability_override(pool, &ovr))
+        .map_err(Into::into)
+}
+
+#[uniffi::export]
+pub fn get_employee_availability_override(
+    employee_id: i64,
+    date: String,
+) -> Result<Option<FfiEmployeeAvailabilityOverride>, FfiError> {
+    let pool = pool()?;
+    let d = parse_date(&date)?;
+    rt().block_on(queries::get_employee_availability_override(pool, employee_id, d))
+        .map(|opt| opt.map(employee_avail_override_to_ffi))
+        .map_err(Into::into)
+}
+
+#[uniffi::export]
+pub fn list_employee_availability_overrides(
+    employee_id: i64,
+) -> Result<Vec<FfiEmployeeAvailabilityOverride>, FfiError> {
+    let pool = pool()?;
+    rt().block_on(queries::list_employee_availability_overrides_for_employee(pool, employee_id))
+        .map(|v| v.into_iter().map(employee_avail_override_to_ffi).collect())
+        .map_err(Into::into)
+}
+
+#[uniffi::export]
+pub fn list_all_employee_availability_overrides() -> Result<Vec<FfiEmployeeAvailabilityOverride>, FfiError> {
+    let pool = pool()?;
+    rt().block_on(queries::list_all_employee_availability_overrides(pool))
+        .map(|v| v.into_iter().map(employee_avail_override_to_ffi).collect())
+        .map_err(Into::into)
+}
+
+#[uniffi::export]
+pub fn delete_employee_availability_override(id: i64) -> Result<(), FfiError> {
+    let pool = pool()?;
+    rt().block_on(queries::delete_employee_availability_override(pool, id))
+        .map_err(Into::into)
+}
+
+// ── Shift Template Override exports ───────────────────────────────────────────
+
+#[uniffi::export]
+pub fn upsert_shift_template_override(
+    override_: FfiShiftTemplateOverride,
+) -> Result<i64, FfiError> {
+    let pool = pool()?;
+    let ovr = ffi_to_shift_template_override(override_)?;
+    rt().block_on(queries::upsert_shift_template_override(pool, &ovr))
+        .map_err(Into::into)
+}
+
+#[uniffi::export]
+pub fn get_shift_template_override(
+    template_id: i64,
+    date: String,
+) -> Result<Option<FfiShiftTemplateOverride>, FfiError> {
+    let pool = pool()?;
+    let d = parse_date(&date)?;
+    rt().block_on(queries::get_shift_template_override(pool, template_id, d))
+        .map(|opt| opt.map(shift_template_override_to_ffi))
+        .map_err(Into::into)
+}
+
+#[uniffi::export]
+pub fn list_shift_template_overrides_for_template(
+    template_id: i64,
+) -> Result<Vec<FfiShiftTemplateOverride>, FfiError> {
+    let pool = pool()?;
+    rt().block_on(queries::list_shift_template_overrides_for_template(pool, template_id))
+        .map(|v| v.into_iter().map(shift_template_override_to_ffi).collect())
+        .map_err(Into::into)
+}
+
+#[uniffi::export]
+pub fn list_all_shift_template_overrides() -> Result<Vec<FfiShiftTemplateOverride>, FfiError> {
+    let pool = pool()?;
+    rt().block_on(queries::list_all_shift_template_overrides(pool))
+        .map(|v| v.into_iter().map(shift_template_override_to_ffi).collect())
+        .map_err(Into::into)
+}
+
+#[uniffi::export]
+pub fn delete_shift_template_override(id: i64) -> Result<(), FfiError> {
+    let pool = pool()?;
+    rt().block_on(queries::delete_shift_template_override(pool, id))
+        .map_err(Into::into)
 }

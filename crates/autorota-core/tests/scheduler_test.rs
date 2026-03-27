@@ -12,7 +12,7 @@ fn single_employee_single_shift() {
     let emp = make_employee(1, "Alice", "barista", AvailabilityState::Yes);
     let shift = make_shift(1, date(23), 7, 12, "barista");
 
-    let result = schedule_pure(&[shift], &[emp], &[], 1, week_start());
+    let result = schedule_pure(&[shift], &[emp], &[], &[], 1, week_start());
 
     assert_eq!(result.assignments.len(), 1);
     assert_eq!(result.assignments[0].employee_id, 1);
@@ -26,7 +26,7 @@ fn yes_preferred_over_maybe() {
     let bob = make_employee(2, "Bob", "barista", AvailabilityState::Yes);
     let shift = make_shift(1, date(23), 7, 12, "barista");
 
-    let result = schedule_pure(&[shift], &[alice, bob], &[], 1, week_start());
+    let result = schedule_pure(&[shift], &[alice, bob], &[], &[], 1, week_start());
 
     assert_eq!(result.assignments.len(), 1);
     assert_eq!(result.assignments[0].employee_id, 2); // Bob (Yes) wins
@@ -37,7 +37,7 @@ fn no_availability_excluded() {
     let emp = make_employee(1, "Alice", "barista", AvailabilityState::No);
     let shift = make_shift(1, date(23), 7, 12, "barista");
 
-    let result = schedule_pure(&[shift], &[emp], &[], 1, week_start());
+    let result = schedule_pure(&[shift], &[emp], &[], &[], 1, week_start());
 
     assert!(result.assignments.is_empty());
     assert_eq!(result.warnings.len(), 1);
@@ -49,7 +49,7 @@ fn wrong_role_excluded() {
     let emp = make_employee(1, "Alice", "cashier", AvailabilityState::Yes);
     let shift = make_shift(1, date(23), 7, 12, "barista");
 
-    let result = schedule_pure(&[shift], &[emp], &[], 1, week_start());
+    let result = schedule_pure(&[shift], &[emp], &[], &[], 1, week_start());
 
     assert!(result.assignments.is_empty());
     assert_eq!(result.warnings.len(), 1);
@@ -66,7 +66,7 @@ fn weekly_hour_cap_respected() {
     let s1 = make_shift(1, date(23), 7, 13, "barista"); // 6h
     let s2 = make_shift(2, date(24), 7, 13, "barista"); // 6h, would exceed 10h cap
 
-    let result = schedule_pure(&[s1, s2], &[emp], &[], 1, week_start());
+    let result = schedule_pure(&[s1, s2], &[emp], &[], &[], 1, week_start());
 
     assert_eq!(result.assignments.len(), 1);
     assert_eq!(result.assignments[0].shift_id, 1);
@@ -82,7 +82,7 @@ fn daily_hour_cap_respected() {
     let s1 = make_shift(1, date(23), 7, 11, "barista"); // 4h
     let s2 = make_shift(2, date(23), 13, 17, "barista"); // 4h, total=8 > 6
 
-    let result = schedule_pure(&[s1, s2], &[emp], &[], 1, week_start());
+    let result = schedule_pure(&[s1, s2], &[emp], &[], &[], 1, week_start());
 
     assert_eq!(result.assignments.len(), 1);
 }
@@ -97,7 +97,7 @@ fn fairness_spreads_hours() {
     let s2 = make_shift(2, date(24), 7, 12, "barista"); // Tue
     let s3 = make_shift(3, date(25), 7, 12, "barista"); // Wed
 
-    let result = schedule_pure(&[s1, s2, s3], &[alice, bob], &[], 1, week_start());
+    let result = schedule_pure(&[s1, s2, s3], &[alice, bob], &[], &[], 1, week_start());
 
     assert_eq!(result.assignments.len(), 3);
 
@@ -134,7 +134,7 @@ fn overrides_respected() {
         employee_name: Some("Bob".to_string()),
     }];
 
-    let result = schedule_pure(&[shift], &[alice, bob], &existing, 1, week_start());
+    let result = schedule_pure(&[shift], &[alice, bob], &existing, &[], 1, week_start());
 
     // The override should be included, and no additional assignment for a 1-person shift
     assert_eq!(result.assignments.len(), 1);
@@ -151,7 +151,7 @@ fn multi_capacity_shift() {
     shift.min_employees = 2;
     shift.max_employees = 2;
 
-    let result = schedule_pure(&[shift], &[alice, bob], &[], 1, week_start());
+    let result = schedule_pure(&[shift], &[alice, bob], &[], &[], 1, week_start());
 
     assert_eq!(result.assignments.len(), 2);
     assert!(result.warnings.is_empty());
@@ -165,7 +165,7 @@ fn overlapping_shifts_prevented() {
     let s1 = make_shift(1, date(23), 7, 12, "barista"); // 7-12
     let s2 = make_shift(2, date(23), 10, 15, "barista"); // 10-15, overlaps s1
 
-    let result = schedule_pure(&[s1, s2], &[emp], &[], 1, week_start());
+    let result = schedule_pure(&[s1, s2], &[emp], &[], &[], 1, week_start());
 
     // Only one should be assigned (the other has no eligible candidate)
     assert_eq!(result.assignments.len(), 1);
@@ -191,6 +191,7 @@ fn hardest_to_fill_assigned_first() {
         &[barista_shift, cashier_shift],
         &[alice, bob],
         &[],
+        &[],
         1,
         week_start(),
     );
@@ -210,7 +211,7 @@ fn hardest_to_fill_assigned_first() {
 
 #[test]
 fn empty_inputs_produce_empty_result() {
-    let result = schedule_pure(&[], &[], &[], 1, week_start());
+    let result = schedule_pure(&[], &[], &[], &[], 1, week_start());
     assert!(result.assignments.is_empty());
     assert!(result.warnings.is_empty());
 }
@@ -220,7 +221,7 @@ fn all_maybe_still_assigns() {
     let emp = make_employee(1, "Alice", "barista", AvailabilityState::Maybe);
     let shift = make_shift(1, date(23), 7, 12, "barista");
 
-    let result = schedule_pure(&[shift], &[emp], &[], 1, week_start());
+    let result = schedule_pure(&[shift], &[emp], &[], &[], 1, week_start());
 
     assert_eq!(result.assignments.len(), 1);
     assert!(result.warnings.is_empty());
@@ -240,7 +241,7 @@ fn multi_role_employee_fills_different_roles() {
     let s2 = make_shift(2, date(24), 7, 12, "cashier");
     let s3 = make_shift(3, date(25), 7, 12, "manager");
 
-    let result = schedule_pure(&[s1, s2, s3], &[emp], &[], 1, week_start());
+    let result = schedule_pure(&[s1, s2, s3], &[emp], &[], &[], 1, week_start());
 
     assert_eq!(result.assignments.len(), 3);
     assert!(result.warnings.is_empty());
@@ -252,8 +253,8 @@ fn tiebreak_is_deterministic() {
     let bob = make_employee(2, "Bob", "barista", AvailabilityState::Yes);
     let shift = make_shift(1, date(23), 7, 12, "barista");
 
-    let result1 = schedule_pure(&[shift.clone()], &[alice.clone(), bob.clone()], &[], 1, week_start());
-    let result2 = schedule_pure(&[shift], &[alice, bob], &[], 1, week_start());
+    let result1 = schedule_pure(&[shift.clone()], &[alice.clone(), bob.clone()], &[], &[], 1, week_start());
+    let result2 = schedule_pure(&[shift], &[alice, bob], &[], &[], 1, week_start());
 
     assert_eq!(result1.assignments[0].employee_id, result2.assignments[0].employee_id);
 }
@@ -276,7 +277,7 @@ fn override_counts_toward_hours_budget() {
         employee_name: Some("Alice".to_string()),
     }];
 
-    let result = schedule_pure(&[s1, s2], &[emp], &existing, 1, week_start());
+    let result = schedule_pure(&[s1, s2], &[emp], &existing, &[], 1, week_start());
 
     // Override takes 8h. s2 would push to 13h > 10h max, so it shouldn't be assigned.
     let proposed: Vec<_> = result.assignments.iter().filter(|a| a.status == AssignmentStatus::Proposed).collect();
@@ -300,7 +301,7 @@ fn overnight_shift_with_matching_availability() {
     // Friday overnight shift 22:00-02:00
     let shift = make_shift(1, date(27), 22, 2, "barista"); // date(27) = Friday
 
-    let result = schedule_pure(&[shift], &[emp], &[], 1, week_start());
+    let result = schedule_pure(&[shift], &[emp], &[], &[], 1, week_start());
 
     assert_eq!(result.assignments.len(), 1);
     assert!(result.warnings.is_empty());
@@ -313,7 +314,7 @@ fn zero_max_capacity_shift_produces_no_assignments() {
     shift.min_employees = 0;
     shift.max_employees = 0;
 
-    let result = schedule_pure(&[shift], &[emp], &[], 1, week_start());
+    let result = schedule_pure(&[shift], &[emp], &[], &[], 1, week_start());
 
     assert!(result.assignments.is_empty());
     assert!(result.warnings.is_empty());
