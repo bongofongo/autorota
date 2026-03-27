@@ -37,6 +37,19 @@ struct ShiftTemplateListView: View {
                                 }
                                 .tint(.orange)
                             }
+                            .contextMenu {
+                                Button {
+                                    renamingRole = role
+                                    renameText = role.name
+                                } label: {
+                                    Label("Rename", systemImage: "pencil")
+                                }
+                                Button(role: .destructive) {
+                                    Task { await roleVM.delete(id: role.id) }
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
                     }
                 } header: {
                     Text("Roles")
@@ -65,6 +78,18 @@ struct ShiftTemplateListView: View {
                                         .font(.caption2)
                                         .foregroundStyle(.tertiary)
                                 }
+                            }
+                        }
+                        .contextMenu {
+                            Button {
+                                editing = tmpl
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+                            Button(role: .destructive) {
+                                Task { await vm.delete(id: tmpl.id) }
+                            } label: {
+                                Label("Delete", systemImage: "trash")
                             }
                         }
                     }
@@ -158,6 +183,9 @@ struct AddRoleSheet: View {
                 }
             }
             .dismissesKeyboardOnTap()
+            #if os(macOS)
+            .formStyle(.grouped)
+            #endif
             .navigationTitle("New Role")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -178,6 +206,9 @@ struct AddRoleSheet: View {
             }
             .onAppear { focused = true }
         }
+        #if os(macOS)
+        .frame(minWidth: 340, idealWidth: 400, minHeight: 160, idealHeight: 200)
+        #endif
     }
 }
 
@@ -241,6 +272,9 @@ struct ShiftTemplateEditSheet: View {
                 }
             }
             .dismissesKeyboardOnTap()
+            #if os(macOS)
+            .formStyle(.grouped)
+            #endif
             .navigationTitle(isEditing ? "Edit Template" : "New Template")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
@@ -251,6 +285,9 @@ struct ShiftTemplateEditSheet: View {
             }
             .onAppear { prefill() }
         }
+        #if os(macOS)
+        .frame(minWidth: 420, idealWidth: 480, minHeight: 460, idealHeight: 540)
+        #endif
     }
 
     private func prefill() {

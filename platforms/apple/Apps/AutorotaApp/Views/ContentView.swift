@@ -17,6 +17,14 @@ struct ContentView: View {
                 .tabItem {
                     Label("Templates", systemImage: "clock")
                 }
+
+            OverridesTabView()
+                .tabItem {
+                    Label("Overrides", systemImage: "exclamationmark.circle")
+                }
         }
+        #if os(macOS)
+        .tabViewStyle(.sidebarAdaptable)
+        #endif
     }
 }

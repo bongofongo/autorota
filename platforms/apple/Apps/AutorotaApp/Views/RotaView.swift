@@ -50,6 +50,14 @@ struct RotaView: View {
                         .tint(vm.pastUnlocked ? .orange : .secondary)
                     }
 
+                    // Delete schedule (past/current weeks, edit mode only)
+                    if vm.isEditMode && vm.weekCategory != .future {
+                        Button("Delete Schedule", systemImage: "trash") {
+                            vm.showDeleteScheduleConfirmation = true
+                        }
+                        .tint(.red)
+                    }
+
                     // Edit / Done toggle
                     if vm.schedule != nil {
                         Button(vm.isEditMode ? "Done" : "Edit") {
@@ -70,6 +78,31 @@ struct RotaView: View {
                         }
                     }
                 }
+            }
+            .alert(
+                "No schedule for \(vm.weekDateRangeLabel)",
+                isPresented: $vm.showGenerateConfirmation
+            ) {
+                Button("Use existing shift templates") {
+                    Task { await vm.createFromTemplate() }
+                }
+                Button("Create empty schedule") {
+                    Task { await vm.createEmpty() }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("How would you like to create a schedule for this week?")
+            }
+            .alert(
+                "Delete schedule for \(vm.weekDateRangeLabel)?",
+                isPresented: $vm.showDeleteScheduleConfirmation
+            ) {
+                Button("Delete", role: .destructive) {
+                    Task { await vm.deleteSchedule() }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("All shifts and assignments for this week will be permanently deleted.")
             }
             .alert("Scheduling Warnings", isPresented: .constant(!vm.warnings.isEmpty)) {
                 Button("OK") { vm.warnings = [] }
@@ -210,7 +243,7 @@ private struct ScheduleGridView: View {
             )
         ) {
             Button("Cancel", role: .cancel) { shiftToDelete = nil }
-            Button("Delete", role: .destructive) {
+            Button("Delete", role: .destructive) {2
                 if let id = shiftToDelete {
                     Task { await vm.deleteShift(id: id) }
                 }
@@ -603,7 +636,12 @@ private struct EmployeePickerSheet: View {
                 }
             }
         }
+        #if os(iOS)
         .presentationDetents([.medium])
+        #endif
+        #if os(macOS)
+        .frame(minWidth: 320, idealWidth: 400, minHeight: 300, idealHeight: 450)
+        #endif
     }
 }
 
@@ -633,6 +671,9 @@ private struct ShiftTimeEditSheet: View {
                 DatePicker("Start Time", selection: $startDate, displayedComponents: .hourAndMinute)
                 DatePicker("End Time", selection: $endDate, displayedComponents: .hourAndMinute)
             }
+            #if os(macOS)
+            .formStyle(.grouped)
+            #endif
             .navigationTitle("Edit Shift Time")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -656,7 +697,12 @@ private struct ShiftTimeEditSheet: View {
                 }
             }
         }
+        #if os(iOS)
         .presentationDetents([.medium])
+        #endif
+        #if os(macOS)
+        .frame(minWidth: 340, idealWidth: 400, minHeight: 200, idealHeight: 280)
+        #endif
     }
 }
 
@@ -682,6 +728,9 @@ private struct AddShiftSheet: View {
                     }
                 }
             }
+            #if os(macOS)
+            .formStyle(.grouped)
+            #endif
             .navigationTitle("Add Shift")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -709,7 +758,12 @@ private struct AddShiftSheet: View {
                 }
             }
         }
+        #if os(iOS)
         .presentationDetents([.medium])
+        #endif
+        #if os(macOS)
+        .frame(minWidth: 360, idealWidth: 420, minHeight: 260, idealHeight: 340)
+        #endif
     }
 }
 

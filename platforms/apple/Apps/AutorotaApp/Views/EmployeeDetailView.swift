@@ -8,6 +8,9 @@ struct EmployeeDetailView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var showingEditSheet = false
+    @State private var overrideVM = OverrideViewModel()
+    @State private var showingAddOverride = false
+    @State private var editingOverride: FfiEmployeeAvailabilityOverride? = nil
 
     var body: some View {
         List {
@@ -43,8 +46,53 @@ struct EmployeeDetailView: View {
                     visibleHourEnd: range.end
                 )
             }
+
+            Section("Date Overrides") {
+                if overrideVM.isLoading {
+                    ProgressView()
+                } else {
+                    ForEach(overrideVM.employeeAvailabilityOverrides) { ovr in
+                        Button { editingOverride = ovr } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(ovr.date).fontWeight(.medium)
+                                if let notes = ovr.notes, !notes.isEmpty {
+                                    Text(notes).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            Button {
+                                editingOverride = ovr
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+                            Button(role: .destructive) {
+                                Task {
+                                    await overrideVM.deleteEmployeeOverride(id: ovr.id)
+                                    await overrideVM.loadForEmployee(id: employee.id)
+                                }
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                    }
+                    .onDelete { indexSet in
+                        Task {
+                            for idx in indexSet {
+                                await overrideVM.deleteEmployeeOverride(
+                                    id: overrideVM.employeeAvailabilityOverrides[idx].id)
+                            }
+                            await overrideVM.loadForEmployee(id: employee.id)
+                        }
+                    }
+                    Button("Add Date Override") { showingAddOverride = true }
+                        .foregroundStyle(.tint)
+                }
+            }
         }
         .navigationTitle(employee.displayName)
+        .task { await overrideVM.loadForEmployee(id: employee.id) }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("Edit") { showingEditSheet = true }
@@ -52,6 +100,18 @@ struct EmployeeDetailView: View {
         }
         .sheet(isPresented: $showingEditSheet) {
             EmployeeEditSheet(viewModel: viewModel, existing: employee, onDelete: { dismiss() })
+        }
+        .sheet(isPresented: $showingAddOverride, onDismiss: { Task { await overrideVM.loadForEmployee(id: employee.id) } }) {
+            EmployeeAvailabilityOverrideSheet(
+                vm: overrideVM, employees: [employee], existing: nil,
+                preselectedEmployeeId: employee.id
+            )
+        }
+        .sheet(item: $editingOverride, onDismiss: { Task { await overrideVM.loadForEmployee(id: employee.id) } }) { ovr in
+            EmployeeAvailabilityOverrideSheet(
+                vm: overrideVM, employees: [employee], existing: ovr,
+                preselectedEmployeeId: employee.id
+            )
         }
     }
 }
@@ -201,6 +261,9 @@ struct EmployeeEditSheet: View {
             }
             .scrollDisabled(selectionModeActive)
             .dismissesKeyboardOnTap()
+            #if os(macOS)
+            .formStyle(.grouped)
+            #endif
             .navigationTitle(isEditing ? "Edit Employee" : "New Employee")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -231,6 +294,9 @@ struct EmployeeEditSheet: View {
             .onAppear { prefill() }
             .task { await roleVM.load() }
         }
+        #if os(macOS)
+        .frame(minWidth: 560, idealWidth: 640, minHeight: 550, idealHeight: 700)
+        #endif
     }
 
     private func prefill() {
@@ -297,19 +363,19 @@ struct EmployeeEditSheet: View {
 // MARK: - Keyboard dismiss helper
 
 extension View {
-    /// Dismisses the software keyboard (iOS) or resigns window first responder (macOS)
-    /// when the user taps on a non-interactive area of this view.
+    /// Dismisses the software keyboard (iOS) when the user taps on a non-interactive area.
+    /// On macOS this is a no-op — adding onTapGesture to a Form breaks click-through to controls.
     func dismissesKeyboardOnTap() -> some View {
+        #if canImport(UIKit)
         onTapGesture {
-            #if canImport(UIKit)
             UIApplication.shared.sendAction(
                 #selector(UIResponder.resignFirstResponder),
                 to: nil, from: nil, for: nil
             )
-            #elseif canImport(AppKit)
-            NSApp.keyWindow?.makeFirstResponder(nil)
-            #endif
         }
+        #else
+        self
+        #endif
     }
 }
 
