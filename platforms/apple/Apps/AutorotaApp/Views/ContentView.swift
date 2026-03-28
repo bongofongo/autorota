@@ -22,6 +22,11 @@ struct ContentView: View {
                 .tabItem {
                     Label("Overrides", systemImage: "exclamationmark.circle")
                 }
+
+            SettingsView()
+                .tabItem {
+                    Label("Settings", systemImage: "gear")
+                }
         }
         #if os(macOS)
         .tabViewStyle(.sidebarAdaptable)

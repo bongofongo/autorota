@@ -12,9 +12,16 @@ struct AutorotaAppApp: App {
         }
     }
 
+    @AppStorage("appAppearance") private var appearance: String = AppAppearance.system.rawValue
+
+    private var selectedAppearance: AppAppearance {
+        AppAppearance(rawValue: appearance) ?? .system
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .preferredColorScheme(selectedAppearance.colorScheme)
                 #if os(macOS)
                 .frame(minWidth: 800, minHeight: 500)
                 #endif
