@@ -8,6 +8,7 @@ use crate::models::overrides::{DayAvailability, EmployeeAvailabilityOverride, Sh
 use crate::models::role::Role;
 use crate::models::rota::Rota;
 use crate::models::shift::{Shift, ShiftTemplate};
+use crate::models::shift_history::EmployeeShiftRecord;
 
 type ShiftTemplateRow = (i64, String, String, String, String, String, u32, u32, bool);
 type ShiftRow = (i64, Option<i64>, i64, String, String, String, String, u32, u32);
@@ -927,4 +928,55 @@ fn shift_template_override_from_row(
         max_employees: max_emp.map(|v| v as u32),
         notes,
     })
+}
+
+// ─── Shift History ───────────────────────────────────────────
+
+type ShiftHistoryRow = (
+    i64, i64, i64, i64, String, Option<String>,
+    String, String, String, String,
+    String, bool,
+);
+
+fn shift_record_from_row(row: ShiftHistoryRow) -> Option<EmployeeShiftRecord> {
+    let (
+        assignment_id, rota_id, shift_id, employee_id, status_str, employee_name,
+        date_str, start_str, end_str, required_role,
+        week_start_str, finalized,
+    ) = row;
+    Some(EmployeeShiftRecord {
+        assignment_id,
+        rota_id,
+        shift_id,
+        employee_id,
+        status: status_str.parse::<AssignmentStatus>().ok()?,
+        employee_name,
+        date: NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").ok()?,
+        start_time: NaiveTime::parse_from_str(&start_str, "%H:%M:%S").ok()?,
+        end_time: NaiveTime::parse_from_str(&end_str, "%H:%M:%S").ok()?,
+        required_role,
+        week_start: NaiveDate::parse_from_str(&week_start_str, "%Y-%m-%d").ok()?,
+        finalized,
+    })
+}
+
+pub async fn list_employee_shift_history(
+    pool: &SqlitePool,
+    employee_id: i64,
+) -> Result<Vec<EmployeeShiftRecord>, sqlx::Error> {
+    let rows: Vec<ShiftHistoryRow> = sqlx::query_as(
+        "SELECT a.id, a.rota_id, a.shift_id, a.employee_id, a.status, a.employee_name,
+                s.date, s.start_time, s.end_time, s.required_role,
+                r.week_start, r.finalized
+         FROM assignments a
+         JOIN shifts s ON s.id = a.shift_id
+         JOIN rotas r ON r.id = a.rota_id
+         WHERE a.employee_id = ?
+         ORDER BY s.date, s.start_time",
+    )
+    .bind(employee_id)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows.into_iter().filter_map(shift_record_from_row).collect())
 }

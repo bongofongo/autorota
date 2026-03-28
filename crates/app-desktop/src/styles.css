@@ -1307,3 +1307,108 @@ details.avail-section[open] > summary::before {
 .day-avail-cell.state-no      { background: rgba(231,76,60,0.45); }
 .day-avail-cell.state-maybe   { background: rgba(243,156,18,0.3); }
 .day-avail-cell:hover { border-color: #3498db; }
+
+/* ── Shift History ───────────────────────────────────────────── */
+
+.shift-hist-summary {
+  display: flex;
+  gap: 24px;
+  padding: 8px 0 12px;
+  flex-wrap: wrap;
+}
+.shift-hist-stat {
+  font-size: 0.92rem;
+  color: #555;
+}
+.shift-hist-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid #ecf0f1;
+  margin-bottom: 12px;
+}
+.shift-hist-tab {
+  padding: 6px 16px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.88rem;
+  color: #666;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.shift-hist-tab:hover { color: #333; }
+.shift-hist-tab.active {
+  color: #3498db;
+  border-bottom-color: #3498db;
+  font-weight: 600;
+}
+.shift-hist-heading {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 12px 0 6px;
+  color: #333;
+}
+.shift-hist-week-group {
+  margin-bottom: 12px;
+}
+.shift-hist-week-header {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #555;
+  padding: 4px 0;
+  border-bottom: 1px solid #ecf0f1;
+  display: flex;
+  justify-content: space-between;
+}
+.shift-hist-week-total {
+  color: #3498db;
+}
+.shift-hist-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 4px;
+  font-size: 0.85rem;
+  border-bottom: 1px solid #f5f5f5;
+}
+.shift-hist-row:last-child { border-bottom: none; }
+.shift-hist-date { min-width: 100px; color: #333; }
+.shift-hist-time { min-width: 100px; color: #555; }
+.shift-hist-role {
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: #ecf0f1;
+  font-size: 0.78rem;
+  color: #555;
+}
+.shift-hist-status {
+  font-size: 0.78rem;
+  padding: 1px 8px;
+  border-radius: 10px;
+}
+.shift-hist-status.proposed { background: rgba(243,156,18,0.15); color: #e67e22; }
+.shift-hist-status.confirmed { background: rgba(39,174,96,0.2); color: #27ae60; }
+.shift-hist-status.overridden { background: rgba(52,152,219,0.2); color: #2980b9; }
+.shift-hist-hours {
+  margin-left: auto;
+  font-weight: 600;
+  color: #333;
+}
+.shift-hist-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  margin-bottom: 12px;
+}
+.shift-hist-table th {
+  text-align: left;
+  padding: 4px 8px;
+  border-bottom: 2px solid #ecf0f1;
+  color: #555;
+  font-weight: 600;
+}
+.shift-hist-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid #f5f5f5;
+}

@@ -5,3 +5,4 @@ pub mod overrides;
 pub mod role;
 pub mod rota;
 pub mod shift;
+pub mod shift_history;

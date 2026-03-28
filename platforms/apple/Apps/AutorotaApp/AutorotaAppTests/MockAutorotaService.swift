@@ -18,6 +18,7 @@ final class MockAutorotaService: AutorotaServiceProtocol, @unchecked Sendable {
     var stubbedWeekSchedule: FfiWeekSchedule? = nil
     var stubbedScheduleResult = FfiScheduleResult(assignments: [], warnings: [])
     var stubbedShifts: [FfiShift] = []
+    var stubbedShiftHistory: [FfiEmployeeShiftRecord] = []
     var errorToThrow: Error? = nil
 
     // MARK: - Roles
@@ -178,6 +179,14 @@ final class MockAutorotaService: AutorotaServiceProtocol, @unchecked Sendable {
         callLog.append("listShiftsForRota:\(rotaId)")
         if let e = errorToThrow { throw e }
         return stubbedShifts
+    }
+
+    // MARK: - Shift History
+
+    func listEmployeeShiftHistory(employeeId: Int64) async throws -> [FfiEmployeeShiftRecord] {
+        callLog.append("listEmployeeShiftHistory:\(employeeId)")
+        if let e = errorToThrow { throw e }
+        return stubbedShiftHistory
     }
 
     // MARK: - Overrides

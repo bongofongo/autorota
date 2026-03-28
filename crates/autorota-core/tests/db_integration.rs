@@ -835,3 +835,62 @@ async fn delete_shifts_for_rota_preserves_adhoc() {
     assert_eq!(after.len(), 1);
     assert!(after[0].template_id.is_none());
 }
+
+#[tokio::test]
+async fn list_employee_shift_history_returns_joined_records() {
+    let pool = test_pool().await;
+
+    // Create an employee
+    let emp = helpers::make_employee(0, "Alice", "barista", AvailabilityState::Yes);
+    let emp_id = queries::insert_employee(&pool, &emp).await.unwrap();
+
+    // Create a rota for the test week
+    let week = helpers::week_start();
+    let rota_id = queries::insert_rota(&pool, week).await.unwrap();
+
+    // Insert a shift
+    let shift = Shift {
+        id: 0,
+        template_id: None,
+        rota_id,
+        date: helpers::date(23), // Monday
+        start_time: NaiveTime::from_hms_opt(9, 0, 0).unwrap(),
+        end_time: NaiveTime::from_hms_opt(17, 0, 0).unwrap(),
+        required_role: "barista".to_string(),
+        min_employees: 1,
+        max_employees: 1,
+    };
+    let shift_id = queries::insert_shift(&pool, &shift).await.unwrap();
+
+    // Create an assignment
+    let assignment = Assignment {
+        id: 0,
+        rota_id,
+        shift_id,
+        employee_id: emp_id,
+        status: AssignmentStatus::Confirmed,
+        employee_name: Some("Alice".to_string()),
+    };
+    queries::insert_assignment(&pool, &assignment).await.unwrap();
+
+    // Query shift history
+    let history = queries::list_employee_shift_history(&pool, emp_id).await.unwrap();
+    assert_eq!(history.len(), 1);
+
+    let rec = &history[0];
+    assert_eq!(rec.employee_id, emp_id);
+    assert_eq!(rec.shift_id, shift_id);
+    assert_eq!(rec.rota_id, rota_id);
+    assert_eq!(rec.status, AssignmentStatus::Confirmed);
+    assert_eq!(rec.date, helpers::date(23));
+    assert_eq!(rec.required_role, "barista");
+    assert_eq!(rec.week_start, week);
+    assert!(!rec.finalized);
+    assert!((rec.duration_hours() - 8.0).abs() < 0.01);
+
+    // Employee with no assignments returns empty
+    let emp2 = helpers::make_employee(0, "Bob", "barista", AvailabilityState::Yes);
+    let emp2_id = queries::insert_employee(&pool, &emp2).await.unwrap();
+    let empty = queries::list_employee_shift_history(&pool, emp2_id).await.unwrap();
+    assert!(empty.is_empty());
+}

@@ -7,6 +7,7 @@ use autorota_core::models::overrides::{DayAvailability, EmployeeAvailabilityOver
 use autorota_core::models::rota::Rota;
 use autorota_core::models::role::Role;
 use autorota_core::models::shift::ShiftTemplate;
+use autorota_core::models::shift_history::EmployeeShiftRecord;
 use autorota_core::scheduler;
 use autorota_core::scheduler::ScheduleResult;
 use chrono::{Datelike, Local, NaiveDate, NaiveTime};
@@ -606,6 +607,58 @@ struct WeekSchedule {
     shifts: Vec<ShiftInfo>,
 }
 
+// ─── Employee Shift History ─────────────────────────────────
+
+#[derive(serde::Serialize)]
+struct TauriEmployeeShiftRecord {
+    assignment_id: i64,
+    rota_id: i64,
+    shift_id: i64,
+    employee_id: i64,
+    status: String,
+    employee_name: Option<String>,
+    date: String,
+    weekday: String,
+    start_time: String,
+    end_time: String,
+    required_role: String,
+    duration_hours: f32,
+    week_start: String,
+    finalized: bool,
+}
+
+fn shift_record_to_tauri(r: EmployeeShiftRecord) -> TauriEmployeeShiftRecord {
+    let duration = r.duration_hours();
+    TauriEmployeeShiftRecord {
+        assignment_id: r.assignment_id,
+        rota_id: r.rota_id,
+        shift_id: r.shift_id,
+        employee_id: r.employee_id,
+        status: r.status.to_string(),
+        employee_name: r.employee_name,
+        date: r.date.to_string(),
+        weekday: r.date.weekday().to_string(),
+        start_time: r.start_time.format("%H:%M").to_string(),
+        end_time: r.end_time.format("%H:%M").to_string(),
+        required_role: r.required_role,
+        duration_hours: duration,
+        week_start: r.week_start.to_string(),
+        finalized: r.finalized,
+    }
+}
+
+#[tauri::command]
+async fn list_employee_shift_history(
+    state: State<'_, AppState>,
+    employee_id: i64,
+) -> Result<Vec<TauriEmployeeShiftRecord>, String> {
+    let pool = get_pool(&state).await?;
+    queries::list_employee_shift_history(&pool, employee_id)
+        .await
+        .map(|records| records.into_iter().map(shift_record_to_tauri).collect())
+        .map_err(|e| e.to_string())
+}
+
 // ─── Override DTOs ───────────────────────────────────────────
 // Thin structs that use String/HashMap so Tauri's JSON layer
 // handles chrono types without relying on chrono's serde impl.
@@ -889,6 +942,7 @@ pub fn run() {
             list_shift_template_overrides_for_template,
             list_all_shift_template_overrides,
             delete_shift_template_override,
+            list_employee_shift_history,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

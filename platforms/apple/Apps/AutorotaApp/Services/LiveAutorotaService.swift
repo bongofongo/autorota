@@ -35,6 +35,8 @@ struct LiveAutorotaService: AutorotaServiceProtocol {
     func createAdHocShift(rotaId: Int64, date: String, startTime: String, endTime: String, requiredRole: String) async throws -> Int64 { try await createAdHocShiftAsync(rotaId: rotaId, date: date, startTime: startTime, endTime: endTime, requiredRole: requiredRole) }
     func listShiftsForRota(rotaId: Int64) async throws -> [FfiShift] { try await listShiftsForRotaAsync(rotaId: rotaId) }
 
+    func listEmployeeShiftHistory(employeeId: Int64) async throws -> [FfiEmployeeShiftRecord] { try await listEmployeeShiftHistoryAsync(employeeId: employeeId) }
+
     func upsertEmployeeAvailabilityOverride(_ o: FfiEmployeeAvailabilityOverride) async throws -> Int64 { try await upsertEmployeeAvailabilityOverrideAsync(override_: o) }
     func getEmployeeAvailabilityOverride(employeeId: Int64, date: String) async throws -> FfiEmployeeAvailabilityOverride? { try await getEmployeeAvailabilityOverrideAsync(employeeId: employeeId, date: date) }
     func listEmployeeAvailabilityOverrides(employeeId: Int64) async throws -> [FfiEmployeeAvailabilityOverride] { try await listEmployeeAvailabilityOverridesAsync(employeeId: employeeId) }

@@ -47,6 +47,17 @@ struct EmployeeDetailView: View {
                 )
             }
 
+            Section("Shift Data") {
+                NavigationLink {
+                    EmployeeShiftHistoryView(
+                        employeeId: employee.id,
+                        targetWeeklyHours: employee.targetWeeklyHours
+                    )
+                } label: {
+                    Label("View Shift Data", systemImage: "clock.arrow.circlepath")
+                }
+            }
+
             Section("Date Overrides") {
                 if overrideVM.isLoading {
                     ProgressView()

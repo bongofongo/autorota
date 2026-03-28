@@ -10,6 +10,7 @@ use autorota_core::models::employee::Employee;
 use autorota_core::models::overrides::{DayAvailability, EmployeeAvailabilityOverride, ShiftTemplateOverride};
 use autorota_core::models::rota::Rota;
 use autorota_core::models::shift::{Shift, ShiftTemplate};
+use autorota_core::models::shift_history::EmployeeShiftRecord;
 use chrono::{Datelike, Local, NaiveDate, NaiveTime, Weekday};
 use sqlx::SqlitePool;
 use tokio::runtime::Runtime;
@@ -1271,5 +1272,37 @@ pub fn list_all_shift_template_overrides() -> Result<Vec<FfiShiftTemplateOverrid
 pub fn delete_shift_template_override(id: i64) -> Result<(), FfiError> {
     let pool = pool()?;
     rt().block_on(queries::delete_shift_template_override(pool, id))
+        .map_err(Into::into)
+}
+
+// ── Employee Shift History ───────────────────────────────────────────────────
+
+fn shift_record_to_ffi(r: EmployeeShiftRecord) -> FfiEmployeeShiftRecord {
+    let duration = r.duration_hours();
+    FfiEmployeeShiftRecord {
+        assignment_id: r.assignment_id,
+        rota_id: r.rota_id,
+        shift_id: r.shift_id,
+        employee_id: r.employee_id,
+        status: r.status.to_string(),
+        employee_name: r.employee_name,
+        date: r.date.to_string(),
+        weekday: weekday_to_str(r.date.weekday()).to_string(),
+        start_time: r.start_time.format("%H:%M").to_string(),
+        end_time: r.end_time.format("%H:%M").to_string(),
+        required_role: r.required_role,
+        duration_hours: duration,
+        week_start: r.week_start.to_string(),
+        finalized: r.finalized,
+    }
+}
+
+#[uniffi::export]
+pub fn list_employee_shift_history(
+    employee_id: i64,
+) -> Result<Vec<FfiEmployeeShiftRecord>, FfiError> {
+    let pool = pool()?;
+    rt().block_on(queries::list_employee_shift_history(pool, employee_id))
+        .map(|records| records.into_iter().map(shift_record_to_ffi).collect())
         .map_err(Into::into)
 }

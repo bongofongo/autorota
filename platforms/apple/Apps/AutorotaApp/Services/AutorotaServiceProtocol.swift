@@ -43,6 +43,9 @@ protocol AutorotaServiceProtocol: Sendable {
     func createAdHocShift(rotaId: Int64, date: String, startTime: String, endTime: String, requiredRole: String) async throws -> Int64
     func listShiftsForRota(rotaId: Int64) async throws -> [FfiShift]
 
+    // Shift History
+    func listEmployeeShiftHistory(employeeId: Int64) async throws -> [FfiEmployeeShiftRecord]
+
     // Overrides
     func upsertEmployeeAvailabilityOverride(_ o: FfiEmployeeAvailabilityOverride) async throws -> Int64
     func getEmployeeAvailabilityOverride(employeeId: Int64, date: String) async throws -> FfiEmployeeAvailabilityOverride?

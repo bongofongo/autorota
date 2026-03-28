@@ -292,3 +292,11 @@ public func weekStart(weeksFromNow offset: Int) -> String {
     fmt.locale = Locale(identifier: "en_US_POSIX")
     return fmt.string(from: target)
 }
+
+// MARK: - Employee Shift History
+
+public func listEmployeeShiftHistoryAsync(employeeId: Int64) async throws -> [FfiEmployeeShiftRecord] {
+    try await Task.detached(priority: .userInitiated) {
+        try listEmployeeShiftHistory(employeeId: employeeId)
+    }.value
+}

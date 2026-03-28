@@ -103,6 +103,23 @@ interface ShiftTemplateOverride {
   notes: string | null;
 }
 
+interface EmployeeShiftRecord {
+  assignment_id: number;
+  rota_id: number;
+  shift_id: number;
+  employee_id: number;
+  status: string;
+  employee_name: string | null;
+  date: string;
+  weekday: string;
+  start_time: string;
+  end_time: string;
+  required_role: string;
+  duration_hours: number;
+  week_start: string;
+  finalized: boolean;
+}
+
 // ─── Helpers ────────────────────────────────────────────────
 
 function displayName(e: Employee): string {
@@ -664,6 +681,181 @@ function createAvailGridInteraction(gridEl: HTMLElement): {
   return { applyState, readCells, clearSelection, selectAll };
 }
 
+function renderShiftHistory(
+  container: HTMLElement,
+  records: EmployeeShiftRecord[],
+  targetWeeklyHours: number,
+) {
+  container.textContent = "";
+
+  if (records.length === 0) {
+    container.textContent = "No shift history.";
+    return;
+  }
+
+  const today = todayISO();
+  const monday = getMonday(new Date());
+  const mondayStr = toLocalISODate(monday);
+  const sunday = new Date(monday);
+  sunday.setDate(sunday.getDate() + 6);
+  const sundayStr = toLocalISODate(sunday);
+
+  const current: EmployeeShiftRecord[] = [];
+  const planned: EmployeeShiftRecord[] = [];
+  const past: EmployeeShiftRecord[] = [];
+
+  for (const r of records) {
+    if (r.date >= mondayStr && r.date <= sundayStr) current.push(r);
+    else if (r.date > sundayStr) planned.push(r);
+    else past.push(r);
+  }
+
+  // Hour summaries
+  const currentWeekHours = current.reduce((s, r) => s + r.duration_hours, 0);
+
+  // Weekly breakdown — past shifts only (group by week_start)
+  const weeklyMap = new Map<string, number>();
+  for (const r of past) {
+    weeklyMap.set(r.week_start, (weeklyMap.get(r.week_start) || 0) + r.duration_hours);
+  }
+  const weeklyEntries = [...weeklyMap.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+
+  // Monthly breakdown — past shifts only
+  const monthlyMap = new Map<string, number>();
+  for (const r of past) {
+    const month = r.date.substring(0, 7);
+    monthlyMap.set(month, (monthlyMap.get(month) || 0) + r.duration_hours);
+  }
+  const monthlyEntries = [...monthlyMap.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+
+  function shiftRowHTML(r: EmployeeShiftRecord): string {
+    const statusClass = r.status.toLowerCase();
+    return `<div class="shift-hist-row">
+      <span class="shift-hist-date">${r.weekday} ${r.date}</span>
+      <span class="shift-hist-time">${r.start_time} – ${r.end_time}</span>
+      <span class="shift-hist-role">${escapeHtml(r.required_role)}</span>
+      <span class="shift-hist-status ${statusClass}">${r.status}</span>
+      <span class="shift-hist-hours">${r.duration_hours.toFixed(1)}h</span>
+    </div>`;
+  }
+
+  function weekGroupHTML(label: string, shifts: EmployeeShiftRecord[]): string {
+    if (shifts.length === 0) return "";
+    // Group by week_start
+    const byWeek = new Map<string, EmployeeShiftRecord[]>();
+    for (const s of shifts) {
+      const arr = byWeek.get(s.week_start) || [];
+      arr.push(s);
+      byWeek.set(s.week_start, arr);
+    }
+    const sortedWeeks = [...byWeek.entries()].sort((a, b) =>
+      label === "Past" ? b[0].localeCompare(a[0]) : a[0].localeCompare(b[0])
+    );
+    let html = `<h4 class="shift-hist-heading">${escapeHtml(label)}</h4>`;
+    for (const [week, recs] of sortedWeeks) {
+      const weekTotal = recs.reduce((s, r) => s + r.duration_hours, 0);
+      html += `<div class="shift-hist-week-group">
+        <div class="shift-hist-week-header">Week of ${week} <span class="shift-hist-week-total">${weekTotal.toFixed(1)}h</span></div>
+        ${recs.map(shiftRowHTML).join("")}
+      </div>`;
+    }
+    return html;
+  }
+
+  // Build the HTML using DOM for the summary, innerHTML for the shift rows
+  // (shift data is from our own DB, not user-generated content in a dangerous sense)
+  const summaryEl = document.createElement("div");
+  summaryEl.className = "shift-hist-summary";
+  const thisWeekLabel = document.createElement("div");
+  thisWeekLabel.className = "shift-hist-stat";
+  thisWeekLabel.textContent = `This week: ${currentWeekHours.toFixed(1)}h / ${targetWeeklyHours}h target`;
+  summaryEl.appendChild(thisWeekLabel);
+  const totalLabel = document.createElement("div");
+  totalLabel.className = "shift-hist-stat";
+  const totalHours = past.reduce((s, r) => s + r.duration_hours, 0);
+  totalLabel.textContent = `Total worked: ${totalHours.toFixed(1)}h across ${past.length} shifts`;
+  summaryEl.appendChild(totalLabel);
+  container.appendChild(summaryEl);
+
+  // Tabs for Current / Planned / Past / Breakdown
+  const tabs = ["This Week", "Upcoming", "Past", "Hours"];
+  const tabBar = document.createElement("div");
+  tabBar.className = "shift-hist-tabs";
+  const panels = document.createElement("div");
+  panels.className = "shift-hist-panels";
+
+  tabs.forEach((tabName, i) => {
+    const btn = document.createElement("button");
+    btn.className = "shift-hist-tab" + (i === 0 ? " active" : "");
+    btn.textContent = tabName;
+    btn.addEventListener("click", () => {
+      tabBar.querySelectorAll(".shift-hist-tab").forEach((t) => t.classList.remove("active"));
+      btn.classList.add("active");
+      panels.querySelectorAll(".shift-hist-panel").forEach((p) =>
+        (p as HTMLElement).style.display = "none"
+      );
+      const panel = panels.children[i] as HTMLElement;
+      if (panel) panel.style.display = "";
+    });
+    tabBar.appendChild(btn);
+  });
+  container.appendChild(tabBar);
+
+  // Panel: This Week
+  const currentPanel = document.createElement("div");
+  currentPanel.className = "shift-hist-panel";
+  if (current.length === 0) {
+    currentPanel.textContent = "No shifts this week.";
+  } else {
+    currentPanel.innerHTML = current.map(shiftRowHTML).join("");
+  }
+  panels.appendChild(currentPanel);
+
+  // Panel: Upcoming
+  const plannedPanel = document.createElement("div");
+  plannedPanel.className = "shift-hist-panel";
+  plannedPanel.style.display = "none";
+  if (planned.length === 0) {
+    plannedPanel.textContent = "No upcoming shifts.";
+  } else {
+    plannedPanel.innerHTML = weekGroupHTML("Upcoming", planned);
+  }
+  panels.appendChild(plannedPanel);
+
+  // Panel: Past
+  const pastPanel = document.createElement("div");
+  pastPanel.className = "shift-hist-panel";
+  pastPanel.style.display = "none";
+  if (past.length === 0) {
+    pastPanel.textContent = "No past shifts.";
+  } else {
+    pastPanel.innerHTML = weekGroupHTML("Past", past);
+  }
+  panels.appendChild(pastPanel);
+
+  // Panel: Hours breakdown
+  const hoursPanel = document.createElement("div");
+  hoursPanel.className = "shift-hist-panel";
+  hoursPanel.style.display = "none";
+  let hoursHTML = `<h4 class="shift-hist-heading">Weekly</h4><table class="shift-hist-table">
+    <tr><th>Week</th><th>Hours</th></tr>
+    ${weeklyEntries.map(([w, h]) => `<tr><td>${w}</td><td>${h.toFixed(1)}</td></tr>`).join("")}
+  </table>`;
+  hoursHTML += `<h4 class="shift-hist-heading">Monthly</h4><table class="shift-hist-table">
+    <tr><th>Month</th><th>Hours</th></tr>
+    ${monthlyEntries.map(([m, h]) => `<tr><td>${m}</td><td>${h.toFixed(1)}</td></tr>`).join("")}
+  </table>`;
+  hoursPanel.innerHTML = hoursHTML;
+  panels.appendChild(hoursPanel);
+
+  container.appendChild(panels);
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
 async function renderEmployeeDetailView() {
   const content = document.getElementById("content")!;
   if (selectedEmployeeId === null) {
@@ -743,6 +935,10 @@ async function renderEmployeeDetailView() {
       </div>
       <div class="avail-grid-wrap" id="week-avail-wrap">${buildGridHTML(emp.availability)}</div>
       ${legend}
+    </details>
+    <details class="card avail-section" id="shift-history-section">
+      <summary>Shift History</summary>
+      <div id="shift-history-content">Loading...</div>
     </details>
     <details class="card avail-section" id="date-overrides-section">
       <summary>Date-Specific Availability Overrides</summary>
@@ -937,6 +1133,22 @@ async function renderEmployeeDetailView() {
       });
     });
   }
+
+  // Lazy-load shift history when section is opened
+  const shiftHistSection = document.getElementById("shift-history-section") as HTMLDetailsElement;
+  shiftHistSection.addEventListener("toggle", async () => {
+    if (!shiftHistSection.open) return;
+    const container = document.getElementById("shift-history-content")!;
+    container.textContent = "Loading...";
+    try {
+      const records: EmployeeShiftRecord[] = await invoke("list_employee_shift_history", {
+        employeeId: emp.id,
+      });
+      renderShiftHistory(container, records, emp.target_weekly_hours);
+    } catch (e) {
+      container.textContent = `Failed to load shift history: ${e}`;
+    }
+  });
 
   // Lazy-load when section is opened
   const dateOvrSection = document.getElementById("date-overrides-section") as HTMLDetailsElement;

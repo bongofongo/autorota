@@ -158,6 +158,35 @@ pub struct FfiScheduleResult {
     pub warnings: Vec<FfiShortfallWarning>,
 }
 
+// ── Employee Shift History ────────────────────────────────────────────────────
+
+/// A denormalised record for one of an employee's assigned shifts,
+/// used to build the shift-history view.
+#[derive(Clone, uniffi::Record)]
+pub struct FfiEmployeeShiftRecord {
+    pub assignment_id: i64,
+    pub rota_id: i64,
+    pub shift_id: i64,
+    pub employee_id: i64,
+    /// "Proposed" | "Confirmed" | "Overridden"
+    pub status: String,
+    pub employee_name: Option<String>,
+    /// "YYYY-MM-DD"
+    pub date: String,
+    /// "Mon" | "Tue" | … | "Sun"
+    pub weekday: String,
+    /// "HH:MM"
+    pub start_time: String,
+    /// "HH:MM"
+    pub end_time: String,
+    pub required_role: String,
+    /// Pre-computed shift duration in hours (handles overnight shifts).
+    pub duration_hours: f32,
+    /// "YYYY-MM-DD" — Monday of the rota week this shift belongs to.
+    pub week_start: String,
+    pub finalized: bool,
+}
+
 // ── Overrides ─────────────────────────────────────────────────────────────────
 
 /// A single hour slot in a `DayAvailability` override (no weekday — the date carries that).

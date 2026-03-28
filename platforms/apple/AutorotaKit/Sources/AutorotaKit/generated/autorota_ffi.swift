@@ -1063,6 +1063,214 @@ public func FfiConverterTypeFfiEmployeeAvailabilityOverride_lower(_ value: FfiEm
 
 
 /**
+ * A denormalised record for one of an employee's assigned shifts,
+ * used to build the shift-history view.
+ */
+public struct FfiEmployeeShiftRecord {
+    public var assignmentId: Int64
+    public var rotaId: Int64
+    public var shiftId: Int64
+    public var employeeId: Int64
+    /**
+     * "Proposed" | "Confirmed" | "Overridden"
+     */
+    public var status: String
+    public var employeeName: String?
+    /**
+     * "YYYY-MM-DD"
+     */
+    public var date: String
+    /**
+     * "Mon" | "Tue" | … | "Sun"
+     */
+    public var weekday: String
+    /**
+     * "HH:MM"
+     */
+    public var startTime: String
+    /**
+     * "HH:MM"
+     */
+    public var endTime: String
+    public var requiredRole: String
+    /**
+     * Pre-computed shift duration in hours (handles overnight shifts).
+     */
+    public var durationHours: Float
+    /**
+     * "YYYY-MM-DD" — Monday of the rota week this shift belongs to.
+     */
+    public var weekStart: String
+    public var finalized: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(assignmentId: Int64, rotaId: Int64, shiftId: Int64, employeeId: Int64, 
+        /**
+         * "Proposed" | "Confirmed" | "Overridden"
+         */status: String, employeeName: String?, 
+        /**
+         * "YYYY-MM-DD"
+         */date: String, 
+        /**
+         * "Mon" | "Tue" | … | "Sun"
+         */weekday: String, 
+        /**
+         * "HH:MM"
+         */startTime: String, 
+        /**
+         * "HH:MM"
+         */endTime: String, requiredRole: String, 
+        /**
+         * Pre-computed shift duration in hours (handles overnight shifts).
+         */durationHours: Float, 
+        /**
+         * "YYYY-MM-DD" — Monday of the rota week this shift belongs to.
+         */weekStart: String, finalized: Bool) {
+        self.assignmentId = assignmentId
+        self.rotaId = rotaId
+        self.shiftId = shiftId
+        self.employeeId = employeeId
+        self.status = status
+        self.employeeName = employeeName
+        self.date = date
+        self.weekday = weekday
+        self.startTime = startTime
+        self.endTime = endTime
+        self.requiredRole = requiredRole
+        self.durationHours = durationHours
+        self.weekStart = weekStart
+        self.finalized = finalized
+    }
+}
+
+
+
+extension FfiEmployeeShiftRecord: Equatable, Hashable {
+    public static func ==(lhs: FfiEmployeeShiftRecord, rhs: FfiEmployeeShiftRecord) -> Bool {
+        if lhs.assignmentId != rhs.assignmentId {
+            return false
+        }
+        if lhs.rotaId != rhs.rotaId {
+            return false
+        }
+        if lhs.shiftId != rhs.shiftId {
+            return false
+        }
+        if lhs.employeeId != rhs.employeeId {
+            return false
+        }
+        if lhs.status != rhs.status {
+            return false
+        }
+        if lhs.employeeName != rhs.employeeName {
+            return false
+        }
+        if lhs.date != rhs.date {
+            return false
+        }
+        if lhs.weekday != rhs.weekday {
+            return false
+        }
+        if lhs.startTime != rhs.startTime {
+            return false
+        }
+        if lhs.endTime != rhs.endTime {
+            return false
+        }
+        if lhs.requiredRole != rhs.requiredRole {
+            return false
+        }
+        if lhs.durationHours != rhs.durationHours {
+            return false
+        }
+        if lhs.weekStart != rhs.weekStart {
+            return false
+        }
+        if lhs.finalized != rhs.finalized {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(assignmentId)
+        hasher.combine(rotaId)
+        hasher.combine(shiftId)
+        hasher.combine(employeeId)
+        hasher.combine(status)
+        hasher.combine(employeeName)
+        hasher.combine(date)
+        hasher.combine(weekday)
+        hasher.combine(startTime)
+        hasher.combine(endTime)
+        hasher.combine(requiredRole)
+        hasher.combine(durationHours)
+        hasher.combine(weekStart)
+        hasher.combine(finalized)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFfiEmployeeShiftRecord: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiEmployeeShiftRecord {
+        return
+            try FfiEmployeeShiftRecord(
+                assignmentId: FfiConverterInt64.read(from: &buf), 
+                rotaId: FfiConverterInt64.read(from: &buf), 
+                shiftId: FfiConverterInt64.read(from: &buf), 
+                employeeId: FfiConverterInt64.read(from: &buf), 
+                status: FfiConverterString.read(from: &buf), 
+                employeeName: FfiConverterOptionString.read(from: &buf), 
+                date: FfiConverterString.read(from: &buf), 
+                weekday: FfiConverterString.read(from: &buf), 
+                startTime: FfiConverterString.read(from: &buf), 
+                endTime: FfiConverterString.read(from: &buf), 
+                requiredRole: FfiConverterString.read(from: &buf), 
+                durationHours: FfiConverterFloat.read(from: &buf), 
+                weekStart: FfiConverterString.read(from: &buf), 
+                finalized: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FfiEmployeeShiftRecord, into buf: inout [UInt8]) {
+        FfiConverterInt64.write(value.assignmentId, into: &buf)
+        FfiConverterInt64.write(value.rotaId, into: &buf)
+        FfiConverterInt64.write(value.shiftId, into: &buf)
+        FfiConverterInt64.write(value.employeeId, into: &buf)
+        FfiConverterString.write(value.status, into: &buf)
+        FfiConverterOptionString.write(value.employeeName, into: &buf)
+        FfiConverterString.write(value.date, into: &buf)
+        FfiConverterString.write(value.weekday, into: &buf)
+        FfiConverterString.write(value.startTime, into: &buf)
+        FfiConverterString.write(value.endTime, into: &buf)
+        FfiConverterString.write(value.requiredRole, into: &buf)
+        FfiConverterFloat.write(value.durationHours, into: &buf)
+        FfiConverterString.write(value.weekStart, into: &buf)
+        FfiConverterBool.write(value.finalized, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiEmployeeShiftRecord_lift(_ buf: RustBuffer) throws -> FfiEmployeeShiftRecord {
+    return try FfiConverterTypeFfiEmployeeShiftRecord.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiEmployeeShiftRecord_lower(_ value: FfiEmployeeShiftRecord) -> RustBuffer {
+    return FfiConverterTypeFfiEmployeeShiftRecord.lower(value)
+}
+
+
+/**
  * FFI-safe mirror types for all autorota-core models.
  *
  * Chrono types are flattened to `String`:
@@ -2550,6 +2758,31 @@ fileprivate struct FfiConverterSequenceTypeFfiEmployeeAvailabilityOverride: FfiC
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeFfiEmployeeShiftRecord: FfiConverterRustBuffer {
+    typealias SwiftType = [FfiEmployeeShiftRecord]
+
+    public static func write(_ value: [FfiEmployeeShiftRecord], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeFfiEmployeeShiftRecord.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [FfiEmployeeShiftRecord] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [FfiEmployeeShiftRecord]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeFfiEmployeeShiftRecord.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeFfiRole: FfiConverterRustBuffer {
     typealias SwiftType = [FfiRole]
 
@@ -2914,6 +3147,13 @@ public func listEmployeeAvailabilityOverrides(employeeId: Int64)throws  -> [FfiE
     )
 })
 }
+public func listEmployeeShiftHistory(employeeId: Int64)throws  -> [FfiEmployeeShiftRecord] {
+    return try  FfiConverterSequenceTypeFfiEmployeeShiftRecord.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_list_employee_shift_history(
+        FfiConverterInt64.lower(employeeId),$0
+    )
+})
+}
 public func listEmployees()throws  -> [FfiEmployee] {
     return try  FfiConverterSequenceTypeFfiEmployee.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_list_employees($0
@@ -3122,6 +3362,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_list_employee_availability_overrides() != 21172) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_list_employee_shift_history() != 2928) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_list_employees() != 41749) {

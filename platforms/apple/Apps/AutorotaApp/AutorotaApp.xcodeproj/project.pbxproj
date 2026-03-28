@@ -23,6 +23,8 @@
 		CC0003012F80000000205001 /* OverrideViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0003022F80000000205001 /* OverrideViewModel.swift */; };
 		CC0003032F80000000205001 /* OverridesTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0003042F80000000205001 /* OverridesTabView.swift */; };
 		CC0004012F80000000205001 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0004022F80000000205001 /* SettingsView.swift */; };
+		CC0005012F80000000205001 /* ShiftHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0005022F80000000205001 /* ShiftHistoryViewModel.swift */; };
+		CC0005032F80000000205001 /* EmployeeShiftHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0005042F80000000205001 /* EmployeeShiftHistoryView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -53,6 +55,8 @@
 		CC0003042F80000000205001 /* OverridesTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverridesTabView.swift; sourceTree = "<group>"; };
 		CC0004022F80000000205001 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		CC0002052F80000000205001 /* AutorotaAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AutorotaAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		CC0005022F80000000205001 /* ShiftHistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiftHistoryViewModel.swift; sourceTree = "<group>"; };
+		CC0005042F80000000205001 /* EmployeeShiftHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmployeeShiftHistoryView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -115,6 +119,7 @@
 				CC0003022F80000000205001 /* OverrideViewModel.swift */,
 				5B9675312F72075A00205001 /* RoleViewModel.swift */,
 				5B9675172F72075A00205001 /* RotaViewModel.swift */,
+				CC0005022F80000000205001 /* ShiftHistoryViewModel.swift */,
 				5B9675182F72075A00205001 /* ShiftTemplateViewModel.swift */,
 			);
 			path = ViewModels;
@@ -127,6 +132,7 @@
 				5B96751B2F72075A00205001 /* ContentView.swift */,
 				5B96751C2F72075A00205001 /* EmployeeDetailView.swift */,
 				5B96751D2F72075A00205001 /* EmployeeListView.swift */,
+				CC0005042F80000000205001 /* EmployeeShiftHistoryView.swift */,
 				CC0003042F80000000205001 /* OverridesTabView.swift */,
 				5B96751E2F72075A00205001 /* RotaView.swift */,
 				CC0004022F80000000205001 /* SettingsView.swift */,
@@ -270,6 +276,8 @@
 				CC0003012F80000000205001 /* OverrideViewModel.swift in Sources */,
 				CC0003032F80000000205001 /* OverridesTabView.swift in Sources */,
 				CC0004012F80000000205001 /* SettingsView.swift in Sources */,
+				CC0005012F80000000205001 /* ShiftHistoryViewModel.swift in Sources */,
+				CC0005032F80000000205001 /* EmployeeShiftHistoryView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
