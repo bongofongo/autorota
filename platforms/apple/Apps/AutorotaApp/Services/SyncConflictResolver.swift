@@ -1,4 +1,3 @@
-import CloudKit
 import Foundation
 
 enum SyncConflictResolver {
