@@ -308,3 +308,59 @@ public func exportWeekScheduleAsync(weekStart: String, config: FfiExportConfig) 
         try exportWeekSchedule(weekStart: weekStart, config: config)
     }.value
 }
+
+// MARK: - Sync
+
+public func getPendingSyncRecordsAsync(tableName: String) async throws -> [FfiSyncRecord] {
+    try await Task.detached(priority: .userInitiated) {
+        try getPendingSyncRecords(tableName: tableName)
+    }.value
+}
+
+public func markRecordsSyncedAsync(tableName: String, recordIds: [Int64], baseSnapshots: [String]) async throws {
+    try await Task.detached(priority: .userInitiated) {
+        try markRecordsSynced(tableName: tableName, recordIds: recordIds, baseSnapshots: baseSnapshots)
+    }.value
+}
+
+public func applyRemoteRecordAsync(record: FfiSyncRecord) async throws {
+    try await Task.detached(priority: .userInitiated) {
+        try applyRemoteRecord(record: record)
+    }.value
+}
+
+public func getSyncMetadataAsync(key: String) async throws -> String? {
+    try await Task.detached(priority: .userInitiated) {
+        try getSyncMetadata(key: key)
+    }.value
+}
+
+public func setSyncMetadataAsync(key: String, value: String) async throws {
+    try await Task.detached(priority: .userInitiated) {
+        try setSyncMetadata(key: key, value: value)
+    }.value
+}
+
+public func getBaseSnapshotsAsync(tableName: String, recordIds: [Int64]) async throws -> [FfiBaseSnapshot] {
+    try await Task.detached(priority: .userInitiated) {
+        try getBaseSnapshots(tableName: tableName, recordIds: recordIds)
+    }.value
+}
+
+public func getPendingTombstonesAsync() async throws -> [FfiTombstone] {
+    try await Task.detached(priority: .userInitiated) {
+        try getPendingTombstones()
+    }.value
+}
+
+public func clearTombstonesAsync(ids: [Int64]) async throws {
+    try await Task.detached(priority: .userInitiated) {
+        try clearTombstones(ids: ids)
+    }.value
+}
+
+public func countEmployeesAsync() async throws -> Int64 {
+    try await Task.detached(priority: .userInitiated) {
+        try countEmployees()
+    }.value
+}

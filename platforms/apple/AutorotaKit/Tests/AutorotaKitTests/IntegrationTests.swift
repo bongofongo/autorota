@@ -176,6 +176,8 @@ final class IntegrationTests: XCTestCase {
             maxDailyHours: 8.0,
             notes: nil,
             bankDetails: nil,
+            hourlyWage: nil,
+            wageCurrency: nil,
             defaultAvailability: slots,
             availability: slots,
             deleted: false

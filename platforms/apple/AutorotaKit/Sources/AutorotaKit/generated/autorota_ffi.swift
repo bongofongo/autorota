@@ -799,6 +799,72 @@ public func FfiConverterTypeFfiAssignment_lower(_ value: FfiAssignment) -> RustB
 }
 
 
+public struct FfiBaseSnapshot {
+    public var recordId: Int64
+    public var snapshot: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(recordId: Int64, snapshot: String) {
+        self.recordId = recordId
+        self.snapshot = snapshot
+    }
+}
+
+
+
+extension FfiBaseSnapshot: Equatable, Hashable {
+    public static func ==(lhs: FfiBaseSnapshot, rhs: FfiBaseSnapshot) -> Bool {
+        if lhs.recordId != rhs.recordId {
+            return false
+        }
+        if lhs.snapshot != rhs.snapshot {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(recordId)
+        hasher.combine(snapshot)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFfiBaseSnapshot: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiBaseSnapshot {
+        return
+            try FfiBaseSnapshot(
+                recordId: FfiConverterInt64.read(from: &buf), 
+                snapshot: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FfiBaseSnapshot, into buf: inout [UInt8]) {
+        FfiConverterInt64.write(value.recordId, into: &buf)
+        FfiConverterString.write(value.snapshot, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiBaseSnapshot_lift(_ buf: RustBuffer) throws -> FfiBaseSnapshot {
+    return try FfiConverterTypeFfiBaseSnapshot.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiBaseSnapshot_lower(_ value: FfiBaseSnapshot) -> RustBuffer {
+    return FfiConverterTypeFfiBaseSnapshot.lower(value)
+}
+
+
 public struct FfiEmployee {
     public var id: Int64
     public var firstName: String
@@ -1527,6 +1593,72 @@ public func FfiConverterTypeFfiExportResult_lift(_ buf: RustBuffer) throws -> Ff
 #endif
 public func FfiConverterTypeFfiExportResult_lower(_ value: FfiExportResult) -> RustBuffer {
     return FfiConverterTypeFfiExportResult.lower(value)
+}
+
+
+public struct FfiMergeConflict {
+    public var recordId: Int64
+    public var resolvedFields: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(recordId: Int64, resolvedFields: String) {
+        self.recordId = recordId
+        self.resolvedFields = resolvedFields
+    }
+}
+
+
+
+extension FfiMergeConflict: Equatable, Hashable {
+    public static func ==(lhs: FfiMergeConflict, rhs: FfiMergeConflict) -> Bool {
+        if lhs.recordId != rhs.recordId {
+            return false
+        }
+        if lhs.resolvedFields != rhs.resolvedFields {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(recordId)
+        hasher.combine(resolvedFields)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFfiMergeConflict: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiMergeConflict {
+        return
+            try FfiMergeConflict(
+                recordId: FfiConverterInt64.read(from: &buf), 
+                resolvedFields: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FfiMergeConflict, into buf: inout [UInt8]) {
+        FfiConverterInt64.write(value.recordId, into: &buf)
+        FfiConverterString.write(value.resolvedFields, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiMergeConflict_lift(_ buf: RustBuffer) throws -> FfiMergeConflict {
+    return try FfiConverterTypeFfiMergeConflict.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiMergeConflict_lower(_ value: FfiMergeConflict) -> RustBuffer {
+    return FfiConverterTypeFfiMergeConflict.lower(value)
 }
 
 
@@ -2499,6 +2631,170 @@ public func FfiConverterTypeFfiShortfallWarning_lower(_ value: FfiShortfallWarni
 }
 
 
+public struct FfiSyncRecord {
+    public var tableName: String
+    public var recordId: Int64
+    public var fields: String
+    public var lastModified: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(tableName: String, recordId: Int64, fields: String, lastModified: String) {
+        self.tableName = tableName
+        self.recordId = recordId
+        self.fields = fields
+        self.lastModified = lastModified
+    }
+}
+
+
+
+extension FfiSyncRecord: Equatable, Hashable {
+    public static func ==(lhs: FfiSyncRecord, rhs: FfiSyncRecord) -> Bool {
+        if lhs.tableName != rhs.tableName {
+            return false
+        }
+        if lhs.recordId != rhs.recordId {
+            return false
+        }
+        if lhs.fields != rhs.fields {
+            return false
+        }
+        if lhs.lastModified != rhs.lastModified {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(tableName)
+        hasher.combine(recordId)
+        hasher.combine(fields)
+        hasher.combine(lastModified)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFfiSyncRecord: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiSyncRecord {
+        return
+            try FfiSyncRecord(
+                tableName: FfiConverterString.read(from: &buf), 
+                recordId: FfiConverterInt64.read(from: &buf), 
+                fields: FfiConverterString.read(from: &buf), 
+                lastModified: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FfiSyncRecord, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.tableName, into: &buf)
+        FfiConverterInt64.write(value.recordId, into: &buf)
+        FfiConverterString.write(value.fields, into: &buf)
+        FfiConverterString.write(value.lastModified, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiSyncRecord_lift(_ buf: RustBuffer) throws -> FfiSyncRecord {
+    return try FfiConverterTypeFfiSyncRecord.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiSyncRecord_lower(_ value: FfiSyncRecord) -> RustBuffer {
+    return FfiConverterTypeFfiSyncRecord.lower(value)
+}
+
+
+public struct FfiTombstone {
+    public var id: Int64
+    public var tableName: String
+    public var recordId: Int64
+    public var deletedAt: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(id: Int64, tableName: String, recordId: Int64, deletedAt: String) {
+        self.id = id
+        self.tableName = tableName
+        self.recordId = recordId
+        self.deletedAt = deletedAt
+    }
+}
+
+
+
+extension FfiTombstone: Equatable, Hashable {
+    public static func ==(lhs: FfiTombstone, rhs: FfiTombstone) -> Bool {
+        if lhs.id != rhs.id {
+            return false
+        }
+        if lhs.tableName != rhs.tableName {
+            return false
+        }
+        if lhs.recordId != rhs.recordId {
+            return false
+        }
+        if lhs.deletedAt != rhs.deletedAt {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+        hasher.combine(tableName)
+        hasher.combine(recordId)
+        hasher.combine(deletedAt)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFfiTombstone: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiTombstone {
+        return
+            try FfiTombstone(
+                id: FfiConverterInt64.read(from: &buf), 
+                tableName: FfiConverterString.read(from: &buf), 
+                recordId: FfiConverterInt64.read(from: &buf), 
+                deletedAt: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FfiTombstone, into buf: inout [UInt8]) {
+        FfiConverterInt64.write(value.id, into: &buf)
+        FfiConverterString.write(value.tableName, into: &buf)
+        FfiConverterInt64.write(value.recordId, into: &buf)
+        FfiConverterString.write(value.deletedAt, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiTombstone_lift(_ buf: RustBuffer) throws -> FfiTombstone {
+    return try FfiConverterTypeFfiTombstone.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiTombstone_lower(_ value: FfiTombstone) -> RustBuffer {
+    return FfiConverterTypeFfiTombstone.lower(value)
+}
+
+
 public struct FfiWeekSchedule {
     public var rotaId: Int64
     public var weekStart: String
@@ -2892,6 +3188,31 @@ fileprivate struct FfiConverterOptionTypeFfiWeekSchedule: FfiConverterRustBuffer
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceInt64: FfiConverterRustBuffer {
+    typealias SwiftType = [Int64]
+
+    public static func write(_ value: [Int64], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterInt64.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [Int64] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [Int64]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterInt64.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceString: FfiConverterRustBuffer {
     typealias SwiftType = [String]
 
@@ -2984,6 +3305,31 @@ fileprivate struct FfiConverterSequenceTypeFfiAssignment: FfiConverterRustBuffer
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeFfiAssignment.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeFfiBaseSnapshot: FfiConverterRustBuffer {
+    typealias SwiftType = [FfiBaseSnapshot]
+
+    public static func write(_ value: [FfiBaseSnapshot], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeFfiBaseSnapshot.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [FfiBaseSnapshot] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [FfiBaseSnapshot]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeFfiBaseSnapshot.read(from: &buf))
         }
         return seq
     }
@@ -3238,6 +3584,77 @@ fileprivate struct FfiConverterSequenceTypeFfiShortfallWarning: FfiConverterRust
         return seq
     }
 }
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeFfiSyncRecord: FfiConverterRustBuffer {
+    typealias SwiftType = [FfiSyncRecord]
+
+    public static func write(_ value: [FfiSyncRecord], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeFfiSyncRecord.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [FfiSyncRecord] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [FfiSyncRecord]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeFfiSyncRecord.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeFfiTombstone: FfiConverterRustBuffer {
+    typealias SwiftType = [FfiTombstone]
+
+    public static func write(_ value: [FfiTombstone], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeFfiTombstone.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [FfiTombstone] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [FfiTombstone]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeFfiTombstone.read(from: &buf))
+        }
+        return seq
+    }
+}
+public func applyRemoteRecord(record: FfiSyncRecord)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_apply_remote_record(
+        FfiConverterTypeFfiSyncRecord.lower(record),$0
+    )
+}
+}
+public func clearTombstones(ids: [Int64])throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_clear_tombstones(
+        FfiConverterSequenceInt64.lower(ids),$0
+    )
+}
+}
+/**
+ * Returns the count of employees in the database (used for first-launch detection).
+ */
+public func countEmployees()throws  -> Int64 {
+    return try  FfiConverterInt64.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_count_employees($0
+    )
+})
+}
 public func createAdHocShift(rotaId: Int64, date: String, startTime: String, endTime: String, requiredRole: String)throws  -> Int64 {
     return try  FfiConverterInt64.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_create_ad_hoc_shift(
@@ -3361,6 +3778,14 @@ public func finalizeRota(id: Int64)throws  {try rustCallWithError(FfiConverterTy
     )
 }
 }
+public func getBaseSnapshots(tableName: String, recordIds: [Int64])throws  -> [FfiBaseSnapshot] {
+    return try  FfiConverterSequenceTypeFfiBaseSnapshot.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_get_base_snapshots(
+        FfiConverterString.lower(tableName),
+        FfiConverterSequenceInt64.lower(recordIds),$0
+    )
+})
+}
 public func getEmployee(id: Int64)throws  -> FfiEmployee? {
     return try  FfiConverterOptionTypeFfiEmployee.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_get_employee(
@@ -3373,6 +3798,19 @@ public func getEmployeeAvailabilityOverride(employeeId: Int64, date: String)thro
     uniffi_autorota_ffi_fn_func_get_employee_availability_override(
         FfiConverterInt64.lower(employeeId),
         FfiConverterString.lower(date),$0
+    )
+})
+}
+public func getPendingSyncRecords(tableName: String)throws  -> [FfiSyncRecord] {
+    return try  FfiConverterSequenceTypeFfiSyncRecord.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_get_pending_sync_records(
+        FfiConverterString.lower(tableName),$0
+    )
+})
+}
+public func getPendingTombstones()throws  -> [FfiTombstone] {
+    return try  FfiConverterSequenceTypeFfiTombstone.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_get_pending_tombstones($0
     )
 })
 }
@@ -3395,6 +3833,13 @@ public func getShiftTemplateOverride(templateId: Int64, date: String)throws  -> 
     uniffi_autorota_ffi_fn_func_get_shift_template_override(
         FfiConverterInt64.lower(templateId),
         FfiConverterString.lower(date),$0
+    )
+})
+}
+public func getSyncMetadata(key: String)throws  -> String? {
+    return try  FfiConverterOptionString.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_get_sync_metadata(
+        FfiConverterString.lower(key),$0
     )
 })
 }
@@ -3478,6 +3923,14 @@ public func listShiftsForRota(rotaId: Int64)throws  -> [FfiShift] {
     )
 })
 }
+public func markRecordsSynced(tableName: String, recordIds: [Int64], baseSnapshots: [String])throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_mark_records_synced(
+        FfiConverterString.lower(tableName),
+        FfiConverterSequenceInt64.lower(recordIds),
+        FfiConverterSequenceString.lower(baseSnapshots),$0
+    )
+}
+}
 /**
  * Ensure a rota exists for the given week and materialise shifts from templates.
  * Returns the rota id. Safe to call multiple times.
@@ -3506,6 +3959,13 @@ public func runSchedule(weekStart: String)throws  -> FfiScheduleResult {
         FfiConverterString.lower(weekStart),$0
     )
 })
+}
+public func setSyncMetadata(key: String, value: String)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_set_sync_metadata(
+        FfiConverterString.lower(key),
+        FfiConverterString.lower(value),$0
+    )
+}
 }
 public func swapAssignments(idA: Int64, idB: Int64)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_swap_assignments(
@@ -3578,6 +4038,15 @@ private var initializationResult: InitializationResult = {
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
     }
+    if (uniffi_autorota_ffi_checksum_func_apply_remote_record() != 2938) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_clear_tombstones() != 33976) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_count_employees() != 39440) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_autorota_ffi_checksum_func_create_ad_hoc_shift() != 52379) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -3629,10 +4098,19 @@ private var initializationResult: InitializationResult = {
     if (uniffi_autorota_ffi_checksum_func_finalize_rota() != 14644) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_autorota_ffi_checksum_func_get_base_snapshots() != 29408) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_autorota_ffi_checksum_func_get_employee() != 21114) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_get_employee_availability_override() != 39578) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_get_pending_sync_records() != 11172) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_get_pending_tombstones() != 32900) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_get_rota() != 30703) {
@@ -3642,6 +4120,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_get_shift_template_override() != 29428) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_get_sync_metadata() != 32899) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_get_week_schedule() != 63555) {
@@ -3677,6 +4158,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_autorota_ffi_checksum_func_list_shifts_for_rota() != 18619) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_autorota_ffi_checksum_func_mark_records_synced() != 61452) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_autorota_ffi_checksum_func_materialise_week() != 28167) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -3684,6 +4168,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_run_schedule() != 48877) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_set_sync_metadata() != 2617) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_swap_assignments() != 10327) {

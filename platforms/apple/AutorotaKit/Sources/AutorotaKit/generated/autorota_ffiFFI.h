@@ -251,6 +251,22 @@ typedef void (*UniffiForeignFutureCompleteVoid)(uint64_t, UniffiForeignFutureStr
     );
 
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_APPLY_REMOTE_RECORD
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_APPLY_REMOTE_RECORD
+void uniffi_autorota_ffi_fn_func_apply_remote_record(RustBuffer record, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_CLEAR_TOMBSTONES
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_CLEAR_TOMBSTONES
+void uniffi_autorota_ffi_fn_func_clear_tombstones(RustBuffer ids, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_COUNT_EMPLOYEES
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_COUNT_EMPLOYEES
+int64_t uniffi_autorota_ffi_fn_func_count_employees(RustCallStatus *_Nonnull out_status
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_CREATE_AD_HOC_SHIFT
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_CREATE_AD_HOC_SHIFT
 int64_t uniffi_autorota_ffi_fn_func_create_ad_hoc_shift(int64_t rota_id, RustBuffer date, RustBuffer start_time, RustBuffer end_time, RustBuffer required_role, RustCallStatus *_Nonnull out_status
@@ -336,6 +352,11 @@ RustBuffer uniffi_autorota_ffi_fn_func_export_week_schedule(RustBuffer week_star
 void uniffi_autorota_ffi_fn_func_finalize_rota(int64_t id, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_BASE_SNAPSHOTS
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_BASE_SNAPSHOTS
+RustBuffer uniffi_autorota_ffi_fn_func_get_base_snapshots(RustBuffer table_name, RustBuffer record_ids, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_EMPLOYEE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_EMPLOYEE
 RustBuffer uniffi_autorota_ffi_fn_func_get_employee(int64_t id, RustCallStatus *_Nonnull out_status
@@ -344,6 +365,17 @@ RustBuffer uniffi_autorota_ffi_fn_func_get_employee(int64_t id, RustCallStatus *
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_EMPLOYEE_AVAILABILITY_OVERRIDE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_EMPLOYEE_AVAILABILITY_OVERRIDE
 RustBuffer uniffi_autorota_ffi_fn_func_get_employee_availability_override(int64_t employee_id, RustBuffer date, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_PENDING_SYNC_RECORDS
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_PENDING_SYNC_RECORDS
+RustBuffer uniffi_autorota_ffi_fn_func_get_pending_sync_records(RustBuffer table_name, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_PENDING_TOMBSTONES
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_PENDING_TOMBSTONES
+RustBuffer uniffi_autorota_ffi_fn_func_get_pending_tombstones(RustCallStatus *_Nonnull out_status
+    
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_ROTA
@@ -359,6 +391,11 @@ RustBuffer uniffi_autorota_ffi_fn_func_get_rota_by_week(RustBuffer week_start, R
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_SHIFT_TEMPLATE_OVERRIDE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_SHIFT_TEMPLATE_OVERRIDE
 RustBuffer uniffi_autorota_ffi_fn_func_get_shift_template_override(int64_t template_id, RustBuffer date, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_SYNC_METADATA
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_SYNC_METADATA
+RustBuffer uniffi_autorota_ffi_fn_func_get_sync_metadata(RustBuffer key, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_WEEK_SCHEDULE
@@ -421,6 +458,11 @@ RustBuffer uniffi_autorota_ffi_fn_func_list_shift_templates(RustCallStatus *_Non
 RustBuffer uniffi_autorota_ffi_fn_func_list_shifts_for_rota(int64_t rota_id, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_MARK_RECORDS_SYNCED
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_MARK_RECORDS_SYNCED
+void uniffi_autorota_ffi_fn_func_mark_records_synced(RustBuffer table_name, RustBuffer record_ids, RustBuffer base_snapshots, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_MATERIALISE_WEEK
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_MATERIALISE_WEEK
 int64_t uniffi_autorota_ffi_fn_func_materialise_week(RustBuffer week_start, RustCallStatus *_Nonnull out_status
@@ -434,6 +476,11 @@ void uniffi_autorota_ffi_fn_func_move_assignment(int64_t id, int64_t new_shift_i
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_RUN_SCHEDULE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_RUN_SCHEDULE
 RustBuffer uniffi_autorota_ffi_fn_func_run_schedule(RustBuffer week_start, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_SET_SYNC_METADATA
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_SET_SYNC_METADATA
+void uniffi_autorota_ffi_fn_func_set_sync_metadata(RustBuffer key, RustBuffer value, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_SWAP_ASSIGNMENTS
@@ -756,6 +803,24 @@ void ffi_autorota_ffi_rust_future_free_void(uint64_t handle
 void ffi_autorota_ffi_rust_future_complete_void(uint64_t handle, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_APPLY_REMOTE_RECORD
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_APPLY_REMOTE_RECORD
+uint16_t uniffi_autorota_ffi_checksum_func_apply_remote_record(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_CLEAR_TOMBSTONES
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_CLEAR_TOMBSTONES
+uint16_t uniffi_autorota_ffi_checksum_func_clear_tombstones(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_COUNT_EMPLOYEES
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_COUNT_EMPLOYEES
+uint16_t uniffi_autorota_ffi_checksum_func_count_employees(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_CREATE_AD_HOC_SHIFT
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_CREATE_AD_HOC_SHIFT
 uint16_t uniffi_autorota_ffi_checksum_func_create_ad_hoc_shift(void
@@ -858,6 +923,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_finalize_rota(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_BASE_SNAPSHOTS
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_BASE_SNAPSHOTS
+uint16_t uniffi_autorota_ffi_checksum_func_get_base_snapshots(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_EMPLOYEE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_EMPLOYEE
 uint16_t uniffi_autorota_ffi_checksum_func_get_employee(void
@@ -867,6 +938,18 @@ uint16_t uniffi_autorota_ffi_checksum_func_get_employee(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_EMPLOYEE_AVAILABILITY_OVERRIDE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_EMPLOYEE_AVAILABILITY_OVERRIDE
 uint16_t uniffi_autorota_ffi_checksum_func_get_employee_availability_override(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_PENDING_SYNC_RECORDS
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_PENDING_SYNC_RECORDS
+uint16_t uniffi_autorota_ffi_checksum_func_get_pending_sync_records(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_PENDING_TOMBSTONES
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_PENDING_TOMBSTONES
+uint16_t uniffi_autorota_ffi_checksum_func_get_pending_tombstones(void
     
 );
 #endif
@@ -885,6 +968,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_get_rota_by_week(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_SHIFT_TEMPLATE_OVERRIDE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_SHIFT_TEMPLATE_OVERRIDE
 uint16_t uniffi_autorota_ffi_checksum_func_get_shift_template_override(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_SYNC_METADATA
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_SYNC_METADATA
+uint16_t uniffi_autorota_ffi_checksum_func_get_sync_metadata(void
     
 );
 #endif
@@ -954,6 +1043,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_list_shifts_for_rota(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_MARK_RECORDS_SYNCED
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_MARK_RECORDS_SYNCED
+uint16_t uniffi_autorota_ffi_checksum_func_mark_records_synced(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_MATERIALISE_WEEK
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_MATERIALISE_WEEK
 uint16_t uniffi_autorota_ffi_checksum_func_materialise_week(void
@@ -969,6 +1064,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_move_assignment(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_RUN_SCHEDULE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_RUN_SCHEDULE
 uint16_t uniffi_autorota_ffi_checksum_func_run_schedule(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_SET_SYNC_METADATA
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_SET_SYNC_METADATA
+uint16_t uniffi_autorota_ffi_checksum_func_set_sync_metadata(void
     
 );
 #endif

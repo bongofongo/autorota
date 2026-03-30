@@ -25,6 +25,8 @@ enum Fixtures {
             maxDailyHours: 8.0,
             notes: nil,
             bankDetails: nil,
+            hourlyWage: nil,
+            wageCurrency: nil,
             defaultAvailability: avail,
             availability: avail,
             deleted: false
