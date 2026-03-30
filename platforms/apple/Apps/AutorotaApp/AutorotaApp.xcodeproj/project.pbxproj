@@ -28,6 +28,10 @@
 		CC0006012F90000000205001 /* TabPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0006022F90000000205001 /* TabPage.swift */; };
 		CC0007012FA0000000205001 /* ExchangeRateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0007022FA0000000205001 /* ExchangeRateService.swift */; };
 		CC0008012FB0000000205001 /* ExportSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0008022FB0000000205001 /* ExportSheetView.swift */; };
+		CC0009012FC0000000205001 /* AutorotaSyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0009022FC0000000205001 /* AutorotaSyncEngine.swift */; };
+		CC0009032FC0000000205001 /* SyncRecordMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0009042FC0000000205001 /* SyncRecordMapper.swift */; };
+		CC0009052FC0000000205001 /* SyncConflictResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0009062FC0000000205001 /* SyncConflictResolver.swift */; };
+		CC0009072FC0000000205001 /* SyncPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0009082FC0000000205001 /* SyncPromptView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -63,6 +67,10 @@
 		CC0006022F90000000205001 /* TabPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabPage.swift; sourceTree = "<group>"; };
 		CC0007022FA0000000205001 /* ExchangeRateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExchangeRateService.swift; sourceTree = "<group>"; };
 		CC0008022FB0000000205001 /* ExportSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheetView.swift; sourceTree = "<group>"; };
+		CC0009022FC0000000205001 /* AutorotaSyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutorotaSyncEngine.swift; sourceTree = "<group>"; };
+		CC0009042FC0000000205001 /* SyncRecordMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncRecordMapper.swift; sourceTree = "<group>"; };
+		CC0009062FC0000000205001 /* SyncConflictResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncConflictResolver.swift; sourceTree = "<group>"; };
+		CC0009082FC0000000205001 /* SyncPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncPromptView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -144,6 +152,7 @@
 				5B96751E2F72075A00205001 /* RotaView.swift */,
 				CC0004022F80000000205001 /* SettingsView.swift */,
 				5B96751F2F72075A00205001 /* ShiftTemplateListView.swift */,
+				CC0009082FC0000000205001 /* SyncPromptView.swift */,
 				CC0006022F90000000205001 /* TabPage.swift */,
 			);
 			path = Views;
@@ -153,8 +162,11 @@
 			isa = PBXGroup;
 			children = (
 				CC0001032F80000000205001 /* AutorotaServiceProtocol.swift */,
+				CC0009022FC0000000205001 /* AutorotaSyncEngine.swift */,
 				CC0007022FA0000000205001 /* ExchangeRateService.swift */,
 				CC0001042F80000000205001 /* LiveAutorotaService.swift */,
+				CC0009062FC0000000205001 /* SyncConflictResolver.swift */,
+				CC0009042FC0000000205001 /* SyncRecordMapper.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -290,6 +302,10 @@
 				CC0006012F90000000205001 /* TabPage.swift in Sources */,
 				CC0007012FA0000000205001 /* ExchangeRateService.swift in Sources */,
 				CC0008012FB0000000205001 /* ExportSheetView.swift in Sources */,
+				CC0009012FC0000000205001 /* AutorotaSyncEngine.swift in Sources */,
+				CC0009032FC0000000205001 /* SyncRecordMapper.swift in Sources */,
+				CC0009052FC0000000205001 /* SyncConflictResolver.swift in Sources */,
+				CC0009072FC0000000205001 /* SyncPromptView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

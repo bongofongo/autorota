@@ -50,6 +50,7 @@ struct SettingsView: View {
     @AppStorage("exportShowTimes") private var exportShowTimes: Bool = true
     @AppStorage("exportShowRole") private var exportShowRole: Bool = true
     @Environment(TabLayoutManager.self) private var layoutManager
+    @Environment(AutorotaSyncEngine.self) private var syncEngine
 
     private var selectedAppearance: AppAppearance {
         AppAppearance(rawValue: appearance) ?? .system
@@ -108,6 +109,29 @@ struct SettingsView: View {
                     Toggle("Show Shift Name", isOn: $exportShowShiftName)
                     Toggle("Show Times", isOn: $exportShowTimes)
                     Toggle("Show Role", isOn: $exportShowRole)
+                }
+
+                Section("iCloud Sync") {
+                    HStack {
+                        Text("Status")
+                        Spacer()
+                        switch syncEngine.status {
+                        case .idle:
+                            Label("Synced", systemImage: "checkmark.icloud")
+                                .foregroundStyle(.green)
+                        case .syncing:
+                            HStack(spacing: 6) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("Syncing...")
+                            }
+                            .foregroundStyle(.secondary)
+                        case .error(let message):
+                            Label("Error", systemImage: "exclamationmark.icloud")
+                                .foregroundStyle(.red)
+                                .help(message)
+                        }
+                    }
                 }
 
                 DisclosureGroup("Layout") {

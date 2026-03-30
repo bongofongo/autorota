@@ -102,7 +102,7 @@ struct OverridesTabView: View {
                     }
                 } header: {
                     HStack {
-                        Text("Shift Template")
+                        Text("Shifts")
                         Spacer()
                         Button { showingTmplSheet = true } label: { Image(systemName: "plus") }
                             .buttonStyle(.borderless)
