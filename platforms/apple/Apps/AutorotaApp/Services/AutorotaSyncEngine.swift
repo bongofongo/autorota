@@ -21,6 +21,13 @@ final class AutorotaSyncEngine: @unchecked Sendable {
             let config = try await loadOrCreateConfiguration()
             let engine = CKSyncEngine(config)
             self.engine = engine
+            NotificationCenter.default.addObserver(
+                forName: .autorotaDataChanged,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.schedulePush()
+            }
             logger.info("CKSyncEngine started")
         } catch {
             logger.error("Failed to start CKSyncEngine: \(error)")
