@@ -107,13 +107,13 @@ struct RotaViewModelTests {
             id: 1, firstName: "Alice", lastName: "S", nickname: nil, displayName: "Alice S",
             roles: ["Barista"], startDate: "2025-01-01", targetWeeklyHours: 20,
             weeklyHoursDeviation: 5, maxDailyHours: 8, notes: nil, bankDetails: nil,
-            defaultAvailability: [], availability: [], deleted: false
+            hourlyWage: nil, wageCurrency: nil, defaultAvailability: [], availability: [], deleted: false
         )
         let emp2 = FfiEmployee(
             id: 2, firstName: "Bob", lastName: "J", nickname: nil, displayName: "Bob J",
             roles: ["Barista"], startDate: "2025-01-01", targetWeeklyHours: 20,
             weeklyHoursDeviation: 5, maxDailyHours: 8, notes: nil, bankDetails: nil,
-            defaultAvailability: [], availability: [], deleted: false
+            hourlyWage: nil, wageCurrency: nil, defaultAvailability: [], availability: [], deleted: false
         )
         mock.stubbedEmployees = [emp1, emp2]
         let vm = RotaViewModel(service: mock)

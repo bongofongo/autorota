@@ -178,7 +178,7 @@ final class RotaViewModel {
         do {
             let assignment = FfiAssignment(
                 id: 0, rotaId: rotaId, shiftId: shiftId,
-                employeeId: employeeId, status: "Overridden", employeeName: nil
+                employeeId: employeeId, status: "Overridden", employeeName: nil, hourlyWage: nil
             )
             _ = try await service.createAssignment(assignment)
             await loadSchedule()

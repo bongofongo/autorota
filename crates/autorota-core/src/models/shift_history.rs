@@ -12,6 +12,8 @@ pub struct EmployeeShiftRecord {
     pub employee_id: i64,
     pub status: AssignmentStatus,
     pub employee_name: Option<String>,
+    /// Snapshot of the employee's hourly wage at assignment time.
+    pub hourly_wage: Option<f32>,
     pub date: NaiveDate,
     pub start_time: NaiveTime,
     pub end_time: NaiveTime,

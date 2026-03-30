@@ -13,6 +13,7 @@ struct AutorotaAppApp: App {
     }
 
     @AppStorage("appAppearance") private var appearance: String = AppAppearance.system.rawValue
+    @State private var exchangeRateService = ExchangeRateService()
 
     private var selectedAppearance: AppAppearance {
         AppAppearance(rawValue: appearance) ?? .system
@@ -21,6 +22,8 @@ struct AutorotaAppApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(exchangeRateService)
+                .task { await exchangeRateService.fetchRates() }
                 .preferredColorScheme(selectedAppearance.colorScheme)
                 #if os(macOS)
                 .frame(minWidth: 800, minHeight: 500)

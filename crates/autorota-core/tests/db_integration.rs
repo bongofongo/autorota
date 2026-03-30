@@ -251,6 +251,8 @@ async fn employee_crud() {
         max_daily_hours: 8.0,
         notes: None,
         bank_details: None,
+        hourly_wage: None,
+        wage_currency: None,
         default_availability: avail.clone(),
         availability: avail,
         deleted: false,
@@ -331,6 +333,8 @@ async fn full_scheduling_flow() {
         max_daily_hours: 8.0,
         notes: None,
         bank_details: None,
+        hourly_wage: None,
+        wage_currency: None,
         default_availability: Availability::default(),
         availability: Availability::default(),
         deleted: false,
@@ -377,6 +381,7 @@ async fn full_scheduling_flow() {
         employee_id: emp_id,
         status: AssignmentStatus::Proposed,
         employee_name: Some("Bob".to_string()),
+        hourly_wage: None,
     };
     let assign_id = queries::insert_assignment(&pool, &assignment)
         .await
@@ -451,6 +456,8 @@ async fn role_rename_cascades() {
         max_daily_hours: 8.0,
         notes: None,
         bank_details: None,
+        hourly_wage: None,
+        wage_currency: None,
         default_availability: Availability::default(),
         availability: Availability::default(),
         deleted: false,
@@ -507,6 +514,8 @@ async fn role_delete_blocked_when_in_use() {
         max_daily_hours: 8.0,
         notes: None,
         bank_details: None,
+        hourly_wage: None,
+        wage_currency: None,
         default_availability: Availability::default(),
         availability: Availability::default(),
         deleted: false,
@@ -536,6 +545,8 @@ async fn migration_populates_roles_from_existing_data() {
         max_daily_hours: 8.0,
         notes: None,
         bank_details: None,
+        hourly_wage: None,
+        wage_currency: None,
         default_availability: Availability::default(),
         availability: Availability::default(),
         deleted: false,
@@ -612,6 +623,8 @@ async fn soft_deleted_employee_assignments_survive() {
         max_daily_hours: 8.0,
         notes: None,
         bank_details: None,
+        hourly_wage: None,
+        wage_currency: None,
         default_availability: Availability::default(),
         availability: Availability::default(),
         deleted: false,
@@ -640,6 +653,7 @@ async fn soft_deleted_employee_assignments_survive() {
         employee_id: emp_id,
         status: AssignmentStatus::Confirmed,
         employee_name: Some("Alice".to_string()),
+        hourly_wage: None,
     };
     queries::insert_assignment(&pool, &assignment).await.unwrap();
 
@@ -699,6 +713,8 @@ async fn swap_assignment_shifts_exchanges_shift_ids() {
         max_daily_hours: 8.0,
         notes: None,
         bank_details: None,
+        hourly_wage: None,
+        wage_currency: None,
         default_availability: Availability::default(),
         availability: Availability::default(),
         deleted: false,
@@ -715,6 +731,7 @@ async fn swap_assignment_shifts_exchanges_shift_ids() {
         employee_id: emp_id_1,
         status: AssignmentStatus::Confirmed,
         employee_name: Some("Alice".to_string()),
+        hourly_wage: None,
     };
     let a2 = Assignment {
         id: 0,
@@ -723,6 +740,7 @@ async fn swap_assignment_shifts_exchanges_shift_ids() {
         employee_id: emp_id_2,
         status: AssignmentStatus::Confirmed,
         employee_name: Some("Bob".to_string()),
+        hourly_wage: None,
     };
     let a1_id = queries::insert_assignment(&pool, &a1).await.unwrap();
     let a2_id = queries::insert_assignment(&pool, &a2).await.unwrap();
@@ -870,6 +888,7 @@ async fn list_employee_shift_history_returns_joined_records() {
         employee_id: emp_id,
         status: AssignmentStatus::Confirmed,
         employee_name: Some("Alice".to_string()),
+        hourly_wage: None,
     };
     queries::insert_assignment(&pool, &assignment).await.unwrap();
 

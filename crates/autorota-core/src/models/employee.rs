@@ -21,6 +21,10 @@ pub struct Employee {
     pub notes: Option<String>,
     /// Bank details for payment.
     pub bank_details: Option<String>,
+    /// Hourly wage rate.
+    pub hourly_wage: Option<f32>,
+    /// Currency code for the wage (e.g. "usd", "gbp", "eur").
+    pub wage_currency: Option<String>,
     /// Default (template) availability — reused each week unless overridden.
     pub default_availability: Availability,
     /// Week-specific availability, copied from default at the start of each scheduling run.
@@ -77,6 +81,8 @@ mod tests {
             max_daily_hours: 8.0,
             notes: None,
             bank_details: None,
+            hourly_wage: None,
+            wage_currency: None,
             default_availability: Availability::default(),
             availability: Availability::default(),
             deleted: false,

@@ -47,6 +47,8 @@ pub fn make_employee(id: i64, name: &str, role: &str, avail_state: AvailabilityS
         max_daily_hours: 8.0,
         notes: None,
         bank_details: None,
+        hourly_wage: None,
+        wage_currency: None,
         default_availability: avail.clone(),
         availability: avail,
         deleted: false,

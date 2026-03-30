@@ -67,6 +67,8 @@ mod tests {
             max_daily_hours: max_daily,
             notes: None,
             bank_details: None,
+            hourly_wage: None,
+            wage_currency: None,
             default_availability: Availability::default(),
             availability: avail,
             deleted: false,

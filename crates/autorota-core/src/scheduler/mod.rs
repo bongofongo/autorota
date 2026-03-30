@@ -66,6 +66,7 @@ impl SchedulerState {
         &mut self,
         employee_id: i64,
         employee_name: Option<String>,
+        hourly_wage: Option<f32>,
         shift: &Shift,
         rota_id: i64,
         status: AssignmentStatus,
@@ -87,6 +88,7 @@ impl SchedulerState {
             employee_id,
             status,
             employee_name,
+            hourly_wage,
         });
     }
 
@@ -254,8 +256,10 @@ pub fn schedule_pure(
             continue;
         }
         if let Some(shift) = shift_map.get(&a.shift_id) {
-            let name = emp_map.get(&a.employee_id).map(|e| e.display_name());
-            state.record_assignment(a.employee_id, name, shift, rota_id, AssignmentStatus::Overridden);
+            let emp = emp_map.get(&a.employee_id);
+            let name = emp.map(|e| e.display_name());
+            let wage = emp.and_then(|e| e.hourly_wage);
+            state.record_assignment(a.employee_id, name, wage, shift, rota_id, AssignmentStatus::Overridden);
         }
     }
 
@@ -363,7 +367,7 @@ pub fn schedule_pure(
                 "[Scheduler]     Assigned: {} (score={:?})",
                 winner.display_name(), candidates[0].1
             );
-            state.record_assignment(winner.id, Some(winner.display_name()), shift, rota_id, AssignmentStatus::Proposed);
+            state.record_assignment(winner.id, Some(winner.display_name()), winner.hourly_wage, shift, rota_id, AssignmentStatus::Proposed);
         }
 
         let filled = state.slots_filled(shift.id);

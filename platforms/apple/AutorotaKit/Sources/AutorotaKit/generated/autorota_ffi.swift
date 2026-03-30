@@ -691,19 +691,27 @@ public struct FfiAssignment {
      */
     public var status: String
     public var employeeName: String?
+    /**
+     * Snapshot of the employee's hourly wage at assignment time.
+     */
+    public var hourlyWage: Float?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(id: Int64, rotaId: Int64, shiftId: Int64, employeeId: Int64, 
         /**
          * "Proposed" | "Confirmed" | "Overridden"
-         */status: String, employeeName: String?) {
+         */status: String, employeeName: String?, 
+        /**
+         * Snapshot of the employee's hourly wage at assignment time.
+         */hourlyWage: Float?) {
         self.id = id
         self.rotaId = rotaId
         self.shiftId = shiftId
         self.employeeId = employeeId
         self.status = status
         self.employeeName = employeeName
+        self.hourlyWage = hourlyWage
     }
 }
 
@@ -729,6 +737,9 @@ extension FfiAssignment: Equatable, Hashable {
         if lhs.employeeName != rhs.employeeName {
             return false
         }
+        if lhs.hourlyWage != rhs.hourlyWage {
+            return false
+        }
         return true
     }
 
@@ -739,6 +750,7 @@ extension FfiAssignment: Equatable, Hashable {
         hasher.combine(employeeId)
         hasher.combine(status)
         hasher.combine(employeeName)
+        hasher.combine(hourlyWage)
     }
 }
 
@@ -755,7 +767,8 @@ public struct FfiConverterTypeFfiAssignment: FfiConverterRustBuffer {
                 shiftId: FfiConverterInt64.read(from: &buf), 
                 employeeId: FfiConverterInt64.read(from: &buf), 
                 status: FfiConverterString.read(from: &buf), 
-                employeeName: FfiConverterOptionString.read(from: &buf)
+                employeeName: FfiConverterOptionString.read(from: &buf), 
+                hourlyWage: FfiConverterOptionFloat.read(from: &buf)
         )
     }
 
@@ -766,6 +779,7 @@ public struct FfiConverterTypeFfiAssignment: FfiConverterRustBuffer {
         FfiConverterInt64.write(value.employeeId, into: &buf)
         FfiConverterString.write(value.status, into: &buf)
         FfiConverterOptionString.write(value.employeeName, into: &buf)
+        FfiConverterOptionFloat.write(value.hourlyWage, into: &buf)
     }
 }
 
@@ -802,6 +816,11 @@ public struct FfiEmployee {
     public var maxDailyHours: Float
     public var notes: String?
     public var bankDetails: String?
+    public var hourlyWage: Float?
+    /**
+     * Currency code for the wage (e.g. "usd", "gbp", "eur").
+     */
+    public var wageCurrency: String?
     public var defaultAvailability: [AvailabilitySlot]
     public var availability: [AvailabilitySlot]
     public var deleted: Bool
@@ -812,7 +831,10 @@ public struct FfiEmployee {
         /**
          * Computed display name: nickname if set, otherwise "first_name last_name".
          * This field is ignored when creating/updating employees; Rust recomputes it.
-         */displayName: String, roles: [String], startDate: String, targetWeeklyHours: Float, weeklyHoursDeviation: Float, maxDailyHours: Float, notes: String?, bankDetails: String?, defaultAvailability: [AvailabilitySlot], availability: [AvailabilitySlot], deleted: Bool) {
+         */displayName: String, roles: [String], startDate: String, targetWeeklyHours: Float, weeklyHoursDeviation: Float, maxDailyHours: Float, notes: String?, bankDetails: String?, hourlyWage: Float?, 
+        /**
+         * Currency code for the wage (e.g. "usd", "gbp", "eur").
+         */wageCurrency: String?, defaultAvailability: [AvailabilitySlot], availability: [AvailabilitySlot], deleted: Bool) {
         self.id = id
         self.firstName = firstName
         self.lastName = lastName
@@ -825,6 +847,8 @@ public struct FfiEmployee {
         self.maxDailyHours = maxDailyHours
         self.notes = notes
         self.bankDetails = bankDetails
+        self.hourlyWage = hourlyWage
+        self.wageCurrency = wageCurrency
         self.defaultAvailability = defaultAvailability
         self.availability = availability
         self.deleted = deleted
@@ -871,6 +895,12 @@ extension FfiEmployee: Equatable, Hashable {
         if lhs.bankDetails != rhs.bankDetails {
             return false
         }
+        if lhs.hourlyWage != rhs.hourlyWage {
+            return false
+        }
+        if lhs.wageCurrency != rhs.wageCurrency {
+            return false
+        }
         if lhs.defaultAvailability != rhs.defaultAvailability {
             return false
         }
@@ -896,6 +926,8 @@ extension FfiEmployee: Equatable, Hashable {
         hasher.combine(maxDailyHours)
         hasher.combine(notes)
         hasher.combine(bankDetails)
+        hasher.combine(hourlyWage)
+        hasher.combine(wageCurrency)
         hasher.combine(defaultAvailability)
         hasher.combine(availability)
         hasher.combine(deleted)
@@ -922,6 +954,8 @@ public struct FfiConverterTypeFfiEmployee: FfiConverterRustBuffer {
                 maxDailyHours: FfiConverterFloat.read(from: &buf), 
                 notes: FfiConverterOptionString.read(from: &buf), 
                 bankDetails: FfiConverterOptionString.read(from: &buf), 
+                hourlyWage: FfiConverterOptionFloat.read(from: &buf), 
+                wageCurrency: FfiConverterOptionString.read(from: &buf), 
                 defaultAvailability: FfiConverterSequenceTypeAvailabilitySlot.read(from: &buf), 
                 availability: FfiConverterSequenceTypeAvailabilitySlot.read(from: &buf), 
                 deleted: FfiConverterBool.read(from: &buf)
@@ -941,6 +975,8 @@ public struct FfiConverterTypeFfiEmployee: FfiConverterRustBuffer {
         FfiConverterFloat.write(value.maxDailyHours, into: &buf)
         FfiConverterOptionString.write(value.notes, into: &buf)
         FfiConverterOptionString.write(value.bankDetails, into: &buf)
+        FfiConverterOptionFloat.write(value.hourlyWage, into: &buf)
+        FfiConverterOptionString.write(value.wageCurrency, into: &buf)
         FfiConverterSequenceTypeAvailabilitySlot.write(value.defaultAvailability, into: &buf)
         FfiConverterSequenceTypeAvailabilitySlot.write(value.availability, into: &buf)
         FfiConverterBool.write(value.deleted, into: &buf)
@@ -1077,6 +1113,14 @@ public struct FfiEmployeeShiftRecord {
     public var status: String
     public var employeeName: String?
     /**
+     * Snapshot of the employee's hourly wage at assignment time.
+     */
+    public var hourlyWage: Float?
+    /**
+     * Pre-computed shift cost (hourly_wage × duration_hours), None if no wage set.
+     */
+    public var shiftCost: Float?
+    /**
      * "YYYY-MM-DD"
      */
     public var date: String
@@ -1110,6 +1154,12 @@ public struct FfiEmployeeShiftRecord {
          * "Proposed" | "Confirmed" | "Overridden"
          */status: String, employeeName: String?, 
         /**
+         * Snapshot of the employee's hourly wage at assignment time.
+         */hourlyWage: Float?, 
+        /**
+         * Pre-computed shift cost (hourly_wage × duration_hours), None if no wage set.
+         */shiftCost: Float?, 
+        /**
          * "YYYY-MM-DD"
          */date: String, 
         /**
@@ -1133,6 +1183,8 @@ public struct FfiEmployeeShiftRecord {
         self.employeeId = employeeId
         self.status = status
         self.employeeName = employeeName
+        self.hourlyWage = hourlyWage
+        self.shiftCost = shiftCost
         self.date = date
         self.weekday = weekday
         self.startTime = startTime
@@ -1164,6 +1216,12 @@ extension FfiEmployeeShiftRecord: Equatable, Hashable {
             return false
         }
         if lhs.employeeName != rhs.employeeName {
+            return false
+        }
+        if lhs.hourlyWage != rhs.hourlyWage {
+            return false
+        }
+        if lhs.shiftCost != rhs.shiftCost {
             return false
         }
         if lhs.date != rhs.date {
@@ -1200,6 +1258,8 @@ extension FfiEmployeeShiftRecord: Equatable, Hashable {
         hasher.combine(employeeId)
         hasher.combine(status)
         hasher.combine(employeeName)
+        hasher.combine(hourlyWage)
+        hasher.combine(shiftCost)
         hasher.combine(date)
         hasher.combine(weekday)
         hasher.combine(startTime)
@@ -1225,6 +1285,8 @@ public struct FfiConverterTypeFfiEmployeeShiftRecord: FfiConverterRustBuffer {
                 employeeId: FfiConverterInt64.read(from: &buf), 
                 status: FfiConverterString.read(from: &buf), 
                 employeeName: FfiConverterOptionString.read(from: &buf), 
+                hourlyWage: FfiConverterOptionFloat.read(from: &buf), 
+                shiftCost: FfiConverterOptionFloat.read(from: &buf), 
                 date: FfiConverterString.read(from: &buf), 
                 weekday: FfiConverterString.read(from: &buf), 
                 startTime: FfiConverterString.read(from: &buf), 
@@ -1243,6 +1305,8 @@ public struct FfiConverterTypeFfiEmployeeShiftRecord: FfiConverterRustBuffer {
         FfiConverterInt64.write(value.employeeId, into: &buf)
         FfiConverterString.write(value.status, into: &buf)
         FfiConverterOptionString.write(value.employeeName, into: &buf)
+        FfiConverterOptionFloat.write(value.hourlyWage, into: &buf)
+        FfiConverterOptionFloat.write(value.shiftCost, into: &buf)
         FfiConverterString.write(value.date, into: &buf)
         FfiConverterString.write(value.weekday, into: &buf)
         FfiConverterString.write(value.startTime, into: &buf)
@@ -2456,6 +2520,30 @@ fileprivate struct FfiConverterOptionInt64: FfiConverterRustBuffer {
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterInt64.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionFloat: FfiConverterRustBuffer {
+    typealias SwiftType = Float?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterFloat.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterFloat.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }

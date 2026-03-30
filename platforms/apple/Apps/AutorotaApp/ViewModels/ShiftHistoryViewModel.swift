@@ -11,17 +11,21 @@ final class ShiftHistoryViewModel {
 
     var currentWeekHours: Float = 0
     var totalHours: Float = 0
+    var currentWeekEarnings: Float = 0
+    var totalEarnings: Float = 0
 
     struct WeekSummary: Identifiable {
         var id: String { weekStart }
         let weekStart: String
         let hours: Float
+        let earnings: Float
     }
 
     struct MonthSummary: Identifiable {
         var id: String { month }
         let month: String
         let hours: Float
+        let earnings: Float
     }
 
     var weeklyBreakdown: [WeekSummary] = []
@@ -78,20 +82,28 @@ final class ShiftHistoryViewModel {
 
         currentWeekHours = current.reduce(0) { $0 + $1.durationHours }
         totalHours = past.reduce(0) { $0 + $1.durationHours }
+        currentWeekEarnings = current.reduce(0) { $0 + ($1.shiftCost ?? 0) }
+        totalEarnings = past.reduce(0) { $0 + ($1.shiftCost ?? 0) }
 
         // Weekly breakdown — past shifts only (most recent first)
-        var weekMap: [String: Float] = [:]
-        for r in past { weekMap[r.weekStart, default: 0] += r.durationHours }
-        weeklyBreakdown = weekMap.map { WeekSummary(weekStart: $0.key, hours: $0.value) }
+        var weekHoursMap: [String: Float] = [:]
+        var weekEarningsMap: [String: Float] = [:]
+        for r in past {
+            weekHoursMap[r.weekStart, default: 0] += r.durationHours
+            weekEarningsMap[r.weekStart, default: 0] += r.shiftCost ?? 0
+        }
+        weeklyBreakdown = weekHoursMap.map { WeekSummary(weekStart: $0.key, hours: $0.value, earnings: weekEarningsMap[$0.key] ?? 0) }
             .sorted { $0.weekStart > $1.weekStart }
 
         // Monthly breakdown — past shifts only (most recent first)
-        var monthMap: [String: Float] = [:]
+        var monthHoursMap: [String: Float] = [:]
+        var monthEarningsMap: [String: Float] = [:]
         for r in past {
             let month = String(r.date.prefix(7))
-            monthMap[month, default: 0] += r.durationHours
+            monthHoursMap[month, default: 0] += r.durationHours
+            monthEarningsMap[month, default: 0] += r.shiftCost ?? 0
         }
-        monthlyBreakdown = monthMap.map { MonthSummary(month: $0.key, hours: $0.value) }
+        monthlyBreakdown = monthHoursMap.map { MonthSummary(month: $0.key, hours: $0.value, earnings: monthEarningsMap[$0.key] ?? 0) }
             .sorted { $0.month > $1.month }
     }
 }

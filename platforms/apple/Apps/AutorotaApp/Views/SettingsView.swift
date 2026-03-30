@@ -1,5 +1,25 @@
 import SwiftUI
 
+enum AppCurrency: String, CaseIterable {
+    case usd, gbp, eur
+
+    var label: String {
+        switch self {
+        case .usd: "USD ($)"
+        case .gbp: "GBP (£)"
+        case .eur: "EUR (€)"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .usd: "$"
+        case .gbp: "£"
+        case .eur: "€"
+        }
+    }
+}
+
 enum AppAppearance: String, CaseIterable {
     case system, light, dark
 
@@ -22,6 +42,7 @@ enum AppAppearance: String, CaseIterable {
 
 struct SettingsView: View {
     @AppStorage("appAppearance") private var appearance: String = AppAppearance.system.rawValue
+    @AppStorage("appCurrency") private var currency: String = AppCurrency.usd.rawValue
     @Environment(TabLayoutManager.self) private var layoutManager
 
     private var selectedAppearance: AppAppearance {
@@ -52,6 +73,14 @@ struct SettingsView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                }
+
+                Section("Currency") {
+                    Picker("Currency", selection: $currency) {
+                        ForEach(AppCurrency.allCases, id: \.rawValue) { option in
+                            Text(option.label).tag(option.rawValue)
+                        }
+                    }
                 }
 
                 DisclosureGroup("Layout") {

@@ -115,6 +115,8 @@ fn employee_to_ffi(e: Employee) -> FfiEmployee {
         max_daily_hours: e.max_daily_hours,
         notes: e.notes,
         bank_details: e.bank_details,
+        hourly_wage: e.hourly_wage,
+        wage_currency: e.wage_currency,
         default_availability: availability_to_slots(&e.default_availability),
         availability: availability_to_slots(&e.availability),
         deleted: e.deleted,
@@ -134,6 +136,8 @@ fn ffi_to_employee(e: FfiEmployee) -> Result<Employee, FfiError> {
         max_daily_hours: e.max_daily_hours,
         notes: e.notes,
         bank_details: e.bank_details,
+        hourly_wage: e.hourly_wage,
+        wage_currency: e.wage_currency,
         default_availability: slots_to_availability(e.default_availability)?,
         availability: slots_to_availability(e.availability)?,
         deleted: e.deleted,
@@ -201,6 +205,7 @@ fn assignment_to_ffi(a: Assignment) -> FfiAssignment {
         employee_id: a.employee_id,
         status: a.status.to_string(),
         employee_name: a.employee_name,
+        hourly_wage: a.hourly_wage,
     }
 }
 
@@ -215,6 +220,7 @@ fn ffi_to_assignment(a: FfiAssignment) -> Result<Assignment, FfiError> {
             .parse::<AssignmentStatus>()
             .map_err(|e| FfiError::InvalidArgument { msg: e })?,
         employee_name: a.employee_name,
+        hourly_wage: a.hourly_wage,
     })
 }
 
@@ -401,13 +407,18 @@ pub fn finalize_rota(id: i64) -> Result<(), FfiError> {
 #[uniffi::export]
 pub fn create_assignment(mut assignment: FfiAssignment) -> Result<i64, FfiError> {
     let pool = pool()?;
-    // Snapshot employee name if missing
-    if assignment.employee_name.is_none() {
+    // Snapshot employee name and wage if missing
+    if assignment.employee_name.is_none() || assignment.hourly_wage.is_none() {
         if let Some(emp) = rt()
             .block_on(queries::get_employee(pool, assignment.employee_id))
             .map_err(FfiError::from)?
         {
-            assignment.employee_name = Some(emp.display_name());
+            if assignment.employee_name.is_none() {
+                assignment.employee_name = Some(emp.display_name());
+            }
+            if assignment.hourly_wage.is_none() {
+                assignment.hourly_wage = emp.hourly_wage;
+            }
         }
     }
     let core = ffi_to_assignment(assignment)?;
@@ -430,8 +441,8 @@ pub fn move_assignment(id: i64, new_shift_id: i64) -> Result<(), FfiError> {
     let pool = pool()?;
     rt().block_on(async {
         // Fetch the assignment to get its rota_id
-        let row = sqlx::query_as::<_, (i64, i64, i64, i64, String, Option<String>)>(
-            "SELECT id, rota_id, shift_id, employee_id, status, employee_name \
+        let row = sqlx::query_as::<_, (i64, i64, i64, i64, String, Option<String>, Option<f64>)>(
+            "SELECT id, rota_id, shift_id, employee_id, status, employee_name, hourly_wage \
              FROM assignments WHERE id = ?",
         )
         .bind(id)
@@ -868,6 +879,8 @@ mod tests {
             max_daily_hours: 8.0,
             notes: Some("Prefers mornings".into()),
             bank_details: None,
+            hourly_wage: None,
+            wage_currency: None,
             default_availability: Availability::default(),
             availability: Availability::default(),
             deleted: false,
@@ -924,6 +937,7 @@ mod tests {
             employee_id: 7,
             status: AssignmentStatus::Confirmed,
             employee_name: Some("Bob".into()),
+            hourly_wage: None,
         };
 
         let ffi = assignment_to_ffi(a);
@@ -943,6 +957,7 @@ mod tests {
             employee_id: 1,
             status: "InvalidStatus".into(),
             employee_name: None,
+            hourly_wage: None,
         };
         assert!(ffi_to_assignment(ffi).is_err());
     }
@@ -994,6 +1009,8 @@ mod tests {
             max_daily_hours: 8.0,
             notes: None,
             bank_details: None,
+            hourly_wage: None,
+            wage_currency: None,
             default_availability: avail_slots.clone(),
             availability: avail_slots,
             deleted: false,
@@ -1074,6 +1091,7 @@ mod tests {
             employee_id: emp_id,
             status: "Proposed".into(),
             employee_name: None,
+            hourly_wage: None,
         };
         let assign_id = create_assignment(assign).unwrap();
         update_assignment_status(assign_id, "Confirmed".into()).unwrap();
@@ -1279,6 +1297,7 @@ pub fn delete_shift_template_override(id: i64) -> Result<(), FfiError> {
 
 fn shift_record_to_ffi(r: EmployeeShiftRecord) -> FfiEmployeeShiftRecord {
     let duration = r.duration_hours();
+    let shift_cost = r.hourly_wage.map(|w| w * duration);
     FfiEmployeeShiftRecord {
         assignment_id: r.assignment_id,
         rota_id: r.rota_id,
@@ -1286,6 +1305,8 @@ fn shift_record_to_ffi(r: EmployeeShiftRecord) -> FfiEmployeeShiftRecord {
         employee_id: r.employee_id,
         status: r.status.to_string(),
         employee_name: r.employee_name,
+        hourly_wage: r.hourly_wage,
+        shift_cost,
         date: r.date.to_string(),
         weekday: weekday_to_str(r.date.weekday()).to_string(),
         start_time: r.start_time.format("%H:%M").to_string(),

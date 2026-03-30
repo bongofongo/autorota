@@ -43,6 +43,9 @@ pub struct FfiEmployee {
     pub max_daily_hours: f32,
     pub notes: Option<String>,
     pub bank_details: Option<String>,
+    pub hourly_wage: Option<f32>,
+    /// Currency code for the wage (e.g. "usd", "gbp", "eur").
+    pub wage_currency: Option<String>,
     pub default_availability: Vec<AvailabilitySlot>,
     pub availability: Vec<AvailabilitySlot>,
     pub deleted: bool,
@@ -89,6 +92,8 @@ pub struct FfiAssignment {
     /// "Proposed" | "Confirmed" | "Overridden"
     pub status: String,
     pub employee_name: Option<String>,
+    /// Snapshot of the employee's hourly wage at assignment time.
+    pub hourly_wage: Option<f32>,
 }
 
 // ── Rota ──────────────────────────────────────────────────────────────────────
@@ -171,6 +176,10 @@ pub struct FfiEmployeeShiftRecord {
     /// "Proposed" | "Confirmed" | "Overridden"
     pub status: String,
     pub employee_name: Option<String>,
+    /// Snapshot of the employee's hourly wage at assignment time.
+    pub hourly_wage: Option<f32>,
+    /// Pre-computed shift cost (hourly_wage × duration_hours), None if no wage set.
+    pub shift_cost: Option<f32>,
     /// "YYYY-MM-DD"
     pub date: String,
     /// "Mon" | "Tue" | … | "Sun"

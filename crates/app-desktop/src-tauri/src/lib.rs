@@ -617,6 +617,8 @@ struct TauriEmployeeShiftRecord {
     employee_id: i64,
     status: String,
     employee_name: Option<String>,
+    hourly_wage: Option<f32>,
+    shift_cost: Option<f32>,
     date: String,
     weekday: String,
     start_time: String,
@@ -629,6 +631,7 @@ struct TauriEmployeeShiftRecord {
 
 fn shift_record_to_tauri(r: EmployeeShiftRecord) -> TauriEmployeeShiftRecord {
     let duration = r.duration_hours();
+    let shift_cost = r.hourly_wage.map(|w| w * duration);
     TauriEmployeeShiftRecord {
         assignment_id: r.assignment_id,
         rota_id: r.rota_id,
@@ -636,6 +639,8 @@ fn shift_record_to_tauri(r: EmployeeShiftRecord) -> TauriEmployeeShiftRecord {
         employee_id: r.employee_id,
         status: r.status.to_string(),
         employee_name: r.employee_name,
+        hourly_wage: r.hourly_wage,
+        shift_cost,
         date: r.date.to_string(),
         weekday: r.date.weekday().to_string(),
         start_time: r.start_time.format("%H:%M").to_string(),

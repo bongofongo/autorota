@@ -11,7 +11,7 @@ struct EmployeeViewModelTests {
             id: id, firstName: first, lastName: last, nickname: nil,
             displayName: "\(first) \(last)", roles: ["Barista"], startDate: "2025-01-01",
             targetWeeklyHours: 20, weeklyHoursDeviation: 5, maxDailyHours: 8,
-            notes: nil, bankDetails: nil, defaultAvailability: [], availability: [], deleted: false
+            notes: nil, bankDetails: nil, hourlyWage: nil, wageCurrency: nil, defaultAvailability: [], availability: [], deleted: false
         )
     }
 

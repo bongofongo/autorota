@@ -136,5 +136,29 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         sqlx::raw_sql(m8).execute(pool).await?;
     }
 
+    // Migration 009: add hourly_wage to employees and assignments.
+    let has_hourly_wage: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) > 0 FROM pragma_table_info('employees') WHERE name = 'hourly_wage'",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    if !has_hourly_wage {
+        let m9 = include_str!("../../migrations/009_employee_wages.sql");
+        sqlx::raw_sql(m9).execute(pool).await?;
+    }
+
+    // Migration 010: add wage_currency to employees.
+    let has_wage_currency: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) > 0 FROM pragma_table_info('employees') WHERE name = 'wage_currency'",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    if !has_wage_currency {
+        let m10 = include_str!("../../migrations/010_employee_wage_currency.sql");
+        sqlx::raw_sql(m10).execute(pool).await?;
+    }
+
     Ok(())
 }

@@ -21,8 +21,8 @@ pub async fn insert_employee(pool: &SqlitePool, emp: &Employee) -> Result<i64, s
     let avail = emp.availability.to_json().unwrap_or_default();
 
     let id = sqlx::query_scalar(
-        "INSERT INTO employees (first_name, last_name, nickname, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, default_availability, availability)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO employees (first_name, last_name, nickname, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, hourly_wage, wage_currency, default_availability, availability)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(&emp.first_name)
     .bind(&emp.last_name)
@@ -34,6 +34,8 @@ pub async fn insert_employee(pool: &SqlitePool, emp: &Employee) -> Result<i64, s
     .bind(emp.max_daily_hours)
     .bind(&emp.notes)
     .bind(&emp.bank_details)
+    .bind(emp.hourly_wage)
+    .bind(&emp.wage_currency)
     .bind(&default_avail)
     .bind(&avail)
     .fetch_one(pool)
@@ -43,8 +45,8 @@ pub async fn insert_employee(pool: &SqlitePool, emp: &Employee) -> Result<i64, s
 }
 
 pub async fn get_employee(pool: &SqlitePool, id: i64) -> Result<Option<Employee>, sqlx::Error> {
-    let row: Option<(i64, String, String, Option<String>, String, String, f64, f64, f64, Option<String>, Option<String>, String, String, bool)> = sqlx::query_as(
-        "SELECT id, first_name, last_name, nickname, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, default_availability, availability, deleted
+    let row: Option<(i64, String, String, Option<String>, String, String, f64, f64, f64, Option<String>, Option<String>, Option<f64>, Option<String>, String, String, bool)> = sqlx::query_as(
+        "SELECT id, first_name, last_name, nickname, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, hourly_wage, wage_currency, default_availability, availability, deleted
          FROM employees WHERE id = ?",
     )
     .bind(id)
@@ -55,8 +57,8 @@ pub async fn get_employee(pool: &SqlitePool, id: i64) -> Result<Option<Employee>
 }
 
 pub async fn list_employees(pool: &SqlitePool) -> Result<Vec<Employee>, sqlx::Error> {
-    let rows: Vec<(i64, String, String, Option<String>, String, String, f64, f64, f64, Option<String>, Option<String>, String, String, bool)> = sqlx::query_as(
-        "SELECT id, first_name, last_name, nickname, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, default_availability, availability, deleted
+    let rows: Vec<(i64, String, String, Option<String>, String, String, f64, f64, f64, Option<String>, Option<String>, Option<f64>, Option<String>, String, String, bool)> = sqlx::query_as(
+        "SELECT id, first_name, last_name, nickname, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, hourly_wage, wage_currency, default_availability, availability, deleted
          FROM employees WHERE deleted = 0 ORDER BY start_date",
     )
     .fetch_all(pool)
@@ -67,8 +69,8 @@ pub async fn list_employees(pool: &SqlitePool) -> Result<Vec<Employee>, sqlx::Er
 
 /// List all employees including soft-deleted ones (for historical schedule display).
 pub async fn list_all_employees(pool: &SqlitePool) -> Result<Vec<Employee>, sqlx::Error> {
-    let rows: Vec<(i64, String, String, Option<String>, String, String, f64, f64, f64, Option<String>, Option<String>, String, String, bool)> = sqlx::query_as(
-        "SELECT id, first_name, last_name, nickname, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, default_availability, availability, deleted
+    let rows: Vec<(i64, String, String, Option<String>, String, String, f64, f64, f64, Option<String>, Option<String>, Option<f64>, Option<String>, String, String, bool)> = sqlx::query_as(
+        "SELECT id, first_name, last_name, nickname, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, hourly_wage, wage_currency, default_availability, availability, deleted
          FROM employees ORDER BY start_date",
     )
     .fetch_all(pool)
@@ -84,7 +86,7 @@ pub async fn update_employee(pool: &SqlitePool, emp: &Employee) -> Result<(), sq
 
     sqlx::query(
         "UPDATE employees SET first_name = ?, last_name = ?, nickname = ?, roles = ?, start_date = ?, target_weekly_hours = ?, weekly_hours_deviation = ?, max_daily_hours = ?,
-         notes = ?, bank_details = ?, default_availability = ?, availability = ? WHERE id = ?",
+         notes = ?, bank_details = ?, hourly_wage = ?, wage_currency = ?, default_availability = ?, availability = ? WHERE id = ?",
     )
     .bind(&emp.first_name)
     .bind(&emp.last_name)
@@ -96,6 +98,8 @@ pub async fn update_employee(pool: &SqlitePool, emp: &Employee) -> Result<(), sq
     .bind(emp.max_daily_hours)
     .bind(&emp.notes)
     .bind(&emp.bank_details)
+    .bind(emp.hourly_wage)
+    .bind(&emp.wage_currency)
     .bind(&default_avail)
     .bind(&avail)
     .bind(emp.id)
@@ -126,6 +130,8 @@ fn employee_from_row(
         f64,
         Option<String>,
         Option<String>,
+        Option<f64>,
+        Option<String>,
         String,
         String,
         bool,
@@ -143,6 +149,8 @@ fn employee_from_row(
         max_daily,
         notes,
         bank_details,
+        hourly_wage,
+        wage_currency,
         default_avail_json,
         avail_json,
         deleted,
@@ -160,6 +168,8 @@ fn employee_from_row(
         max_daily_hours: max_daily as f32,
         notes,
         bank_details,
+        hourly_wage: hourly_wage.map(|v| v as f32),
+        wage_currency,
         default_availability: Availability::from_json(&default_avail_json).unwrap_or_default(),
         availability: Availability::from_json(&avail_json).unwrap_or_default(),
         deleted,
@@ -469,14 +479,15 @@ pub async fn insert_assignment(
     let status_str = assignment.status.to_string();
 
     let id: i64 = sqlx::query_scalar(
-        "INSERT INTO assignments (rota_id, shift_id, employee_id, status, employee_name)
-         VALUES (?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO assignments (rota_id, shift_id, employee_id, status, employee_name, hourly_wage)
+         VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(assignment.rota_id)
     .bind(assignment.shift_id)
     .bind(assignment.employee_id)
     .bind(&status_str)
     .bind(&assignment.employee_name)
+    .bind(assignment.hourly_wage)
     .fetch_one(pool)
     .await?;
 
@@ -487,8 +498,8 @@ pub async fn list_assignments_for_rota(
     pool: &SqlitePool,
     rota_id: i64,
 ) -> Result<Vec<Assignment>, sqlx::Error> {
-    let rows: Vec<(i64, i64, i64, i64, String, Option<String>)> = sqlx::query_as(
-        "SELECT id, rota_id, shift_id, employee_id, status, employee_name
+    let rows: Vec<(i64, i64, i64, i64, String, Option<String>, Option<f64>)> = sqlx::query_as(
+        "SELECT id, rota_id, shift_id, employee_id, status, employee_name, hourly_wage
          FROM assignments WHERE rota_id = ? ORDER BY id",
     )
     .bind(rota_id)
@@ -596,8 +607,8 @@ pub async fn delete_assignment(pool: &SqlitePool, id: i64) -> Result<(), sqlx::E
     Ok(())
 }
 
-fn assignment_from_row(row: (i64, i64, i64, i64, String, Option<String>)) -> Option<Assignment> {
-    let (id, rota_id, shift_id, employee_id, status_str, employee_name) = row;
+fn assignment_from_row(row: (i64, i64, i64, i64, String, Option<String>, Option<f64>)) -> Option<Assignment> {
+    let (id, rota_id, shift_id, employee_id, status_str, employee_name, hourly_wage) = row;
     Some(Assignment {
         id,
         rota_id,
@@ -605,6 +616,7 @@ fn assignment_from_row(row: (i64, i64, i64, i64, String, Option<String>)) -> Opt
         employee_id,
         status: status_str.parse().ok()?,
         employee_name,
+        hourly_wage: hourly_wage.map(|v| v as f32),
     })
 }
 
@@ -933,14 +945,14 @@ fn shift_template_override_from_row(
 // ─── Shift History ───────────────────────────────────────────
 
 type ShiftHistoryRow = (
-    i64, i64, i64, i64, String, Option<String>,
+    i64, i64, i64, i64, String, Option<String>, Option<f64>,
     String, String, String, String,
     String, bool,
 );
 
 fn shift_record_from_row(row: ShiftHistoryRow) -> Option<EmployeeShiftRecord> {
     let (
-        assignment_id, rota_id, shift_id, employee_id, status_str, employee_name,
+        assignment_id, rota_id, shift_id, employee_id, status_str, employee_name, hourly_wage,
         date_str, start_str, end_str, required_role,
         week_start_str, finalized,
     ) = row;
@@ -951,6 +963,7 @@ fn shift_record_from_row(row: ShiftHistoryRow) -> Option<EmployeeShiftRecord> {
         employee_id,
         status: status_str.parse::<AssignmentStatus>().ok()?,
         employee_name,
+        hourly_wage: hourly_wage.map(|v| v as f32),
         date: NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").ok()?,
         start_time: NaiveTime::parse_from_str(&start_str, "%H:%M:%S").ok()?,
         end_time: NaiveTime::parse_from_str(&end_str, "%H:%M:%S").ok()?,
@@ -965,7 +978,7 @@ pub async fn list_employee_shift_history(
     employee_id: i64,
 ) -> Result<Vec<EmployeeShiftRecord>, sqlx::Error> {
     let rows: Vec<ShiftHistoryRow> = sqlx::query_as(
-        "SELECT a.id, a.rota_id, a.shift_id, a.employee_id, a.status, a.employee_name,
+        "SELECT a.id, a.rota_id, a.shift_id, a.employee_id, a.status, a.employee_name, a.hourly_wage,
                 s.date, s.start_time, s.end_time, s.required_role,
                 r.week_start, r.finalized
          FROM assignments a

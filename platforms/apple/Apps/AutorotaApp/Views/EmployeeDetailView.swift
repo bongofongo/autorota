@@ -6,6 +6,8 @@ struct EmployeeDetailView: View {
     let employee: FfiEmployee
     let viewModel: EmployeeViewModel
 
+    @AppStorage("appCurrency") private var displayCurrency: String = AppCurrency.usd.rawValue
+    @Environment(ExchangeRateService.self) private var exchangeRates
     @Environment(\.dismiss) private var dismiss
     @State private var showingEditSheet = false
     @State private var overrideVM = OverrideViewModel()
@@ -29,6 +31,12 @@ struct EmployeeDetailView: View {
                 LabeledContent("Target hours/week",
                     value: "\(String(format: "%.1f", employee.targetWeeklyHours)) ± \(String(format: "%.1f", employee.weeklyHoursDeviation))h")
                 LabeledContent("Max daily hours", value: String(format: "%.1f", employee.maxDailyHours))
+                if let wage = employee.hourlyWage {
+                    let from = employee.wageCurrency ?? displayCurrency
+                    let converted = exchangeRates.convert(wage, from: from, to: displayCurrency)
+                    let sym = exchangeRates.symbol(for: displayCurrency)
+                    LabeledContent("Hourly wage", value: String(format: "%@%.2f", sym, converted))
+                }
             }
 
             if let notes = employee.notes, !notes.isEmpty {
@@ -47,14 +55,16 @@ struct EmployeeDetailView: View {
                 )
             }
 
-            Section("Shift Data") {
+            Section("Analytics") {
                 NavigationLink {
                     EmployeeShiftHistoryView(
                         employeeId: employee.id,
-                        targetWeeklyHours: employee.targetWeeklyHours
+                        targetWeeklyHours: employee.targetWeeklyHours,
+                        hourlyWage: employee.hourlyWage,
+                        wageCurrency: employee.wageCurrency
                     )
                 } label: {
-                    Label("View Shift Data", systemImage: "clock.arrow.circlepath")
+                    Label("View Analytics", systemImage: "chart.bar.xaxis")
                 }
             }
 
@@ -136,6 +146,8 @@ struct EmployeeEditSheet: View {
     var onDelete: (() -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(ExchangeRateService.self) private var exchangeRates
+    @AppStorage("appCurrency") private var displayCurrency: String = AppCurrency.usd.rawValue
     @State private var showingDeleteConfirmation = false
 
     @State private var roleVM = RoleViewModel()
@@ -148,6 +160,8 @@ struct EmployeeEditSheet: View {
     @State private var deviation = 4.0
     @State private var maxDaily = 8.0
     @State private var notes = ""
+    @State private var hourlyWageText = ""
+    @State private var wageCurrency: String = AppCurrency.usd.rawValue
 
     // Dual availability state
     @State private var defaultAvailabilitySlots: [AvailabilitySlot] = []
@@ -197,6 +211,33 @@ struct EmployeeEditSheet: View {
                                  value: $deviation, range: 0...20, step: 1)
                     StepperField(label: "Max daily", suffix: "h",
                                  value: $maxDaily, range: 1...24, step: 1)
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Hourly wage")
+                            Spacer()
+                            Text(exchangeRates.symbol(for: displayCurrency))
+                                .foregroundStyle(.secondary)
+                            TextField("Not set", text: $hourlyWageText)
+                                #if os(iOS)
+                                .keyboardType(.decimalPad)
+                                #endif
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 80)
+                        }
+                        HStack {
+                            Text("Stored as")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Picker("", selection: $wageCurrency) {
+                                ForEach(AppCurrency.allCases, id: \.rawValue) { c in
+                                    Text(c.label).tag(c.rawValue)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .labelsHidden()
+                            .fixedSize()
+                        }
+                    }
                 }
                 Section("Notes") {
                     TextField("Optional notes", text: $notes, axis: .vertical)
@@ -302,7 +343,10 @@ struct EmployeeEditSheet: View {
             } message: {
                 Text("This employee will be removed from future rotas. Past and current assignments are preserved.")
             }
-            .onAppear { prefill() }
+            .onAppear {
+                if existing == nil { wageCurrency = displayCurrency }
+                prefill()
+            }
             .task { await roleVM.load() }
         }
         #if os(macOS)
@@ -323,6 +367,14 @@ struct EmployeeEditSheet: View {
         deviation = Double(e.weeklyHoursDeviation)
         maxDaily = Double(e.maxDailyHours)
         notes = e.notes ?? ""
+        let storedCurrency = e.wageCurrency ?? displayCurrency
+        wageCurrency = storedCurrency
+        if let wage = e.hourlyWage {
+            let converted = exchangeRates.convert(wage, from: storedCurrency, to: displayCurrency)
+            hourlyWageText = String(format: "%.2f", converted)
+        } else {
+            hourlyWageText = ""
+        }
         defaultAvailabilitySlots = e.defaultAvailability
         nextWeekSlots = e.availability
         let range = AvailabilityGridView.inferredVisibleRange(from: e.defaultAvailability)
@@ -342,6 +394,9 @@ struct EmployeeEditSheet: View {
         let trimmedFirst = firstName.trimmingCharacters(in: .whitespaces)
         let trimmedLast = lastName.trimmingCharacters(in: .whitespaces)
         let trimmedNick = nickname.trimmingCharacters(in: .whitespaces)
+        let displayWage: Float? = Float(hourlyWageText.trimmingCharacters(in: .whitespaces))
+        // Convert from display currency back to the employee's storage currency
+        let parsedWage: Float? = displayWage.map { exchangeRates.convert($0, from: displayCurrency, to: wageCurrency) }
         let emp = FfiEmployee(
             id: existing?.id ?? 0,
             firstName: trimmedFirst,
@@ -355,6 +410,8 @@ struct EmployeeEditSheet: View {
             maxDailyHours: Float(maxDaily),
             notes: notes.isEmpty ? nil : notes,
             bankDetails: existing?.bankDetails,
+            hourlyWage: parsedWage,
+            wageCurrency: parsedWage != nil ? wageCurrency : nil,
             defaultAvailability: finalDefault,
             availability: finalNextWeek,
             deleted: false

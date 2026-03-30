@@ -39,7 +39,7 @@ autorota/
         models/                       # employee, availability, shift, assignment, rota, role
         scheduler/                    # mod.rs (algorithm), scoring.rs
         db/                           # mod.rs (pool + migrations), queries.rs
-      migrations/                     # 001–007 SQL files, embedded at runtime
+      migrations/                     # 001–010 SQL files, embedded at runtime
       tests/                          # db_integration.rs, scheduler_test.rs, helpers/
     app-desktop/                      # Tauri v2 desktop shell
       src/                            # main.ts (single-file UI), styles.css, main.js
@@ -60,7 +60,7 @@ autorota/
         XCFrameworks/                 # gitignored — built by scripts/build_xcframework.sh
       Apps/AutorotaApp/               # Xcode project (iOS 17 / macOS 14)
         AutorotaApp/                  # @main entry, assets
-        Services/                     # AutorotaServiceProtocol.swift, LiveAutorotaService.swift
+        Services/                     # AutorotaServiceProtocol, LiveAutorotaService, ExchangeRateService
         ViewModels/                   # RotaViewModel, EmployeeViewModel, ShiftTemplateViewModel, RoleViewModel
         Views/                        # SwiftUI views
         AutorotaAppTests/             # ViewModel unit tests using MockAutorotaService
@@ -93,6 +93,10 @@ UniFFI 0.28 wrapper exposing the full command surface to Swift (and future Kotli
 - `AutorotaKit.swift` provides async wrappers using `Task.detached` to keep blocking FFI off the main actor
 - `scripts/build_xcframework.sh` compiles for `aarch64-apple-darwin`, `x86_64-apple-darwin`, `aarch64-apple-ios`, `aarch64-apple-ios-sim`; lipo-s macOS slices; assembles XCFramework
 - **`SDKROOT` must be set per target** so `libsqlite3-sys`/cc-rs finds the correct SDK headers
+
+## Wages & currency
+
+Employees have an optional `hourly_wage` and `wage_currency` (e.g. "usd", "gbp", "eur"). Wages are stored in the employee's chosen currency. Assignments snapshot the wage at scheduling time. `shift_cost` is computed at the FFI layer (`hourly_wage × duration`), not stored in DB. The global display currency (`@AppStorage("appCurrency")`) controls what the user sees everywhere — `ExchangeRateService` fetches live rates from `api.frankfurter.dev`, caches in UserDefaults for offline use, and converts between currencies at display time. The `AppCurrency` enum is defined in `SettingsView.swift`.
 
 ## Stack
 

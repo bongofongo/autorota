@@ -41,6 +41,8 @@ pub struct Assignment {
     pub status: AssignmentStatus,
     /// Snapshot of the employee name at the time of assignment.
     pub employee_name: Option<String>,
+    /// Snapshot of the employee's hourly wage at the time of assignment.
+    pub hourly_wage: Option<f32>,
 }
 
 #[cfg(test)]

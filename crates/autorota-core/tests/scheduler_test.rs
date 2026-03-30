@@ -132,6 +132,7 @@ fn overrides_respected() {
         employee_id: 2,
         status: AssignmentStatus::Overridden,
         employee_name: Some("Bob".to_string()),
+        hourly_wage: None,
     }];
 
     let result = schedule_pure(&[shift], &[alice, bob], &existing, &[], 1, week_start());
@@ -275,6 +276,7 @@ fn override_counts_toward_hours_budget() {
         employee_id: 1,
         status: AssignmentStatus::Overridden,
         employee_name: Some("Alice".to_string()),
+        hourly_wage: None,
     }];
 
     let result = schedule_pure(&[s1, s2], &[emp], &existing, &[], 1, week_start());
