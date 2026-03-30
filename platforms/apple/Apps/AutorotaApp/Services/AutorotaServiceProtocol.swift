@@ -57,4 +57,7 @@ protocol AutorotaServiceProtocol: Sendable {
     func listShiftTemplateOverridesForTemplate(templateId: Int64) async throws -> [FfiShiftTemplateOverride]
     func listAllShiftTemplateOverrides() async throws -> [FfiShiftTemplateOverride]
     func deleteShiftTemplateOverride(id: Int64) async throws
+
+    // Export
+    func exportWeekSchedule(weekStart: String, config: FfiExportConfig) async throws -> FfiExportResult
 }

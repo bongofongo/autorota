@@ -248,4 +248,14 @@ final class MockAutorotaService: AutorotaServiceProtocol, @unchecked Sendable {
         callLog.append("deleteShiftTemplateOverride:\(id)")
         if let e = errorToThrow { throw e }
     }
+
+    // MARK: - Export
+
+    var stubbedExportResult = FfiExportResult(data: "mock,data\n", filename: "test.csv", mimeType: "text/csv")
+
+    func exportWeekSchedule(weekStart: String, config: FfiExportConfig) async throws -> FfiExportResult {
+        callLog.append("exportWeekSchedule:\(weekStart)")
+        if let e = errorToThrow { throw e }
+        return stubbedExportResult
+    }
 }

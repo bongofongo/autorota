@@ -757,6 +757,69 @@ pub fn list_shifts_for_rota(rota_id: i64) -> Result<Vec<FfiShift>, FfiError> {
     Ok(rows.into_iter().map(shift_to_ffi).collect())
 }
 
+// ── Export ───────────────────────────────────────────────────────────────────
+
+use autorota_core::export::config::{
+    CellContentFlags, ExportConfig, ExportFormat, ExportLayout, ExportProfile,
+};
+
+fn parse_export_config(config: FfiExportConfig) -> Result<ExportConfig, FfiError> {
+    let layout: ExportLayout = config
+        .layout
+        .parse()
+        .map_err(|e: String| FfiError::InvalidArgument { msg: e })?;
+    let format: ExportFormat = config
+        .format
+        .parse()
+        .map_err(|e: String| FfiError::InvalidArgument { msg: e })?;
+    let profile: ExportProfile = config
+        .profile
+        .parse()
+        .map_err(|e: String| FfiError::InvalidArgument { msg: e })?;
+
+    Ok(ExportConfig {
+        layout,
+        format,
+        profile,
+        cell_content: CellContentFlags {
+            show_shift_name: config.show_shift_name,
+            show_times: config.show_times,
+            show_role: config.show_role,
+        },
+    })
+}
+
+#[uniffi::export]
+pub fn export_week_schedule(
+    week_start: String,
+    config: FfiExportConfig,
+) -> Result<FfiExportResult, FfiError> {
+    let pool = pool()?;
+    let date = parse_date(&week_start)?;
+    let core_config = parse_export_config(config)?;
+
+    let result = rt()
+        .block_on(autorota_core::export::export_week_schedule(
+            pool,
+            date,
+            core_config,
+        ))
+        .map_err(|e| match e {
+            autorota_core::export::ExportError::Db(db_err) => {
+                FfiError::Db { msg: db_err.to_string() }
+            }
+            autorota_core::export::ExportError::NoSchedule(msg) => {
+                FfiError::NotFound { msg }
+            }
+        })?;
+
+    Ok(FfiExportResult {
+        data: result.data,
+        filename: result.filename,
+        mime_type: result.mime_type,
+    })
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]

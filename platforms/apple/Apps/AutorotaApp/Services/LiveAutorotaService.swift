@@ -47,4 +47,6 @@ struct LiveAutorotaService: AutorotaServiceProtocol {
     func listShiftTemplateOverridesForTemplate(templateId: Int64) async throws -> [FfiShiftTemplateOverride] { try await listShiftTemplateOverridesForTemplateAsync(templateId: templateId) }
     func listAllShiftTemplateOverrides() async throws -> [FfiShiftTemplateOverride] { try await listAllShiftTemplateOverridesAsync() }
     func deleteShiftTemplateOverride(id: Int64) async throws { try await deleteShiftTemplateOverrideAsync(id: id) }
+
+    func exportWeekSchedule(weekStart: String, config: FfiExportConfig) async throws -> FfiExportResult { try await exportWeekScheduleAsync(weekStart: weekStart, config: config) }
 }

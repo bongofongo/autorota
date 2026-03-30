@@ -1335,6 +1335,202 @@ public func FfiConverterTypeFfiEmployeeShiftRecord_lower(_ value: FfiEmployeeShi
 
 
 /**
+ * Configuration for exporting a week schedule.
+ */
+public struct FfiExportConfig {
+    /**
+     * "employee_by_weekday" | "shift_by_weekday"
+     */
+    public var layout: String
+    /**
+     * "csv" | "json"
+     */
+    public var format: String
+    /**
+     * "staff_schedule" | "manager_report"
+     */
+    public var profile: String
+    public var showShiftName: Bool
+    public var showTimes: Bool
+    public var showRole: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * "employee_by_weekday" | "shift_by_weekday"
+         */layout: String, 
+        /**
+         * "csv" | "json"
+         */format: String, 
+        /**
+         * "staff_schedule" | "manager_report"
+         */profile: String, showShiftName: Bool, showTimes: Bool, showRole: Bool) {
+        self.layout = layout
+        self.format = format
+        self.profile = profile
+        self.showShiftName = showShiftName
+        self.showTimes = showTimes
+        self.showRole = showRole
+    }
+}
+
+
+
+extension FfiExportConfig: Equatable, Hashable {
+    public static func ==(lhs: FfiExportConfig, rhs: FfiExportConfig) -> Bool {
+        if lhs.layout != rhs.layout {
+            return false
+        }
+        if lhs.format != rhs.format {
+            return false
+        }
+        if lhs.profile != rhs.profile {
+            return false
+        }
+        if lhs.showShiftName != rhs.showShiftName {
+            return false
+        }
+        if lhs.showTimes != rhs.showTimes {
+            return false
+        }
+        if lhs.showRole != rhs.showRole {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(layout)
+        hasher.combine(format)
+        hasher.combine(profile)
+        hasher.combine(showShiftName)
+        hasher.combine(showTimes)
+        hasher.combine(showRole)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFfiExportConfig: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiExportConfig {
+        return
+            try FfiExportConfig(
+                layout: FfiConverterString.read(from: &buf), 
+                format: FfiConverterString.read(from: &buf), 
+                profile: FfiConverterString.read(from: &buf), 
+                showShiftName: FfiConverterBool.read(from: &buf), 
+                showTimes: FfiConverterBool.read(from: &buf), 
+                showRole: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FfiExportConfig, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.layout, into: &buf)
+        FfiConverterString.write(value.format, into: &buf)
+        FfiConverterString.write(value.profile, into: &buf)
+        FfiConverterBool.write(value.showShiftName, into: &buf)
+        FfiConverterBool.write(value.showTimes, into: &buf)
+        FfiConverterBool.write(value.showRole, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiExportConfig_lift(_ buf: RustBuffer) throws -> FfiExportConfig {
+    return try FfiConverterTypeFfiExportConfig.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiExportConfig_lower(_ value: FfiExportConfig) -> RustBuffer {
+    return FfiConverterTypeFfiExportConfig.lower(value)
+}
+
+
+/**
+ * Result of an export operation.
+ */
+public struct FfiExportResult {
+    public var data: String
+    public var filename: String
+    public var mimeType: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(data: String, filename: String, mimeType: String) {
+        self.data = data
+        self.filename = filename
+        self.mimeType = mimeType
+    }
+}
+
+
+
+extension FfiExportResult: Equatable, Hashable {
+    public static func ==(lhs: FfiExportResult, rhs: FfiExportResult) -> Bool {
+        if lhs.data != rhs.data {
+            return false
+        }
+        if lhs.filename != rhs.filename {
+            return false
+        }
+        if lhs.mimeType != rhs.mimeType {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(data)
+        hasher.combine(filename)
+        hasher.combine(mimeType)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFfiExportResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiExportResult {
+        return
+            try FfiExportResult(
+                data: FfiConverterString.read(from: &buf), 
+                filename: FfiConverterString.read(from: &buf), 
+                mimeType: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FfiExportResult, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.data, into: &buf)
+        FfiConverterString.write(value.filename, into: &buf)
+        FfiConverterString.write(value.mimeType, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiExportResult_lift(_ buf: RustBuffer) throws -> FfiExportResult {
+    return try FfiConverterTypeFfiExportResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiExportResult_lower(_ value: FfiExportResult) -> RustBuffer {
+    return FfiConverterTypeFfiExportResult.lower(value)
+}
+
+
+/**
  * FFI-safe mirror types for all autorota-core models.
  *
  * Chrono types are flattened to `String`:
@@ -3151,6 +3347,14 @@ public func deleteWeek(weekStart: String)throws  {try rustCallWithError(FfiConve
     )
 }
 }
+public func exportWeekSchedule(weekStart: String, config: FfiExportConfig)throws  -> FfiExportResult {
+    return try  FfiConverterTypeFfiExportResult.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_export_week_schedule(
+        FfiConverterString.lower(weekStart),
+        FfiConverterTypeFfiExportConfig.lower(config),$0
+    )
+})
+}
 public func finalizeRota(id: Int64)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_finalize_rota(
         FfiConverterInt64.lower(id),$0
@@ -3417,6 +3621,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_delete_week() != 24828) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_export_week_schedule() != 7973) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_finalize_rota() != 14644) {

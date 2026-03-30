@@ -43,6 +43,12 @@ enum AppAppearance: String, CaseIterable {
 struct SettingsView: View {
     @AppStorage("appAppearance") private var appearance: String = AppAppearance.system.rawValue
     @AppStorage("appCurrency") private var currency: String = AppCurrency.usd.rawValue
+    @AppStorage("exportDefaultLayout") private var exportDefaultLayout: String = "employee_by_weekday"
+    @AppStorage("exportDefaultFormat") private var exportDefaultFormat: String = "csv"
+    @AppStorage("exportDefaultProfile") private var exportDefaultProfile: String = "staff_schedule"
+    @AppStorage("exportShowShiftName") private var exportShowShiftName: Bool = true
+    @AppStorage("exportShowTimes") private var exportShowTimes: Bool = true
+    @AppStorage("exportShowRole") private var exportShowRole: Bool = true
     @Environment(TabLayoutManager.self) private var layoutManager
 
     private var selectedAppearance: AppAppearance {
@@ -81,6 +87,27 @@ struct SettingsView: View {
                             Text(option.label).tag(option.rawValue)
                         }
                     }
+                }
+
+                DisclosureGroup("Export Defaults") {
+                    Picker("Layout", selection: $exportDefaultLayout) {
+                        Text("By Employee").tag("employee_by_weekday")
+                        Text("By Shift").tag("shift_by_weekday")
+                    }
+
+                    Picker("Format", selection: $exportDefaultFormat) {
+                        Text("CSV").tag("csv")
+                        Text("JSON").tag("json")
+                    }
+
+                    Picker("Profile", selection: $exportDefaultProfile) {
+                        Text("Staff Schedule").tag("staff_schedule")
+                        Text("Manager Report").tag("manager_report")
+                    }
+
+                    Toggle("Show Shift Name", isOn: $exportShowShiftName)
+                    Toggle("Show Times", isOn: $exportShowTimes)
+                    Toggle("Show Role", isOn: $exportShowRole)
                 }
 
                 DisclosureGroup("Layout") {

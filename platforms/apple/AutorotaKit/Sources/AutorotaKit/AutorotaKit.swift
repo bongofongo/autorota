@@ -300,3 +300,11 @@ public func listEmployeeShiftHistoryAsync(employeeId: Int64) async throws -> [Ff
         try listEmployeeShiftHistory(employeeId: employeeId)
     }.value
 }
+
+// MARK: - Export
+
+public func exportWeekScheduleAsync(weekStart: String, config: FfiExportConfig) async throws -> FfiExportResult {
+    try await Task.detached(priority: .userInitiated) {
+        try exportWeekSchedule(weekStart: weekStart, config: config)
+    }.value
+}

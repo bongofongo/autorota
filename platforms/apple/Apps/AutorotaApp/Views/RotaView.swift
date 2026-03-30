@@ -4,6 +4,7 @@ import AutorotaKit
 struct RotaView: View {
 
     @State private var vm = RotaViewModel()
+    @State private var showExportSheet = false
 
     var body: some View {
         NavigationStack {
@@ -56,6 +57,15 @@ struct RotaView: View {
                             vm.showDeleteScheduleConfirmation = true
                         }
                         .tint(.red)
+                    }
+
+                    // Export
+                    if vm.schedule != nil {
+                        Button {
+                            showExportSheet = true
+                        } label: {
+                            Image(systemName: "square.and.arrow.up")
+                        }
                     }
 
                     // Edit / Done toggle
@@ -115,6 +125,9 @@ struct RotaView: View {
                 Button("OK") { vm.error = nil }
             } message: {
                 Text(vm.error ?? "")
+            }
+            .sheet(isPresented: $showExportSheet) {
+                ExportSheetView(weekStart: vm.selectedWeekStart, service: vm.service)
             }
             .task { await vm.loadSchedule() }
         }

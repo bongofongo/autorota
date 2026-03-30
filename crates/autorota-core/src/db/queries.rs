@@ -217,6 +217,23 @@ pub async fn list_shift_templates(pool: &SqlitePool) -> Result<Vec<ShiftTemplate
         .collect())
 }
 
+/// Like `list_shift_templates` but includes soft-deleted templates (for historical lookups).
+pub async fn list_all_shift_templates(
+    pool: &SqlitePool,
+) -> Result<Vec<ShiftTemplate>, sqlx::Error> {
+    let rows: Vec<ShiftTemplateRow> = sqlx::query_as(
+        "SELECT id, name, weekdays, start_time, end_time, required_role, min_employees, max_employees, deleted
+         FROM shift_templates ORDER BY start_time",
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(rows
+        .into_iter()
+        .filter_map(shift_template_from_row)
+        .collect())
+}
+
 pub async fn update_shift_template(
     pool: &SqlitePool,
     tmpl: &ShiftTemplate,

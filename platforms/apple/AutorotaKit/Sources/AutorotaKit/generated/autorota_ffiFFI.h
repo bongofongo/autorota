@@ -326,6 +326,11 @@ void uniffi_autorota_ffi_fn_func_delete_shift_template_override(int64_t id, Rust
 void uniffi_autorota_ffi_fn_func_delete_week(RustBuffer week_start, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_EXPORT_WEEK_SCHEDULE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_EXPORT_WEEK_SCHEDULE
+RustBuffer uniffi_autorota_ffi_fn_func_export_week_schedule(RustBuffer week_start, RustBuffer config, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_FINALIZE_ROTA
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_FINALIZE_ROTA
 void uniffi_autorota_ffi_fn_func_finalize_rota(int64_t id, RustCallStatus *_Nonnull out_status
@@ -838,6 +843,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_delete_shift_template_override(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_DELETE_WEEK
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_DELETE_WEEK
 uint16_t uniffi_autorota_ffi_checksum_func_delete_week(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_EXPORT_WEEK_SCHEDULE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_EXPORT_WEEK_SCHEDULE
+uint16_t uniffi_autorota_ffi_checksum_func_export_week_schedule(void
     
 );
 #endif

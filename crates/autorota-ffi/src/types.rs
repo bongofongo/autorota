@@ -217,6 +217,30 @@ pub struct FfiEmployeeAvailabilityOverride {
     pub notes: Option<String>,
 }
 
+// ── Export ────────────────────────────────────────────────────────────────────
+
+/// Configuration for exporting a week schedule.
+#[derive(Clone, uniffi::Record)]
+pub struct FfiExportConfig {
+    /// "employee_by_weekday" | "shift_by_weekday"
+    pub layout: String,
+    /// "csv" | "json"
+    pub format: String,
+    /// "staff_schedule" | "manager_report"
+    pub profile: String,
+    pub show_shift_name: bool,
+    pub show_times: bool,
+    pub show_role: bool,
+}
+
+/// Result of an export operation.
+#[derive(Clone, uniffi::Record)]
+pub struct FfiExportResult {
+    pub data: String,
+    pub filename: String,
+    pub mime_type: String,
+}
+
 /// Date-specific modification to a recurring shift template on one calendar date.
 #[derive(Clone, uniffi::Record)]
 pub struct FfiShiftTemplateOverride {

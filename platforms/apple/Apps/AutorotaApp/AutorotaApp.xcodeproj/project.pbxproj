@@ -27,6 +27,7 @@
 		CC0005032F80000000205001 /* EmployeeShiftHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0005042F80000000205001 /* EmployeeShiftHistoryView.swift */; };
 		CC0006012F90000000205001 /* TabPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0006022F90000000205001 /* TabPage.swift */; };
 		CC0007012FA0000000205001 /* ExchangeRateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0007022FA0000000205001 /* ExchangeRateService.swift */; };
+		CC0008012FB0000000205001 /* ExportSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0008022FB0000000205001 /* ExportSheetView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -61,6 +62,7 @@
 		CC0005042F80000000205001 /* EmployeeShiftHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmployeeShiftHistoryView.swift; sourceTree = "<group>"; };
 		CC0006022F90000000205001 /* TabPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabPage.swift; sourceTree = "<group>"; };
 		CC0007022FA0000000205001 /* ExchangeRateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExchangeRateService.swift; sourceTree = "<group>"; };
+		CC0008022FB0000000205001 /* ExportSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheetView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -137,6 +139,7 @@
 				5B96751C2F72075A00205001 /* EmployeeDetailView.swift */,
 				5B96751D2F72075A00205001 /* EmployeeListView.swift */,
 				CC0005042F80000000205001 /* EmployeeShiftHistoryView.swift */,
+				CC0008022FB0000000205001 /* ExportSheetView.swift */,
 				CC0003042F80000000205001 /* OverridesTabView.swift */,
 				5B96751E2F72075A00205001 /* RotaView.swift */,
 				CC0004022F80000000205001 /* SettingsView.swift */,
@@ -286,6 +289,7 @@
 				CC0005032F80000000205001 /* EmployeeShiftHistoryView.swift in Sources */,
 				CC0006012F90000000205001 /* TabPage.swift in Sources */,
 				CC0007012FA0000000205001 /* ExchangeRateService.swift in Sources */,
+				CC0008012FB0000000205001 /* ExportSheetView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
