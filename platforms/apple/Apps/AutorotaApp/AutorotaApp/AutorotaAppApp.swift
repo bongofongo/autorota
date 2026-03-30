@@ -69,6 +69,12 @@ struct AutorotaAppApp: App {
     }
 
     private func checkFirstLaunchSync() async {
+        // Skip sync when running in a test host process.
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            syncCheckComplete = true
+            return
+        }
+
         do {
             let initialized = try getSyncMetadata(key: "sync_initialized")
             let disabled = try getSyncMetadata(key: "sync_disabled")
