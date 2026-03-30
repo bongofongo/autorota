@@ -199,4 +199,62 @@ final class IntegrationTests: XCTestCase {
         try await deleteEmployeeAsync(id: empId)
         try await deleteRoleAsync(id: roleId)
     }
+
+    // MARK: - Sync
+
+    func testSyncMetadataRoundtrip() async throws {
+        // Initially nil
+        let initial = try getSyncMetadata(key: "test_sync_key")
+        XCTAssertNil(initial)
+
+        // Set and get
+        try setSyncMetadata(key: "test_sync_key", value: "test_value")
+        let fetched = try getSyncMetadata(key: "test_sync_key")
+        XCTAssertEqual(fetched, "test_value")
+
+        // Overwrite
+        try setSyncMetadata(key: "test_sync_key", value: "updated")
+        let updated = try getSyncMetadata(key: "test_sync_key")
+        XCTAssertEqual(updated, "updated")
+    }
+
+    func testPendingSyncRecordsAndMarkSynced() async throws {
+        let roleId = try createRole(name: "SyncTestRole_\(UUID().uuidString)")
+
+        let pending = try getPendingSyncRecords(tableName: "roles")
+        XCTAssertTrue(pending.contains(where: { $0.recordId == roleId }))
+
+        // Mark as synced
+        let snapshot = "{\"id\": \(roleId), \"name\": \"SyncTestRole\"}"
+        try markRecordsSynced(tableName: "roles", recordIds: [roleId], baseSnapshots: [snapshot])
+
+        // Should no longer be pending
+        let afterSync = try getPendingSyncRecords(tableName: "roles")
+        XCTAssertFalse(afterSync.contains(where: { $0.recordId == roleId }))
+
+        // Base snapshot should be stored
+        let snapshots = try getBaseSnapshots(tableName: "roles", recordIds: [roleId])
+        XCTAssertEqual(snapshots.count, 1)
+
+        // Cleanup
+        try deleteRole(id: roleId)
+    }
+
+    func testTombstoneLifecycle() async throws {
+        let roleId = try createRole(name: "TombstoneTestRole_\(UUID().uuidString)")
+        try deleteRole(id: roleId)
+
+        // Should have a tombstone
+        let tombstones = try getPendingTombstones()
+        let match = tombstones.first(where: { $0.tableName == "roles" && $0.recordId == roleId })
+        XCTAssertNotNil(match)
+
+        // Clear it
+        if let t = match {
+            try clearTombstones(ids: [t.id])
+        }
+
+        let after = try getPendingTombstones()
+        XCTAssertFalse(after.contains(where: { $0.tableName == "roles" && $0.recordId == roleId }))
+    }
 }
