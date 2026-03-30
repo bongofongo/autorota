@@ -160,5 +160,17 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         sqlx::raw_sql(m10).execute(pool).await?;
     }
 
+    // Migration 011: add sync tracking columns and tables.
+    let has_sync_status: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) > 0 FROM pragma_table_info('employees') WHERE name = 'sync_status'",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    if !has_sync_status {
+        let m11 = include_str!("../../migrations/011_sync_support.sql");
+        sqlx::raw_sql(m11).execute(pool).await?;
+    }
+
     Ok(())
 }
