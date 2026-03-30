@@ -9,6 +9,7 @@ use crate::models::role::Role;
 use crate::models::rota::Rota;
 use crate::models::shift::{Shift, ShiftTemplate};
 use crate::models::shift_history::EmployeeShiftRecord;
+use crate::models::sync::{BaseSnapshot, SyncRecord, Tombstone};
 
 type ShiftTemplateRow = (i64, String, String, String, String, String, u32, u32, bool);
 type ShiftRow = (i64, Option<i64>, i64, String, String, String, String, u32, u32);
@@ -19,10 +20,11 @@ pub async fn insert_employee(pool: &SqlitePool, emp: &Employee) -> Result<i64, s
     let roles_json = serde_json::to_string(&emp.roles).unwrap_or_default();
     let default_avail = emp.default_availability.to_json().unwrap_or_default();
     let avail = emp.availability.to_json().unwrap_or_default();
+    let now = chrono::Utc::now().to_rfc3339();
 
     let id = sqlx::query_scalar(
-        "INSERT INTO employees (first_name, last_name, nickname, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, hourly_wage, wage_currency, default_availability, availability)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO employees (first_name, last_name, nickname, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, hourly_wage, wage_currency, default_availability, availability, last_modified, sync_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0) RETURNING id",
     )
     .bind(&emp.first_name)
     .bind(&emp.last_name)
@@ -38,6 +40,7 @@ pub async fn insert_employee(pool: &SqlitePool, emp: &Employee) -> Result<i64, s
     .bind(&emp.wage_currency)
     .bind(&default_avail)
     .bind(&avail)
+    .bind(&now)
     .fetch_one(pool)
     .await?;
 
@@ -83,10 +86,11 @@ pub async fn update_employee(pool: &SqlitePool, emp: &Employee) -> Result<(), sq
     let roles_json = serde_json::to_string(&emp.roles).unwrap_or_default();
     let default_avail = emp.default_availability.to_json().unwrap_or_default();
     let avail = emp.availability.to_json().unwrap_or_default();
+    let now = chrono::Utc::now().to_rfc3339();
 
     sqlx::query(
         "UPDATE employees SET first_name = ?, last_name = ?, nickname = ?, roles = ?, start_date = ?, target_weekly_hours = ?, weekly_hours_deviation = ?, max_daily_hours = ?,
-         notes = ?, bank_details = ?, hourly_wage = ?, wage_currency = ?, default_availability = ?, availability = ? WHERE id = ?",
+         notes = ?, bank_details = ?, hourly_wage = ?, wage_currency = ?, default_availability = ?, availability = ?, last_modified = ?, sync_status = 0 WHERE id = ?",
     )
     .bind(&emp.first_name)
     .bind(&emp.last_name)
@@ -102,6 +106,7 @@ pub async fn update_employee(pool: &SqlitePool, emp: &Employee) -> Result<(), sq
     .bind(&emp.wage_currency)
     .bind(&default_avail)
     .bind(&avail)
+    .bind(&now)
     .bind(emp.id)
     .execute(pool)
     .await?;
@@ -110,7 +115,9 @@ pub async fn update_employee(pool: &SqlitePool, emp: &Employee) -> Result<(), sq
 }
 
 pub async fn delete_employee(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
-    sqlx::query("UPDATE employees SET deleted = 1 WHERE id = ?")
+    let now = chrono::Utc::now().to_rfc3339();
+    sqlx::query("UPDATE employees SET deleted = 1, last_modified = ?, sync_status = 0 WHERE id = ?")
+        .bind(&now)
         .bind(id)
         .execute(pool)
         .await?;
@@ -186,9 +193,10 @@ pub async fn insert_shift_template(
     let start = tmpl.start_time.to_string();
     let end = tmpl.end_time.to_string();
 
+    let now = chrono::Utc::now().to_rfc3339();
     let id: i64 = sqlx::query_scalar(
-        "INSERT INTO shift_templates (name, weekdays, start_time, end_time, required_role, min_employees, max_employees)
-         VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO shift_templates (name, weekdays, start_time, end_time, required_role, min_employees, max_employees, last_modified, sync_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0) RETURNING id",
     )
     .bind(&tmpl.name)
     .bind(&weekdays_str)
@@ -197,6 +205,7 @@ pub async fn insert_shift_template(
     .bind(&tmpl.required_role)
     .bind(tmpl.min_employees)
     .bind(tmpl.max_employees)
+    .bind(&now)
     .fetch_one(pool)
     .await?;
 
@@ -242,8 +251,9 @@ pub async fn update_shift_template(
     let start = tmpl.start_time.to_string();
     let end = tmpl.end_time.to_string();
 
+    let now = chrono::Utc::now().to_rfc3339();
     sqlx::query(
-        "UPDATE shift_templates SET name = ?, weekdays = ?, start_time = ?, end_time = ?, required_role = ?, min_employees = ?, max_employees = ? WHERE id = ?",
+        "UPDATE shift_templates SET name = ?, weekdays = ?, start_time = ?, end_time = ?, required_role = ?, min_employees = ?, max_employees = ?, last_modified = ?, sync_status = 0 WHERE id = ?",
     )
     .bind(&tmpl.name)
     .bind(&weekdays_str)
@@ -252,6 +262,7 @@ pub async fn update_shift_template(
     .bind(&tmpl.required_role)
     .bind(tmpl.min_employees)
     .bind(tmpl.max_employees)
+    .bind(&now)
     .bind(tmpl.id)
     .execute(pool)
     .await?;
@@ -260,7 +271,9 @@ pub async fn update_shift_template(
 }
 
 pub async fn delete_shift_template(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
-    sqlx::query("UPDATE shift_templates SET deleted = 1 WHERE id = ?")
+    let now = chrono::Utc::now().to_rfc3339();
+    sqlx::query("UPDATE shift_templates SET deleted = 1, last_modified = ?, sync_status = 0 WHERE id = ?")
+        .bind(&now)
         .bind(id)
         .execute(pool)
         .await?;
@@ -365,9 +378,11 @@ pub async fn materialise_shifts(
 // ─── Rotas ───────────────────────────────────────────────────
 
 pub async fn insert_rota(pool: &SqlitePool, week_start: NaiveDate) -> Result<i64, sqlx::Error> {
+    let now = chrono::Utc::now().to_rfc3339();
     let id: i64 =
-        sqlx::query_scalar("INSERT INTO rotas (week_start, finalized) VALUES (?, 0) RETURNING id")
+        sqlx::query_scalar("INSERT INTO rotas (week_start, finalized, last_modified, sync_status) VALUES (?, 0, ?, 0) RETURNING id")
             .bind(week_start.to_string())
+            .bind(&now)
             .fetch_one(pool)
             .await?;
 
@@ -416,10 +431,34 @@ pub async fn get_rota_by_week(
 /// Delete a rota and all its data. Deletes all shifts first (which cascades
 /// to assignments via the ON DELETE CASCADE FK), then removes the rota row.
 pub async fn delete_rota(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
+    // Insert tombstones for assignments belonging to shifts in this rota.
+    let assignment_ids: Vec<(i64,)> = sqlx::query_as(
+        "SELECT a.id FROM assignments a JOIN shifts s ON s.id = a.shift_id WHERE s.rota_id = ?",
+    )
+    .bind(id)
+    .fetch_all(pool)
+    .await?;
+    for (aid,) in &assignment_ids {
+        insert_tombstone(pool, "assignments", *aid).await?;
+    }
+
+    // Insert tombstones for shifts in this rota.
+    let shift_ids: Vec<(i64,)> =
+        sqlx::query_as("SELECT id FROM shifts WHERE rota_id = ?")
+            .bind(id)
+            .fetch_all(pool)
+            .await?;
+    for (sid,) in &shift_ids {
+        insert_tombstone(pool, "shifts", *sid).await?;
+    }
+
     sqlx::query("DELETE FROM shifts WHERE rota_id = ?")
         .bind(id)
         .execute(pool)
         .await?;
+
+    // Insert tombstone for the rota itself.
+    insert_tombstone(pool, "rotas", id).await?;
     sqlx::query("DELETE FROM rotas WHERE id = ?")
         .bind(id)
         .execute(pool)
@@ -428,7 +467,9 @@ pub async fn delete_rota(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> 
 }
 
 pub async fn finalize_rota(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
-    sqlx::query("UPDATE rotas SET finalized = 1 WHERE id = ?")
+    let now = chrono::Utc::now().to_rfc3339();
+    sqlx::query("UPDATE rotas SET finalized = 1, last_modified = ?, sync_status = 0 WHERE id = ?")
+        .bind(&now)
         .bind(id)
         .execute(pool)
         .await?;
@@ -438,9 +479,10 @@ pub async fn finalize_rota(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error
 // ─── Shifts ──────────────────────────────────────────────────
 
 pub async fn insert_shift(pool: &SqlitePool, shift: &Shift) -> Result<i64, sqlx::Error> {
+    let now = chrono::Utc::now().to_rfc3339();
     let id: i64 = sqlx::query_scalar(
-        "INSERT INTO shifts (template_id, rota_id, date, start_time, end_time, required_role, min_employees, max_employees)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO shifts (template_id, rota_id, date, start_time, end_time, required_role, min_employees, max_employees, last_modified, sync_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0) RETURNING id",
     )
     .bind(shift.template_id)
     .bind(shift.rota_id)
@@ -450,6 +492,7 @@ pub async fn insert_shift(pool: &SqlitePool, shift: &Shift) -> Result<i64, sqlx:
     .bind(&shift.required_role)
     .bind(shift.min_employees)
     .bind(shift.max_employees)
+    .bind(&now)
     .fetch_one(pool)
     .await?;
 
@@ -495,9 +538,10 @@ pub async fn insert_assignment(
 ) -> Result<i64, sqlx::Error> {
     let status_str = assignment.status.to_string();
 
+    let now = chrono::Utc::now().to_rfc3339();
     let id: i64 = sqlx::query_scalar(
-        "INSERT INTO assignments (rota_id, shift_id, employee_id, status, employee_name, hourly_wage)
-         VALUES (?, ?, ?, ?, ?, ?) RETURNING id",
+        "INSERT INTO assignments (rota_id, shift_id, employee_id, status, employee_name, hourly_wage, last_modified, sync_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0) RETURNING id",
     )
     .bind(assignment.rota_id)
     .bind(assignment.shift_id)
@@ -505,6 +549,7 @@ pub async fn insert_assignment(
     .bind(&status_str)
     .bind(&assignment.employee_name)
     .bind(assignment.hourly_wage)
+    .bind(&now)
     .fetch_one(pool)
     .await?;
 
@@ -528,6 +573,15 @@ pub async fn list_assignments_for_rota(
 
 pub async fn delete_shifts_for_rota(pool: &SqlitePool, rota_id: i64) -> Result<(), sqlx::Error> {
     // Only delete template-based shifts; preserve ad-hoc shifts (template_id IS NULL).
+    // Insert tombstones for all affected shifts first.
+    let ids: Vec<(i64,)> =
+        sqlx::query_as("SELECT id FROM shifts WHERE rota_id = ? AND template_id IS NOT NULL")
+            .bind(rota_id)
+            .fetch_all(pool)
+            .await?;
+    for (sid,) in &ids {
+        insert_tombstone(pool, "shifts", *sid).await?;
+    }
     sqlx::query("DELETE FROM shifts WHERE rota_id = ? AND template_id IS NOT NULL")
         .bind(rota_id)
         .execute(pool)
@@ -536,6 +590,7 @@ pub async fn delete_shifts_for_rota(pool: &SqlitePool, rota_id: i64) -> Result<(
 }
 
 pub async fn delete_shift(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
+    insert_tombstone(pool, "shifts", id).await?;
     sqlx::query("DELETE FROM shifts WHERE id = ?")
         .bind(id)
         .execute(pool)
@@ -549,9 +604,11 @@ pub async fn update_shift_times(
     start_time: NaiveTime,
     end_time: NaiveTime,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query("UPDATE shifts SET start_time = ?, end_time = ? WHERE id = ?")
+    let now = chrono::Utc::now().to_rfc3339();
+    sqlx::query("UPDATE shifts SET start_time = ?, end_time = ?, last_modified = ?, sync_status = 0 WHERE id = ?")
         .bind(start_time.to_string())
         .bind(end_time.to_string())
+        .bind(&now)
         .bind(id)
         .execute(pool)
         .await?;
@@ -562,6 +619,15 @@ pub async fn delete_proposed_assignments(
     pool: &SqlitePool,
     rota_id: i64,
 ) -> Result<(), sqlx::Error> {
+    // Insert tombstones for all affected assignments first.
+    let ids: Vec<(i64,)> =
+        sqlx::query_as("SELECT id FROM assignments WHERE rota_id = ? AND status = 'Proposed'")
+            .bind(rota_id)
+            .fetch_all(pool)
+            .await?;
+    for (aid,) in &ids {
+        insert_tombstone(pool, "assignments", *aid).await?;
+    }
     sqlx::query("DELETE FROM assignments WHERE rota_id = ? AND status = 'Proposed'")
         .bind(rota_id)
         .execute(pool)
@@ -574,8 +640,10 @@ pub async fn update_assignment_status(
     id: i64,
     status: AssignmentStatus,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query("UPDATE assignments SET status = ? WHERE id = ?")
+    let now = chrono::Utc::now().to_rfc3339();
+    sqlx::query("UPDATE assignments SET status = ?, last_modified = ?, sync_status = 0 WHERE id = ?")
         .bind(status.to_string())
+        .bind(&now)
         .bind(id)
         .execute(pool)
         .await?;
@@ -587,8 +655,10 @@ pub async fn update_assignment_shift(
     id: i64,
     new_shift_id: i64,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query("UPDATE assignments SET shift_id = ? WHERE id = ?")
+    let now = chrono::Utc::now().to_rfc3339();
+    sqlx::query("UPDATE assignments SET shift_id = ?, last_modified = ?, sync_status = 0 WHERE id = ?")
         .bind(new_shift_id)
+        .bind(&now)
         .bind(id)
         .execute(pool)
         .await?;
@@ -602,14 +672,17 @@ pub async fn swap_assignment_shifts(
     id_b: i64,
     shift_b: i64,
 ) -> Result<(), sqlx::Error> {
+    let now = chrono::Utc::now().to_rfc3339();
     // Swap: A gets B's shift, B gets A's shift
-    sqlx::query("UPDATE assignments SET shift_id = ? WHERE id = ?")
+    sqlx::query("UPDATE assignments SET shift_id = ?, last_modified = ?, sync_status = 0 WHERE id = ?")
         .bind(shift_b)
+        .bind(&now)
         .bind(id_a)
         .execute(pool)
         .await?;
-    sqlx::query("UPDATE assignments SET shift_id = ? WHERE id = ?")
+    sqlx::query("UPDATE assignments SET shift_id = ?, last_modified = ?, sync_status = 0 WHERE id = ?")
         .bind(shift_a)
+        .bind(&now)
         .bind(id_b)
         .execute(pool)
         .await?;
@@ -617,6 +690,7 @@ pub async fn swap_assignment_shifts(
 }
 
 pub async fn delete_assignment(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
+    insert_tombstone(pool, "assignments", id).await?;
     sqlx::query("DELETE FROM assignments WHERE id = ?")
         .bind(id)
         .execute(pool)
@@ -652,9 +726,11 @@ pub async fn list_roles(pool: &SqlitePool) -> Result<Vec<Role>, sqlx::Error> {
 }
 
 pub async fn insert_role(pool: &SqlitePool, name: &str) -> Result<i64, sqlx::Error> {
+    let now = chrono::Utc::now().to_rfc3339();
     let id: i64 =
-        sqlx::query_scalar("INSERT INTO roles (name) VALUES (?) RETURNING id")
+        sqlx::query_scalar("INSERT INTO roles (name, last_modified, sync_status) VALUES (?, ?, 0) RETURNING id")
             .bind(name)
+            .bind(&now)
             .fetch_one(pool)
             .await?;
 
@@ -673,23 +749,28 @@ pub async fn update_role(pool: &SqlitePool, id: i64, new_name: &str) -> Result<(
         return Ok(());
     }
 
+    let now = chrono::Utc::now().to_rfc3339();
+
     // Update the role name.
-    sqlx::query("UPDATE roles SET name = ? WHERE id = ?")
+    sqlx::query("UPDATE roles SET name = ?, last_modified = ?, sync_status = 0 WHERE id = ?")
         .bind(new_name)
+        .bind(&now)
         .bind(id)
         .execute(pool)
         .await?;
 
     // Cascade: update shift_templates.required_role
-    sqlx::query("UPDATE shift_templates SET required_role = ? WHERE required_role = ?")
+    sqlx::query("UPDATE shift_templates SET required_role = ?, last_modified = ?, sync_status = 0 WHERE required_role = ?")
         .bind(new_name)
+        .bind(&now)
         .bind(&old_name)
         .execute(pool)
         .await?;
 
     // Cascade: update shifts.required_role
-    sqlx::query("UPDATE shifts SET required_role = ? WHERE required_role = ?")
+    sqlx::query("UPDATE shifts SET required_role = ?, last_modified = ?, sync_status = 0 WHERE required_role = ?")
         .bind(new_name)
+        .bind(&now)
         .bind(&old_name)
         .execute(pool)
         .await?;
@@ -711,8 +792,9 @@ pub async fn update_role(pool: &SqlitePool, id: i64, new_name: &str) -> Result<(
             }
         }
         let updated_json = serde_json::to_string(&roles).unwrap_or_default();
-        sqlx::query("UPDATE employees SET roles = ? WHERE id = ?")
+        sqlx::query("UPDATE employees SET roles = ?, last_modified = ?, sync_status = 0 WHERE id = ?")
             .bind(&updated_json)
+            .bind(&now)
             .bind(emp_id)
             .execute(pool)
             .await?;
@@ -758,6 +840,7 @@ pub async fn delete_role(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> 
         )));
     }
 
+    insert_tombstone(pool, "roles", id).await?;
     sqlx::query("DELETE FROM roles WHERE id = ?")
         .bind(id)
         .execute(pool)
@@ -774,16 +857,18 @@ pub async fn upsert_employee_availability_override(
     ovr: &EmployeeAvailabilityOverride,
 ) -> Result<i64, sqlx::Error> {
     let avail_json = ovr.availability.to_json().unwrap_or_default();
+    let now = chrono::Utc::now().to_rfc3339();
     let id: i64 = sqlx::query_scalar(
-        "INSERT INTO employee_availability_overrides (employee_id, date, availability, notes)
-         VALUES (?, ?, ?, ?)
-         ON CONFLICT(employee_id, date) DO UPDATE SET availability = excluded.availability, notes = excluded.notes
+        "INSERT INTO employee_availability_overrides (employee_id, date, availability, notes, last_modified, sync_status)
+         VALUES (?, ?, ?, ?, ?, 0)
+         ON CONFLICT(employee_id, date) DO UPDATE SET availability = excluded.availability, notes = excluded.notes, last_modified = excluded.last_modified, sync_status = 0
          RETURNING id",
     )
     .bind(ovr.employee_id)
     .bind(ovr.date.to_string())
     .bind(&avail_json)
     .bind(&ovr.notes)
+    .bind(&now)
     .fetch_one(pool)
     .await?;
     Ok(id)
@@ -835,6 +920,7 @@ pub async fn delete_employee_availability_override(
     pool: &SqlitePool,
     id: i64,
 ) -> Result<(), sqlx::Error> {
+    insert_tombstone(pool, "employee_availability_overrides", id).await?;
     sqlx::query("DELETE FROM employee_availability_overrides WHERE id = ?")
         .bind(id)
         .execute(pool)
@@ -864,16 +950,19 @@ pub async fn upsert_shift_template_override(
 ) -> Result<i64, sqlx::Error> {
     let start_str = ovr.start_time.map(|t| t.format("%H:%M:%S").to_string());
     let end_str = ovr.end_time.map(|t| t.format("%H:%M:%S").to_string());
+    let now = chrono::Utc::now().to_rfc3339();
     let id: i64 = sqlx::query_scalar(
-        "INSERT INTO shift_template_overrides (template_id, date, cancelled, start_time, end_time, min_employees, max_employees, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        "INSERT INTO shift_template_overrides (template_id, date, cancelled, start_time, end_time, min_employees, max_employees, notes, last_modified, sync_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
          ON CONFLICT(template_id, date) DO UPDATE SET
            cancelled = excluded.cancelled,
            start_time = excluded.start_time,
            end_time = excluded.end_time,
            min_employees = excluded.min_employees,
            max_employees = excluded.max_employees,
-           notes = excluded.notes
+           notes = excluded.notes,
+           last_modified = excluded.last_modified,
+           sync_status = 0
          RETURNING id",
     )
     .bind(ovr.template_id)
@@ -884,6 +973,7 @@ pub async fn upsert_shift_template_override(
     .bind(ovr.min_employees.map(|v| v as i64))
     .bind(ovr.max_employees.map(|v| v as i64))
     .bind(&ovr.notes)
+    .bind(&now)
     .fetch_one(pool)
     .await?;
     Ok(id)
@@ -935,6 +1025,7 @@ pub async fn delete_shift_template_override(
     pool: &SqlitePool,
     id: i64,
 ) -> Result<(), sqlx::Error> {
+    insert_tombstone(pool, "shift_template_overrides", id).await?;
     sqlx::query("DELETE FROM shift_template_overrides WHERE id = ?")
         .bind(id)
         .execute(pool)
@@ -1009,4 +1100,232 @@ pub async fn list_employee_shift_history(
     .await?;
 
     Ok(rows.into_iter().filter_map(shift_record_from_row).collect())
+}
+
+// ─── Sync ───────────────────────────────────────────────────
+
+pub async fn get_sync_metadata(pool: &SqlitePool, key: &str) -> Result<Option<String>, sqlx::Error> {
+    sqlx::query_scalar("SELECT value FROM sync_metadata WHERE key = ?")
+        .bind(key)
+        .fetch_optional(pool)
+        .await
+}
+
+pub async fn set_sync_metadata(pool: &SqlitePool, key: &str, value: &str) -> Result<(), sqlx::Error> {
+    sqlx::query("INSERT INTO sync_metadata (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+        .bind(key)
+        .bind(value)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn insert_tombstone(pool: &SqlitePool, table_name: &str, record_id: i64) -> Result<i64, sqlx::Error> {
+    let now = chrono::Utc::now().to_rfc3339();
+    let result = sqlx::query("INSERT INTO sync_tombstones (table_name, record_id, deleted_at) VALUES (?, ?, ?)")
+        .bind(table_name)
+        .bind(record_id)
+        .bind(&now)
+        .execute(pool)
+        .await?;
+    Ok(result.last_insert_rowid())
+}
+
+pub async fn get_pending_tombstones(pool: &SqlitePool) -> Result<Vec<Tombstone>, sqlx::Error> {
+    let rows: Vec<(i64, String, i64, String)> = sqlx::query_as(
+        "SELECT id, table_name, record_id, deleted_at FROM sync_tombstones ORDER BY id",
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|(id, table_name, record_id, deleted_at)| Tombstone {
+            id,
+            table_name,
+            record_id,
+            deleted_at,
+        })
+        .collect())
+}
+
+pub async fn clear_tombstones(pool: &SqlitePool, ids: &[i64]) -> Result<(), sqlx::Error> {
+    if ids.is_empty() {
+        return Ok(());
+    }
+    let placeholders: String = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let sql = format!(
+        "DELETE FROM sync_tombstones WHERE id IN ({})",
+        placeholders
+    );
+    let mut query = sqlx::query(&sql);
+    for id in ids {
+        query = query.bind(id);
+    }
+    query.execute(pool).await?;
+    Ok(())
+}
+
+pub async fn get_pending_sync_records(
+    pool: &SqlitePool,
+    table_name: &str,
+) -> Result<Vec<SyncRecord>, sqlx::Error> {
+    let columns = syncable_columns(table_name);
+    let json_pairs: String = columns
+        .iter()
+        .map(|c| format!("'{}', {}", c, c))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let sql = format!(
+        "SELECT id, json_object({}) AS fields, last_modified FROM {} WHERE sync_status = 0",
+        json_pairs, table_name
+    );
+    let rows: Vec<(i64, String, String)> = sqlx::query_as(&sql).fetch_all(pool).await?;
+    Ok(rows
+        .into_iter()
+        .map(|(record_id, fields, last_modified)| SyncRecord {
+            table_name: table_name.to_string(),
+            record_id,
+            fields,
+            last_modified,
+        })
+        .collect())
+}
+
+fn syncable_columns(table_name: &str) -> Vec<&'static str> {
+    match table_name {
+        "employees" => vec![
+            "id", "first_name", "last_name", "nickname", "roles", "start_date",
+            "target_weekly_hours", "weekly_hours_deviation", "max_daily_hours", "notes",
+            "bank_details", "hourly_wage", "wage_currency", "default_availability",
+            "availability", "deleted", "last_modified",
+        ],
+        "shift_templates" => vec![
+            "id", "name", "weekdays", "start_time", "end_time", "required_role",
+            "min_employees", "max_employees", "deleted", "last_modified",
+        ],
+        "rotas" => vec!["id", "week_start", "finalized", "last_modified"],
+        "shifts" => vec![
+            "id", "template_id", "rota_id", "date", "start_time", "end_time",
+            "required_role", "min_employees", "max_employees", "last_modified",
+        ],
+        "assignments" => vec![
+            "id", "rota_id", "shift_id", "employee_id", "status", "employee_name",
+            "hourly_wage", "last_modified",
+        ],
+        "roles" => vec!["id", "name", "last_modified"],
+        "employee_availability_overrides" => vec![
+            "id", "employee_id", "date", "availability", "notes", "last_modified",
+        ],
+        "shift_template_overrides" => vec![
+            "id", "template_id", "date", "cancelled", "start_time", "end_time",
+            "min_employees", "max_employees", "notes", "last_modified",
+        ],
+        _ => vec![],
+    }
+}
+
+pub async fn mark_records_synced(
+    pool: &SqlitePool,
+    table_name: &str,
+    record_ids: &[i64],
+    base_snapshots: &[String],
+) -> Result<(), sqlx::Error> {
+    for (id, snapshot) in record_ids.iter().zip(base_snapshots.iter()) {
+        let sql = format!(
+            "UPDATE {} SET sync_status = 1, sync_base_snapshot = ? WHERE id = ?",
+            table_name
+        );
+        sqlx::query(&sql)
+            .bind(snapshot)
+            .bind(id)
+            .execute(pool)
+            .await?;
+    }
+    Ok(())
+}
+
+pub async fn get_base_snapshots(
+    pool: &SqlitePool,
+    table_name: &str,
+    record_ids: &[i64],
+) -> Result<Vec<BaseSnapshot>, sqlx::Error> {
+    if record_ids.is_empty() {
+        return Ok(vec![]);
+    }
+    let placeholders: String = record_ids
+        .iter()
+        .map(|_| "?")
+        .collect::<Vec<_>>()
+        .join(",");
+    let sql = format!(
+        "SELECT id, sync_base_snapshot FROM {} WHERE id IN ({}) AND sync_base_snapshot IS NOT NULL",
+        table_name, placeholders
+    );
+    let mut query = sqlx::query_as::<_, (i64, String)>(&sql);
+    for id in record_ids {
+        query = query.bind(id);
+    }
+    let rows = query.fetch_all(pool).await?;
+    Ok(rows
+        .into_iter()
+        .map(|(record_id, snapshot)| BaseSnapshot {
+            record_id,
+            snapshot,
+        })
+        .collect())
+}
+
+pub async fn apply_remote_record(
+    pool: &SqlitePool,
+    record: &SyncRecord,
+) -> Result<(), sqlx::Error> {
+    let columns = syncable_columns(&record.table_name);
+    let _fields: serde_json::Value = serde_json::from_str(&record.fields)
+        .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+
+    let exists: bool = sqlx::query_scalar(&format!(
+        "SELECT COUNT(*) > 0 FROM {} WHERE id = ?",
+        record.table_name
+    ))
+    .bind(record.record_id)
+    .fetch_one(pool)
+    .await?;
+
+    if exists {
+        let set_clauses: Vec<String> = columns
+            .iter()
+            .filter(|c| **c != "id")
+            .map(|c| format!("{} = json_extract(?, '$.{}')", c, c))
+            .collect();
+        let sql = format!(
+            "UPDATE {} SET {}, sync_status = 1, sync_base_snapshot = ? WHERE id = ?",
+            record.table_name,
+            set_clauses.join(", ")
+        );
+        let mut query = sqlx::query(&sql);
+        for _ in columns.iter().filter(|c| **c != "id") {
+            query = query.bind(&record.fields);
+        }
+        query = query.bind(&record.fields).bind(record.record_id);
+        query.execute(pool).await?;
+    } else {
+        let col_list = columns.join(", ");
+        let value_exprs: Vec<String> = columns
+            .iter()
+            .map(|c| format!("json_extract(?, '$.{}')", c))
+            .collect();
+        let sql = format!(
+            "INSERT INTO {} ({}, sync_status, sync_base_snapshot) VALUES ({}, 1, ?)",
+            record.table_name,
+            col_list,
+            value_exprs.join(", ")
+        );
+        let mut query = sqlx::query(&sql);
+        for _ in &columns {
+            query = query.bind(&record.fields);
+        }
+        query = query.bind(&record.fields);
+        query.execute(pool).await?;
+    }
+    Ok(())
 }
