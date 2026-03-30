@@ -74,3 +74,21 @@ pub fn make_shift(id: i64, date: NaiveDate, start: u32, end: u32, role: &str) ->
 pub async fn test_pool() -> sqlx::SqlitePool {
     db::connect("sqlite::memory:").await.unwrap()
 }
+
+/// Query the sync-tracking columns for a row directly (models don't expose these).
+/// Returns (sync_status, last_modified, sync_base_snapshot).
+pub async fn query_sync_status(
+    pool: &sqlx::SqlitePool,
+    table_name: &str,
+    id: i64,
+) -> (i64, String, Option<String>) {
+    let sql = format!(
+        "SELECT sync_status, last_modified, sync_base_snapshot FROM {} WHERE id = ?",
+        table_name
+    );
+    sqlx::query_as::<_, (i64, String, Option<String>)>(&sql)
+        .bind(id)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}

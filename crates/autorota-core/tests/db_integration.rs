@@ -6,11 +6,12 @@ use autorota_core::models::assignment::{Assignment, AssignmentStatus};
 use autorota_core::models::availability::{Availability, AvailabilityState};
 use autorota_core::models::employee::Employee;
 use autorota_core::models::shift::{Shift, ShiftTemplate};
+use autorota_core::models::sync::SyncRecord;
 use chrono::{NaiveDate, NaiveTime, Weekday};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::str::FromStr;
 
-use helpers::test_pool;
+use helpers::{query_sync_status, test_pool};
 
 /// The OLD schema (before weekdays migration) — uses `weekday` singular column
 /// and no ON DELETE CASCADE.
@@ -912,4 +913,301 @@ async fn list_employee_shift_history_returns_joined_records() {
     let emp2_id = queries::insert_employee(&pool, &emp2).await.unwrap();
     let empty = queries::list_employee_shift_history(&pool, emp2_id).await.unwrap();
     assert!(empty.is_empty());
+}
+
+// ── Sync tests ──
+
+#[sqlx::test]
+async fn apply_remote_record_inserts_new_row() {
+    let pool = test_pool().await;
+
+    let record = SyncRecord {
+        table_name: "roles".to_string(),
+        record_id: 999,
+        fields: r#"{"id": 999, "name": "RemoteRole", "last_modified": "2026-03-30T12:00:00Z"}"#
+            .to_string(),
+        last_modified: "2026-03-30T12:00:00Z".to_string(),
+    };
+
+    queries::apply_remote_record(&pool, &record).await.unwrap();
+
+    // Row should exist
+    let roles = queries::list_roles(&pool).await.unwrap();
+    assert!(roles.iter().any(|r| r.name == "RemoteRole"));
+
+    // Should be marked synced with base snapshot
+    let (status, _, snapshot) = query_sync_status(&pool, "roles", 999).await;
+    assert_eq!(status, 1, "remote records should arrive as synced");
+    assert!(snapshot.is_some(), "base snapshot should be stored");
+}
+
+#[sqlx::test]
+async fn apply_remote_record_updates_existing_row() {
+    let pool = test_pool().await;
+
+    let id = queries::insert_role(&pool, "LocalRole").await.unwrap();
+
+    let record = SyncRecord {
+        table_name: "roles".to_string(),
+        record_id: id,
+        fields: format!(
+            r#"{{"id": {}, "name": "RemoteUpdated", "last_modified": "2026-03-30T12:00:00Z"}}"#,
+            id
+        ),
+        last_modified: "2026-03-30T12:00:00Z".to_string(),
+    };
+
+    queries::apply_remote_record(&pool, &record).await.unwrap();
+
+    let roles = queries::list_roles(&pool).await.unwrap();
+    assert!(roles.iter().any(|r| r.name == "RemoteUpdated"));
+    assert!(!roles.iter().any(|r| r.name == "LocalRole"));
+
+    let (status, _, snapshot) = query_sync_status(&pool, "roles", id).await;
+    assert_eq!(status, 1);
+    assert!(snapshot.is_some());
+}
+
+#[sqlx::test]
+async fn sync_status_resets_on_local_update() {
+    let pool = test_pool().await;
+
+    let emp = helpers::make_employee(0, "Alice", "barista", AvailabilityState::Yes);
+    let id = queries::insert_employee(&pool, &emp).await.unwrap();
+
+    // Should start as pending
+    let (status, _, _) = query_sync_status(&pool, "employees", id).await;
+    assert_eq!(status, 0, "new record should be pending sync");
+
+    // Mark as synced
+    let snapshot = r#"{"first_name":"Alice"}"#.to_string();
+    queries::mark_records_synced(&pool, "employees", &[id], &[snapshot])
+        .await
+        .unwrap();
+
+    let (status, _, _) = query_sync_status(&pool, "employees", id).await;
+    assert_eq!(status, 1, "should be synced after mark");
+
+    // Update the employee — sync status should reset
+    let mut updated = emp.clone();
+    updated.id = id;
+    updated.first_name = "Alicia".to_string();
+    queries::update_employee(&pool, &updated).await.unwrap();
+
+    let (status, _, _) = query_sync_status(&pool, "employees", id).await;
+    assert_eq!(status, 0, "update should reset sync_status to pending");
+
+    // Should appear in pending sync records
+    let pending = queries::get_pending_sync_records(&pool, "employees")
+        .await
+        .unwrap();
+    assert!(pending.iter().any(|r| r.record_id == id));
+}
+
+#[sqlx::test]
+async fn last_modified_set_on_writes() {
+    let pool = test_pool().await;
+
+    let emp = helpers::make_employee(0, "Alice", "barista", AvailabilityState::Yes);
+    let id = queries::insert_employee(&pool, &emp).await.unwrap();
+
+    let (_, last_modified, _) = query_sync_status(&pool, "employees", id).await;
+    assert_ne!(
+        last_modified, "1970-01-01T00:00:00Z",
+        "last_modified should not be the migration default"
+    );
+    // Should be a parseable RFC 3339 timestamp
+    assert!(
+        chrono::DateTime::parse_from_rfc3339(&last_modified).is_ok(),
+        "last_modified should be valid RFC 3339: {}",
+        last_modified
+    );
+
+    let first_modified = last_modified;
+
+    // Update and check it changes
+    let mut updated = emp.clone();
+    updated.id = id;
+    updated.first_name = "Alicia".to_string();
+    queries::update_employee(&pool, &updated).await.unwrap();
+
+    let (_, last_modified, _) = query_sync_status(&pool, "employees", id).await;
+    assert!(
+        last_modified >= first_modified,
+        "last_modified should advance on update"
+    );
+}
+
+#[sqlx::test]
+async fn delete_rota_creates_cascade_tombstones() {
+    let pool = test_pool().await;
+
+    // Set up: employee + role + rota + shift + assignment
+    let _role_id = queries::insert_role(&pool, "barista").await.unwrap();
+    let emp = helpers::make_employee(0, "Alice", "barista", AvailabilityState::Yes);
+    let emp_id = queries::insert_employee(&pool, &emp).await.unwrap();
+
+    let week = helpers::week_start();
+    let rota_id = queries::insert_rota(&pool, week).await.unwrap();
+
+    let shift = Shift {
+        id: 0,
+        template_id: None,
+        rota_id,
+        date: week,
+        start_time: helpers::time(8),
+        end_time: helpers::time(16),
+        required_role: "barista".to_string(),
+        min_employees: 1,
+        max_employees: 1,
+    };
+    let shift_id = queries::insert_shift(&pool, &shift).await.unwrap();
+
+    let assignment = Assignment {
+        id: 0,
+        rota_id,
+        shift_id,
+        employee_id: emp_id,
+        status: AssignmentStatus::Confirmed,
+        employee_name: Some("Alice".to_string()),
+        hourly_wage: None,
+    };
+    let assignment_id = queries::insert_assignment(&pool, &assignment).await.unwrap();
+
+    // Clear any tombstones from prior operations
+    let prior = queries::get_pending_tombstones(&pool).await.unwrap();
+    if !prior.is_empty() {
+        let ids: Vec<i64> = prior.iter().map(|t| t.id).collect();
+        queries::clear_tombstones(&pool, &ids).await.unwrap();
+    }
+
+    // Delete the rota — should cascade and create tombstones
+    queries::delete_rota(&pool, rota_id).await.unwrap();
+
+    let tombstones = queries::get_pending_tombstones(&pool).await.unwrap();
+
+    // Should have tombstones for assignments, shifts, and the rota
+    assert!(
+        tombstones.iter().any(|t| t.table_name == "assignments" && t.record_id == assignment_id),
+        "should have tombstone for assignment"
+    );
+    assert!(
+        tombstones.iter().any(|t| t.table_name == "shifts" && t.record_id == shift_id),
+        "should have tombstone for shift"
+    );
+    assert!(
+        tombstones.iter().any(|t| t.table_name == "rotas" && t.record_id == rota_id),
+        "should have tombstone for rota"
+    );
+}
+
+#[sqlx::test]
+async fn soft_delete_sets_sync_pending_no_tombstone() {
+    let pool = test_pool().await;
+
+    let emp = helpers::make_employee(0, "Alice", "barista", AvailabilityState::Yes);
+    let id = queries::insert_employee(&pool, &emp).await.unwrap();
+
+    // Mark as synced
+    let snapshot = r#"{"first_name":"Alice"}"#.to_string();
+    queries::mark_records_synced(&pool, "employees", &[id], &[snapshot])
+        .await
+        .unwrap();
+
+    let (status, _, _) = query_sync_status(&pool, "employees", id).await;
+    assert_eq!(status, 1);
+
+    // Soft-delete
+    queries::delete_employee(&pool, id).await.unwrap();
+
+    // Should be pending sync again (deleted flag changed)
+    let (status, _, _) = query_sync_status(&pool, "employees", id).await;
+    assert_eq!(status, 0, "soft-delete should reset sync_status to pending");
+
+    // Should NOT have a tombstone (soft-delete, not hard-delete)
+    let tombstones = queries::get_pending_tombstones(&pool).await.unwrap();
+    assert!(
+        !tombstones.iter().any(|t| t.table_name == "employees" && t.record_id == id),
+        "soft-deleted employee should NOT have a tombstone"
+    );
+
+    // Should appear in pending sync records so the delete syncs
+    let pending = queries::get_pending_sync_records(&pool, "employees")
+        .await
+        .unwrap();
+    assert!(
+        pending.iter().any(|r| r.record_id == id),
+        "soft-deleted employee should be in pending sync records"
+    );
+}
+
+#[sqlx::test]
+async fn pending_sync_records_json_has_all_columns() {
+    let pool = test_pool().await;
+
+    // Insert one record per core table
+    let _role_id = queries::insert_role(&pool, "barista").await.unwrap();
+
+    let emp = helpers::make_employee(0, "Alice", "barista", AvailabilityState::Yes);
+    let emp_id = queries::insert_employee(&pool, &emp).await.unwrap();
+
+    let week = helpers::week_start();
+    let rota_id = queries::insert_rota(&pool, week).await.unwrap();
+
+    let shift = Shift {
+        id: 0,
+        template_id: None,
+        rota_id,
+        date: week,
+        start_time: helpers::time(8),
+        end_time: helpers::time(16),
+        required_role: "barista".to_string(),
+        min_employees: 1,
+        max_employees: 1,
+    };
+    let shift_id = queries::insert_shift(&pool, &shift).await.unwrap();
+
+    let assignment = Assignment {
+        id: 0,
+        rota_id,
+        shift_id,
+        employee_id: emp_id,
+        status: AssignmentStatus::Confirmed,
+        employee_name: Some("Alice".to_string()),
+        hourly_wage: None,
+    };
+    queries::insert_assignment(&pool, &assignment).await.unwrap();
+
+    // Check JSON fields for each table
+    let tables = vec!["roles", "employees", "rotas", "shifts", "assignments"];
+    for table in tables {
+        let records = queries::get_pending_sync_records(&pool, table)
+            .await
+            .unwrap();
+        assert!(
+            !records.is_empty(),
+            "should have pending records for {}",
+            table
+        );
+
+        let record = &records[0];
+        let json: serde_json::Value = serde_json::from_str(&record.fields).unwrap_or_else(|e| {
+            panic!("invalid JSON for {}: {} — fields: {}", table, e, record.fields)
+        });
+        let obj = json.as_object().unwrap_or_else(|| {
+            panic!("fields for {} should be a JSON object", table)
+        });
+
+        // Verify all expected columns are present as keys
+        let expected_columns = queries::syncable_columns(table);
+        for col in &expected_columns {
+            assert!(
+                obj.contains_key(*col),
+                "JSON for {} is missing column '{}'. Keys present: {:?}",
+                table,
+                col,
+                obj.keys().collect::<Vec<_>>()
+            );
+        }
+    }
 }

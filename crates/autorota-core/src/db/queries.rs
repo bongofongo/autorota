@@ -1191,7 +1191,7 @@ pub async fn get_pending_sync_records(
         .collect())
 }
 
-fn syncable_columns(table_name: &str) -> Vec<&'static str> {
+pub fn syncable_columns(table_name: &str) -> Vec<&'static str> {
     match table_name {
         "employees" => vec![
             "id", "first_name", "last_name", "nickname", "roles", "start_date",
