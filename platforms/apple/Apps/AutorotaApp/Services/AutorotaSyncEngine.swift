@@ -20,7 +20,6 @@ final class AutorotaSyncEngine: @unchecked Sendable {
         do {
             let config = try await loadOrCreateConfiguration()
             let engine = CKSyncEngine(config)
-            engine.delegate = self
             self.engine = engine
             logger.info("CKSyncEngine started")
         } catch {
@@ -100,7 +99,7 @@ final class AutorotaSyncEngine: @unchecked Sendable {
 
 extension AutorotaSyncEngine: CKSyncEngineDelegate {
 
-    func handleEvent(_ event: CKSyncEngine.Event) {
+    func handleEvent(_ event: CKSyncEngine.Event, syncEngine: CKSyncEngine) async {
         switch event {
         case .stateUpdate(let stateUpdate):
             saveEngineState(stateUpdate.stateSerialization)
@@ -127,6 +126,12 @@ extension AutorotaSyncEngine: CKSyncEngineDelegate {
         case .willFetchChanges:
             status = .syncing
 
+        case .willFetchRecordZoneChanges:
+            break
+
+        case .didFetchRecordZoneChanges:
+            break
+
         case .didFetchChanges:
             status = .idle
 
@@ -142,10 +147,11 @@ extension AutorotaSyncEngine: CKSyncEngineDelegate {
     }
 
     func nextRecordZoneChangeBatch(
-        _ context: CKSyncEngine.SendChangesContext
+        _ context: CKSyncEngine.SendChangesContext,
+        syncEngine: CKSyncEngine
     ) async -> CKSyncEngine.RecordZoneChangeBatch? {
         let scope = context.options.scope
-        let allPendingChanges = engine?.state.pendingRecordZoneChanges ?? []
+        let allPendingChanges = syncEngine.state.pendingRecordZoneChanges
         let filteredChanges = allPendingChanges.filter { scope.contains($0) }
         guard !filteredChanges.isEmpty else { return nil }
 
