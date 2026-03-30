@@ -1,35 +1,21 @@
 import SwiftUI
 
 struct ContentView: View {
+    @State private var layoutManager = TabLayoutManager()
+
     var body: some View {
         TabView {
-            RotaView()
-                .tabItem {
-                    Label("Rota", systemImage: "calendar")
-                }
-
-            EmployeeListView()
-                .tabItem {
-                    Label("Employees", systemImage: "person.2")
-                }
-
-            ShiftTemplateListView()
-                .tabItem {
-                    Label("Templates", systemImage: "clock")
-                }
-
-            OverridesTabView()
-                .tabItem {
-                    Label("Overrides", systemImage: "exclamationmark.circle")
-                }
-
-            SettingsView()
-                .tabItem {
-                    Label("Settings", systemImage: "gear")
-                }
+            ForEach(layoutManager.tabBarPages) { page in
+                page.destinationView
+                    .tabItem {
+                        Label(page.title, systemImage: page.systemImage)
+                    }
+                    .tag(page)
+            }
         }
         #if os(macOS)
         .tabViewStyle(.sidebarAdaptable)
         #endif
+        .environment(layoutManager)
     }
 }
