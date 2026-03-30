@@ -241,6 +241,36 @@ pub struct FfiExportResult {
     pub mime_type: String,
 }
 
+// ── Sync ──────────────────────────────────────────────────────────────────────
+
+#[derive(Clone, uniffi::Record)]
+pub struct FfiSyncRecord {
+    pub table_name: String,
+    pub record_id: i64,
+    pub fields: String,
+    pub last_modified: String,
+}
+
+#[derive(Clone, uniffi::Record)]
+pub struct FfiMergeConflict {
+    pub record_id: i64,
+    pub resolved_fields: String,
+}
+
+#[derive(Clone, uniffi::Record)]
+pub struct FfiBaseSnapshot {
+    pub record_id: i64,
+    pub snapshot: String,
+}
+
+#[derive(Clone, uniffi::Record)]
+pub struct FfiTombstone {
+    pub id: i64,
+    pub table_name: String,
+    pub record_id: i64,
+    pub deleted_at: String,
+}
+
 /// Date-specific modification to a recurring shift template on one calendar date.
 #[derive(Clone, uniffi::Record)]
 pub struct FfiShiftTemplateOverride {

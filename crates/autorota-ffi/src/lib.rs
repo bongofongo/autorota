@@ -820,6 +820,105 @@ pub fn export_week_schedule(
     })
 }
 
+// ── Sync ─────────────────────────────────────────────────────────────────────
+
+use autorota_core::models::sync::SyncRecord;
+
+#[uniffi::export]
+pub fn get_pending_sync_records(table_name: String) -> Result<Vec<FfiSyncRecord>, FfiError> {
+    let pool = pool()?;
+    let records = rt()
+        .block_on(queries::get_pending_sync_records(pool, &table_name))
+        .map_err(FfiError::from)?;
+    Ok(records.into_iter().map(|r| FfiSyncRecord {
+        table_name: r.table_name,
+        record_id: r.record_id,
+        fields: r.fields,
+        last_modified: r.last_modified,
+    }).collect())
+}
+
+#[uniffi::export]
+pub fn mark_records_synced(table_name: String, record_ids: Vec<i64>, base_snapshots: Vec<String>) -> Result<(), FfiError> {
+    let pool = pool()?;
+    rt().block_on(queries::mark_records_synced(pool, &table_name, &record_ids, &base_snapshots))
+        .map_err(FfiError::from)?;
+    Ok(())
+}
+
+#[uniffi::export]
+pub fn apply_remote_record(record: FfiSyncRecord) -> Result<(), FfiError> {
+    let pool = pool()?;
+    let core_record = SyncRecord {
+        table_name: record.table_name,
+        record_id: record.record_id,
+        fields: record.fields,
+        last_modified: record.last_modified,
+    };
+    rt().block_on(queries::apply_remote_record(pool, &core_record))
+        .map_err(FfiError::from)?;
+    Ok(())
+}
+
+#[uniffi::export]
+pub fn get_sync_metadata(key: String) -> Result<Option<String>, FfiError> {
+    let pool = pool()?;
+    rt().block_on(queries::get_sync_metadata(pool, &key))
+        .map_err(FfiError::from)
+}
+
+#[uniffi::export]
+pub fn set_sync_metadata(key: String, value: String) -> Result<(), FfiError> {
+    let pool = pool()?;
+    rt().block_on(queries::set_sync_metadata(pool, &key, &value))
+        .map_err(FfiError::from)?;
+    Ok(())
+}
+
+#[uniffi::export]
+pub fn get_base_snapshots(table_name: String, record_ids: Vec<i64>) -> Result<Vec<FfiBaseSnapshot>, FfiError> {
+    let pool = pool()?;
+    let snapshots = rt()
+        .block_on(queries::get_base_snapshots(pool, &table_name, &record_ids))
+        .map_err(FfiError::from)?;
+    Ok(snapshots.into_iter().map(|s| FfiBaseSnapshot {
+        record_id: s.record_id,
+        snapshot: s.snapshot,
+    }).collect())
+}
+
+#[uniffi::export]
+pub fn get_pending_tombstones() -> Result<Vec<FfiTombstone>, FfiError> {
+    let pool = pool()?;
+    let tombstones = rt()
+        .block_on(queries::get_pending_tombstones(pool))
+        .map_err(FfiError::from)?;
+    Ok(tombstones.into_iter().map(|t| FfiTombstone {
+        id: t.id,
+        table_name: t.table_name,
+        record_id: t.record_id,
+        deleted_at: t.deleted_at,
+    }).collect())
+}
+
+#[uniffi::export]
+pub fn clear_tombstones(ids: Vec<i64>) -> Result<(), FfiError> {
+    let pool = pool()?;
+    rt().block_on(queries::clear_tombstones(pool, &ids))
+        .map_err(FfiError::from)?;
+    Ok(())
+}
+
+/// Returns the count of employees in the database (used for first-launch detection).
+#[uniffi::export]
+pub fn count_employees() -> Result<i64, FfiError> {
+    let pool = pool()?;
+    let count: i64 = rt()
+        .block_on(sqlx::query_scalar("SELECT COUNT(*) FROM employees").fetch_one(pool))
+        .map_err(FfiError::from)?;
+    Ok(count)
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
