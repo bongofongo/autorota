@@ -140,6 +140,10 @@ pub struct FfiWeekSchedule {
     pub rota_id: i64,
     pub week_start: String,
     pub finalized: bool,
+    /// Whether this rota has at least one commit.
+    pub committed: bool,
+    /// Shift IDs that are currently staged for commit.
+    pub staged_shift_ids: Vec<i64>,
     pub entries: Vec<FfiScheduleEntry>,
     pub shifts: Vec<FfiShiftInfo>,
 }
@@ -194,6 +198,38 @@ pub struct FfiEmployeeShiftRecord {
     /// "YYYY-MM-DD" — Monday of the rota week this shift belongs to.
     pub week_start: String,
     pub finalized: bool,
+}
+
+// ── Staging & Commits ────────────────────────────────────────────────────────
+
+/// Current staging state for a rota.
+#[derive(Clone, uniffi::Record)]
+pub struct FfiStagingState {
+    pub rota_id: i64,
+    pub staged_shift_ids: Vec<i64>,
+    pub total_stageable_past_shift_ids: Vec<i64>,
+}
+
+/// A commit record (for list views — excludes the full snapshot JSON).
+#[derive(Clone, uniffi::Record)]
+pub struct FfiCommit {
+    pub id: i64,
+    pub rota_id: i64,
+    pub committed_at: String,
+    pub summary: String,
+    /// Denormalized from the rota for display convenience.
+    pub week_start: String,
+}
+
+/// A commit record with the full snapshot JSON (for detail views).
+#[derive(Clone, uniffi::Record)]
+pub struct FfiCommitDetail {
+    pub id: i64,
+    pub rota_id: i64,
+    pub committed_at: String,
+    pub summary: String,
+    pub week_start: String,
+    pub snapshot_json: String,
 }
 
 // ── Overrides ─────────────────────────────────────────────────────────────────

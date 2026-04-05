@@ -35,6 +35,10 @@ final class RotaViewModel {
     // Past lock
     var pastUnlocked = false
 
+    // Staging
+    var isStagingMode = false
+    var stagedShiftIds: Set<Int64> = []
+
     let service: AutorotaServiceProtocol
 
     init(service: AutorotaServiceProtocol = LiveAutorotaService()) {
@@ -62,6 +66,11 @@ final class RotaViewModel {
         error = nil
         do {
             schedule = try await service.getWeekSchedule(weekStart: selectedWeekStart)
+            if let s = schedule {
+                stagedShiftIds = Set(s.stagedShiftIds)
+            } else {
+                stagedShiftIds = []
+            }
         } catch {
             self.error = error.localizedDescription
         }
@@ -156,6 +165,7 @@ final class RotaViewModel {
 
     func resetModes() {
         isEditMode = false
+        isStagingMode = false
         pastUnlocked = false
         showGenerateConfirmation = false
         showDeleteScheduleConfirmation = false
@@ -334,6 +344,107 @@ final class RotaViewModel {
     func availableEmployees(for shiftId: Int64) -> [FfiEmployee] {
         let assignedIds = Set(assignments(for: shiftId).map(\.employeeId))
         return employees.filter { !assignedIds.contains($0.id) }
+    }
+
+    // MARK: - Staging
+
+    /// Whether this rota has been committed at least once.
+    var isCommitted: Bool {
+        schedule?.committed ?? false
+    }
+
+    var stagedCount: Int { stagedShiftIds.count }
+    var hasStaged: Bool { !stagedShiftIds.isEmpty }
+
+    func isShiftStaged(_ shiftId: Int64) -> Bool {
+        stagedShiftIds.contains(shiftId)
+    }
+
+    func toggleShiftStaged(_ shiftId: Int64) async {
+        do {
+            if stagedShiftIds.contains(shiftId) {
+                try await service.unstageShifts(shiftIds: [shiftId])
+                stagedShiftIds.remove(shiftId)
+            } else {
+                try await service.stageShifts(shiftIds: [shiftId])
+                stagedShiftIds.insert(shiftId)
+            }
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func stageDay(_ weekday: String) async {
+        guard let rotaId = schedule?.rotaId else { return }
+        let date = dateForWeekday(weekday)
+        do {
+            try await service.stageDay(rotaId: rotaId, date: date)
+            await loadStagingState()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func unstageDay(_ weekday: String) async {
+        guard let rotaId = schedule?.rotaId else { return }
+        let date = dateForWeekday(weekday)
+        do {
+            try await service.unstageDay(rotaId: rotaId, date: date)
+            await loadStagingState()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func stageAllPast() async {
+        guard let rotaId = schedule?.rotaId else { return }
+        do {
+            try await service.stageWeek(rotaId: rotaId)
+            await loadStagingState()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func unstageAll() async {
+        guard let rotaId = schedule?.rotaId else { return }
+        do {
+            try await service.unstageWeek(rotaId: rotaId)
+            stagedShiftIds = []
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func commitStaged() async {
+        guard let rotaId = schedule?.rotaId else { return }
+        do {
+            _ = try await service.commitStagedShifts(rotaId: rotaId)
+            stagedShiftIds = []
+            isStagingMode = false
+            await loadSchedule()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    func enterStagingMode() {
+        isStagingMode = true
+        isEditMode = false
+    }
+
+    func exitStagingMode() {
+        isStagingMode = false
+    }
+
+    private func loadStagingState() async {
+        guard let rotaId = schedule?.rotaId else { return }
+        do {
+            let state = try await service.getStagingState(rotaId: rotaId)
+            stagedShiftIds = Set(state.stagedShiftIds)
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 
     // MARK: - Private helpers

@@ -5,11 +5,12 @@ struct RotaView: View {
 
     @State private var vm = RotaViewModel()
     @State private var showExportSheet = false
+    @State private var showToolbarOptions = false
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                WeekPickerView(selectedWeek: $vm.selectedWeekStart, category: vm.weekCategory)
+                WeekPickerView(selectedWeek: $vm.selectedWeekStart, category: vm.weekCategory, isCommitted: vm.isCommitted)
                     .padding(.horizontal)
                     .padding(.vertical, 8)
                     .onChange(of: vm.selectedWeekStart) { _, _ in
@@ -41,53 +42,101 @@ struct RotaView: View {
             #endif
             .toolbar {
                 ToolbarItemGroup(placement: .primaryAction) {
-                    // Past lock/unlock (only in edit mode when week has past days)
-                    if vm.isEditMode && vm.weekHasPastDays {
+                    if vm.isStagingMode {
+                        // --- Staging mode toolbar ---
                         Button {
-                            vm.pastUnlocked.toggle()
+                            vm.exitStagingMode()
                         } label: {
-                            Image(systemName: vm.pastUnlocked ? "lock.open.fill" : "lock.fill")
+                            Image(systemName: "checkmark")
                         }
-                        .tint(vm.pastUnlocked ? .orange : .secondary)
-                    }
+                    } else if vm.isEditMode {
+                        // --- Edit mode toolbar ---
 
-                    // Delete schedule (past/current weeks, edit mode only)
-                    if vm.isEditMode && vm.weekCategory != .future {
-                        Button("Delete Schedule", systemImage: "trash") {
-                            vm.showDeleteScheduleConfirmation = true
+                        // Past lock/unlock (only when week has past days)
+                        if vm.weekHasPastDays {
+                            Button {
+                                vm.pastUnlocked.toggle()
+                            } label: {
+                                Image(systemName: vm.pastUnlocked ? "lock.open.fill" : "lock.fill")
+                            }
+                            .tint(vm.pastUnlocked ? .orange : .secondary)
                         }
-                        .tint(.red)
-                    }
 
-                    // Export
-                    if vm.schedule != nil {
+                        // Delete schedule (past/current weeks only)
+                        if vm.weekCategory != .future {
+                            Button {
+                                vm.showDeleteScheduleConfirmation = true
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .tint(.red)
+                        }
+
+                        // Done (checkmark)
                         Button {
-                            showExportSheet = true
+                            vm.exitEditMode()
                         } label: {
-                            Image(systemName: "square.and.arrow.up")
+                            Image(systemName: "checkmark")
                         }
-                    }
+                    } else {
+                        // --- Normal mode toolbar ---
 
-                    // Edit / Done toggle
-                    if vm.schedule != nil {
-                        Button(vm.isEditMode ? "Done" : "Edit") {
-                            if vm.isEditMode {
-                                vm.exitEditMode()
-                            } else {
-                                Task { await vm.enterEditMode() }
+                        if vm.isScheduling {
+                            ProgressView()
+                        } else {
+                            // Expanded option icons (appear to the left of the dots)
+                            if showToolbarOptions {
+                                if vm.schedule != nil {
+                                    // Stage button (only for weeks with past days)
+                                    if vm.weekHasPastDays {
+                                        Button {
+                                            vm.enterStagingMode()
+                                            showToolbarOptions = false
+                                        } label: {
+                                            Image(systemName: "tray.and.arrow.down")
+                                        }
+                                    }
+
+                                    Button {
+                                        Task { await vm.enterEditMode() }
+                                        showToolbarOptions = false
+                                    } label: {
+                                        Image(systemName: "pencil")
+                                    }
+
+                                    Button {
+                                        showExportSheet = true
+                                        showToolbarOptions = false
+                                    } label: {
+                                        Image(systemName: "square.and.arrow.up")
+                                    }
+                                }
+
+                                Button {
+                                    Task { await vm.runSchedule() }
+                                    showToolbarOptions = false
+                                } label: {
+                                    Image(systemName: "wand.and.stars")
+                                }
+                            }
+
+                            // Dots toggle
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    showToolbarOptions.toggle()
+                                }
+                            } label: {
+                                Image(systemName: showToolbarOptions ? "xmark.circle" : "ellipsis.circle")
                             }
                         }
                     }
-
-                    // Generate
-                    if vm.isScheduling {
-                        ProgressView()
-                    } else {
-                        Button("Generate", systemImage: "wand.and.stars") {
-                            Task { await vm.runSchedule() }
-                        }
-                    }
                 }
+            }
+            .onChange(of: vm.isEditMode) { _, _ in
+                showToolbarOptions = false
+            }
+            .onChange(of: vm.selectedWeekStart) { _, _ in
+                showToolbarOptions = false
             }
             .alert(
                 "No schedule for \(vm.weekDateRangeLabel)",
@@ -139,6 +188,7 @@ struct RotaView: View {
 private struct WeekPickerView: View {
     @Binding var selectedWeek: String
     let category: WeekCategory
+    var isCommitted: Bool = false
 
     var body: some View {
         HStack {
@@ -150,6 +200,15 @@ private struct WeekPickerView: View {
                 Text("Week of \(selectedWeek)")
                     .font(.subheadline.bold())
                 CategoryBadge(category: category)
+                if isCommitted {
+                    Text("Committed")
+                        .font(.caption2.bold())
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.green.opacity(0.2))
+                        .foregroundStyle(.green)
+                        .clipShape(Capsule())
+                }
             }
             Spacer()
             Button(action: { selectedWeek = shifted(by: 1) }) {
@@ -226,7 +285,28 @@ private struct ScheduleGridView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            if vm.hasSwapSource {
+            if vm.isStagingMode {
+                HStack(spacing: 12) {
+                    Image(systemName: "tray.and.arrow.down")
+                    Text("\(vm.stagedCount) shift\(vm.stagedCount == 1 ? "" : "s") staged")
+                        .font(.subheadline)
+                    Spacer()
+                    Button("Stage All") {
+                        Task { await vm.stageAllPast() }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    Button("Commit") {
+                        Task { await vm.commitStaged() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(!vm.hasStaged)
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 10)
+                .background(.regularMaterial)
+            } else if vm.hasSwapSource {
                 HStack {
                     Image(systemName: "arrow.left.arrow.right")
                     Text("Tap a highlighted employee to swap")
@@ -301,10 +381,21 @@ private struct ScheduleGridView: View {
                             HStack {
                                 Text(day)
                                     .font(.headline)
-                                if vm.isDayPast(day) {
+                                if vm.isDayPast(day) && !vm.isStagingMode {
                                     Image(systemName: vm.pastUnlocked ? "lock.open" : "lock")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                if vm.isStagingMode && vm.isDayPast(day) {
+                                    Button {
+                                        Task { await vm.stageDay(day) }
+                                    } label: {
+                                        Text("Stage Day")
+                                            .font(.caption2)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.mini)
                                 }
                             }
                             .padding(.horizontal)
@@ -349,12 +440,22 @@ private struct ScheduleGridView: View {
             HStack(spacing: 4) {
                 Text(day)
                     .font(.headline)
-                if vm.isDayPast(day) {
+                if vm.isDayPast(day) && !vm.isStagingMode {
                     Image(systemName: vm.pastUnlocked ? "lock.open" : "lock")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
+                if vm.isStagingMode && vm.isDayPast(day) {
+                    Button {
+                        Task { await vm.stageDay(day) }
+                    } label: {
+                        Text("Stage")
+                            .font(.caption2)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.mini)
+                }
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
@@ -417,11 +518,24 @@ private struct ShiftCard: View {
     var isCompact: Bool = false
 
     private var canEdit: Bool { isEditMode && !isLocked }
+    private var isStageable: Bool { vm.isStagingMode && vm.isShiftPast(shift) }
+    private var isStaged: Bool { vm.isShiftStaged(shift.id) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             // Header row
             HStack {
+                // Staging checkbox
+                if isStageable {
+                    Button {
+                        Task { await vm.toggleShiftStaged(shift.id) }
+                    } label: {
+                        Image(systemName: isStaged ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(isStaged ? .green : .secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+
                 VStack(alignment: .leading, spacing: 2) {
                     if canEdit {
                         Button(action: onEditTimes) {

@@ -172,5 +172,17 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         sqlx::raw_sql(m11).execute(pool).await?;
     }
 
+    // Migration 012: add staged_shifts and commits tables for git-like staging/commit workflow.
+    let has_commits_table: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='commits'",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    if !has_commits_table {
+        let m12 = include_str!("../../migrations/012_staging_commits.sql");
+        sqlx::raw_sql(m12).execute(pool).await?;
+    }
+
     Ok(())
 }

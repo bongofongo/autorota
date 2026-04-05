@@ -58,6 +58,19 @@ protocol AutorotaServiceProtocol: Sendable {
     func listAllShiftTemplateOverrides() async throws -> [FfiShiftTemplateOverride]
     func deleteShiftTemplateOverride(id: Int64) async throws
 
+    // Staging & Commits
+    func stageShifts(shiftIds: [Int64]) async throws
+    func stageDay(rotaId: Int64, date: String) async throws
+    func stageWeek(rotaId: Int64) async throws
+    func unstageShifts(shiftIds: [Int64]) async throws
+    func unstageDay(rotaId: Int64, date: String) async throws
+    func unstageWeek(rotaId: Int64) async throws
+    func getStagingState(rotaId: Int64) async throws -> FfiStagingState
+    func commitStagedShifts(rotaId: Int64) async throws -> Int64
+    func listCommits(rotaId: Int64?) async throws -> [FfiCommit]
+    func getCommitDetail(commitId: Int64) async throws -> FfiCommitDetail?
+    func rotaIsCommitted(rotaId: Int64) async throws -> Bool
+
     // Export
     func exportWeekSchedule(weekStart: String, config: FfiExportConfig) async throws -> FfiExportResult
 }

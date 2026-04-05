@@ -7,7 +7,9 @@ use autorota_core::db::{self, queries};
 use autorota_core::models::assignment::{Assignment, AssignmentStatus};
 use autorota_core::models::availability::{Availability, AvailabilityState};
 use autorota_core::models::employee::Employee;
-use autorota_core::models::overrides::{DayAvailability, EmployeeAvailabilityOverride, ShiftTemplateOverride};
+use autorota_core::models::overrides::{
+    DayAvailability, EmployeeAvailabilityOverride, ShiftTemplateOverride,
+};
 use autorota_core::models::rota::Rota;
 use autorota_core::models::shift::{Shift, ShiftTemplate};
 use autorota_core::models::shift_history::EmployeeShiftRecord;
@@ -30,21 +32,25 @@ fn rt() -> &'static Runtime {
 }
 
 fn pool() -> Result<&'static SqlitePool, FfiError> {
-    POOL.get()
-        .ok_or_else(|| FfiError::Db { msg: "database not initialized — call initDb first".into() })
+    POOL.get().ok_or_else(|| FfiError::Db {
+        msg: "database not initialized — call initDb first".into(),
+    })
 }
 
 // ── String ↔ chrono conversions ───────────────────────────────────────────────
 
 fn parse_date(s: &str) -> Result<NaiveDate, FfiError> {
-    NaiveDate::parse_from_str(s, "%Y-%m-%d")
-        .map_err(|e| FfiError::InvalidArgument { msg: format!("invalid date '{s}': {e}") })
+    NaiveDate::parse_from_str(s, "%Y-%m-%d").map_err(|e| FfiError::InvalidArgument {
+        msg: format!("invalid date '{s}': {e}"),
+    })
 }
 
 fn parse_time(s: &str) -> Result<NaiveTime, FfiError> {
     NaiveTime::parse_from_str(s, "%H:%M")
         .or_else(|_| NaiveTime::parse_from_str(s, "%H:%M:%S"))
-        .map_err(|e| FfiError::InvalidArgument { msg: format!("invalid time '{s}': {e}") })
+        .map_err(|e| FfiError::InvalidArgument {
+            msg: format!("invalid time '{s}': {e}"),
+        })
 }
 
 fn weekday_to_str(wd: Weekday) -> &'static str {
@@ -68,7 +74,9 @@ fn weekday_from_str(s: &str) -> Result<Weekday, FfiError> {
         "Fri" => Ok(Weekday::Fri),
         "Sat" => Ok(Weekday::Sat),
         "Sun" => Ok(Weekday::Sun),
-        other => Err(FfiError::InvalidArgument { msg: format!("invalid weekday: {other}") }),
+        other => Err(FfiError::InvalidArgument {
+            msg: format!("invalid weekday: {other}"),
+        }),
     }
 }
 
@@ -150,7 +158,11 @@ fn shift_template_to_ffi(t: ShiftTemplate) -> FfiShiftTemplate {
     FfiShiftTemplate {
         id: t.id,
         name: t.name,
-        weekdays: t.weekdays.iter().map(|&wd| weekday_to_str(wd).to_string()).collect(),
+        weekdays: t
+            .weekdays
+            .iter()
+            .map(|&wd| weekday_to_str(wd).to_string())
+            .collect(),
         start_time: t.start_time.format("%H:%M").to_string(),
         end_time: t.end_time.format("%H:%M").to_string(),
         required_role: t.required_role,
@@ -250,8 +262,9 @@ pub fn init_db(db_path: String) -> Result<(), FfiError> {
     let pool = rt()
         .block_on(db::connect(&url))
         .map_err(|e| FfiError::Db { msg: e.to_string() })?;
-    POOL.set(pool)
-        .map_err(|_| FfiError::Db { msg: "database already initialized".into() })
+    POOL.set(pool).map_err(|_| FfiError::Db {
+        msg: "database already initialized".into(),
+    })
 }
 
 // ── Employees ─────────────────────────────────────────────────────────────────
@@ -307,7 +320,10 @@ pub fn list_roles() -> Result<Vec<FfiRole>, FfiError> {
         .map_err(FfiError::from)?;
     Ok(rows
         .into_iter()
-        .map(|r| FfiRole { id: r.id, name: r.name })
+        .map(|r| FfiRole {
+            id: r.id,
+            name: r.name,
+        })
         .collect())
 }
 
@@ -468,11 +484,10 @@ pub fn move_assignment(id: i64, new_shift_id: i64) -> Result<(), FfiError> {
         }
 
         // Check capacity
-        let count: (i64,) =
-            sqlx::query_as("SELECT COUNT(*) FROM assignments WHERE shift_id = ?")
-                .bind(new_shift_id)
-                .fetch_one(pool)
-                .await?;
+        let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM assignments WHERE shift_id = ?")
+            .bind(new_shift_id)
+            .fetch_one(pool)
+            .await?;
 
         if count.0 >= target.2 as i64 {
             return Err(sqlx::Error::Protocol("target shift is at capacity".into()));
@@ -487,21 +502,19 @@ pub fn move_assignment(id: i64, new_shift_id: i64) -> Result<(), FfiError> {
 pub fn swap_assignments(id_a: i64, id_b: i64) -> Result<(), FfiError> {
     let pool = pool()?;
     rt().block_on(async {
-        let a = sqlx::query_as::<_, (i64, i64)>(
-            "SELECT id, shift_id FROM assignments WHERE id = ?",
-        )
-        .bind(id_a)
-        .fetch_optional(pool)
-        .await?
-        .ok_or_else(|| sqlx::Error::RowNotFound)?;
+        let a =
+            sqlx::query_as::<_, (i64, i64)>("SELECT id, shift_id FROM assignments WHERE id = ?")
+                .bind(id_a)
+                .fetch_optional(pool)
+                .await?
+                .ok_or_else(|| sqlx::Error::RowNotFound)?;
 
-        let b = sqlx::query_as::<_, (i64, i64)>(
-            "SELECT id, shift_id FROM assignments WHERE id = ?",
-        )
-        .bind(id_b)
-        .fetch_optional(pool)
-        .await?
-        .ok_or_else(|| sqlx::Error::RowNotFound)?;
+        let b =
+            sqlx::query_as::<_, (i64, i64)>("SELECT id, shift_id FROM assignments WHERE id = ?")
+                .bind(id_b)
+                .fetch_optional(pool)
+                .await?
+                .ok_or_else(|| sqlx::Error::RowNotFound)?;
 
         queries::swap_assignment_shifts(pool, a.0, a.1, b.0, b.1).await
     })
@@ -655,11 +668,17 @@ pub fn run_schedule(week_start: String) -> Result<FfiScheduleResult, FfiError> {
             autorota_core::scheduler::SchedulerError::AlreadyFinalized(_) => {
                 FfiError::AlreadyFinalized
             }
-            other => FfiError::Db { msg: other.to_string() },
+            other => FfiError::Db {
+                msg: other.to_string(),
+            },
         })?;
 
     Ok(FfiScheduleResult {
-        assignments: result.assignments.into_iter().map(assignment_to_ffi).collect(),
+        assignments: result
+            .assignments
+            .into_iter()
+            .map(assignment_to_ffi)
+            .collect(),
         warnings: result
             .warnings
             .into_iter()
@@ -735,10 +754,15 @@ pub fn get_week_schedule(week_start: String) -> Result<Option<FfiWeekSchedule>, 
             })
             .collect();
 
+        let committed = queries::rota_has_commits(pool, rota.id).await?;
+        let staged_shift_ids = queries::list_staged_shift_ids(pool, rota.id).await?;
+
         Ok(Some(FfiWeekSchedule {
             rota_id: rota.id,
             week_start: rota.week_start.to_string(),
             finalized: rota.finalized,
+            committed,
+            staged_shift_ids,
             entries,
             shifts: shift_infos,
         }))
@@ -805,12 +829,10 @@ pub fn export_week_schedule(
             core_config,
         ))
         .map_err(|e| match e {
-            autorota_core::export::ExportError::Db(db_err) => {
-                FfiError::Db { msg: db_err.to_string() }
-            }
-            autorota_core::export::ExportError::NoSchedule(msg) => {
-                FfiError::NotFound { msg }
-            }
+            autorota_core::export::ExportError::Db(db_err) => FfiError::Db {
+                msg: db_err.to_string(),
+            },
+            autorota_core::export::ExportError::NoSchedule(msg) => FfiError::NotFound { msg },
         })?;
 
     Ok(FfiExportResult {
@@ -830,19 +852,31 @@ pub fn get_pending_sync_records(table_name: String) -> Result<Vec<FfiSyncRecord>
     let records = rt()
         .block_on(queries::get_pending_sync_records(pool, &table_name))
         .map_err(FfiError::from)?;
-    Ok(records.into_iter().map(|r| FfiSyncRecord {
-        table_name: r.table_name,
-        record_id: r.record_id,
-        fields: r.fields,
-        last_modified: r.last_modified,
-    }).collect())
+    Ok(records
+        .into_iter()
+        .map(|r| FfiSyncRecord {
+            table_name: r.table_name,
+            record_id: r.record_id,
+            fields: r.fields,
+            last_modified: r.last_modified,
+        })
+        .collect())
 }
 
 #[uniffi::export]
-pub fn mark_records_synced(table_name: String, record_ids: Vec<i64>, base_snapshots: Vec<String>) -> Result<(), FfiError> {
+pub fn mark_records_synced(
+    table_name: String,
+    record_ids: Vec<i64>,
+    base_snapshots: Vec<String>,
+) -> Result<(), FfiError> {
     let pool = pool()?;
-    rt().block_on(queries::mark_records_synced(pool, &table_name, &record_ids, &base_snapshots))
-        .map_err(FfiError::from)?;
+    rt().block_on(queries::mark_records_synced(
+        pool,
+        &table_name,
+        &record_ids,
+        &base_snapshots,
+    ))
+    .map_err(FfiError::from)?;
     Ok(())
 }
 
@@ -876,15 +910,21 @@ pub fn set_sync_metadata(key: String, value: String) -> Result<(), FfiError> {
 }
 
 #[uniffi::export]
-pub fn get_base_snapshots(table_name: String, record_ids: Vec<i64>) -> Result<Vec<FfiBaseSnapshot>, FfiError> {
+pub fn get_base_snapshots(
+    table_name: String,
+    record_ids: Vec<i64>,
+) -> Result<Vec<FfiBaseSnapshot>, FfiError> {
     let pool = pool()?;
     let snapshots = rt()
         .block_on(queries::get_base_snapshots(pool, &table_name, &record_ids))
         .map_err(FfiError::from)?;
-    Ok(snapshots.into_iter().map(|s| FfiBaseSnapshot {
-        record_id: s.record_id,
-        snapshot: s.snapshot,
-    }).collect())
+    Ok(snapshots
+        .into_iter()
+        .map(|s| FfiBaseSnapshot {
+            record_id: s.record_id,
+            snapshot: s.snapshot,
+        })
+        .collect())
 }
 
 #[uniffi::export]
@@ -893,12 +933,15 @@ pub fn get_pending_tombstones() -> Result<Vec<FfiTombstone>, FfiError> {
     let tombstones = rt()
         .block_on(queries::get_pending_tombstones(pool))
         .map_err(FfiError::from)?;
-    Ok(tombstones.into_iter().map(|t| FfiTombstone {
-        id: t.id,
-        table_name: t.table_name,
-        record_id: t.record_id,
-        deleted_at: t.deleted_at,
-    }).collect())
+    Ok(tombstones
+        .into_iter()
+        .map(|t| FfiTombstone {
+            id: t.id,
+            table_name: t.table_name,
+            record_id: t.record_id,
+            deleted_at: t.deleted_at,
+        })
+        .collect())
 }
 
 #[uniffi::export]
@@ -1083,7 +1126,10 @@ mod tests {
         assert_eq!(ffi.end_time, "12:00");
 
         let back = ffi_to_shift_template(ffi).unwrap();
-        assert_eq!(back.weekdays, vec![Weekday::Mon, Weekday::Wed, Weekday::Fri]);
+        assert_eq!(
+            back.weekdays,
+            vec![Weekday::Mon, Weekday::Wed, Weekday::Fri]
+        );
         assert_eq!(back.start_time, tmpl.start_time);
         assert_eq!(back.end_time, tmpl.end_time);
     }
@@ -1305,7 +1351,9 @@ fn slots_to_day_availability(slots: Vec<DayAvailabilitySlot>) -> Result<DayAvail
     Ok(avail)
 }
 
-fn employee_avail_override_to_ffi(o: EmployeeAvailabilityOverride) -> FfiEmployeeAvailabilityOverride {
+fn employee_avail_override_to_ffi(
+    o: EmployeeAvailabilityOverride,
+) -> FfiEmployeeAvailabilityOverride {
     FfiEmployeeAvailabilityOverride {
         id: o.id,
         employee_id: o.employee_id,
@@ -1376,9 +1424,13 @@ pub fn get_employee_availability_override(
 ) -> Result<Option<FfiEmployeeAvailabilityOverride>, FfiError> {
     let pool = pool()?;
     let d = parse_date(&date)?;
-    rt().block_on(queries::get_employee_availability_override(pool, employee_id, d))
-        .map(|opt| opt.map(employee_avail_override_to_ffi))
-        .map_err(Into::into)
+    rt().block_on(queries::get_employee_availability_override(
+        pool,
+        employee_id,
+        d,
+    ))
+    .map(|opt| opt.map(employee_avail_override_to_ffi))
+    .map_err(Into::into)
 }
 
 #[uniffi::export]
@@ -1386,13 +1438,17 @@ pub fn list_employee_availability_overrides(
     employee_id: i64,
 ) -> Result<Vec<FfiEmployeeAvailabilityOverride>, FfiError> {
     let pool = pool()?;
-    rt().block_on(queries::list_employee_availability_overrides_for_employee(pool, employee_id))
-        .map(|v| v.into_iter().map(employee_avail_override_to_ffi).collect())
-        .map_err(Into::into)
+    rt().block_on(queries::list_employee_availability_overrides_for_employee(
+        pool,
+        employee_id,
+    ))
+    .map(|v| v.into_iter().map(employee_avail_override_to_ffi).collect())
+    .map_err(Into::into)
 }
 
 #[uniffi::export]
-pub fn list_all_employee_availability_overrides() -> Result<Vec<FfiEmployeeAvailabilityOverride>, FfiError> {
+pub fn list_all_employee_availability_overrides()
+-> Result<Vec<FfiEmployeeAvailabilityOverride>, FfiError> {
     let pool = pool()?;
     rt().block_on(queries::list_all_employee_availability_overrides(pool))
         .map(|v| v.into_iter().map(employee_avail_override_to_ffi).collect())
@@ -1435,9 +1491,12 @@ pub fn list_shift_template_overrides_for_template(
     template_id: i64,
 ) -> Result<Vec<FfiShiftTemplateOverride>, FfiError> {
     let pool = pool()?;
-    rt().block_on(queries::list_shift_template_overrides_for_template(pool, template_id))
-        .map(|v| v.into_iter().map(shift_template_override_to_ffi).collect())
-        .map_err(Into::into)
+    rt().block_on(queries::list_shift_template_overrides_for_template(
+        pool,
+        template_id,
+    ))
+    .map(|v| v.into_iter().map(shift_template_override_to_ffi).collect())
+    .map_err(Into::into)
 }
 
 #[uniffi::export]
@@ -1487,5 +1546,133 @@ pub fn list_employee_shift_history(
     let pool = pool()?;
     rt().block_on(queries::list_employee_shift_history(pool, employee_id))
         .map(|records| records.into_iter().map(shift_record_to_ffi).collect())
+        .map_err(Into::into)
+}
+
+// ── Staging & Commits ───────────────────────────────────────────────────────
+
+#[uniffi::export]
+pub fn stage_shifts(shift_ids: Vec<i64>) -> Result<(), FfiError> {
+    let pool = pool()?;
+    let today = Local::now().date_naive();
+    rt().block_on(queries::stage_shifts(pool, &shift_ids, today))
+        .map_err(Into::into)
+}
+
+#[uniffi::export]
+pub fn stage_day(rota_id: i64, date: String) -> Result<(), FfiError> {
+    let pool = pool()?;
+    let d = parse_date(&date)?;
+    let today = Local::now().date_naive();
+    rt().block_on(queries::stage_day(pool, rota_id, d, today))
+        .map_err(Into::into)
+}
+
+#[uniffi::export]
+pub fn stage_week(rota_id: i64) -> Result<(), FfiError> {
+    let pool = pool()?;
+    let today = Local::now().date_naive();
+    rt().block_on(queries::stage_week(pool, rota_id, today))
+        .map_err(Into::into)
+}
+
+#[uniffi::export]
+pub fn unstage_shifts(shift_ids: Vec<i64>) -> Result<(), FfiError> {
+    let pool = pool()?;
+    rt().block_on(queries::unstage_shifts(pool, &shift_ids))
+        .map_err(Into::into)
+}
+
+#[uniffi::export]
+pub fn unstage_day(rota_id: i64, date: String) -> Result<(), FfiError> {
+    let pool = pool()?;
+    let d = parse_date(&date)?;
+    rt().block_on(queries::unstage_day(pool, rota_id, d))
+        .map_err(Into::into)
+}
+
+#[uniffi::export]
+pub fn unstage_week(rota_id: i64) -> Result<(), FfiError> {
+    let pool = pool()?;
+    rt().block_on(queries::unstage_week(pool, rota_id))
+        .map_err(Into::into)
+}
+
+#[uniffi::export]
+pub fn get_staging_state(rota_id: i64) -> Result<FfiStagingState, FfiError> {
+    let pool = pool()?;
+    let today = Local::now().date_naive();
+    let result: Result<FfiStagingState, sqlx::Error> = rt().block_on(async move {
+        let staged = queries::list_staged_shift_ids(pool, rota_id).await?;
+        let past = queries::list_past_shift_ids(pool, rota_id, today).await?;
+        Ok(FfiStagingState {
+            rota_id,
+            staged_shift_ids: staged,
+            total_stageable_past_shift_ids: past,
+        })
+    });
+    result.map_err(Into::into)
+}
+
+#[uniffi::export]
+pub fn commit_staged_shifts(rota_id: i64) -> Result<i64, FfiError> {
+    let pool = pool()?;
+    rt().block_on(queries::create_commit(pool, rota_id))
+        .map_err(Into::into)
+}
+
+#[uniffi::export]
+pub fn list_commits(rota_id: Option<i64>) -> Result<Vec<FfiCommit>, FfiError> {
+    let pool = pool()?;
+    let result: Result<Vec<FfiCommit>, sqlx::Error> = rt().block_on(async move {
+        let commits = queries::list_commits(pool, rota_id).await?;
+        let mut ffi_commits = Vec::new();
+        for c in commits {
+            let week_start: String =
+                sqlx::query_scalar("SELECT week_start FROM rotas WHERE id = ?")
+                    .bind(c.rota_id)
+                    .fetch_one(pool)
+                    .await?;
+            ffi_commits.push(FfiCommit {
+                id: c.id,
+                rota_id: c.rota_id,
+                committed_at: c.committed_at,
+                summary: c.summary,
+                week_start,
+            });
+        }
+        Ok(ffi_commits)
+    });
+    result.map_err(Into::into)
+}
+
+#[uniffi::export]
+pub fn get_commit_detail(commit_id: i64) -> Result<Option<FfiCommitDetail>, FfiError> {
+    let pool = pool()?;
+    let result: Result<Option<FfiCommitDetail>, sqlx::Error> = rt().block_on(async move {
+        let commit = match queries::get_commit(pool, commit_id).await? {
+            Some(c) => c,
+            None => return Ok(None),
+        };
+        let week_start: String = sqlx::query_scalar("SELECT week_start FROM rotas WHERE id = ?")
+            .bind(commit.rota_id)
+            .fetch_one(pool)
+            .await?;
+        Ok(Some(FfiCommitDetail {
+            id: commit.id,
+            rota_id: commit.rota_id,
+            committed_at: commit.committed_at,
+            summary: commit.summary,
+            week_start,
+            snapshot_json: commit.snapshot_json,
+        }))
+    });
+    result.map_err(Into::into)
+}
+
+#[uniffi::export]
+pub fn rota_is_committed(rota_id: i64) -> Result<bool, FfiError> {
+    let pool = pool()?;
+    rt().block_on(queries::rota_has_commits(pool, rota_id))
         .map_err(Into::into)
 }

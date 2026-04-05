@@ -301,6 +301,74 @@ public func listEmployeeShiftHistoryAsync(employeeId: Int64) async throws -> [Ff
     }.value
 }
 
+// MARK: - Staging & Commits
+
+public func stageShiftsAsync(shiftIds: [Int64]) async throws {
+    try await Task.detached(priority: .userInitiated) {
+        try stageShifts(shiftIds: shiftIds)
+    }.value
+}
+
+public func stageDayAsync(rotaId: Int64, date: String) async throws {
+    try await Task.detached(priority: .userInitiated) {
+        try stageDay(rotaId: rotaId, date: date)
+    }.value
+}
+
+public func stageWeekAsync(rotaId: Int64) async throws {
+    try await Task.detached(priority: .userInitiated) {
+        try stageWeek(rotaId: rotaId)
+    }.value
+}
+
+public func unstageShiftsAsync(shiftIds: [Int64]) async throws {
+    try await Task.detached(priority: .userInitiated) {
+        try unstageShifts(shiftIds: shiftIds)
+    }.value
+}
+
+public func unstageDayAsync(rotaId: Int64, date: String) async throws {
+    try await Task.detached(priority: .userInitiated) {
+        try unstageDay(rotaId: rotaId, date: date)
+    }.value
+}
+
+public func unstageWeekAsync(rotaId: Int64) async throws {
+    try await Task.detached(priority: .userInitiated) {
+        try unstageWeek(rotaId: rotaId)
+    }.value
+}
+
+public func getStagingStateAsync(rotaId: Int64) async throws -> FfiStagingState {
+    try await Task.detached(priority: .userInitiated) {
+        try getStagingState(rotaId: rotaId)
+    }.value
+}
+
+public func commitStagedShiftsAsync(rotaId: Int64) async throws -> Int64 {
+    try await Task.detached(priority: .userInitiated) {
+        try commitStagedShifts(rotaId: rotaId)
+    }.value
+}
+
+public func listCommitsAsync(rotaId: Int64?) async throws -> [FfiCommit] {
+    try await Task.detached(priority: .userInitiated) {
+        try listCommits(rotaId: rotaId)
+    }.value
+}
+
+public func getCommitDetailAsync(commitId: Int64) async throws -> FfiCommitDetail? {
+    try await Task.detached(priority: .userInitiated) {
+        try getCommitDetail(commitId: commitId)
+    }.value
+}
+
+public func rotaIsCommittedAsync(rotaId: Int64) async throws -> Bool {
+    try await Task.detached(priority: .userInitiated) {
+        try rotaIsCommitted(rotaId: rotaId)
+    }.value
+}
+
 // MARK: - Export
 
 public func exportWeekScheduleAsync(weekStart: String, config: FfiExportConfig) async throws -> FfiExportResult {

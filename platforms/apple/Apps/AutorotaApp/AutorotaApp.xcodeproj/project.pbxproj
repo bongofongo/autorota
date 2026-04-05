@@ -32,6 +32,8 @@
 		CC0009032FC0000000205001 /* SyncRecordMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0009042FC0000000205001 /* SyncRecordMapper.swift */; };
 		CC0009052FC0000000205001 /* SyncConflictResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0009062FC0000000205001 /* SyncConflictResolver.swift */; };
 		CC0009072FC0000000205001 /* SyncPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0009082FC0000000205001 /* SyncPromptView.swift */; };
+		CC0010012FD0000000205001 /* CommitHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0010022FD0000000205001 /* CommitHistoryViewModel.swift */; };
+		CC0010032FD0000000205001 /* CommitHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0010042FD0000000205001 /* CommitHistoryView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -71,6 +73,8 @@
 		CC0009042FC0000000205001 /* SyncRecordMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncRecordMapper.swift; sourceTree = "<group>"; };
 		CC0009062FC0000000205001 /* SyncConflictResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncConflictResolver.swift; sourceTree = "<group>"; };
 		CC0009082FC0000000205001 /* SyncPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncPromptView.swift; sourceTree = "<group>"; };
+		CC0010022FD0000000205001 /* CommitHistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommitHistoryViewModel.swift; sourceTree = "<group>"; };
+		CC0010042FD0000000205001 /* CommitHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommitHistoryView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -129,6 +133,7 @@
 		5B9675192F72075A00205001 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				CC0010022FD0000000205001 /* CommitHistoryViewModel.swift */,
 				5B9675162F72075A00205001 /* EmployeeViewModel.swift */,
 				CC0003022F80000000205001 /* OverrideViewModel.swift */,
 				5B9675312F72075A00205001 /* RoleViewModel.swift */,
@@ -143,6 +148,7 @@
 			isa = PBXGroup;
 			children = (
 				5B96751A2F72075A00205001 /* AvailabilityGridView.swift */,
+				CC0010042FD0000000205001 /* CommitHistoryView.swift */,
 				5B96751B2F72075A00205001 /* ContentView.swift */,
 				5B96751C2F72075A00205001 /* EmployeeDetailView.swift */,
 				5B96751D2F72075A00205001 /* EmployeeListView.swift */,
@@ -306,6 +312,8 @@
 				CC0009032FC0000000205001 /* SyncRecordMapper.swift in Sources */,
 				CC0009052FC0000000205001 /* SyncConflictResolver.swift in Sources */,
 				CC0009072FC0000000205001 /* SyncPromptView.swift in Sources */,
+				CC0010012FD0000000205001 /* CommitHistoryViewModel.swift in Sources */,
+				CC0010032FD0000000205001 /* CommitHistoryView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

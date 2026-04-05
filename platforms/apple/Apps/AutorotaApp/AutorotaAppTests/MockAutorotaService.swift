@@ -249,6 +249,73 @@ final class MockAutorotaService: AutorotaServiceProtocol, @unchecked Sendable {
         if let e = errorToThrow { throw e }
     }
 
+    // MARK: - Staging & Commits
+
+    var stubbedStagingState = FfiStagingState(rotaId: 0, stagedShiftIds: [], totalStageablePastShiftIds: [])
+    var stubbedCommits: [FfiCommit] = []
+    var stubbedCommitDetail: FfiCommitDetail? = nil
+    var stubbedRotaIsCommitted = false
+
+    func stageShifts(shiftIds: [Int64]) async throws {
+        callLog.append("stageShifts:\(shiftIds)")
+        if let e = errorToThrow { throw e }
+    }
+
+    func stageDay(rotaId: Int64, date: String) async throws {
+        callLog.append("stageDay:\(rotaId):\(date)")
+        if let e = errorToThrow { throw e }
+    }
+
+    func stageWeek(rotaId: Int64) async throws {
+        callLog.append("stageWeek:\(rotaId)")
+        if let e = errorToThrow { throw e }
+    }
+
+    func unstageShifts(shiftIds: [Int64]) async throws {
+        callLog.append("unstageShifts:\(shiftIds)")
+        if let e = errorToThrow { throw e }
+    }
+
+    func unstageDay(rotaId: Int64, date: String) async throws {
+        callLog.append("unstageDay:\(rotaId):\(date)")
+        if let e = errorToThrow { throw e }
+    }
+
+    func unstageWeek(rotaId: Int64) async throws {
+        callLog.append("unstageWeek:\(rotaId)")
+        if let e = errorToThrow { throw e }
+    }
+
+    func getStagingState(rotaId: Int64) async throws -> FfiStagingState {
+        callLog.append("getStagingState:\(rotaId)")
+        if let e = errorToThrow { throw e }
+        return stubbedStagingState
+    }
+
+    func commitStagedShifts(rotaId: Int64) async throws -> Int64 {
+        callLog.append("commitStagedShifts:\(rotaId)")
+        if let e = errorToThrow { throw e }
+        return 1
+    }
+
+    func listCommits(rotaId: Int64?) async throws -> [FfiCommit] {
+        callLog.append("listCommits:\(String(describing: rotaId))")
+        if let e = errorToThrow { throw e }
+        return stubbedCommits
+    }
+
+    func getCommitDetail(commitId: Int64) async throws -> FfiCommitDetail? {
+        callLog.append("getCommitDetail:\(commitId)")
+        if let e = errorToThrow { throw e }
+        return stubbedCommitDetail
+    }
+
+    func rotaIsCommitted(rotaId: Int64) async throws -> Bool {
+        callLog.append("rotaIsCommitted:\(rotaId)")
+        if let e = errorToThrow { throw e }
+        return stubbedRotaIsCommitted
+    }
+
     // MARK: - Export
 
     var stubbedExportResult = FfiExportResult(data: "mock,data\n", filename: "test.csv", mimeType: "text/csv")

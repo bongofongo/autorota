@@ -141,5 +141,40 @@ struct LiveAutorotaService: AutorotaServiceProtocol {
         NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
     }
 
+    // Staging & Commits
+    func stageShifts(shiftIds: [Int64]) async throws {
+        try await stageShiftsAsync(shiftIds: shiftIds)
+        NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
+    }
+    func stageDay(rotaId: Int64, date: String) async throws {
+        try await stageDayAsync(rotaId: rotaId, date: date)
+        NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
+    }
+    func stageWeek(rotaId: Int64) async throws {
+        try await stageWeekAsync(rotaId: rotaId)
+        NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
+    }
+    func unstageShifts(shiftIds: [Int64]) async throws {
+        try await unstageShiftsAsync(shiftIds: shiftIds)
+        NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
+    }
+    func unstageDay(rotaId: Int64, date: String) async throws {
+        try await unstageDayAsync(rotaId: rotaId, date: date)
+        NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
+    }
+    func unstageWeek(rotaId: Int64) async throws {
+        try await unstageWeekAsync(rotaId: rotaId)
+        NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
+    }
+    func getStagingState(rotaId: Int64) async throws -> FfiStagingState { try await getStagingStateAsync(rotaId: rotaId) }
+    func commitStagedShifts(rotaId: Int64) async throws -> Int64 {
+        let id = try await commitStagedShiftsAsync(rotaId: rotaId)
+        NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
+        return id
+    }
+    func listCommits(rotaId: Int64?) async throws -> [FfiCommit] { try await listCommitsAsync(rotaId: rotaId) }
+    func getCommitDetail(commitId: Int64) async throws -> FfiCommitDetail? { try await getCommitDetailAsync(commitId: commitId) }
+    func rotaIsCommitted(rotaId: Int64) async throws -> Bool { try await rotaIsCommittedAsync(rotaId: rotaId) }
+
     func exportWeekSchedule(weekStart: String, config: FfiExportConfig) async throws -> FfiExportResult { try await exportWeekScheduleAsync(weekStart: weekStart, config: config) }
 }
