@@ -34,6 +34,8 @@
 		CC0009072FC0000000205001 /* SyncPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0009082FC0000000205001 /* SyncPromptView.swift */; };
 		CC0010012FD0000000205001 /* CommitHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0010022FD0000000205001 /* CommitHistoryViewModel.swift */; };
 		CC0010032FD0000000205001 /* CommitHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0010042FD0000000205001 /* CommitHistoryView.swift */; };
+		CC0011012FE0000000205001 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0011022FE0000000205001 /* OnboardingView.swift */; };
+		CC0011032FE0000000205001 /* HelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0011042FE0000000205001 /* HelpView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -75,6 +77,8 @@
 		CC0009082FC0000000205001 /* SyncPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncPromptView.swift; sourceTree = "<group>"; };
 		CC0010022FD0000000205001 /* CommitHistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommitHistoryViewModel.swift; sourceTree = "<group>"; };
 		CC0010042FD0000000205001 /* CommitHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommitHistoryView.swift; sourceTree = "<group>"; };
+		CC0011022FE0000000205001 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		CC0011042FE0000000205001 /* HelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -154,6 +158,8 @@
 				5B96751D2F72075A00205001 /* EmployeeListView.swift */,
 				CC0005042F80000000205001 /* EmployeeShiftHistoryView.swift */,
 				CC0008022FB0000000205001 /* ExportSheetView.swift */,
+				CC0011042FE0000000205001 /* HelpView.swift */,
+				CC0011022FE0000000205001 /* OnboardingView.swift */,
 				CC0003042F80000000205001 /* OverridesTabView.swift */,
 				5B96751E2F72075A00205001 /* RotaView.swift */,
 				CC0004022F80000000205001 /* SettingsView.swift */,
@@ -314,6 +320,8 @@
 				CC0009072FC0000000205001 /* SyncPromptView.swift in Sources */,
 				CC0010012FD0000000205001 /* CommitHistoryViewModel.swift in Sources */,
 				CC0010032FD0000000205001 /* CommitHistoryView.swift in Sources */,
+				CC0011012FE0000000205001 /* OnboardingView.swift in Sources */,
+				CC0011032FE0000000205001 /* HelpView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

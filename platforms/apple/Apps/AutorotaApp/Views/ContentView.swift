@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var layoutManager = TabLayoutManager()
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @State private var showOnboarding = false
 
     var body: some View {
         TabView {
@@ -17,5 +19,25 @@ struct ContentView: View {
         .tabViewStyle(.sidebarAdaptable)
         #endif
         .environment(layoutManager)
+        .onAppear {
+            if !hasCompletedOnboarding {
+                showOnboarding = true
+            }
+        }
+        #if os(iOS)
+        .fullScreenCover(isPresented: $showOnboarding) {
+            hasCompletedOnboarding = true
+        } content: {
+            OnboardingView(isPresented: $showOnboarding)
+                .interactiveDismissDisabled()
+        }
+        #else
+        .sheet(isPresented: $showOnboarding) {
+            hasCompletedOnboarding = true
+        } content: {
+            OnboardingView(isPresented: $showOnboarding)
+                .interactiveDismissDisabled()
+        }
+        #endif
     }
 }

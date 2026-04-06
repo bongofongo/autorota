@@ -81,35 +81,83 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.segmented)
                 }
-
-                Section("Currency") {
+                
+                Section("Experience") {
                     Picker("Currency", selection: $currency) {
                         ForEach(AppCurrency.allCases, id: \.rawValue) { option in
                             Text(option.label).tag(option.rawValue)
                         }
                     }
+                    
+                    DisclosureGroup("Export Defaults") {
+                        Picker("Layout", selection: $exportDefaultLayout) {
+                            Text("By Employee").tag("employee_by_weekday")
+                            Text("By Shift").tag("shift_by_weekday")
+                        }
+                        
+                        Picker("Format", selection: $exportDefaultFormat) {
+                            Text("CSV").tag("csv")
+                            Text("JSON").tag("json")
+                        }
+                        
+                        Picker("Profile", selection: $exportDefaultProfile) {
+                            Text("Staff Schedule").tag("staff_schedule")
+                            Text("Manager Report").tag("manager_report")
+                        }
+                        
+                        Toggle("Show Shift Name", isOn: $exportShowShiftName)
+                        Toggle("Show Times", isOn: $exportShowTimes)
+                        Toggle("Show Role", isOn: $exportShowRole)
+                    }
+                    
+                    DisclosureGroup("Layout") {
+                        Section {
+                            ForEach(layoutManager.configurableTabBarPages) { page in
+                                HStack {
+                                    Label(page.title, systemImage: page.systemImage)
+                                    Spacer()
+                                    Button {
+                                        withAnimation { layoutManager.removeFromTabBar(page) }
+                                    } label: {
+                                        Image(systemName: "arrow.down.circle.fill")
+                                            .foregroundStyle(.red)
+                                    }
+                                }
+                            }
+                        } header: {
+                            Text("Tab Bar (\(layoutManager.configurableTabBarPages.count) of \(TabPage.maxConfigurable))")
+                        }
+                        
+                        if !layoutManager.hiddenPages.isEmpty {
+                            Section {
+                                ForEach(layoutManager.hiddenPages) { page in
+                                    HStack {
+                                        Label(page.title, systemImage: page.systemImage)
+                                        Spacer()
+                                        Button {
+                                            withAnimation { layoutManager.addToTabBar(page) }
+                                        } label: {
+                                            Image(systemName: "arrow.up.circle.fill")
+                                                .foregroundStyle(layoutManager.configurableTabBarPages.count >= TabPage.maxConfigurable ? .gray : .blue)
+                                        }
+                                        .disabled(layoutManager.configurableTabBarPages.count >= TabPage.maxConfigurable)
+                                    }
+                                }
+                            } header: {
+                                Text("Hidden")
+                            }
+                        }
+                    }
                 }
 
-                DisclosureGroup("Export Defaults") {
-                    Picker("Layout", selection: $exportDefaultLayout) {
-                        Text("By Employee").tag("employee_by_weekday")
-                        Text("By Shift").tag("shift_by_weekday")
+                Section {
+                    NavigationLink {
+                        HelpView()
+                    } label: {
+                        Label("Help & Guide", systemImage: "questionmark.circle")
                     }
-
-                    Picker("Format", selection: $exportDefaultFormat) {
-                        Text("CSV").tag("csv")
-                        Text("JSON").tag("json")
-                    }
-
-                    Picker("Profile", selection: $exportDefaultProfile) {
-                        Text("Staff Schedule").tag("staff_schedule")
-                        Text("Manager Report").tag("manager_report")
-                    }
-
-                    Toggle("Show Shift Name", isOn: $exportShowShiftName)
-                    Toggle("Show Times", isOn: $exportShowTimes)
-                    Toggle("Show Role", isOn: $exportShowRole)
                 }
+
 
                 Section("iCloud Sync") {
                     HStack {
@@ -130,45 +178,6 @@ struct SettingsView: View {
                             Label("Error", systemImage: "exclamationmark.icloud")
                                 .foregroundStyle(.red)
                                 .help(message)
-                        }
-                    }
-                }
-
-                DisclosureGroup("Layout") {
-                    Section {
-                        ForEach(layoutManager.configurableTabBarPages) { page in
-                            HStack {
-                                Label(page.title, systemImage: page.systemImage)
-                                Spacer()
-                                Button {
-                                    withAnimation { layoutManager.removeFromTabBar(page) }
-                                } label: {
-                                    Image(systemName: "arrow.down.circle.fill")
-                                        .foregroundStyle(.red)
-                                }
-                            }
-                        }
-                    } header: {
-                        Text("Tab Bar (\(layoutManager.configurableTabBarPages.count) of \(TabPage.maxConfigurable))")
-                    }
-
-                    if !layoutManager.hiddenPages.isEmpty {
-                        Section {
-                            ForEach(layoutManager.hiddenPages) { page in
-                                HStack {
-                                    Label(page.title, systemImage: page.systemImage)
-                                    Spacer()
-                                    Button {
-                                        withAnimation { layoutManager.addToTabBar(page) }
-                                    } label: {
-                                        Image(systemName: "arrow.up.circle.fill")
-                                            .foregroundStyle(layoutManager.configurableTabBarPages.count >= TabPage.maxConfigurable ? .gray : .blue)
-                                    }
-                                    .disabled(layoutManager.configurableTabBarPages.count >= TabPage.maxConfigurable)
-                                }
-                            }
-                        } header: {
-                            Text("Hidden")
                         }
                     }
                 }
