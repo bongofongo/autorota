@@ -17,15 +17,33 @@ struct CommitHistoryView: View {
                         description: Text("Committed shift snapshots will appear here.")
                     )
                 } else {
-                    commitList
+                    VStack(spacing: 0) {
+                        Picker("Mode", selection: $vm.mode) {
+                            ForEach(HistoryMode.allCases) { mode in
+                                Text(mode.label).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                        commitList
+                    }
                 }
             }
             .navigationTitle("History")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
-            .task { await vm.loadCommits() }
-            .refreshable { await vm.loadCommits() }
+            .task {
+                await vm.loadCommits()
+                await vm.loadAllSnapshotsIfNeeded()
+                await vm.refreshChangedShiftsForAllWeeks()
+            }
+            .refreshable {
+                await vm.loadCommits()
+                await vm.loadAllSnapshotsIfNeeded()
+                await vm.refreshChangedShiftsForAllWeeks()
+            }
             .sheet(item: $vm.selectedCommitDetail) { detail in
                 CommitDetailSheet(detail: detail)
             }
@@ -37,20 +55,68 @@ struct CommitHistoryView: View {
         }
     }
 
+    @ViewBuilder
     private var commitList: some View {
-        List {
-            ForEach(vm.commitsByWeek, id: \.weekStart) { group in
-                Section {
-                    ForEach(group.commits, id: \.id) { commit in
-                        CommitRow(commit: commit) {
-                            Task { await vm.loadCommitDetail(id: commit.id) }
+        switch vm.mode {
+        case .commits:
+            List {
+                ForEach(vm.commitsByWeek, id: \.weekStart) { group in
+                    Section {
+                        ForEach(group.commits, id: \.id) { commit in
+                            CommitRow(commit: commit) {
+                                Task { await vm.loadCommitDetail(id: commit.id) }
+                            }
                         }
+                    } header: {
+                        Text("Week of \(group.weekStart)")
                     }
-                } header: {
-                    Text("Week of \(group.weekStart)")
+                }
+            }
+        case .shifts:
+            List {
+                ForEach(vm.latestShiftsByWeek, id: \.weekStart) { group in
+                    DisclosureGroup {
+                        let days = shiftsByDay(group.shifts)
+                        if days.isEmpty {
+                            Text("No shifts")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(days, id: \.date) { day in
+                                DisclosureGroup {
+                                    ForEach(day.shifts) { shift in
+                                        ShiftDisclosureRow(
+                                            shift: shift,
+                                            showWages: false,
+                                            isChanged: vm.changedShiftIdsByWeek[group.weekStart]?.contains(shift.shiftId) ?? false
+                                        )
+                                    }
+                                } label: {
+                                    HStack {
+                                        Text(formatShiftDate(day.date))
+                                            .font(.subheadline.bold())
+                                        Spacer()
+                                        Text("\(day.shifts.count) shift\(day.shifts.count == 1 ? "" : "s")")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                    } label: {
+                        Text("Week of \(group.weekStart)")
+                            .font(.headline)
+                    }
                 }
             }
         }
+    }
+
+    private func shiftsByDay(_ shifts: [ShiftData]) -> [(date: String, shifts: [ShiftData])] {
+        let grouped = Dictionary(grouping: shifts, by: \.date)
+        return grouped
+            .sorted { $0.key < $1.key }
+            .map { (date: $0.key, shifts: $0.value.sorted { $0.startTime < $1.startTime }) }
     }
 }
 
@@ -99,12 +165,14 @@ private struct CommitRow: View {
 private struct CommitDetailSheet: View {
     let detail: FfiCommitDetail
     @Environment(\.dismiss) private var dismiss
+    @State private var showWages = false
 
     var body: some View {
         NavigationStack {
             List {
                 Section("Summary") {
                     Text(detail.summary)
+                        .font(.subheadline.bold())
                     Text("Week of \(detail.weekStart)")
                         .foregroundStyle(.secondary)
                     Text(detail.committedAt)
@@ -112,10 +180,25 @@ private struct CommitDetailSheet: View {
                         .foregroundStyle(.tertiary)
                 }
 
-                Section("Snapshot") {
-                    Text(prettyJSON)
-                        .font(.caption.monospaced())
-                        .textSelection(.enabled)
+                if let snapshot {
+                    Section("Overview") {
+                        LabeledContent("Total hours", value: fmtHoursD(snapshot.totalHours))
+                        LabeledContent("Total shifts", value: "\(snapshot.totalShifts)")
+                        LabeledContent("Unique employees", value: "\(snapshot.uniqueEmployees)")
+                        Toggle("Show wages", isOn: $showWages)
+                    }
+
+                    Section("Shifts") {
+                        ForEach(snapshot.shifts) { shift in
+                            ShiftDisclosureRow(shift: shift, showWages: showWages)
+                        }
+                    }
+                } else {
+                    Section("Snapshot") {
+                        Text(prettyJSON)
+                            .font(.caption.monospaced())
+                            .textSelection(.enabled)
+                    }
                 }
             }
             .navigationTitle("Commit Detail")
@@ -136,6 +219,13 @@ private struct CommitDetailSheet: View {
         #endif
     }
 
+    private var snapshot: SnapshotData? {
+        guard let data = detail.snapshotJson.data(using: .utf8) else { return nil }
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return try? decoder.decode(SnapshotData.self, from: data)
+    }
+
     private var prettyJSON: String {
         guard let data = detail.snapshotJson.data(using: .utf8),
               let obj = try? JSONSerialization.jsonObject(with: data),
@@ -145,6 +235,112 @@ private struct CommitDetailSheet: View {
         }
         return str
     }
+}
+
+// MARK: - Shift disclosure row
+
+private struct ShiftDisclosureRow: View {
+    let shift: ShiftData
+    let showWages: Bool
+    var isChanged: Bool = false
+
+    var body: some View {
+        DisclosureGroup {
+            ForEach(shift.assignments) { assignment in
+                AssignmentRow(assignment: assignment, showWages: showWages)
+            }
+            if shift.assignments.isEmpty {
+                Text("No assignments")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        } label: {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(formatShiftDate(shift.date))
+                        .font(.subheadline.bold())
+                    Text("\(shift.startTime)\u{2013}\(shift.endTime)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 8)
+                Text(shift.requiredRole)
+                    .font(.caption.bold())
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(.quaternary)
+                    .clipShape(Capsule())
+                if isChanged {
+                    Text("Changed")
+                        .font(.caption2.bold())
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.orange.opacity(0.2))
+                        .foregroundStyle(.orange)
+                        .clipShape(Capsule())
+                }
+                if shift.maxEmployees > 1 {
+                    Text("\(shift.assignments.count)/\(shift.maxEmployees)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Assignment row
+
+private struct AssignmentRow: View {
+    let assignment: AssignmentData
+    let showWages: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text(assignment.employeeName)
+                .font(.subheadline)
+            Text(assignment.status)
+                .font(.caption.bold())
+                .foregroundStyle(statusColor)
+            Spacer()
+            if showWages, let wage = assignment.hourlyWage {
+                Text("\(currencySymbol)\(String(format: "%.2f", wage))/hr")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var statusColor: Color {
+        switch assignment.status.lowercased() {
+        case "confirmed": return .green
+        case "proposed": return .orange
+        case "overridden": return .blue
+        default: return .gray
+        }
+    }
+
+    private var currencySymbol: String {
+        (AppCurrency(rawValue: assignment.wageCurrency ?? "usd") ?? .usd).symbol
+    }
+}
+
+// MARK: - Formatting helpers
+
+private func formatShiftDate(_ dateString: String) -> String {
+    let inFmt = DateFormatter()
+    inFmt.dateFormat = "yyyy-MM-dd"
+    inFmt.locale = Locale(identifier: "en_US_POSIX")
+    guard let date = inFmt.date(from: dateString) else { return dateString }
+    let outFmt = DateFormatter()
+    outFmt.dateFormat = "EEE d MMM"
+    return outFmt.string(from: date)
+}
+
+private func fmtHoursD(_ v: Double) -> String {
+    v.truncatingRemainder(dividingBy: 1) == 0
+        ? "\(Int(v))h"
+        : String(format: "%.1fh", v)
 }
 
 // MARK: - Identifiable conformance for sheet binding
