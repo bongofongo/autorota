@@ -10,7 +10,7 @@ struct RotaView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                WeekPickerView(selectedWeek: $vm.selectedWeekStart, category: vm.weekCategory, isCommitted: vm.isCommitted)
+                WeekPickerView(selectedWeek: $vm.selectedWeekStart, category: vm.weekCategory, isCommitted: vm.isCommitted, hasNewChanges: vm.hasNewChanges)
                     .padding(.horizontal)
                     .padding(.vertical, 8)
                     .onChange(of: vm.selectedWeekStart) { _, _ in
@@ -189,6 +189,7 @@ private struct WeekPickerView: View {
     @Binding var selectedWeek: String
     let category: WeekCategory
     var isCommitted: Bool = false
+    var hasNewChanges: Bool = false
 
     var body: some View {
         HStack {
@@ -201,12 +202,14 @@ private struct WeekPickerView: View {
                     .font(.subheadline.bold())
                 CategoryBadge(category: category)
                 if isCommitted {
-                    Text("Committed")
+                    let label = hasNewChanges ? "New changes" : "Committed"
+                    let color: Color = hasNewChanges ? .orange : .green
+                    Text(label)
                         .font(.caption2.bold())
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Color.green.opacity(0.2))
-                        .foregroundStyle(.green)
+                        .background(color.opacity(0.2))
+                        .foregroundStyle(color)
                         .clipShape(Capsule())
                 }
             }
@@ -552,7 +555,18 @@ private struct ShiftCard: View {
                         Text("\(shift.startTime) – \(shift.endTime)")
                             .font(.subheadline.bold())
                     }
-                    RoleTag(name: shift.requiredRole)
+                    HStack(spacing: 4) {
+                        RoleTag(name: shift.requiredRole)
+                        if vm.changedShiftIds.contains(shift.id) {
+                            Text("Changed")
+                                .font(.caption2.bold())
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.orange.opacity(0.2))
+                                .foregroundStyle(.orange)
+                                .clipShape(Capsule())
+                        }
+                    }
                 }
                 Spacer()
 

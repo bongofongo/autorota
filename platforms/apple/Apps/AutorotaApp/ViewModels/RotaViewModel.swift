@@ -39,6 +39,12 @@ final class RotaViewModel {
     var isStagingMode = false
     var stagedShiftIds: Set<Int64> = []
 
+    /// Shift IDs that have been modified since their most recent commit snapshot.
+    var changedShiftIds: Set<Int64> = []
+
+    /// True if the rota has been committed at least once AND any shift differs from its latest commit.
+    var hasNewChanges: Bool { isCommitted && !changedShiftIds.isEmpty }
+
     let service: AutorotaServiceProtocol
 
     init(service: AutorotaServiceProtocol = LiveAutorotaService()) {
@@ -74,7 +80,43 @@ final class RotaViewModel {
         } catch {
             self.error = error.localizedDescription
         }
+        await refreshChangedShifts()
         isLoading = false
+    }
+
+    /// Compute which shifts in the current schedule differ from their most recent commit snapshot.
+    func refreshChangedShifts() async {
+        changedShiftIds = []
+        guard let schedule, schedule.committed else { return }
+        do {
+            let commits = try await service.listCommits(rotaId: schedule.rotaId)
+            // Walk newest → oldest, accumulating latest snapshot per shift_id.
+            let ordered = commits.sorted { $0.committedAt > $1.committedAt }
+            var latestSnapshotByShift: [Int64: ShiftData] = [:]
+            let needed = Set(schedule.shifts.map(\.id))
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            for commit in ordered {
+                if Set(latestSnapshotByShift.keys).isSuperset(of: needed) { break }
+                guard let detail = try await service.getCommitDetail(commitId: commit.id) else { continue }
+                guard let data = detail.snapshotJson.data(using: .utf8),
+                      let snap = try? decoder.decode(SnapshotData.self, from: data) else { continue }
+                for shift in snap.shifts where latestSnapshotByShift[shift.shiftId] == nil {
+                    latestSnapshotByShift[shift.shiftId] = shift
+                }
+            }
+            var changed: Set<Int64> = []
+            for liveShift in schedule.shifts {
+                guard let snap = latestSnapshotByShift[liveShift.id] else { continue }
+                let entries = schedule.entries.filter { $0.shiftId == liveShift.id }
+                if shiftDiffersFromSnapshot(snapshot: snap, liveShift: liveShift, liveEntries: entries) {
+                    changed.insert(liveShift.id)
+                }
+            }
+            changedShiftIds = changed
+        } catch {
+            // Non-fatal: leave changedShiftIds empty
+        }
     }
 
     func runSchedule() async {
