@@ -1,0 +1,315 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+
+  # ─── Parse tag → version + build number ───────────────────────────────────
+  tag-parse:
+    name: Parse tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+      build_number: ${{ github.run_number }}
+    steps:
+      - name: Parse version from tag
+        id: parse
+        env:
+          TAG_REF: ${{ github.ref }}
+        run: |
+          TAG="${TAG_REF#refs/tags/v}"
+          if [[ ! "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag must match vX.Y.Z (semver). Got: v$TAG"
+            exit 1
+          fi
+          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+
+  # ─── Rust checks (reusable) ────────────────────────────────────────────────
+  rust-checks:
+    name: Rust
+    uses: ./.github/workflows/rust-checks.yml
+
+  # ─── iOS: archive → TestFlight ─────────────────────────────────────────────
+  release-ios:
+    name: iOS → TestFlight
+    runs-on: macos-15
+    needs: [tag-parse, rust-checks]
+    env:
+      VERSION: ${{ needs.tag-parse.outputs.version }}
+      BUILD_NUMBER: ${{ needs.tag-parse.outputs.build_number }}
+      PROJECT: platforms/apple/Apps/AutorotaApp/AutorotaApp.xcodeproj
+      SCHEME: AutorotaApp
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (Apple targets)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: >-
+            aarch64-apple-darwin
+            x86_64-apple-darwin
+            aarch64-apple-ios
+            aarch64-apple-ios-sim
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: apple-release
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26.0'
+
+      - name: Build XCFramework (release)
+        run: bash scripts/build_xcframework.sh
+
+      - name: Set version in Xcode project
+        run: |
+          sed -i '' "s/MARKETING_VERSION = .*;/MARKETING_VERSION = $VERSION;/g" \
+            "$PROJECT/project.pbxproj"
+          sed -i '' "s/CURRENT_PROJECT_VERSION = .*;/CURRENT_PROJECT_VERSION = $BUILD_NUMBER;/g" \
+            "$PROJECT/project.pbxproj"
+
+      - name: Install App Store Connect API key
+        env:
+          API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+        run: |
+          mkdir -p ~/private_keys
+          echo "$API_KEY_P8" | base64 --decode > ~/private_keys/AuthKey_${API_KEY_ID}.p8
+
+      - name: Archive (iOS)
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+        run: |
+          xcodebuild archive \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/AutorotaApp-iOS.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
+            -authenticationKeyID "$API_KEY_ID" \
+            -authenticationKeyIssuerID "$API_ISSUER_ID"
+
+      - name: Export IPA
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/AutorotaApp-iOS.xcarchive" \
+            -exportOptionsPlist platforms/apple/ExportOptions.plist \
+            -exportPath "$RUNNER_TEMP/export-ios" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
+            -authenticationKeyID "$API_KEY_ID" \
+            -authenticationKeyIssuerID "$API_ISSUER_ID"
+
+      - name: Upload iOS build to TestFlight
+        uses: Apple-Actions/upload-testflight-build@v3
+        with:
+          app-path: ${{ runner.temp }}/export-ios/AutorotaApp.ipa
+          app-type: ios
+          api-key-id: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          api-issuer: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          api-private-key: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+
+      - name: Cleanup API key
+        if: always()
+        run: rm -rf ~/private_keys
+
+  # ─── macOS: Mac App Store + notarized .dmg ─────────────────────────────────
+  release-macos:
+    name: macOS → Mac App Store + .dmg
+    runs-on: macos-15
+    needs: [tag-parse, rust-checks]
+    env:
+      VERSION: ${{ needs.tag-parse.outputs.version }}
+      BUILD_NUMBER: ${{ needs.tag-parse.outputs.build_number }}
+      PROJECT: platforms/apple/Apps/AutorotaApp/AutorotaApp.xcodeproj
+      SCHEME: AutorotaApp
+    outputs:
+      dmg-path: ${{ steps.dmg.outputs.path }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (Apple targets)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: >-
+            aarch64-apple-darwin
+            x86_64-apple-darwin
+            aarch64-apple-ios
+            aarch64-apple-ios-sim
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: apple-release
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26.0'
+
+      - name: Build XCFramework (release)
+        run: bash scripts/build_xcframework.sh
+
+      - name: Set version in Xcode project
+        run: |
+          sed -i '' "s/MARKETING_VERSION = .*;/MARKETING_VERSION = $VERSION;/g" \
+            "$PROJECT/project.pbxproj"
+          sed -i '' "s/CURRENT_PROJECT_VERSION = .*;/CURRENT_PROJECT_VERSION = $BUILD_NUMBER;/g" \
+            "$PROJECT/project.pbxproj"
+
+      - name: Install App Store Connect API key
+        env:
+          API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+        run: |
+          mkdir -p ~/private_keys
+          echo "$API_KEY_P8" | base64 --decode > ~/private_keys/AuthKey_${API_KEY_ID}.p8
+
+      # ── Mac App Store branch ───────────────────────────────────────────────
+      - name: Archive (macOS, App Store)
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+        run: |
+          xcodebuild archive \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -destination 'generic/platform=macOS' \
+            -archivePath "$RUNNER_TEMP/AutorotaApp-macOS-AppStore.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
+            -authenticationKeyID "$API_KEY_ID" \
+            -authenticationKeyIssuerID "$API_ISSUER_ID"
+
+      - name: Export (Mac App Store)
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/AutorotaApp-macOS-AppStore.xcarchive" \
+            -exportOptionsPlist platforms/apple/ExportOptions-MacAppStore.plist \
+            -exportPath "$RUNNER_TEMP/export-mas" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
+            -authenticationKeyID "$API_KEY_ID" \
+            -authenticationKeyIssuerID "$API_ISSUER_ID"
+
+      - name: Upload macOS build to TestFlight
+        uses: Apple-Actions/upload-testflight-build@v3
+        with:
+          app-path: ${{ runner.temp }}/export-mas/AutorotaApp.pkg
+          app-type: osx
+          api-key-id: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          api-issuer: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          api-private-key: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+
+      # ── Developer ID notarized .dmg branch ─────────────────────────────────
+      - name: Archive (macOS, Developer ID)
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+        run: |
+          xcodebuild archive \
+            -project "$PROJECT" \
+            -scheme "$SCHEME" \
+            -destination 'generic/platform=macOS' \
+            -archivePath "$RUNNER_TEMP/AutorotaApp-macOS-DevID.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
+            -authenticationKeyID "$API_KEY_ID" \
+            -authenticationKeyIssuerID "$API_ISSUER_ID" \
+            CODE_SIGN_STYLE=Automatic
+
+      - name: Export (Developer ID)
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/AutorotaApp-macOS-DevID.xcarchive" \
+            -exportOptionsPlist platforms/apple/ExportOptions-DeveloperID.plist \
+            -exportPath "$RUNNER_TEMP/export-devid" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
+            -authenticationKeyID "$API_KEY_ID" \
+            -authenticationKeyIssuerID "$API_ISSUER_ID"
+
+      - name: Create .dmg
+        id: dmg
+        run: |
+          DMG_PATH="$RUNNER_TEMP/AutorotaApp-$VERSION.dmg"
+          hdiutil create \
+            -volname "AutorotaApp" \
+            -srcfolder "$RUNNER_TEMP/export-devid/AutorotaApp.app" \
+            -ov -format ULFO \
+            "$DMG_PATH"
+          echo "path=$DMG_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Notarize .dmg
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          DMG_PATH: ${{ steps.dmg.outputs.path }}
+        run: |
+          xcrun notarytool submit "$DMG_PATH" \
+            --key ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
+            --key-id "$API_KEY_ID" \
+            --issuer "$API_ISSUER_ID" \
+            --wait
+
+      - name: Staple .dmg
+        env:
+          DMG_PATH: ${{ steps.dmg.outputs.path }}
+        run: xcrun stapler staple "$DMG_PATH"
+
+      - name: Upload .dmg artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: autorota-dmg
+          path: ${{ steps.dmg.outputs.path }}
+          retention-days: 7
+
+      - name: Cleanup API key
+        if: always()
+        run: rm -rf ~/private_keys
+
+  # ─── Publish GitHub Release with .dmg attached ─────────────────────────────
+  publish:
+    name: GitHub Release
+    runs-on: ubuntu-latest
+    needs: [tag-parse, release-ios, release-macos]
+    env:
+      VERSION: ${{ needs.tag-parse.outputs.version }}
+    steps:
+      - name: Download .dmg
+        uses: actions/download-artifact@v4
+        with:
+          name: autorota-dmg
+          path: ./dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: v${{ env.VERSION }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          files: |
+            dist/*.dmg
