@@ -453,24 +453,20 @@ pub async fn get_rota_by_week(
 /// to assignments via the ON DELETE CASCADE FK), then removes the rota row.
 pub async fn delete_rota(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
     // Insert tombstones for assignments belonging to shifts in this rota.
-    let assignment_ids: Vec<(i64,)> = sqlx::query_as(
+    let assignment_ids: Vec<i64> = sqlx::query_scalar(
         "SELECT a.id FROM assignments a JOIN shifts s ON s.id = a.shift_id WHERE s.rota_id = ?",
     )
     .bind(id)
     .fetch_all(pool)
     .await?;
-    for (aid,) in &assignment_ids {
-        insert_tombstone(pool, "assignments", *aid).await?;
-    }
+    insert_tombstones(pool, "assignments", &assignment_ids).await?;
 
     // Insert tombstones for shifts in this rota.
-    let shift_ids: Vec<(i64,)> = sqlx::query_as("SELECT id FROM shifts WHERE rota_id = ?")
+    let shift_ids: Vec<i64> = sqlx::query_scalar("SELECT id FROM shifts WHERE rota_id = ?")
         .bind(id)
         .fetch_all(pool)
         .await?;
-    for (sid,) in &shift_ids {
-        insert_tombstone(pool, "shifts", *sid).await?;
-    }
+    insert_tombstones(pool, "shifts", &shift_ids).await?;
 
     sqlx::query("DELETE FROM shifts WHERE rota_id = ?")
         .bind(id)
@@ -594,14 +590,12 @@ pub async fn list_assignments_for_rota(
 pub async fn delete_shifts_for_rota(pool: &SqlitePool, rota_id: i64) -> Result<(), sqlx::Error> {
     // Only delete template-based shifts; preserve ad-hoc shifts (template_id IS NULL).
     // Insert tombstones for all affected shifts first.
-    let ids: Vec<(i64,)> =
-        sqlx::query_as("SELECT id FROM shifts WHERE rota_id = ? AND template_id IS NOT NULL")
+    let ids: Vec<i64> =
+        sqlx::query_scalar("SELECT id FROM shifts WHERE rota_id = ? AND template_id IS NOT NULL")
             .bind(rota_id)
             .fetch_all(pool)
             .await?;
-    for (sid,) in &ids {
-        insert_tombstone(pool, "shifts", *sid).await?;
-    }
+    insert_tombstones(pool, "shifts", &ids).await?;
     sqlx::query("DELETE FROM shifts WHERE rota_id = ? AND template_id IS NOT NULL")
         .bind(rota_id)
         .execute(pool)
@@ -640,14 +634,12 @@ pub async fn delete_proposed_assignments(
     rota_id: i64,
 ) -> Result<(), sqlx::Error> {
     // Insert tombstones for all affected assignments first.
-    let ids: Vec<(i64,)> =
-        sqlx::query_as("SELECT id FROM assignments WHERE rota_id = ? AND status = 'Proposed'")
+    let ids: Vec<i64> =
+        sqlx::query_scalar("SELECT id FROM assignments WHERE rota_id = ? AND status = 'Proposed'")
             .bind(rota_id)
             .fetch_all(pool)
             .await?;
-    for (aid,) in &ids {
-        insert_tombstone(pool, "assignments", *aid).await?;
-    }
+    insert_tombstones(pool, "assignments", &ids).await?;
     sqlx::query("DELETE FROM assignments WHERE rota_id = ? AND status = 'Proposed'")
         .bind(rota_id)
         .execute(pool)
@@ -1541,6 +1533,32 @@ pub async fn insert_tombstone(
     .execute(pool)
     .await?;
     Ok(result.last_insert_rowid())
+}
+
+/// Batch insert of tombstones for many record_ids in the same table.
+/// Builds a single multi-row INSERT, chunked to stay under SQLite's bind limit.
+pub async fn insert_tombstones(
+    pool: &SqlitePool,
+    table_name: &str,
+    record_ids: &[i64],
+) -> Result<(), sqlx::Error> {
+    if record_ids.is_empty() {
+        return Ok(());
+    }
+    let now = chrono::Utc::now().to_rfc3339();
+    // 3 binds per row; SQLite default SQLITE_MAX_VARIABLE_NUMBER is 999 → 300 rows safe.
+    for chunk in record_ids.chunks(300) {
+        let placeholders = vec!["(?, ?, ?)"; chunk.len()].join(", ");
+        let sql = format!(
+            "INSERT INTO sync_tombstones (table_name, record_id, deleted_at) VALUES {placeholders}"
+        );
+        let mut q = sqlx::query(&sql);
+        for id in chunk {
+            q = q.bind(table_name).bind(*id).bind(&now);
+        }
+        q.execute(pool).await?;
+    }
+    Ok(())
 }
 
 pub async fn get_pending_tombstones(pool: &SqlitePool) -> Result<Vec<Tombstone>, sqlx::Error> {
