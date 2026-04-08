@@ -122,8 +122,14 @@ mod tests {
             row_headers: vec!["Alice".to_string()],
             cells: vec![vec!["Morning".to_string(), String::new()]],
             daily_totals: Some(vec![
-                DaySummary { total_hours: 5.0, total_cost: 75.0 },
-                DaySummary { total_hours: 0.0, total_cost: 0.0 },
+                DaySummary {
+                    total_hours: 5.0,
+                    total_cost: 75.0,
+                },
+                DaySummary {
+                    total_hours: 0.0,
+                    total_cost: 0.0,
+                },
             ]),
             weekly_total_cost: Some(75.0),
         };

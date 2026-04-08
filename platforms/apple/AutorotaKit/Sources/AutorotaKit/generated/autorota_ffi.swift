@@ -1609,7 +1609,7 @@ public struct FfiExportConfig {
      */
     public var layout: String
     /**
-     * "csv" | "json"
+     * "csv" | "json" | "pdf"
      */
     public var format: String
     /**
@@ -1619,6 +1619,11 @@ public struct FfiExportConfig {
     public var showShiftName: Bool
     public var showTimes: Bool
     public var showRole: Bool
+    /**
+     * "weekly_grid" | "per_employee" | "by_role".
+     * Only consulted when `format == "pdf"`. `None` → `weekly_grid`.
+     */
+    public var pdfTemplate: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -1627,17 +1632,22 @@ public struct FfiExportConfig {
          * "employee_by_weekday" | "shift_by_weekday"
          */layout: String, 
         /**
-         * "csv" | "json"
+         * "csv" | "json" | "pdf"
          */format: String, 
         /**
          * "staff_schedule" | "manager_report"
-         */profile: String, showShiftName: Bool, showTimes: Bool, showRole: Bool) {
+         */profile: String, showShiftName: Bool, showTimes: Bool, showRole: Bool, 
+        /**
+         * "weekly_grid" | "per_employee" | "by_role".
+         * Only consulted when `format == "pdf"`. `None` → `weekly_grid`.
+         */pdfTemplate: String?) {
         self.layout = layout
         self.format = format
         self.profile = profile
         self.showShiftName = showShiftName
         self.showTimes = showTimes
         self.showRole = showRole
+        self.pdfTemplate = pdfTemplate
     }
 }
 
@@ -1663,6 +1673,9 @@ extension FfiExportConfig: Equatable, Hashable {
         if lhs.showRole != rhs.showRole {
             return false
         }
+        if lhs.pdfTemplate != rhs.pdfTemplate {
+            return false
+        }
         return true
     }
 
@@ -1673,6 +1686,7 @@ extension FfiExportConfig: Equatable, Hashable {
         hasher.combine(showShiftName)
         hasher.combine(showTimes)
         hasher.combine(showRole)
+        hasher.combine(pdfTemplate)
     }
 }
 
@@ -1689,7 +1703,8 @@ public struct FfiConverterTypeFfiExportConfig: FfiConverterRustBuffer {
                 profile: FfiConverterString.read(from: &buf), 
                 showShiftName: FfiConverterBool.read(from: &buf), 
                 showTimes: FfiConverterBool.read(from: &buf), 
-                showRole: FfiConverterBool.read(from: &buf)
+                showRole: FfiConverterBool.read(from: &buf), 
+                pdfTemplate: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -1700,6 +1715,7 @@ public struct FfiConverterTypeFfiExportConfig: FfiConverterRustBuffer {
         FfiConverterBool.write(value.showShiftName, into: &buf)
         FfiConverterBool.write(value.showTimes, into: &buf)
         FfiConverterBool.write(value.showRole, into: &buf)
+        FfiConverterOptionString.write(value.pdfTemplate, into: &buf)
     }
 }
 

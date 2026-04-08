@@ -98,6 +98,7 @@ mod tests {
                 show_times: true,
                 show_role: false,
             },
+            pdf_template: None,
         }
     }
 
@@ -136,6 +137,7 @@ mod tests {
                 show_times: false,
                 show_role: false,
             },
+            pdf_template: None,
         };
 
         let grid = ExportGrid {

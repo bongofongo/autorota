@@ -784,7 +784,7 @@ pub fn list_shifts_for_rota(rota_id: i64) -> Result<Vec<FfiShift>, FfiError> {
 // ── Export ───────────────────────────────────────────────────────────────────
 
 use autorota_core::export::config::{
-    CellContentFlags, ExportConfig, ExportFormat, ExportLayout, ExportProfile,
+    CellContentFlags, ExportConfig, ExportFormat, ExportLayout, ExportProfile, PdfTemplate,
 };
 
 fn parse_export_config(config: FfiExportConfig) -> Result<ExportConfig, FfiError> {
@@ -800,6 +800,13 @@ fn parse_export_config(config: FfiExportConfig) -> Result<ExportConfig, FfiError
         .profile
         .parse()
         .map_err(|e: String| FfiError::InvalidArgument { msg: e })?;
+    let pdf_template: Option<PdfTemplate> = match config.pdf_template.as_deref() {
+        None | Some("") => None,
+        Some(s) => Some(
+            s.parse()
+                .map_err(|e: String| FfiError::InvalidArgument { msg: e })?,
+        ),
+    };
 
     Ok(ExportConfig {
         layout,
@@ -810,6 +817,7 @@ fn parse_export_config(config: FfiExportConfig) -> Result<ExportConfig, FfiError
             show_times: config.show_times,
             show_role: config.show_role,
         },
+        pdf_template,
     })
 }
 
@@ -833,6 +841,7 @@ pub fn export_week_schedule(
                 msg: db_err.to_string(),
             },
             autorota_core::export::ExportError::NoSchedule(msg) => FfiError::NotFound { msg },
+            autorota_core::export::ExportError::Pdf(msg) => FfiError::InvalidArgument { msg },
         })?;
 
     Ok(FfiExportResult {

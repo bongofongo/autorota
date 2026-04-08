@@ -35,6 +35,7 @@ impl fmt::Display for ExportLayout {
 pub enum ExportFormat {
     Csv,
     Json,
+    Pdf,
 }
 
 impl FromStr for ExportFormat {
@@ -43,6 +44,7 @@ impl FromStr for ExportFormat {
         match s {
             "csv" => Ok(Self::Csv),
             "json" => Ok(Self::Json),
+            "pdf" => Ok(Self::Pdf),
             other => Err(format!("invalid export format: {other}")),
         }
     }
@@ -53,6 +55,40 @@ impl fmt::Display for ExportFormat {
         match self {
             Self::Csv => write!(f, "csv"),
             Self::Json => write!(f, "json"),
+            Self::Pdf => write!(f, "pdf"),
+        }
+    }
+}
+
+/// Fixed PDF template selection (only consulted when format == Pdf).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PdfTemplate {
+    /// Single weekly grid (reuses ExportLayout).
+    WeeklyGrid,
+    /// One section per employee listing their shifts for the week.
+    PerEmployee,
+    /// One grid per role, stacked in a single PDF.
+    ByRole,
+}
+
+impl FromStr for PdfTemplate {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "weekly_grid" => Ok(Self::WeeklyGrid),
+            "per_employee" => Ok(Self::PerEmployee),
+            "by_role" => Ok(Self::ByRole),
+            other => Err(format!("invalid pdf template: {other}")),
+        }
+    }
+}
+
+impl fmt::Display for PdfTemplate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::WeeklyGrid => write!(f, "weekly_grid"),
+            Self::PerEmployee => write!(f, "per_employee"),
+            Self::ByRole => write!(f, "by_role"),
         }
     }
 }
@@ -101,6 +137,8 @@ pub struct ExportConfig {
     pub format: ExportFormat,
     pub profile: ExportProfile,
     pub cell_content: CellContentFlags,
+    /// Selected PDF template (only meaningful when format == Pdf).
+    pub pdf_template: Option<PdfTemplate>,
 }
 
 /// Result of an export operation.
@@ -117,7 +155,10 @@ mod tests {
 
     #[test]
     fn layout_roundtrip() {
-        for layout in [ExportLayout::EmployeeByWeekday, ExportLayout::ShiftByWeekday] {
+        for layout in [
+            ExportLayout::EmployeeByWeekday,
+            ExportLayout::ShiftByWeekday,
+        ] {
             let s = layout.to_string();
             let parsed: ExportLayout = s.parse().unwrap();
             assert_eq!(parsed, layout);

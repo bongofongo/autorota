@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use chrono::{NaiveDate, Weekday};
+use chrono::{NaiveDate, NaiveTime, Weekday};
 
 use crate::models::assignment::Assignment;
 use crate::models::employee::Employee;
@@ -32,6 +32,49 @@ struct ResolvedAssignment<'a> {
     shift: &'a Shift,
     shift_name: String,
     hourly_wage: Option<f32>,
+}
+
+/// Build one `ExportGrid` per unique role present in `shifts`, in alphabetical
+/// role order. Each grid is produced by filtering the shifts/assignments for
+/// that role and delegating to `build_grid` — no business logic is duplicated.
+pub fn build_grids_by_role(
+    config: &ExportConfig,
+    week_start: NaiveDate,
+    assignments: &[Assignment],
+    shifts: &[Shift],
+    employees: &[Employee],
+    templates: &[ShiftTemplate],
+) -> Vec<(String, ExportGrid)> {
+    let mut roles: Vec<String> = shifts.iter().map(|s| s.required_role.clone()).collect();
+    roles.sort();
+    roles.dedup();
+
+    roles
+        .into_iter()
+        .map(|role| {
+            let role_shifts: Vec<Shift> = shifts
+                .iter()
+                .filter(|s| s.required_role == role)
+                .cloned()
+                .collect();
+            let shift_ids: std::collections::HashSet<i64> =
+                role_shifts.iter().map(|s| s.id).collect();
+            let role_assignments: Vec<Assignment> = assignments
+                .iter()
+                .filter(|a| shift_ids.contains(&a.shift_id))
+                .cloned()
+                .collect();
+            let grid = build_grid(
+                config,
+                week_start,
+                &role_assignments,
+                &role_shifts,
+                employees,
+                templates,
+            );
+            (role, grid)
+        })
+        .collect()
 }
 
 pub fn build_grid(
@@ -112,12 +155,24 @@ pub fn build_grid(
     );
 
     match config.layout {
-        ExportLayout::EmployeeByWeekday => {
-            build_employee_grid(&resolved, &dates, &column_headers, &config.cell_content, is_manager, title)
-        }
-        ExportLayout::ShiftByWeekday => {
-            build_shift_grid(&resolved, shifts, &dates, &column_headers, &config.cell_content, is_manager, title, &tmpl_map)
-        }
+        ExportLayout::EmployeeByWeekday => build_employee_grid(
+            &resolved,
+            &dates,
+            &column_headers,
+            &config.cell_content,
+            is_manager,
+            title,
+        ),
+        ExportLayout::ShiftByWeekday => build_shift_grid(
+            &resolved,
+            shifts,
+            &dates,
+            &column_headers,
+            &config.cell_content,
+            is_manager,
+            title,
+            &tmpl_map,
+        ),
     }
 }
 
@@ -130,10 +185,8 @@ fn build_employee_grid(
     title: String,
 ) -> ExportGrid {
     // Collect unique employee names, sorted.
-    let mut employee_names: Vec<String> = resolved
-        .iter()
-        .map(|r| r.employee_name.clone())
-        .collect();
+    let mut employee_names: Vec<String> =
+        resolved.iter().map(|r| r.employee_name.clone()).collect();
     employee_names.sort();
     employee_names.dedup();
 
@@ -230,40 +283,61 @@ fn build_shift_grid(
     // We derive a label and collect unique slots sorted by start_time.
     #[derive(Clone, PartialEq, Eq, Hash)]
     struct SlotKey {
-        start: String,
-        end: String,
+        start: NaiveTime,
+        end: NaiveTime,
         role: String,
     }
 
+    let slot_key_for = |s: &Shift| SlotKey {
+        start: s.start_time,
+        end: s.end_time,
+        role: s.required_role.clone(),
+    };
+
+    // Build the ordered list of unique slot keys (sorted by start_time, then end, then role)
+    // and a label for each. Also build a set of (date, slot) for unfilled detection.
     let mut slot_order: Vec<SlotKey> = Vec::new();
     let mut slot_labels: HashMap<SlotKey, String> = HashMap::new();
+    let mut shift_exists: HashSet<(NaiveDate, SlotKey)> = HashSet::new();
+    let mut seen: HashSet<SlotKey> = HashSet::new();
 
-    // Build slot keys from all shifts (not just assigned ones) so unfilled slots appear.
-    let mut shift_slots: Vec<(&Shift, SlotKey)> = all_shifts
-        .iter()
-        .map(|s| {
-            let key = SlotKey {
-                start: s.start_time.format("%H:%M").to_string(),
-                end: s.end_time.format("%H:%M").to_string(),
-                role: s.required_role.clone(),
-            };
-            (s, key)
-        })
-        .collect();
-    shift_slots.sort_by(|a, b| a.0.start_time.cmp(&b.0.start_time));
+    let mut sorted_shifts: Vec<&Shift> = all_shifts.iter().collect();
+    sorted_shifts.sort_by(|a, b| {
+        a.start_time
+            .cmp(&b.start_time)
+            .then_with(|| a.end_time.cmp(&b.end_time))
+            .then_with(|| a.required_role.cmp(&b.required_role))
+    });
 
-    for (shift, key) in &shift_slots {
-        if !slot_order.contains(key) {
+    for shift in sorted_shifts {
+        let key = slot_key_for(shift);
+        shift_exists.insert((shift.date, key.clone()));
+        if seen.insert(key.clone()) {
             let label = shift
                 .template_id
                 .and_then(|tid| tmpl_map.get(&tid))
                 .map(|t| t.name.clone())
                 .unwrap_or_else(|| {
-                    format!("{} {}-{}", key.role, key.start, key.end)
+                    format!(
+                        "{} {}-{}",
+                        key.role,
+                        key.start.format("%H:%M"),
+                        key.end.format("%H:%M"),
+                    )
                 });
             slot_labels.insert(key.clone(), label);
-            slot_order.push(key.clone());
+            slot_order.push(key);
         }
+    }
+
+    // Bucket resolved assignments by (date, slot) for O(1) cell lookup.
+    let mut assignments_by_cell: HashMap<(NaiveDate, SlotKey), Vec<&ResolvedAssignment>> =
+        HashMap::new();
+    for r in resolved {
+        assignments_by_cell
+            .entry((r.shift.date, slot_key_for(r.shift)))
+            .or_default()
+            .push(r);
     }
 
     let row_headers: Vec<String> = slot_order
@@ -278,25 +352,10 @@ fn build_shift_grid(
     for slot_key in &slot_order {
         let mut row = Vec::with_capacity(7);
         for (col, date) in dates.iter().enumerate() {
-            // Find assignments for this shift slot on this date.
-            let matching: Vec<&ResolvedAssignment> = resolved
-                .iter()
-                .filter(|r| {
-                    r.shift.date == *date
-                        && r.shift.start_time.format("%H:%M").to_string() == slot_key.start
-                        && r.shift.end_time.format("%H:%M").to_string() == slot_key.end
-                        && r.shift.required_role == slot_key.role
-                })
-                .collect();
+            let matching = assignments_by_cell.get(&(*date, slot_key.clone()));
 
-            if matching.is_empty() {
-                // Check if a shift exists but is unfilled.
-                let has_shift = all_shifts.iter().any(|s| {
-                    s.date == *date
-                        && s.start_time.format("%H:%M").to_string() == slot_key.start
-                        && s.end_time.format("%H:%M").to_string() == slot_key.end
-                        && s.required_role == slot_key.role
-                });
+            if matching.is_none_or(|m| m.is_empty()) {
+                let has_shift = shift_exists.contains(&(*date, slot_key.clone()));
                 row.push(if has_shift {
                     "(unfilled)".to_string()
                 } else {
@@ -304,6 +363,7 @@ fn build_shift_grid(
                 });
             } else {
                 let cell_parts: Vec<String> = matching
+                    .unwrap()
                     .iter()
                     .map(|r| {
                         let mut text = r.employee_name.clone();
@@ -380,7 +440,14 @@ mod tests {
         NaiveDate::from_ymd_opt(2026, 3, 23).unwrap() // Monday
     }
 
-    fn make_shift(id: i64, template_id: Option<i64>, date: NaiveDate, start: (u32, u32), end: (u32, u32), role: &str) -> Shift {
+    fn make_shift(
+        id: i64,
+        template_id: Option<i64>,
+        date: NaiveDate,
+        start: (u32, u32),
+        end: (u32, u32),
+        role: &str,
+    ) -> Shift {
         Shift {
             id,
             template_id,
@@ -394,7 +461,13 @@ mod tests {
         }
     }
 
-    fn make_template(id: i64, name: &str, start: (u32, u32), end: (u32, u32), role: &str) -> ShiftTemplate {
+    fn make_template(
+        id: i64,
+        name: &str,
+        start: (u32, u32),
+        end: (u32, u32),
+        role: &str,
+    ) -> ShiftTemplate {
         ShiftTemplate {
             id,
             name: name.to_string(),
@@ -452,6 +525,7 @@ mod tests {
                 show_times: true,
                 show_role: false,
             },
+            pdf_template: None,
         }
     }
 
@@ -465,6 +539,7 @@ mod tests {
                 show_times: true,
                 show_role: false,
             },
+            pdf_template: None,
         }
     }
 
@@ -625,6 +700,7 @@ mod tests {
                 show_times: false,
                 show_role: false,
             },
+            pdf_template: None,
         };
         let grid = build_grid(&config, ws, &assignments, &shifts, &employees, &templates);
         assert_eq!(grid.cells[0][0], "Morning");
@@ -639,6 +715,7 @@ mod tests {
                 show_times: true,
                 show_role: true,
             },
+            pdf_template: None,
         };
         let grid = build_grid(&config, ws, &assignments, &shifts, &employees, &templates);
         assert!(grid.cells[0][0].contains("Morning"));

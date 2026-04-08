@@ -260,13 +260,16 @@ pub struct FfiEmployeeAvailabilityOverride {
 pub struct FfiExportConfig {
     /// "employee_by_weekday" | "shift_by_weekday"
     pub layout: String,
-    /// "csv" | "json"
+    /// "csv" | "json" | "pdf"
     pub format: String,
     /// "staff_schedule" | "manager_report"
     pub profile: String,
     pub show_shift_name: bool,
     pub show_times: bool,
     pub show_role: bool,
+    /// "weekly_grid" | "per_employee" | "by_role".
+    /// Only consulted when `format == "pdf"`. `None` → `weekly_grid`.
+    pub pdf_template: Option<String>,
 }
 
 /// Result of an export operation.

@@ -16,6 +16,7 @@ struct ExportSheetView: View {
     @State private var showShiftName: Bool
     @State private var showTimes: Bool
     @State private var showRole: Bool
+    @State private var pdfTemplate: String
 
     @State private var isExporting = false
     @State private var error: String?
@@ -33,6 +34,7 @@ struct ExportSheetView: View {
         _showShiftName = State(initialValue: defaults.object(forKey: "exportShowShiftName") as? Bool ?? true)
         _showTimes = State(initialValue: defaults.object(forKey: "exportShowTimes") as? Bool ?? true)
         _showRole = State(initialValue: defaults.object(forKey: "exportShowRole") as? Bool ?? true)
+        _pdfTemplate = State(initialValue: defaults.string(forKey: "exportDefaultPdfTemplate") ?? "weekly_grid")
     }
 
     var body: some View {
@@ -50,8 +52,20 @@ struct ExportSheetView: View {
                     Picker("Format", selection: $format) {
                         Text("CSV").tag("csv")
                         Text("JSON").tag("json")
+                        Text("PDF").tag("pdf")
                     }
                     .pickerStyle(.segmented)
+                }
+
+                if format == "pdf" {
+                    Section("PDF Template") {
+                        Picker("Template", selection: $pdfTemplate) {
+                            Text("Weekly Grid").tag("weekly_grid")
+                            Text("Per Employee").tag("per_employee")
+                            Text("By Role").tag("by_role")
+                        }
+                        .pickerStyle(.segmented)
+                    }
                 }
 
                 Section("Profile") {
@@ -114,13 +128,24 @@ struct ExportSheetView: View {
         isExporting = true
         error = nil
 
+        // Persist current selections so they become the defaults next time.
+        let defaults = UserDefaults.standard
+        defaults.set(layout, forKey: "exportDefaultLayout")
+        defaults.set(format, forKey: "exportDefaultFormat")
+        defaults.set(profile, forKey: "exportDefaultProfile")
+        defaults.set(showShiftName, forKey: "exportShowShiftName")
+        defaults.set(showTimes, forKey: "exportShowTimes")
+        defaults.set(showRole, forKey: "exportShowRole")
+        defaults.set(pdfTemplate, forKey: "exportDefaultPdfTemplate")
+
         let config = FfiExportConfig(
             layout: layout,
             format: format,
             profile: profile,
             showShiftName: showShiftName,
             showTimes: showTimes,
-            showRole: showRole
+            showRole: showRole,
+            pdfTemplate: format == "pdf" ? pdfTemplate : nil
         )
 
         do {
@@ -128,20 +153,32 @@ struct ExportSheetView: View {
 
             let tempDir = FileManager.default.temporaryDirectory
             let fileURL = tempDir.appendingPathComponent(result.filename)
-            try result.data.write(to: fileURL, atomically: true, encoding: .utf8)
+
+            // PDF exports arrive base64-encoded so they fit the String-typed
+            // FFI contract. CSV/JSON are UTF-8 text as before.
+            if format == "pdf" {
+                guard let pdfData = Data(base64Encoded: result.data) else {
+                    throw ExportSheetError.invalidPdfPayload
+                }
+                try pdfData.write(to: fileURL, options: .atomic)
+            } else {
+                try result.data.write(to: fileURL, atomically: true, encoding: .utf8)
+            }
 
             exportFileURL = fileURL
 
             #if os(iOS)
             showShareSheet = true
             #else
-            // macOS: use NSSavePanel via the share sheet or just reveal in Finder.
             let panel = NSSavePanel()
             panel.nameFieldStringValue = result.filename
-            panel.allowedContentTypes = format == "csv"
-                ? [.commaSeparatedText]
-                : [.json]
+            panel.allowedContentTypes = allowedContentTypes(for: format)
             if panel.runModal() == .OK, let dest = panel.url {
+                // The user may have picked a destination that already exists
+                // (the panel warns but lets them proceed); overwrite it.
+                if FileManager.default.fileExists(atPath: dest.path) {
+                    try FileManager.default.removeItem(at: dest)
+                }
                 try FileManager.default.copyItem(at: fileURL, to: dest)
             }
             dismiss()
@@ -151,6 +188,28 @@ struct ExportSheetView: View {
         }
 
         isExporting = false
+    }
+
+    #if os(macOS)
+    private func allowedContentTypes(for format: String) -> [UTType] {
+        switch format {
+        case "csv": return [.commaSeparatedText]
+        case "json": return [.json]
+        case "pdf": return [.pdf]
+        default: return []
+        }
+    }
+    #endif
+}
+
+private enum ExportSheetError: LocalizedError {
+    case invalidPdfPayload
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidPdfPayload:
+            return "The exported PDF payload could not be decoded."
+        }
     }
 }
 
