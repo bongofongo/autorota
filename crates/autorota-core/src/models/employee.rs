@@ -147,7 +147,8 @@ mod tests {
     #[test]
     fn reset_availability_restores_default() {
         let mut e = make_employee();
-        e.default_availability.set(Weekday::Mon, 8, AvailabilityState::Yes);
+        e.default_availability
+            .set(Weekday::Mon, 8, AvailabilityState::Yes);
         e.availability.set(Weekday::Mon, 8, AvailabilityState::No);
         assert_eq!(e.availability.get(Weekday::Mon, 8), AvailabilityState::No);
         e.reset_availability();

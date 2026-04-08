@@ -18,9 +18,7 @@ impl TryFrom<HashMap<String, String>> for DayAvailability {
     fn try_from(map: HashMap<String, String>) -> Result<Self, Self::Error> {
         let mut inner = HashMap::new();
         for (k, v) in map {
-            let hour: u8 = k
-                .parse()
-                .map_err(|_| format!("invalid hour key: {k}"))?;
+            let hour: u8 = k.parse().map_err(|_| format!("invalid hour key: {k}"))?;
             let state: AvailabilityState = v
                 .parse()
                 .map_err(|e| format!("invalid state for hour {hour}: {e}"))?;
@@ -40,7 +38,10 @@ impl From<DayAvailability> for HashMap<String, String> {
 
 impl DayAvailability {
     pub fn get(&self, hour: u8) -> AvailabilityState {
-        self.0.get(&hour).copied().unwrap_or(AvailabilityState::Maybe)
+        self.0
+            .get(&hour)
+            .copied()
+            .unwrap_or(AvailabilityState::Maybe)
     }
 
     pub fn set(&mut self, hour: u8, state: AvailabilityState) {

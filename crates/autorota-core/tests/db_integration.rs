@@ -480,7 +480,9 @@ async fn role_rename_cascades() {
     queries::insert_shift_template(&pool, &tmpl).await.unwrap();
 
     // Rename the role
-    queries::update_role(&pool, role_id, "Coffee Maker").await.unwrap();
+    queries::update_role(&pool, role_id, "Coffee Maker")
+        .await
+        .unwrap();
 
     // Verify cascade to employee
     let employees = queries::list_employees(&pool).await.unwrap();
@@ -527,7 +529,10 @@ async fn role_delete_blocked_when_in_use() {
     let result = queries::delete_role(&pool, role_id).await;
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
-    assert!(err_msg.contains("still assigned to"), "Expected 'still assigned to' error, got: {err_msg}");
+    assert!(
+        err_msg.contains("still assigned to"),
+        "Expected 'still assigned to' error, got: {err_msg}"
+    );
 }
 
 #[tokio::test]
@@ -656,13 +661,17 @@ async fn soft_deleted_employee_assignments_survive() {
         employee_name: Some("Alice".to_string()),
         hourly_wage: None,
     };
-    queries::insert_assignment(&pool, &assignment).await.unwrap();
+    queries::insert_assignment(&pool, &assignment)
+        .await
+        .unwrap();
 
     // Soft-delete the employee
     queries::delete_employee(&pool, emp_id).await.unwrap();
 
     // Assignment should still exist
-    let assignments = queries::list_assignments_for_rota(&pool, rota_id).await.unwrap();
+    let assignments = queries::list_assignments_for_rota(&pool, rota_id)
+        .await
+        .unwrap();
     assert_eq!(assignments.len(), 1);
     assert_eq!(assignments[0].employee_id, emp_id);
     assert_eq!(assignments[0].employee_name, Some("Alice".to_string()));
@@ -720,7 +729,10 @@ async fn swap_assignment_shifts_exchanges_shift_ids() {
         availability: Availability::default(),
         deleted: false,
     };
-    let emp2 = Employee { first_name: "Bob".to_string(), ..emp1.clone() };
+    let emp2 = Employee {
+        first_name: "Bob".to_string(),
+        ..emp1.clone()
+    };
     let emp_id_1 = queries::insert_employee(&pool, &emp1).await.unwrap();
     let emp_id_2 = queries::insert_employee(&pool, &emp2).await.unwrap();
 
@@ -752,9 +764,17 @@ async fn swap_assignment_shifts_exchanges_shift_ids() {
         .unwrap();
 
     // Verify: Alice→shift2, Bob→shift1
-    let assignments = queries::list_assignments_for_rota(&pool, rota_id).await.unwrap();
-    let alice_assign = assignments.iter().find(|a| a.employee_id == emp_id_1).unwrap();
-    let bob_assign = assignments.iter().find(|a| a.employee_id == emp_id_2).unwrap();
+    let assignments = queries::list_assignments_for_rota(&pool, rota_id)
+        .await
+        .unwrap();
+    let alice_assign = assignments
+        .iter()
+        .find(|a| a.employee_id == emp_id_1)
+        .unwrap();
+    let bob_assign = assignments
+        .iter()
+        .find(|a| a.employee_id == emp_id_2)
+        .unwrap();
     assert_eq!(alice_assign.shift_id, shift_id_2);
     assert_eq!(bob_assign.shift_id, shift_id_1);
 }
@@ -847,7 +867,9 @@ async fn delete_shifts_for_rota_preserves_adhoc() {
     assert_eq!(before.len(), 2);
 
     // Delete template-based shifts only
-    queries::delete_shifts_for_rota(&pool, rota_id).await.unwrap();
+    queries::delete_shifts_for_rota(&pool, rota_id)
+        .await
+        .unwrap();
 
     // Ad-hoc shift should survive
     let after = queries::list_shifts_for_rota(&pool, rota_id).await.unwrap();
@@ -891,10 +913,14 @@ async fn list_employee_shift_history_returns_joined_records() {
         employee_name: Some("Alice".to_string()),
         hourly_wage: None,
     };
-    queries::insert_assignment(&pool, &assignment).await.unwrap();
+    queries::insert_assignment(&pool, &assignment)
+        .await
+        .unwrap();
 
     // Query shift history
-    let history = queries::list_employee_shift_history(&pool, emp_id).await.unwrap();
+    let history = queries::list_employee_shift_history(&pool, emp_id)
+        .await
+        .unwrap();
     assert_eq!(history.len(), 1);
 
     let rec = &history[0];
@@ -911,7 +937,9 @@ async fn list_employee_shift_history_returns_joined_records() {
     // Employee with no assignments returns empty
     let emp2 = helpers::make_employee(0, "Bob", "barista", AvailabilityState::Yes);
     let emp2_id = queries::insert_employee(&pool, &emp2).await.unwrap();
-    let empty = queries::list_employee_shift_history(&pool, emp2_id).await.unwrap();
+    let empty = queries::list_employee_shift_history(&pool, emp2_id)
+        .await
+        .unwrap();
     assert!(empty.is_empty());
 }
 
@@ -1072,7 +1100,9 @@ async fn delete_rota_creates_cascade_tombstones() {
         employee_name: Some("Alice".to_string()),
         hourly_wage: None,
     };
-    let assignment_id = queries::insert_assignment(&pool, &assignment).await.unwrap();
+    let assignment_id = queries::insert_assignment(&pool, &assignment)
+        .await
+        .unwrap();
 
     // Clear any tombstones from prior operations
     let prior = queries::get_pending_tombstones(&pool).await.unwrap();
@@ -1088,15 +1118,21 @@ async fn delete_rota_creates_cascade_tombstones() {
 
     // Should have tombstones for assignments, shifts, and the rota
     assert!(
-        tombstones.iter().any(|t| t.table_name == "assignments" && t.record_id == assignment_id),
+        tombstones
+            .iter()
+            .any(|t| t.table_name == "assignments" && t.record_id == assignment_id),
         "should have tombstone for assignment"
     );
     assert!(
-        tombstones.iter().any(|t| t.table_name == "shifts" && t.record_id == shift_id),
+        tombstones
+            .iter()
+            .any(|t| t.table_name == "shifts" && t.record_id == shift_id),
         "should have tombstone for shift"
     );
     assert!(
-        tombstones.iter().any(|t| t.table_name == "rotas" && t.record_id == rota_id),
+        tombstones
+            .iter()
+            .any(|t| t.table_name == "rotas" && t.record_id == rota_id),
         "should have tombstone for rota"
     );
 }
@@ -1127,7 +1163,9 @@ async fn soft_delete_sets_sync_pending_no_tombstone() {
     // Should NOT have a tombstone (soft-delete, not hard-delete)
     let tombstones = queries::get_pending_tombstones(&pool).await.unwrap();
     assert!(
-        !tombstones.iter().any(|t| t.table_name == "employees" && t.record_id == id),
+        !tombstones
+            .iter()
+            .any(|t| t.table_name == "employees" && t.record_id == id),
         "soft-deleted employee should NOT have a tombstone"
     );
 
@@ -1176,7 +1214,9 @@ async fn pending_sync_records_json_has_all_columns() {
         employee_name: Some("Alice".to_string()),
         hourly_wage: None,
     };
-    queries::insert_assignment(&pool, &assignment).await.unwrap();
+    queries::insert_assignment(&pool, &assignment)
+        .await
+        .unwrap();
 
     // Check JSON fields for each table
     let tables = vec!["roles", "employees", "rotas", "shifts", "assignments"];
@@ -1192,11 +1232,14 @@ async fn pending_sync_records_json_has_all_columns() {
 
         let record = &records[0];
         let json: serde_json::Value = serde_json::from_str(&record.fields).unwrap_or_else(|e| {
-            panic!("invalid JSON for {}: {} — fields: {}", table, e, record.fields)
+            panic!(
+                "invalid JSON for {}: {} — fields: {}",
+                table, e, record.fields
+            )
         });
-        let obj = json.as_object().unwrap_or_else(|| {
-            panic!("fields for {} should be a JSON object", table)
-        });
+        let obj = json
+            .as_object()
+            .unwrap_or_else(|| panic!("fields for {} should be a JSON object", table));
 
         // Verify all expected columns are present as keys
         let expected_columns = queries::syncable_columns(table);

@@ -3,9 +3,11 @@ use autorota_core::db::queries;
 use autorota_core::models::assignment::{Assignment, AssignmentStatus};
 use autorota_core::models::availability::AvailabilityState;
 use autorota_core::models::employee::Employee;
-use autorota_core::models::overrides::{DayAvailability, EmployeeAvailabilityOverride, ShiftTemplateOverride};
-use autorota_core::models::rota::Rota;
+use autorota_core::models::overrides::{
+    DayAvailability, EmployeeAvailabilityOverride, ShiftTemplateOverride,
+};
 use autorota_core::models::role::Role;
+use autorota_core::models::rota::Rota;
 use autorota_core::models::shift::ShiftTemplate;
 use autorota_core::models::shift_history::EmployeeShiftRecord;
 use autorota_core::scheduler;
@@ -92,9 +94,7 @@ async fn delete_employee(state: State<'_, AppState>, id: i64) -> Result<(), Stri
 #[tauri::command]
 async fn list_roles(state: State<'_, AppState>) -> Result<Vec<Role>, String> {
     let pool = get_pool(&state).await?;
-    queries::list_roles(&pool)
-        .await
-        .map_err(|e| e.to_string())
+    queries::list_roles(&pool).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -258,7 +258,7 @@ async fn move_assignment(
 
     // Validate target shift belongs to same rota
     let target_shift = sqlx::query_as::<_, (i64, i64, u32)>(
-        "SELECT id, rota_id, max_employees FROM shifts WHERE id = ?"
+        "SELECT id, rota_id, max_employees FROM shifts WHERE id = ?",
     )
     .bind(new_shift_id)
     .fetch_optional(&pool)
@@ -271,13 +271,12 @@ async fn move_assignment(
     }
 
     // Check capacity
-    let current_count: (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM assignments WHERE shift_id = ?"
-    )
-    .bind(new_shift_id)
-    .fetch_one(&pool)
-    .await
-    .map_err(|e| e.to_string())?;
+    let current_count: (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM assignments WHERE shift_id = ?")
+            .bind(new_shift_id)
+            .fetch_one(&pool)
+            .await
+            .map_err(|e| e.to_string())?;
 
     if current_count.0 >= target_shift.2 as i64 {
         return Err("Target shift is at capacity".into());
@@ -289,30 +288,22 @@ async fn move_assignment(
 }
 
 #[tauri::command]
-async fn swap_assignments(
-    state: State<'_, AppState>,
-    id_a: i64,
-    id_b: i64,
-) -> Result<(), String> {
+async fn swap_assignments(state: State<'_, AppState>, id_a: i64, id_b: i64) -> Result<(), String> {
     let pool = get_pool(&state).await?;
 
-    let a = sqlx::query_as::<_, (i64, i64)>(
-        "SELECT id, shift_id FROM assignments WHERE id = ?"
-    )
-    .bind(id_a)
-    .fetch_optional(&pool)
-    .await
-    .map_err(|e| e.to_string())?
-    .ok_or("Assignment A not found")?;
+    let a = sqlx::query_as::<_, (i64, i64)>("SELECT id, shift_id FROM assignments WHERE id = ?")
+        .bind(id_a)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or("Assignment A not found")?;
 
-    let b = sqlx::query_as::<_, (i64, i64)>(
-        "SELECT id, shift_id FROM assignments WHERE id = ?"
-    )
-    .bind(id_b)
-    .fetch_optional(&pool)
-    .await
-    .map_err(|e| e.to_string())?
-    .ok_or("Assignment B not found")?;
+    let b = sqlx::query_as::<_, (i64, i64)>("SELECT id, shift_id FROM assignments WHERE id = ?")
+        .bind(id_b)
+        .fetch_optional(&pool)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or("Assignment B not found")?;
 
     queries::swap_assignment_shifts(&pool, a.0, a.1, b.0, b.1)
         .await
@@ -320,10 +311,7 @@ async fn swap_assignments(
 }
 
 #[tauri::command]
-async fn delete_assignment(
-    state: State<'_, AppState>,
-    id: i64,
-) -> Result<(), String> {
+async fn delete_assignment(state: State<'_, AppState>, id: i64) -> Result<(), String> {
     let pool = get_pool(&state).await?;
     queries::delete_assignment(&pool, id)
         .await
@@ -367,8 +355,8 @@ async fn create_ad_hoc_shift(
     required_role: String,
 ) -> Result<i64, String> {
     let pool = get_pool(&state).await?;
-    let shift_date = NaiveDate::parse_from_str(&date, "%Y-%m-%d")
-        .map_err(|e| format!("Invalid date: {e}"))?;
+    let shift_date =
+        NaiveDate::parse_from_str(&date, "%Y-%m-%d").map_err(|e| format!("Invalid date: {e}"))?;
     let start = chrono::NaiveTime::parse_from_str(&start_time, "%H:%M")
         .map_err(|e| format!("Invalid start time: {e}"))?;
     let end = chrono::NaiveTime::parse_from_str(&end_time, "%H:%M")
@@ -392,10 +380,7 @@ async fn create_ad_hoc_shift(
 }
 
 #[tauri::command]
-async fn materialise_week(
-    state: State<'_, AppState>,
-    week_start: String,
-) -> Result<i64, String> {
+async fn materialise_week(state: State<'_, AppState>, week_start: String) -> Result<i64, String> {
     let pool = get_pool(&state).await?;
     let date = NaiveDate::parse_from_str(&week_start, "%Y-%m-%d")
         .map_err(|e| format!("Invalid date: {e}"))?;
@@ -433,7 +418,8 @@ async fn run_schedule(
 
     // Guard: only allow scheduling for future weeks
     let today = Local::now().date_naive();
-    let current_monday = today - chrono::Duration::days(today.weekday().num_days_from_monday() as i64);
+    let current_monday =
+        today - chrono::Duration::days(today.weekday().num_days_from_monday() as i64);
     if date <= current_monday {
         return Err("Cannot generate schedule for current or past weeks".to_string());
     }
@@ -698,7 +684,9 @@ fn tauri_to_employee_avail_override(
         .map_err(|e| format!("invalid date '{}': {e}", dto.date))?;
     let mut avail = DayAvailability::default();
     for (hour_str, state_str) in dto.availability {
-        let hour: u8 = hour_str.parse().map_err(|_| format!("invalid hour key: {hour_str}"))?;
+        let hour: u8 = hour_str
+            .parse()
+            .map_err(|_| format!("invalid hour key: {hour_str}"))?;
         let state: AvailabilityState = state_str
             .parse()
             .map_err(|e| format!("invalid state '{state_str}': {e}"))?;
@@ -810,7 +798,11 @@ async fn list_employee_availability_overrides(
     let pool = get_pool(&state).await?;
     queries::list_employee_availability_overrides_for_employee(&pool, employee_id)
         .await
-        .map(|v| v.into_iter().map(employee_avail_override_to_tauri).collect())
+        .map(|v| {
+            v.into_iter()
+                .map(employee_avail_override_to_tauri)
+                .collect()
+        })
         .map_err(|e| e.to_string())
 }
 
@@ -821,7 +813,11 @@ async fn list_all_employee_availability_overrides(
     let pool = get_pool(&state).await?;
     queries::list_all_employee_availability_overrides(&pool)
         .await
-        .map(|v| v.into_iter().map(employee_avail_override_to_tauri).collect())
+        .map(|v| {
+            v.into_iter()
+                .map(employee_avail_override_to_tauri)
+                .collect()
+        })
         .map_err(|e| e.to_string())
 }
 
@@ -873,7 +869,11 @@ async fn list_shift_template_overrides_for_template(
     let pool = get_pool(&state).await?;
     queries::list_shift_template_overrides_for_template(&pool, template_id)
         .await
-        .map(|v| v.into_iter().map(shift_template_override_to_tauri).collect())
+        .map(|v| {
+            v.into_iter()
+                .map(shift_template_override_to_tauri)
+                .collect()
+        })
         .map_err(|e| e.to_string())
 }
 
@@ -884,15 +884,16 @@ async fn list_all_shift_template_overrides(
     let pool = get_pool(&state).await?;
     queries::list_all_shift_template_overrides(&pool)
         .await
-        .map(|v| v.into_iter().map(shift_template_override_to_tauri).collect())
+        .map(|v| {
+            v.into_iter()
+                .map(shift_template_override_to_tauri)
+                .collect()
+        })
         .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-async fn delete_shift_template_override(
-    state: State<'_, AppState>,
-    id: i64,
-) -> Result<(), String> {
+async fn delete_shift_template_override(state: State<'_, AppState>, id: i64) -> Result<(), String> {
     let pool = get_pool(&state).await?;
     queries::delete_shift_template_override(&pool, id)
         .await

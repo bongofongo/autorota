@@ -501,9 +501,7 @@ async fn template_override_upsert_get_delete_roundtrip() {
 // D. Staging operations
 // ─────────────────────────────────────────────────────────────
 
-async fn seed_rota_with_past_shifts(
-    pool: &sqlx::SqlitePool,
-) -> (i64, Vec<i64>) {
+async fn seed_rota_with_past_shifts(pool: &sqlx::SqlitePool) -> (i64, Vec<i64>) {
     let rota_id = queries::insert_rota(pool, week_start()).await.unwrap();
     let mut ids = Vec::new();
     for day_n in [23u32, 24, 25] {
@@ -523,11 +521,15 @@ async fn stage_and_unstage_shifts_roundtrip() {
     let today = date(30); // all shifts are in the past
 
     queries::stage_shifts(&pool, &ids, today).await.unwrap();
-    let staged = queries::list_staged_shift_ids(&pool, rota_id).await.unwrap();
+    let staged = queries::list_staged_shift_ids(&pool, rota_id)
+        .await
+        .unwrap();
     assert_eq!(staged.len(), 3);
 
     queries::unstage_shifts(&pool, &ids[..1]).await.unwrap();
-    let staged = queries::list_staged_shift_ids(&pool, rota_id).await.unwrap();
+    let staged = queries::list_staged_shift_ids(&pool, rota_id)
+        .await
+        .unwrap();
     assert_eq!(staged.len(), 2);
 }
 
@@ -540,7 +542,9 @@ async fn stage_day_marks_only_that_day() {
     queries::stage_day(&pool, rota_id, date(24), today)
         .await
         .unwrap();
-    let staged = queries::list_staged_shift_ids(&pool, rota_id).await.unwrap();
+    let staged = queries::list_staged_shift_ids(&pool, rota_id)
+        .await
+        .unwrap();
     assert_eq!(staged.len(), 1);
 }
 
@@ -551,11 +555,15 @@ async fn stage_week_marks_all_past_shifts_in_rota() {
     let today = date(30);
 
     queries::stage_week(&pool, rota_id, today).await.unwrap();
-    let staged = queries::list_staged_shift_ids(&pool, rota_id).await.unwrap();
+    let staged = queries::list_staged_shift_ids(&pool, rota_id)
+        .await
+        .unwrap();
     assert_eq!(staged.len(), 3);
 
     queries::unstage_week(&pool, rota_id).await.unwrap();
-    let staged = queries::list_staged_shift_ids(&pool, rota_id).await.unwrap();
+    let staged = queries::list_staged_shift_ids(&pool, rota_id)
+        .await
+        .unwrap();
     assert!(staged.is_empty());
 }
 
@@ -572,13 +580,18 @@ async fn create_commit_and_retrieve() {
     let commit_id = queries::create_commit(&pool, rota_id).await.unwrap();
     assert!(commit_id > 0);
 
-    let got = queries::get_commit(&pool, commit_id).await.unwrap().unwrap();
+    let got = queries::get_commit(&pool, commit_id)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(got.rota_id, rota_id);
     assert!(got.summary.contains("3 shifts"));
     assert!(got.snapshot_json.contains("committed_shift_ids"));
 
     // create_commit should clear staging
-    let staged = queries::list_staged_shift_ids(&pool, rota_id).await.unwrap();
+    let staged = queries::list_staged_shift_ids(&pool, rota_id)
+        .await
+        .unwrap();
     assert!(staged.is_empty());
 }
 
@@ -637,18 +650,19 @@ async fn delete_rota_removes_shifts_and_assignments() {
         employee_name: Some("Alice".into()),
         hourly_wage: None,
     };
-    queries::insert_assignment(&pool, &assignment).await.unwrap();
+    queries::insert_assignment(&pool, &assignment)
+        .await
+        .unwrap();
 
     queries::delete_rota(&pool, rota_id).await.unwrap();
 
     let rota_now = queries::get_rota(&pool, rota_id).await.unwrap();
     assert!(rota_now.is_none());
-    let leftover_shifts: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM shifts WHERE rota_id = ?")
-            .bind(rota_id)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+    let leftover_shifts: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM shifts WHERE rota_id = ?")
+        .bind(rota_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     assert_eq!(leftover_shifts, 0);
     // delete_rota inserts tombstones for assignments and removes shifts; the
     // assignment rows themselves currently remain (sync layer treats them as

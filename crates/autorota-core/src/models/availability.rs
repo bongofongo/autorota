@@ -156,7 +156,10 @@ mod tests {
         for h in 7..12 {
             avail.set(Weekday::Mon, h, AvailabilityState::Yes);
         }
-        assert_eq!(avail.for_window(Weekday::Mon, 7, 12), AvailabilityState::Yes);
+        assert_eq!(
+            avail.for_window(Weekday::Mon, 7, 12),
+            AvailabilityState::Yes
+        );
     }
 
     #[test]
@@ -166,7 +169,10 @@ mod tests {
             avail.set(Weekday::Mon, h, AvailabilityState::Yes);
         }
         avail.set(Weekday::Mon, 9, AvailabilityState::Maybe);
-        assert_eq!(avail.for_window(Weekday::Mon, 7, 12), AvailabilityState::Maybe);
+        assert_eq!(
+            avail.for_window(Weekday::Mon, 7, 12),
+            AvailabilityState::Maybe
+        );
     }
 
     #[test]
@@ -188,7 +194,10 @@ mod tests {
         for h in 0..2 {
             avail.set(Weekday::Fri, h, AvailabilityState::Yes);
         }
-        assert_eq!(avail.for_window(Weekday::Fri, 22, 2), AvailabilityState::Yes);
+        assert_eq!(
+            avail.for_window(Weekday::Fri, 22, 2),
+            AvailabilityState::Yes
+        );
     }
 
     #[test]
@@ -206,7 +215,10 @@ mod tests {
     fn for_window_empty_availability_returns_maybe() {
         let avail = Availability::default();
         // All unset hours default to Maybe
-        assert_eq!(avail.for_window(Weekday::Mon, 7, 12), AvailabilityState::Maybe);
+        assert_eq!(
+            avail.for_window(Weekday::Mon, 7, 12),
+            AvailabilityState::Maybe
+        );
     }
 
     #[test]
@@ -240,7 +252,11 @@ mod tests {
 
     #[test]
     fn availability_state_display_roundtrip() {
-        for state in [AvailabilityState::No, AvailabilityState::Maybe, AvailabilityState::Yes] {
+        for state in [
+            AvailabilityState::No,
+            AvailabilityState::Maybe,
+            AvailabilityState::Yes,
+        ] {
             let s = state.to_string();
             let parsed: AvailabilityState = s.parse().unwrap();
             assert_eq!(parsed, state);

@@ -254,10 +254,20 @@ fn tiebreak_is_deterministic() {
     let bob = make_employee(2, "Bob", "barista", AvailabilityState::Yes);
     let shift = make_shift(1, date(23), 7, 12, "barista");
 
-    let result1 = schedule_pure(&[shift.clone()], &[alice.clone(), bob.clone()], &[], &[], 1, week_start());
+    let result1 = schedule_pure(
+        &[shift.clone()],
+        &[alice.clone(), bob.clone()],
+        &[],
+        &[],
+        1,
+        week_start(),
+    );
     let result2 = schedule_pure(&[shift], &[alice, bob], &[], &[], 1, week_start());
 
-    assert_eq!(result1.assignments[0].employee_id, result2.assignments[0].employee_id);
+    assert_eq!(
+        result1.assignments[0].employee_id,
+        result2.assignments[0].employee_id
+    );
 }
 
 #[test]
@@ -282,8 +292,15 @@ fn override_counts_toward_hours_budget() {
     let result = schedule_pure(&[s1, s2], &[emp], &existing, &[], 1, week_start());
 
     // Override takes 8h. s2 would push to 13h > 10h max, so it shouldn't be assigned.
-    let proposed: Vec<_> = result.assignments.iter().filter(|a| a.status == AssignmentStatus::Proposed).collect();
-    assert!(proposed.is_empty(), "second shift should not be assigned due to weekly budget");
+    let proposed: Vec<_> = result
+        .assignments
+        .iter()
+        .filter(|a| a.status == AssignmentStatus::Proposed)
+        .collect();
+    assert!(
+        proposed.is_empty(),
+        "second shift should not be assigned due to weekly budget"
+    );
     assert_eq!(result.warnings.len(), 1);
 }
 
@@ -292,12 +309,16 @@ fn overnight_shift_with_matching_availability() {
     let mut emp = make_employee(1, "Alice", "barista", AvailabilityState::No);
     // Set availability for overnight hours on Friday
     for h in 22..24 {
-        emp.availability.set(Weekday::Fri, h, AvailabilityState::Yes);
-        emp.default_availability.set(Weekday::Fri, h, AvailabilityState::Yes);
+        emp.availability
+            .set(Weekday::Fri, h, AvailabilityState::Yes);
+        emp.default_availability
+            .set(Weekday::Fri, h, AvailabilityState::Yes);
     }
     for h in 0..6 {
-        emp.availability.set(Weekday::Fri, h, AvailabilityState::Yes);
-        emp.default_availability.set(Weekday::Fri, h, AvailabilityState::Yes);
+        emp.availability
+            .set(Weekday::Fri, h, AvailabilityState::Yes);
+        emp.default_availability
+            .set(Weekday::Fri, h, AvailabilityState::Yes);
     }
 
     // Friday overnight shift 22:00-02:00

@@ -8,9 +8,24 @@
 #   make swift-test-app-macos     ViewModel mock tests on macOS (fast, no FFI needed)
 #   make swift-test-all           All three Swift app targets + package integration tests
 #
+# Output is concise by default. For full verbose output:
+#   VERBOSE=1 make test-all
+#
 # Building the XCFramework is required before running any Swift test that
 # imports AutorotaKit (including the app target compile).  Run once:
 #   make swift-build-xcframework
+
+VERBOSE ?=
+
+ifdef VERBOSE
+  CARGO_TEST_FLAGS :=
+  XCB_QUIET :=
+  SWIFT_TEST_QUIET :=
+else
+  CARGO_TEST_FLAGS := -- --format=terse
+  XCB_QUIET := -quiet
+  SWIFT_TEST_QUIET := --quiet
+endif
 
 PROJECT := platforms/apple/Apps/AutorotaApp/AutorotaApp.xcodeproj
 SCHEME  := AutorotaApp
@@ -24,10 +39,10 @@ XCB     := xcodebuild -project $(PROJECT) -scheme $(SCHEME)
 rust-test: rust-test-unit rust-test-integration
 
 rust-test-unit:
-	cargo test --lib --workspace
+	cargo test --lib --workspace $(CARGO_TEST_FLAGS)
 
 rust-test-integration:
-	cargo test --test '*' -p autorota-core
+	cargo test --test '*' -p autorota-core $(CARGO_TEST_FLAGS)
 
 rust-fmt:
 	cargo fmt --check --all
@@ -54,13 +69,13 @@ swift-build-xcframework-debug:
 .PHONY: swift-build-check-macos swift-build-check-ios swift-build-check-ipad swift-build-check
 
 swift-build-check-macos:
-	$(XCB) build -destination 'platform=macOS' $(NOSIGN)
+	$(XCB) build $(XCB_QUIET) -destination 'platform=macOS' $(NOSIGN)
 
 swift-build-check-ios:
-	$(XCB) build -destination 'platform=iOS Simulator,name=iPhone 17' $(NOSIGN)
+	$(XCB) build $(XCB_QUIET) -destination 'platform=iOS Simulator,name=iPhone 17' $(NOSIGN)
 
 swift-build-check-ipad:
-	$(XCB) build -destination 'platform=iOS Simulator,name=iPad Pro 13-inch (M5)' $(NOSIGN)
+	$(XCB) build $(XCB_QUIET) -destination 'platform=iOS Simulator,name=iPad Pro 13-inch (M5)' $(NOSIGN)
 
 swift-build-check: swift-build-check-macos swift-build-check-ios swift-build-check-ipad
 
@@ -72,20 +87,20 @@ swift-build-check: swift-build-check-macos swift-build-check-ios swift-build-che
 NOSIGN := CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
 
 swift-test-app-macos:
-	$(XCB) test -destination 'platform=macOS' $(NOSIGN)
+	$(XCB) test $(XCB_QUIET) -destination 'platform=macOS' $(NOSIGN)
 
 swift-test-app-ios:
-	$(XCB) test -destination 'platform=iOS Simulator,name=iPhone 17' $(NOSIGN)
+	$(XCB) test $(XCB_QUIET) -destination 'platform=iOS Simulator,name=iPhone 17' $(NOSIGN)
 
 swift-test-app-ipad:
-	$(XCB) test -destination 'platform=iOS Simulator,name=iPad Pro 13-inch (M5)' $(NOSIGN)
+	$(XCB) test $(XCB_QUIET) -destination 'platform=iOS Simulator,name=iPad Pro 13-inch (M5)' $(NOSIGN)
 
 # ─── Apple — SPM integration tests (real FFI calls, XCFramework required) ────
 
 .PHONY: swift-test-package
 
 swift-test-package:
-	cd $(SPM_PKG) && swift test
+	cd $(SPM_PKG) && swift test $(SWIFT_TEST_QUIET)
 
 # ─── Combined ────────────────────────────────────────────────────────────────
 
