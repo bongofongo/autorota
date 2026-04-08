@@ -7,7 +7,7 @@ use crate::models::employee::Employee;
 use crate::models::overrides::EmployeeAvailabilityOverride;
 use crate::models::shift::Shift;
 use chrono::NaiveDate;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -47,7 +47,7 @@ struct SchedulerState {
     /// (employee_id, date) → total hours assigned on that day
     daily_hours: HashMap<(i64, NaiveDate), f32>,
     /// shift_id → employee_ids assigned to that shift
-    shift_assignments: HashMap<i64, Vec<i64>>,
+    shift_assignments: HashMap<i64, HashSet<i64>>,
     /// All assignments produced so far
     assignments: Vec<Assignment>,
 }
@@ -80,7 +80,7 @@ impl SchedulerState {
         self.shift_assignments
             .entry(shift.id)
             .or_default()
-            .push(employee_id);
+            .insert(employee_id);
         self.assignments.push(Assignment {
             id: 0,
             rota_id,
@@ -134,7 +134,8 @@ fn is_eligible(
     // Must not have No availability for any hour of the shift.
     // Use date-specific override when present, otherwise fall back to weekly availability.
     let avail = if let Some(ovr) = avail_override_map.get(&(employee.id, shift.date)) {
-        ovr.availability.for_window(shift.start_hour(), shift.end_hour())
+        ovr.availability
+            .for_window(shift.start_hour(), shift.end_hour())
     } else {
         employee
             .availability
@@ -210,43 +211,14 @@ pub fn schedule_pure(
     rota_id: i64,
     week_start: NaiveDate,
 ) -> ScheduleResult {
-    println!(
-        "[Scheduler] Starting schedule_pure: {} shifts, {} employees, {} existing assignments, rota_id={}, week_start={}",
-        shifts.len(),
-        employees.len(),
-        existing_assignments.len(),
-        rota_id,
-        week_start
-    );
-    for s in shifts {
-        println!(
-            "[Scheduler]   Shift id={} date={} {}–{} role={} min={} max={}",
-            s.id,
-            s.date,
-            s.start_time,
-            s.end_time,
-            s.required_role,
-            s.min_employees,
-            s.max_employees
-        );
-    }
-    for e in employees {
-        println!(
-            "[Scheduler]   Employee id={} name={} roles={:?} daily={}h target_weekly={}h (±{})",
-            e.id,
-            e.display_name(),
-            e.roles,
-            e.max_daily_hours,
-            e.target_weekly_hours,
-            e.weekly_hours_deviation
-        );
-    }
-
     let shift_map: HashMap<i64, &Shift> = shifts.iter().map(|s| (s.id, s)).collect();
     let emp_map: HashMap<i64, &Employee> = employees.iter().map(|e| (e.id, e)).collect();
     // Build a (employee_id, date) → override lookup for O(1) access during scheduling.
     let avail_override_map: HashMap<(i64, NaiveDate), &EmployeeAvailabilityOverride> =
-        avail_overrides.iter().map(|o| ((o.employee_id, o.date), o)).collect();
+        avail_overrides
+            .iter()
+            .map(|o| ((o.employee_id, o.date), o))
+            .collect();
     let mut state = SchedulerState::new();
     let mut warnings = Vec::new();
 
@@ -259,7 +231,14 @@ pub fn schedule_pure(
             let emp = emp_map.get(&a.employee_id);
             let name = emp.map(|e| e.display_name());
             let wage = emp.and_then(|e| e.hourly_wage);
-            state.record_assignment(a.employee_id, name, wage, shift, rota_id, AssignmentStatus::Overridden);
+            state.record_assignment(
+                a.employee_id,
+                name,
+                wage,
+                shift,
+                rota_id,
+                AssignmentStatus::Overridden,
+            );
         }
     }
 
@@ -294,65 +273,28 @@ pub fn schedule_pure(
             .then(a.start_time.cmp(&b.start_time)) // earlier time first
     });
 
-    println!(
-        "[Scheduler] Pass 2: {} shifts to fill (sorted by difficulty)",
-        shift_order.len()
-    );
-
     // For each shift, fill remaining slots one at a time
     for shift in &shift_order {
         let remaining = shift.max_employees - state.slots_filled(shift.id);
-        println!(
-            "[Scheduler]   Filling shift id={} {} {} {}–{} role={} (need {} more)",
-            shift.id,
-            shift.date,
-            shift.weekday(),
-            shift.start_time,
-            shift.end_time,
-            shift.required_role,
-            remaining
-        );
 
-        for slot in 0..remaining {
+        for _slot in 0..remaining {
             // Find and score all eligible candidates
             let mut candidates: Vec<(&Employee, (u8, i32, i32), u64)> = employees
                 .iter()
-                .filter(|e| {
-                    let eligible = is_eligible(e, shift, &state, &shift_map, &avail_override_map);
-                    if !eligible {
-                        // Log why each employee is ineligible
-                        let has_role = e.has_role(&shift.required_role);
-                        let avail = if let Some(ovr) = avail_override_map.get(&(e.id, shift.date)) {
-                            ovr.availability.for_window(shift.start_hour(), shift.end_hour())
-                        } else {
-                            e.availability.for_window(shift.weekday(), shift.start_hour(), shift.end_hour())
-                        };
-                        let already = state.is_assigned_to_shift(e.id, shift.id);
-                        let daily = state.employee_daily_hours(e.id, shift.date);
-                        let weekly = state.employee_weekly_hours(e.id);
-                        let hours = shift.duration_hours();
-                        println!("[Scheduler]     {} ineligible: role={} avail={} already_assigned={} daily={}/{}h weekly={}/{}h shift_hours={}", e.display_name(), has_role, avail, already, daily, e.max_daily_hours, weekly, e.max_weekly_hours(), hours);
-                    }
-                    eligible
-                })
+                .filter(|e| is_eligible(e, shift, &state, &shift_map, &avail_override_map))
                 .map(|e| {
                     let weekly = state.employee_weekly_hours(e.id);
                     let daily = state.employee_daily_hours(e.id, shift.date);
-                    let day_avail = avail_override_map.get(&(e.id, shift.date)).map(|o| &o.availability);
+                    let day_avail = avail_override_map
+                        .get(&(e.id, shift.date))
+                        .map(|o| &o.availability);
                     let score = scoring::score_employee(e, shift, weekly, daily, day_avail);
                     let tb = tiebreak::tiebreak_key(e.id, &week_start);
                     (e, score, tb)
                 })
                 .collect();
 
-            println!(
-                "[Scheduler]     Slot {}: {} eligible candidates",
-                slot + 1,
-                candidates.len()
-            );
-
             if candidates.is_empty() {
-                println!("[Scheduler]     No candidates available, stopping fill for this shift");
                 break;
             }
 
@@ -363,11 +305,14 @@ pub fn schedule_pure(
             });
 
             let winner = candidates[0].0;
-            println!(
-                "[Scheduler]     Assigned: {} (score={:?})",
-                winner.display_name(), candidates[0].1
+            state.record_assignment(
+                winner.id,
+                Some(winner.display_name()),
+                winner.hourly_wage,
+                shift,
+                rota_id,
+                AssignmentStatus::Proposed,
             );
-            state.record_assignment(winner.id, Some(winner.display_name()), winner.hourly_wage, shift, rota_id, AssignmentStatus::Proposed);
         }
 
         let filled = state.slots_filled(shift.id);
@@ -384,11 +329,6 @@ pub fn schedule_pure(
         }
     }
 
-    println!(
-        "[Scheduler] Done: {} assignments, {} warnings",
-        state.assignments.len(),
-        warnings.len()
-    );
     ScheduleResult {
         assignments: state.assignments,
         warnings,
@@ -417,7 +357,14 @@ pub async fn schedule(
     let existing = queries::list_assignments_for_rota(pool, rota_id).await?;
     let avail_overrides = queries::list_all_employee_availability_overrides(pool).await?;
 
-    let result = schedule_pure(&shifts, &employees, &existing, &avail_overrides, rota_id, rota.week_start);
+    let result = schedule_pure(
+        &shifts,
+        &employees,
+        &existing,
+        &avail_overrides,
+        rota_id,
+        rota.week_start,
+    );
 
     // Persist only newly generated assignments (not the existing overrides)
     for assignment in &result.assignments {
