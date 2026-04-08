@@ -17,6 +17,64 @@ struct OverridesTabView: View {
     @State private var editingEmpOverride: FfiEmployeeAvailabilityOverride? = nil
     @State private var showingTmplSheet = false
     @State private var editingTmplOverride: FfiShiftTemplateOverride? = nil
+    @State private var empFilter: EmpOverrideFilter = .all
+
+    enum EmpOverrideFilter: String, CaseIterable, Identifiable {
+        case all = "All"
+        case single = "Single Days"
+        case range = "Date Ranges"
+        var id: String { rawValue }
+    }
+
+    /// A contiguous run of overrides for the same employee on consecutive calendar days.
+    struct EmpOverrideGroup: Identifiable {
+        let items: [FfiEmployeeAvailabilityOverride]  // sorted by date
+        var id: String { "\(items.first?.employeeId ?? 0)-\(items.first?.date ?? "")-\(items.count)" }
+        var isRange: Bool { items.count > 1 }
+        var employeeId: Int64 { items.first?.employeeId ?? 0 }
+        var startDate: String { items.first?.date ?? "" }
+        var endDate: String { items.last?.date ?? "" }
+    }
+
+    private static let isoFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+
+    private var employeeOverrideGroups: [EmpOverrideGroup] {
+        // Group by employee, then split into runs of consecutive days.
+        let byEmp = Dictionary(grouping: vm.employeeAvailabilityOverrides, by: { $0.employeeId })
+        var groups: [EmpOverrideGroup] = []
+        let cal = Calendar(identifier: .iso8601)
+        for (_, list) in byEmp {
+            let sorted = list.sorted { $0.date < $1.date }
+            var run: [FfiEmployeeAvailabilityOverride] = []
+            for ovr in sorted {
+                if let last = run.last,
+                   let lastDate = Self.isoFmt.date(from: last.date),
+                   let thisDate = Self.isoFmt.date(from: ovr.date),
+                   let next = cal.date(byAdding: .day, value: 1, to: lastDate),
+                   cal.isDate(next, inSameDayAs: thisDate) {
+                    run.append(ovr)
+                } else {
+                    if !run.isEmpty { groups.append(EmpOverrideGroup(items: run)) }
+                    run = [ovr]
+                }
+            }
+            if !run.isEmpty { groups.append(EmpOverrideGroup(items: run)) }
+        }
+        return groups.sorted { $0.startDate < $1.startDate }
+    }
+
+    private var filteredEmpGroups: [EmpOverrideGroup] {
+        switch empFilter {
+        case .all: return employeeOverrideGroups
+        case .single: return employeeOverrideGroups.filter { !$0.isRange }
+        case .range: return employeeOverrideGroups.filter { $0.isRange }
+        }
+    }
 
     private var employeeLookup: [Int64: String] {
         Dictionary(uniqueKeysWithValues: employeeVM.employees.map { ($0.id, $0.displayName) })
@@ -31,33 +89,47 @@ struct OverridesTabView: View {
             List {
                 // Employee availability overrides
                 Section {
-                    ForEach(vm.employeeAvailabilityOverrides) { ovr in
-                        Button { editingEmpOverride = ovr } label: {
-                            EmpOverrideRow(ovr: ovr, employeeLookup: employeeLookup)
-                        }
-                        .buttonStyle(.plain)
-                        .contextMenu {
-                            Button {
-                                editingEmpOverride = ovr
-                            } label: {
-                                Label("Edit", systemImage: "pencil")
-                            }
-                            Button(role: .destructive) {
-                                Task {
-                                    await vm.deleteEmployeeOverride(id: ovr.id)
-                                    await vm.loadAll()
-                                }
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
+                    Picker("Show", selection: $empFilter) {
+                        ForEach(EmpOverrideFilter.allCases) { f in
+                            Text(f.rawValue).tag(f)
                         }
                     }
-                    .onDelete { indexSet in
-                        Task {
-                            for idx in indexSet {
-                                await vm.deleteEmployeeOverride(id: vm.employeeAvailabilityOverrides[idx].id)
+                    .pickerStyle(.menu)
+
+                    let groups = filteredEmpGroups
+                    if groups.isEmpty {
+                        Text("No overrides")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(groups) { group in
+                            Button {
+                                // Edit the first item; range edits still operate per-day.
+                                if let first = group.items.first { editingEmpOverride = first }
+                            } label: {
+                                EmpOverrideGroupRow(group: group, employeeLookup: employeeLookup)
                             }
-                            await vm.loadAll()
+                            .buttonStyle(.plain)
+                            .contextMenu {
+                                if let first = group.items.first {
+                                    Button {
+                                        editingEmpOverride = first
+                                    } label: {
+                                        Label(group.isRange ? "Edit First Day" : "Edit", systemImage: "pencil")
+                                    }
+                                }
+                                Button(role: .destructive) {
+                                    Task {
+                                        for ovr in group.items {
+                                            await vm.deleteEmployeeOverride(id: ovr.id)
+                                        }
+                                        await vm.loadAll()
+                                    }
+                                } label: {
+                                    Label(group.isRange ? "Delete All (\(group.items.count))" : "Delete",
+                                          systemImage: "trash")
+                                }
+                            }
                         }
                     }
                 } header: {
@@ -132,6 +204,54 @@ struct OverridesTabView: View {
 }
 
 // MARK: - Row helpers
+
+private struct EmpOverrideGroupRow: View {
+    let group: OverridesTabView.EmpOverrideGroup
+    let employeeLookup: [Int64: String]
+
+    private static let displayFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEE d MMM"
+        return f
+    }()
+
+    private static let isoFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+
+    private func pretty(_ iso: String) -> String {
+        guard let d = Self.isoFmt.date(from: iso) else { return iso }
+        return Self.displayFmt.string(from: d)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text(employeeLookup[group.employeeId] ?? "Employee #\(group.employeeId)")
+                    .fontWeight(.medium)
+                if group.isRange {
+                    Text("RANGE · \(group.items.count) days")
+                        .font(.caption2).fontWeight(.semibold)
+                        .padding(.horizontal, 5).padding(.vertical, 2)
+                        .background(Color.blue.opacity(0.15), in: Capsule())
+                        .foregroundStyle(.blue)
+                }
+                Spacer()
+                Text(group.isRange
+                     ? "\(pretty(group.startDate)) – \(pretty(group.endDate))"
+                     : pretty(group.startDate))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            if let notes = group.items.first?.notes, !notes.isEmpty {
+                Text(notes).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+        }
+    }
+}
 
 private struct EmpOverrideRow: View {
     let ovr: FfiEmployeeAvailabilityOverride

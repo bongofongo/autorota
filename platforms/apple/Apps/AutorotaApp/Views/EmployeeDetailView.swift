@@ -14,6 +14,76 @@ struct EmployeeDetailView: View {
     @State private var showingAddOverride = false
     @State private var editingOverride: FfiEmployeeAvailabilityOverride? = nil
 
+    private struct OverrideGroup: Identifiable {
+        let items: [FfiEmployeeAvailabilityOverride]
+        var id: String { "\(items.first?.date ?? "")-\(items.count)" }
+        var isRange: Bool { items.count > 1 }
+        var startDate: String { items.first?.date ?? "" }
+        var endDate: String { items.last?.date ?? "" }
+    }
+
+    private static let isoFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+
+    private static let displayFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEE d MMM"
+        return f
+    }()
+
+    private var groupedOverrides: [OverrideGroup] {
+        let sorted = overrideVM.employeeAvailabilityOverrides.sorted { $0.date < $1.date }
+        let cal = Calendar(identifier: .iso8601)
+        var groups: [OverrideGroup] = []
+        var run: [FfiEmployeeAvailabilityOverride] = []
+        for ovr in sorted {
+            if let last = run.last,
+               let lastDate = Self.isoFmt.date(from: last.date),
+               let thisDate = Self.isoFmt.date(from: ovr.date),
+               let next = cal.date(byAdding: .day, value: 1, to: lastDate),
+               cal.isDate(next, inSameDayAs: thisDate) {
+                run.append(ovr)
+            } else {
+                if !run.isEmpty { groups.append(OverrideGroup(items: run)) }
+                run = [ovr]
+            }
+        }
+        if !run.isEmpty { groups.append(OverrideGroup(items: run)) }
+        return groups
+    }
+
+    private func pretty(_ iso: String) -> String {
+        guard let d = Self.isoFmt.date(from: iso) else { return iso }
+        return Self.displayFmt.string(from: d)
+    }
+
+    @ViewBuilder
+    private func overrideGroupRow(_ group: OverrideGroup) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text(group.isRange
+                     ? "\(pretty(group.startDate)) – \(pretty(group.endDate))"
+                     : pretty(group.startDate))
+                    .fontWeight(.medium)
+                if group.isRange {
+                    Text("RANGE · \(group.items.count) days")
+                        .font(.caption2).fontWeight(.semibold)
+                        .padding(.horizontal, 5).padding(.vertical, 2)
+                        .background(Color.blue.opacity(0.15), in: Capsule())
+                        .foregroundStyle(.blue)
+                }
+                Spacer()
+            }
+            if let notes = group.items.first?.notes, !notes.isEmpty {
+                Text(notes).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+        }
+    }
+
     var body: some View {
         List {
             Section("Details") {
@@ -45,7 +115,7 @@ struct EmployeeDetailView: View {
                 }
             }
 
-            Section("Next Week's Availability") {
+            Section("Availability — Week of \(weekStart(weeksFromNow: 1))") {
                 let range = AvailabilityGridView.inferredVisibleRange(from: employee.availability)
                 AvailabilityGridView(
                     slots: employee.availability,
@@ -72,39 +142,32 @@ struct EmployeeDetailView: View {
                 if overrideVM.isLoading {
                     ProgressView()
                 } else {
-                    ForEach(overrideVM.employeeAvailabilityOverrides) { ovr in
-                        Button { editingOverride = ovr } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(ovr.date).fontWeight(.medium)
-                                if let notes = ovr.notes, !notes.isEmpty {
-                                    Text(notes).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                                }
-                            }
+                    ForEach(groupedOverrides) { group in
+                        Button {
+                            if let first = group.items.first { editingOverride = first }
+                        } label: {
+                            overrideGroupRow(group)
                         }
                         .buttonStyle(.plain)
                         .contextMenu {
-                            Button {
-                                editingOverride = ovr
-                            } label: {
-                                Label("Edit", systemImage: "pencil")
+                            if let first = group.items.first {
+                                Button {
+                                    editingOverride = first
+                                } label: {
+                                    Label(group.isRange ? "Edit First Day" : "Edit", systemImage: "pencil")
+                                }
                             }
                             Button(role: .destructive) {
                                 Task {
-                                    await overrideVM.deleteEmployeeOverride(id: ovr.id)
+                                    for ovr in group.items {
+                                        await overrideVM.deleteEmployeeOverride(id: ovr.id)
+                                    }
                                     await overrideVM.loadForEmployee(id: employee.id)
                                 }
                             } label: {
-                                Label("Delete", systemImage: "trash")
+                                Label(group.isRange ? "Delete All (\(group.items.count))" : "Delete",
+                                      systemImage: "trash")
                             }
-                        }
-                    }
-                    .onDelete { indexSet in
-                        Task {
-                            for idx in indexSet {
-                                await overrideVM.deleteEmployeeOverride(
-                                    id: overrideVM.employeeAvailabilityOverrides[idx].id)
-                            }
-                            await overrideVM.loadForEmployee(id: employee.id)
                         }
                     }
                     Button("Add Date Override") { showingAddOverride = true }
