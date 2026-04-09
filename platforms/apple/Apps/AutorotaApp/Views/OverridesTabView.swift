@@ -17,12 +17,16 @@ struct OverridesTabView: View {
     @State private var editingEmpOverride: FfiEmployeeAvailabilityOverride? = nil
     @State private var showingTmplSheet = false
     @State private var editingTmplOverride: FfiShiftTemplateOverride? = nil
-    @State private var empFilter: EmpOverrideFilter = .all
+    @State private var empViewMode: EmpViewMode = .allByDate
+    @State private var expandedEmployees: Set<Int64> = []
 
-    enum EmpOverrideFilter: String, CaseIterable, Identifiable {
-        case all = "All"
-        case single = "Single Days"
-        case range = "Date Ranges"
+    enum EmpViewMode: String, CaseIterable, Identifiable {
+        case allByDate = "All · Soonest Date"
+        case singleByDate = "Single Days · Soonest Date"
+        case rangeByDate = "Date Ranges · Soonest Date"
+        case allByEmployee = "All · By Employee"
+        case singleByEmployee = "Single Days · By Employee"
+        case rangeByEmployee = "Date Ranges · By Employee"
         var id: String { rawValue }
     }
 
@@ -69,11 +73,39 @@ struct OverridesTabView: View {
     }
 
     private var filteredEmpGroups: [EmpOverrideGroup] {
-        switch empFilter {
-        case .all: return employeeOverrideGroups
-        case .single: return employeeOverrideGroups.filter { !$0.isRange }
-        case .range: return employeeOverrideGroups.filter { $0.isRange }
+        let all = employeeOverrideGroups
+        let filtered: [EmpOverrideGroup]
+        switch empViewMode {
+        case .allByDate, .allByEmployee: filtered = all
+        case .singleByDate, .singleByEmployee: filtered = all.filter { !$0.isRange }
+        case .rangeByDate, .rangeByEmployee: filtered = all.filter { $0.isRange }
         }
+        if isByEmployee {
+            let lookup = employeeLookup
+            return filtered.sorted {
+                let name0 = lookup[$0.employeeId] ?? ""
+                let name1 = lookup[$1.employeeId] ?? ""
+                if name0 != name1 { return name0.localizedCaseInsensitiveCompare(name1) == .orderedAscending }
+                return $0.startDate < $1.startDate
+            }
+        }
+        return filtered
+    }
+
+    private var isByEmployee: Bool {
+        switch empViewMode {
+        case .allByEmployee, .singleByEmployee, .rangeByEmployee: return true
+        default: return false
+        }
+    }
+
+    private var groupedByEmployee: [(employeeId: Int64, name: String, groups: [EmpOverrideGroup])] {
+        let lookup = employeeLookup
+        let byEmp = Dictionary(grouping: filteredEmpGroups, by: { $0.employeeId })
+        return byEmp.map { (id, groups) in
+            (employeeId: id, name: lookup[id] ?? "Employee #\(id)", groups: groups.sorted { $0.startDate < $1.startDate })
+        }
+        .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     private var employeeLookup: [Int64: String] {
@@ -84,60 +116,103 @@ struct OverridesTabView: View {
         Dictionary(uniqueKeysWithValues: templateVM.templates.map { ($0.id, $0.name) })
     }
 
+    @ViewBuilder
+    private func empOverrideGroupButton(group: EmpOverrideGroup) -> some View {
+        Button {
+            if let first = group.items.first { editingEmpOverride = first }
+        } label: {
+            EmpOverrideGroupRow(group: group, employeeLookup: employeeLookup)
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            if let first = group.items.first {
+                Button {
+                    editingEmpOverride = first
+                } label: {
+                    Label(group.isRange ? "Edit First Day" : "Edit", systemImage: "pencil")
+                }
+            }
+            Button(role: .destructive) {
+                Task {
+                    for ovr in group.items {
+                        await vm.deleteEmployeeOverride(id: ovr.id)
+                    }
+                    await vm.loadAll()
+                }
+            } label: {
+                Label(group.isRange ? "Delete All (\(group.items.count))" : "Delete",
+                      systemImage: "trash")
+            }
+        }
+    }
+
     var body: some View {
         NavigationStack {
             List {
                 // Employee availability overrides
                 Section {
-                    Picker("Show", selection: $empFilter) {
-                        ForEach(EmpOverrideFilter.allCases) { f in
-                            Text(f.rawValue).tag(f)
+                    Picker("View", selection: $empViewMode) {
+                        ForEach(EmpViewMode.allCases) { m in
+                            Text(m.rawValue).tag(m)
                         }
                     }
                     .pickerStyle(.menu)
-
-                    let groups = filteredEmpGroups
-                    if groups.isEmpty {
-                        Text("No overrides")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(groups) { group in
-                            Button {
-                                // Edit the first item; range edits still operate per-day.
-                                if let first = group.items.first { editingEmpOverride = first }
-                            } label: {
-                                EmpOverrideGroupRow(group: group, employeeLookup: employeeLookup)
-                            }
-                            .buttonStyle(.plain)
-                            .contextMenu {
-                                if let first = group.items.first {
-                                    Button {
-                                        editingEmpOverride = first
-                                    } label: {
-                                        Label(group.isRange ? "Edit First Day" : "Edit", systemImage: "pencil")
-                                    }
-                                }
-                                Button(role: .destructive) {
-                                    Task {
-                                        for ovr in group.items {
-                                            await vm.deleteEmployeeOverride(id: ovr.id)
-                                        }
-                                        await vm.loadAll()
-                                    }
-                                } label: {
-                                    Label(group.isRange ? "Delete All (\(group.items.count))" : "Delete",
-                                          systemImage: "trash")
-                                }
-                            }
-                        }
-                    }
                 } header: {
                     HStack {
                         Text("Employee Availability")
                         Spacer()
                         Button { showingEmpSheet = true } label: { Image(systemName: "plus") }
                             .buttonStyle(.borderless)
+                    }
+                }
+
+                if isByEmployee {
+                    let grouped = groupedByEmployee
+                    if grouped.isEmpty {
+                        Section {
+                            Text("No overrides")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        ForEach(grouped, id: \.employeeId) { entry in
+                            Section {
+                                DisclosureGroup(
+                                    isExpanded: Binding(
+                                        get: { expandedEmployees.contains(entry.employeeId) },
+                                        set: { isExpanded in
+                                            if isExpanded { expandedEmployees.insert(entry.employeeId) }
+                                            else { expandedEmployees.remove(entry.employeeId) }
+                                        }
+                                    )
+                                ) {
+                                    ForEach(entry.groups) { group in
+                                        empOverrideGroupButton(group: group)
+                                    }
+                                } label: {
+                                    HStack {
+                                        Text(entry.name).fontWeight(.medium)
+                                        Spacer()
+                                        Text("\(entry.groups.count)")
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Section {
+                        let groups = filteredEmpGroups
+                        if groups.isEmpty {
+                            Text("No overrides")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(groups) { group in
+                                empOverrideGroupButton(group: group)
+                            }
+                        }
                     }
                 }
 
