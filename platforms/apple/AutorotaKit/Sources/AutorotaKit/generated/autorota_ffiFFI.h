@@ -429,6 +429,11 @@ RustBuffer uniffi_autorota_ffi_fn_func_list_all_employee_availability_overrides(
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LIST_ALL_SHIFT_HISTORY
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LIST_ALL_SHIFT_HISTORY
+RustBuffer uniffi_autorota_ffi_fn_func_list_all_shift_history(RustBuffer start_date, RustBuffer end_date, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LIST_ALL_SHIFT_TEMPLATE_OVERRIDES
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LIST_ALL_SHIFT_TEMPLATE_OVERRIDES
 RustBuffer uniffi_autorota_ffi_fn_func_list_all_shift_template_overrides(RustCallStatus *_Nonnull out_status
@@ -1065,6 +1070,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_init_db(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_ALL_EMPLOYEE_AVAILABILITY_OVERRIDES
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_ALL_EMPLOYEE_AVAILABILITY_OVERRIDES
 uint16_t uniffi_autorota_ffi_checksum_func_list_all_employee_availability_overrides(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_ALL_SHIFT_HISTORY
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_ALL_SHIFT_HISTORY
+uint16_t uniffi_autorota_ffi_checksum_func_list_all_shift_history(void
     
 );
 #endif

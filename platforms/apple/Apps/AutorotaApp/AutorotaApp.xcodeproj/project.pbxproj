@@ -38,6 +38,8 @@
 		CC0010032FD0000000205001 /* CommitHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0010042FD0000000205001 /* CommitHistoryView.swift */; };
 		CC0011012FE0000000205001 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0011022FE0000000205001 /* OnboardingView.swift */; };
 		CC0011032FE0000000205001 /* HelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0011042FE0000000205001 /* HelpView.swift */; };
+		CC0012012FF0000000205001 /* AnalyticsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0012022FF0000000205001 /* AnalyticsViewModel.swift */; };
+		CC0012032FF0000000205001 /* AnalyticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0012042FF0000000205001 /* AnalyticsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -83,6 +85,8 @@
 		CC0010042FD0000000205001 /* CommitHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommitHistoryView.swift; sourceTree = "<group>"; };
 		CC0011022FE0000000205001 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		CC0011042FE0000000205001 /* HelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpView.swift; sourceTree = "<group>"; };
+		CC0012022FF0000000205001 /* AnalyticsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsViewModel.swift; sourceTree = "<group>"; };
+		CC0012042FF0000000205001 /* AnalyticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -141,6 +145,7 @@
 		5B9675192F72075A00205001 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
+				CC0012022FF0000000205001 /* AnalyticsViewModel.swift */,
 				CC0010022FD0000000205001 /* CommitHistoryViewModel.swift */,
 				5B9675162F72075A00205001 /* EmployeeViewModel.swift */,
 				CC0003022F80000000205001 /* OverrideViewModel.swift */,
@@ -155,6 +160,7 @@
 		5B9675202F72075A00205001 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				CC0012042FF0000000205001 /* AnalyticsView.swift */,
 				5B96751A2F72075A00205001 /* AvailabilityGridView.swift */,
 				CC0010042FD0000000205001 /* CommitHistoryView.swift */,
 				5B96751B2F72075A00205001 /* ContentView.swift */,
@@ -330,6 +336,8 @@
 				CC0010032FD0000000205001 /* CommitHistoryView.swift in Sources */,
 				CC0011012FE0000000205001 /* OnboardingView.swift in Sources */,
 				CC0011032FE0000000205001 /* HelpView.swift in Sources */,
+				CC0012012FF0000000205001 /* AnalyticsViewModel.swift in Sources */,
+				CC0012032FF0000000205001 /* AnalyticsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

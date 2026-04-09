@@ -4262,6 +4262,14 @@ public func listAllEmployeeAvailabilityOverrides()throws  -> [FfiEmployeeAvailab
     )
 })
 }
+public func listAllShiftHistory(startDate: String?, endDate: String?)throws  -> [FfiEmployeeShiftRecord] {
+    return try  FfiConverterSequenceTypeFfiEmployeeShiftRecord.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_list_all_shift_history(
+        FfiConverterOptionString.lower(startDate),
+        FfiConverterOptionString.lower(endDate),$0
+    )
+})
+}
 public func listAllShiftTemplateOverrides()throws  -> [FfiShiftTemplateOverride] {
     return try  FfiConverterSequenceTypeFfiShiftTemplateOverride.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_list_all_shift_template_overrides($0
@@ -4584,6 +4592,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_list_all_employee_availability_overrides() != 51272) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_list_all_shift_history() != 47892) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_list_all_shift_template_overrides() != 9399) {

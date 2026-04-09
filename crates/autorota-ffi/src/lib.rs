@@ -1558,6 +1558,19 @@ pub fn list_employee_shift_history(
         .map_err(Into::into)
 }
 
+#[uniffi::export]
+pub fn list_all_shift_history(
+    start_date: Option<String>,
+    end_date: Option<String>,
+) -> Result<Vec<FfiEmployeeShiftRecord>, FfiError> {
+    let pool = pool()?;
+    let sd = start_date.as_deref().map(parse_date).transpose()?;
+    let ed = end_date.as_deref().map(parse_date).transpose()?;
+    rt().block_on(queries::list_all_shift_history(pool, sd, ed))
+        .map(|records| records.into_iter().map(shift_record_to_ffi).collect())
+        .map_err(Into::into)
+}
+
 // ── Staging & Commits ───────────────────────────────────────────────────────
 
 #[uniffi::export]

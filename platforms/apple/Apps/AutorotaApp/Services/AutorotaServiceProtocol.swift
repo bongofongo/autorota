@@ -45,6 +45,7 @@ protocol AutorotaServiceProtocol: Sendable {
 
     // Shift History
     func listEmployeeShiftHistory(employeeId: Int64) async throws -> [FfiEmployeeShiftRecord]
+    func listAllShiftHistory(startDate: String?, endDate: String?) async throws -> [FfiEmployeeShiftRecord]
 
     // Overrides
     func upsertEmployeeAvailabilityOverride(_ o: FfiEmployeeAvailabilityOverride) async throws -> Int64

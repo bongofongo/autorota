@@ -189,6 +189,13 @@ final class MockAutorotaService: AutorotaServiceProtocol, @unchecked Sendable {
         return stubbedShiftHistory
     }
 
+    var stubbedAllShiftHistory: [FfiEmployeeShiftRecord] = []
+    func listAllShiftHistory(startDate: String?, endDate: String?) async throws -> [FfiEmployeeShiftRecord] {
+        callLog.append("listAllShiftHistory:\(startDate ?? "nil"):\(endDate ?? "nil")")
+        if let e = errorToThrow { throw e }
+        return stubbedAllShiftHistory
+    }
+
     // MARK: - Overrides
 
     func upsertEmployeeAvailabilityOverride(_ o: FfiEmployeeAvailabilityOverride) async throws -> Int64 {

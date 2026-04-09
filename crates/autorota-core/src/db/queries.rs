@@ -1166,6 +1166,47 @@ pub async fn list_employee_shift_history(
     Ok(rows.into_iter().filter_map(shift_record_from_row).collect())
 }
 
+pub async fn list_all_shift_history(
+    pool: &SqlitePool,
+    start_date: Option<NaiveDate>,
+    end_date: Option<NaiveDate>,
+) -> Result<Vec<EmployeeShiftRecord>, sqlx::Error> {
+    let base = "SELECT a.id, a.rota_id, a.shift_id, a.employee_id, a.status, a.employee_name, a.hourly_wage,
+                s.date, s.start_time, s.end_time, s.required_role,
+                r.week_start, r.finalized
+         FROM assignments a
+         JOIN shifts s ON s.id = a.shift_id
+         JOIN rotas r ON r.id = a.rota_id";
+
+    let mut conditions = Vec::new();
+    if start_date.is_some() {
+        conditions.push("s.date >= ?");
+    }
+    if end_date.is_some() {
+        conditions.push("s.date <= ?");
+    }
+
+    let sql = if conditions.is_empty() {
+        format!("{base} ORDER BY s.date, s.start_time")
+    } else {
+        format!(
+            "{base} WHERE {} ORDER BY s.date, s.start_time",
+            conditions.join(" AND ")
+        )
+    };
+
+    let mut query = sqlx::query_as::<_, ShiftHistoryRow>(&sql);
+    if let Some(d) = start_date {
+        query = query.bind(d.to_string());
+    }
+    if let Some(d) = end_date {
+        query = query.bind(d.to_string());
+    }
+
+    let rows: Vec<ShiftHistoryRow> = query.fetch_all(pool).await?;
+    Ok(rows.into_iter().filter_map(shift_record_from_row).collect())
+}
+
 // ─── Staging & Commits ──────────────────────────────────────
 
 /// Stage individual shifts by ID. Only shifts with dates before `today` are accepted.

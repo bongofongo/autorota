@@ -115,6 +115,7 @@ struct LiveAutorotaService: AutorotaServiceProtocol {
     func listShiftsForRota(rotaId: Int64) async throws -> [FfiShift] { try await listShiftsForRotaAsync(rotaId: rotaId) }
 
     func listEmployeeShiftHistory(employeeId: Int64) async throws -> [FfiEmployeeShiftRecord] { try await listEmployeeShiftHistoryAsync(employeeId: employeeId) }
+    func listAllShiftHistory(startDate: String?, endDate: String?) async throws -> [FfiEmployeeShiftRecord] { try await listAllShiftHistoryAsync(startDate: startDate, endDate: endDate) }
 
     func upsertEmployeeAvailabilityOverride(_ o: FfiEmployeeAvailabilityOverride) async throws -> Int64 {
         let id = try await upsertEmployeeAvailabilityOverrideAsync(override_: o)

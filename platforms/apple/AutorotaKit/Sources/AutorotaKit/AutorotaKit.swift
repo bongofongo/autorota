@@ -301,6 +301,12 @@ public func listEmployeeShiftHistoryAsync(employeeId: Int64) async throws -> [Ff
     }.value
 }
 
+public func listAllShiftHistoryAsync(startDate: String?, endDate: String?) async throws -> [FfiEmployeeShiftRecord] {
+    try await Task.detached(priority: .userInitiated) {
+        try listAllShiftHistory(startDate: startDate, endDate: endDate)
+    }.value
+}
+
 // MARK: - Staging & Commits
 
 public func stageShiftsAsync(shiftIds: [Int64]) async throws {
