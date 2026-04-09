@@ -11,8 +11,14 @@ struct EmployeeDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showingEditSheet = false
     @State private var overrideVM = OverrideViewModel()
+    @State private var shiftVM = ShiftHistoryViewModel()
     @State private var showingAddOverride = false
     @State private var editingOverride: FfiEmployeeAvailabilityOverride? = nil
+
+    // Disclosure group expansion state for shifts section
+    @State private var lastWeekExpanded = false
+    @State private var thisWeekExpanded = true
+    @State private var nextWeekExpanded = true
 
     private struct OverrideGroup: Identifiable {
         let items: [FfiEmployeeAvailabilityOverride]
@@ -62,6 +68,61 @@ struct EmployeeDetailView: View {
     }
 
     @ViewBuilder
+    private func shiftWeekGroup(
+        title: String,
+        shifts: [FfiEmployeeShiftRecord],
+        isExpanded: Binding<Bool>,
+        showTarget: Bool
+    ) -> some View {
+        let totalHours = shifts.reduce(0) { $0 + $1.durationHours }
+        if shifts.isEmpty {
+            HStack {
+                Text(title).foregroundStyle(.secondary)
+                Spacer()
+                Text("No shifts").font(.subheadline).foregroundStyle(.tertiary)
+            }
+        } else {
+            DisclosureGroup(isExpanded: isExpanded) {
+                ForEach(shifts, id: \.assignmentId) { record in
+                    ShiftRecordRow(
+                        record: record,
+                        currencySymbol: currencySymbol,
+                        convertedCost: convertedCost(record.shiftCost)
+                    )
+                }
+            } label: {
+                HStack {
+                    Text(title)
+                    Spacer()
+                    Text(showTarget
+                         ? "\(fmtHours(totalHours)) / \(fmtHours(employee.targetWeeklyHours))"
+                         : fmtHours(totalHours))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private var previousWeekShifts: [FfiEmployeeShiftRecord] {
+        let prevMonday = weekStart(weeksFromNow: -1)
+        return shiftVM.pastShifts.filter { $0.weekStart == prevMonday }
+    }
+
+    private var nextWeekShifts: [FfiEmployeeShiftRecord] {
+        let nextMonday = weekStart(weeksFromNow: 1)
+        return shiftVM.plannedShifts.filter { $0.weekStart == nextMonday }
+    }
+
+    private var currencySymbol: String {
+        exchangeRates.symbol(for: displayCurrency)
+    }
+
+    private func convertedCost(_ cost: Float?) -> Float? {
+        cost.map { exchangeRates.convert($0, from: employee.wageCurrency ?? displayCurrency, to: displayCurrency) }
+    }
+
+    @ViewBuilder
     private func overrideGroupRow(_ group: OverrideGroup) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
@@ -106,6 +167,35 @@ struct EmployeeDetailView: View {
                     let converted = exchangeRates.convert(wage, from: from, to: displayCurrency)
                     let sym = exchangeRates.symbol(for: displayCurrency)
                     LabeledContent("Hourly wage", value: String(format: "%@%.2f", sym, converted))
+                }
+            }
+
+            Section("Shifts") {
+                if shiftVM.isLoading {
+                    ProgressView()
+                } else {
+                    let prevShifts = previousWeekShifts
+                    let currShifts = shiftVM.currentWeekShifts
+                    let nextShifts = nextWeekShifts
+
+                    shiftWeekGroup(
+                        title: "Last week",
+                        shifts: prevShifts,
+                        isExpanded: $lastWeekExpanded,
+                        showTarget: false
+                    )
+                    shiftWeekGroup(
+                        title: "This week",
+                        shifts: currShifts,
+                        isExpanded: $thisWeekExpanded,
+                        showTarget: true
+                    )
+                    shiftWeekGroup(
+                        title: "Next week",
+                        shifts: nextShifts,
+                        isExpanded: $nextWeekExpanded,
+                        showTarget: false
+                    )
                 }
             }
 
@@ -176,7 +266,10 @@ struct EmployeeDetailView: View {
             }
         }
         .navigationTitle(employee.displayName)
-        .task { await overrideVM.loadForEmployee(id: employee.id) }
+        .task {
+            await overrideVM.loadForEmployee(id: employee.id)
+            await shiftVM.load(employeeId: employee.id)
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("Edit") { showingEditSheet = true }

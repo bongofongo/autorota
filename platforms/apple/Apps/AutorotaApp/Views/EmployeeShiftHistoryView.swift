@@ -186,13 +186,13 @@ struct EmployeeShiftHistoryView: View {
 // MARK: - Formatting helpers
 
 /// Formats a float, dropping the decimal when it's a whole number (e.g. 8.0 → "8", 8.5 → "8.5").
-private func fmtHours(_ v: Float) -> String {
+func fmtHours(_ v: Float) -> String {
     v.truncatingRemainder(dividingBy: 1) == 0
         ? "\(Int(v))h"
         : String(format: "%.1fh", v)
 }
 
-private func fmtCurrency(_ v: Float, symbol: String) -> String {
+func fmtCurrency(_ v: Float, symbol: String) -> String {
     v.truncatingRemainder(dividingBy: 1) == 0
         ? "\(symbol)\(Int(v))"
         : String(format: "%@%.2f", symbol, v)
@@ -200,7 +200,7 @@ private func fmtCurrency(_ v: Float, symbol: String) -> String {
 
 // MARK: - Shift Record Row
 
-private struct ShiftRecordRow: View {
+struct ShiftRecordRow: View {
     let record: FfiEmployeeShiftRecord
     let currencySymbol: String
     var convertedCost: Float?
