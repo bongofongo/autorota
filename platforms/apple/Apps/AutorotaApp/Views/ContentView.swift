@@ -2,23 +2,76 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var layoutManager = TabLayoutManager()
+    @State private var bridge = RotaUIBridge()
+    @State private var selection: TabSelection = .page(.rota)
+    @State private var lastPage: TabPage = .rota
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var showOnboarding = false
+    #if os(iOS)
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    #endif
+
+    /// The dots tab is only shown in portrait iPhone while the Rota tab is
+    /// active. Landscape iPhone uses a floating overlay inside `RotaView`
+    /// instead, because the iOS 26 floating tab bar leading-aligns in
+    /// landscape when a `.search` role tab is present.
+    private var showsDotsTab: Bool {
+        #if os(iOS)
+        guard verticalSizeClass == .regular else { return false }
+        if case .page(.rota) = selection { return true }
+        return false
+        #else
+        return false
+        #endif
+    }
 
     var body: some View {
-        TabView {
+        TabView(selection: $selection) {
             ForEach(layoutManager.tabBarPages) { page in
-                page.destinationView
-                    .tabItem {
-                        Label(page.title, systemImage: page.systemImage)
-                    }
-                    .tag(page)
+                Tab(
+                    page.title,
+                    systemImage: page.systemImage,
+                    value: TabSelection.page(page)
+                ) {
+                    page.destinationView
+                }
             }
+
+            #if os(iOS)
+            if showsDotsTab {
+                Tab(
+                    "More",
+                    systemImage: "ellipsis",
+                    value: TabSelection.dots,
+                    role: .search
+                ) {
+                    // Empty destination — this tab is hijacked: tapping it
+                    // just surfaces the Rota overflow menu via `bridge` and
+                    // reverts selection to the previously-active page.
+                    Color.clear
+                }
+            }
+            #endif
         }
+        #if os(iOS)
+        .tabBarMinimizeBehavior(.onScrollDown)
+        #endif
         #if os(macOS)
         .tabViewStyle(.sidebarAdaptable)
         #endif
         .environment(layoutManager)
+        .environment(bridge)
+        .onChange(of: selection) { _, new in
+            switch new {
+            case .dots:
+                // Always route the overflow menu through the Rota tab.
+                selection = .page(.rota)
+                lastPage = .rota
+                bridge.overflowOpen.toggle()
+            case .page(let p):
+                lastPage = p
+            }
+        }
         .onAppear {
             if !hasCompletedOnboarding {
                 showOnboarding = true
@@ -40,4 +93,9 @@ struct ContentView: View {
         }
         #endif
     }
+}
+
+enum TabSelection: Hashable {
+    case page(TabPage)
+    case dots
 }

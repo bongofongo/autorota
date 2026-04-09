@@ -5,10 +5,25 @@ struct RotaView: View {
 
     @State private var vm = RotaViewModel()
     @State private var showExportSheet = false
-    @State private var showToolbarOptions = false
+    @Environment(RotaUIBridge.self) private var bridge
+    #if os(iOS)
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    #endif
+
+    /// In landscape iPhone we render a floating overlay button instead of
+    /// the tab-bar dots tab (see `ContentView.showsDotsTab`).
+    private var showsFloatingDotsButton: Bool {
+        #if os(iOS)
+        return verticalSizeClass == .compact
+        #else
+        return false
+        #endif
+    }
 
     var body: some View {
+        @Bindable var bridge = bridge
         NavigationStack {
+            ZStack(alignment: .bottomTrailing) {
             VStack(spacing: 0) {
                 WeekPickerView(selectedWeek: $vm.selectedWeekStart, category: vm.weekCategory, isCommitted: vm.isCommitted, hasNewChanges: vm.hasNewChanges)
                     .padding(.horizontal)
@@ -36,108 +51,43 @@ struct RotaView: View {
                     Spacer()
                 }
             }
-            .navigationTitle("Rota")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    if vm.isStagingMode {
-                        // --- Staging mode toolbar ---
-                        Button {
-                            vm.exitStagingMode()
-                        } label: {
-                            Image(systemName: "checkmark")
+
+            if showsFloatingDotsButton {
+                GeometryReader { geo in
+                    Button {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
+                            bridge.overflowOpen.toggle()
                         }
-                    } else if vm.isEditMode {
-                        // --- Edit mode toolbar ---
-
-                        // Past lock/unlock (only when week has past days)
-                        if vm.weekHasPastDays {
-                            Button {
-                                vm.pastUnlocked.toggle()
-                            } label: {
-                                Image(systemName: vm.pastUnlocked ? "lock.open.fill" : "lock.fill")
-                            }
-                            .tint(vm.pastUnlocked ? .orange : .secondary)
-                        }
-
-                        // Delete schedule (past/current weeks only)
-                        if vm.weekCategory != .future {
-                            Button {
-                                vm.showDeleteScheduleConfirmation = true
-                            } label: {
-                                Image(systemName: "trash")
-                            }
-                            .tint(.red)
-                        }
-
-                        // Done (checkmark)
-                        Button {
-                            vm.exitEditMode()
-                        } label: {
-                            Image(systemName: "checkmark")
-                        }
-                    } else {
-                        // --- Normal mode toolbar ---
-
-                        if vm.isScheduling {
-                            ProgressView()
-                        } else {
-                            // Expanded option icons (appear to the left of the dots)
-                            if showToolbarOptions {
-                                if vm.schedule != nil {
-                                    // Stage button (only for weeks with past days)
-                                    if vm.weekHasPastDays {
-                                        Button {
-                                            vm.enterStagingMode()
-                                            showToolbarOptions = false
-                                        } label: {
-                                            Image(systemName: "tray.and.arrow.down")
-                                        }
-                                    }
-
-                                    Button {
-                                        Task { await vm.enterEditMode() }
-                                        showToolbarOptions = false
-                                    } label: {
-                                        Image(systemName: "pencil")
-                                    }
-
-                                    Button {
-                                        showExportSheet = true
-                                        showToolbarOptions = false
-                                    } label: {
-                                        Image(systemName: "square.and.arrow.up")
-                                    }
-                                }
-
-                                Button {
-                                    Task { await vm.runSchedule() }
-                                    showToolbarOptions = false
-                                } label: {
-                                    Image(systemName: "wand.and.stars")
-                                }
-                            }
-
-                            // Dots toggle
-                            Button {
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    showToolbarOptions.toggle()
-                                }
-                            } label: {
-                                Image(systemName: showToolbarOptions ? "xmark.circle" : "ellipsis.circle")
-                            }
-                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 24, height: 24)
+                            .padding(14)
+                            .glassEffect(.regular.interactive(), in: Circle())
                     }
+                    .position(
+                        x: geo.size.width * 0.8,
+                        y: geo.size.height - 28
+                    )
+                }
+                .allowsHitTesting(true)
+            }
+
+                if bridge.overflowOpen {
+                    RotaOverflowPopover(
+                        actions: overflowActions,
+                        isPresented: $bridge.overflowOpen
+                    )
                 }
             }
-            .onChange(of: vm.isEditMode) { _, _ in
-                showToolbarOptions = false
+            #if os(iOS)
+            .toolbar(.hidden, for: .navigationBar)
+            #endif
+            .onDisappear {
+                bridge.overflowOpen = false
             }
-            .onChange(of: vm.selectedWeekStart) { _, _ in
-                showToolbarOptions = false
-            }
+            .animation(.spring(response: 0.3, dampingFraction: 0.78), value: bridge.overflowOpen)
             .alert(
                 "No schedule for \(vm.weekDateRangeLabel)",
                 isPresented: $vm.showGenerateConfirmation
@@ -180,6 +130,76 @@ struct RotaView: View {
             }
             .task { await vm.loadSchedule() }
         }
+    }
+
+    // MARK: - Overflow menu actions
+
+    private var overflowActions: [RotaOverflowAction] {
+        var actions: [RotaOverflowAction] = []
+
+        if vm.isStagingMode {
+            actions.append(RotaOverflowAction(
+                title: "Done staging",
+                systemImage: "checkmark"
+            ) {
+                vm.exitStagingMode()
+            })
+        } else if vm.isEditMode {
+            if vm.weekHasPastDays {
+                actions.append(RotaOverflowAction(
+                    title: vm.pastUnlocked ? "Lock past days" : "Unlock past days",
+                    systemImage: vm.pastUnlocked ? "lock.fill" : "lock.open.fill"
+                ) {
+                    vm.pastUnlocked.toggle()
+                })
+            }
+            if vm.weekCategory != .future {
+                actions.append(RotaOverflowAction(
+                    title: "Delete schedule",
+                    systemImage: "trash",
+                    role: .destructive
+                ) {
+                    vm.showDeleteScheduleConfirmation = true
+                })
+            }
+            actions.append(RotaOverflowAction(
+                title: "Done editing",
+                systemImage: "checkmark"
+            ) {
+                vm.exitEditMode()
+            })
+        } else {
+            if vm.schedule != nil {
+                if vm.weekHasPastDays {
+                    actions.append(RotaOverflowAction(
+                        title: "Stage",
+                        systemImage: "tray.and.arrow.down"
+                    ) {
+                        vm.enterStagingMode()
+                    })
+                }
+                actions.append(RotaOverflowAction(
+                    title: "Edit",
+                    systemImage: "pencil"
+                ) {
+                    Task { await vm.enterEditMode() }
+                })
+                actions.append(RotaOverflowAction(
+                    title: "Share",
+                    systemImage: "square.and.arrow.up"
+                ) {
+                    showExportSheet = true
+                })
+            }
+            actions.append(RotaOverflowAction(
+                title: "Generate",
+                systemImage: "wand.and.stars"
+            ) {
+                Task { await vm.runSchedule() }
+            })
+        }
+
+        return actions
     }
 }
 

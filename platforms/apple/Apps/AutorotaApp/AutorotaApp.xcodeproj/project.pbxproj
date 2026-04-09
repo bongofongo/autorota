@@ -26,6 +26,8 @@
 		CC0005012F80000000205001 /* ShiftHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0005022F80000000205001 /* ShiftHistoryViewModel.swift */; };
 		CC0005032F80000000205001 /* EmployeeShiftHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0005042F80000000205001 /* EmployeeShiftHistoryView.swift */; };
 		CC0006012F90000000205001 /* TabPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0006022F90000000205001 /* TabPage.swift */; };
+		CC0006052F90000000205001 /* RotaUIBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0006062F90000000205001 /* RotaUIBridge.swift */; };
+		CC00060A2F90000000205001 /* RotaOverflowPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00060B2F90000000205001 /* RotaOverflowPopover.swift */; };
 		CC0007012FA0000000205001 /* ExchangeRateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0007022FA0000000205001 /* ExchangeRateService.swift */; };
 		CC0008012FB0000000205001 /* ExportSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0008022FB0000000205001 /* ExportSheetView.swift */; };
 		CC0009012FC0000000205001 /* AutorotaSyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0009022FC0000000205001 /* AutorotaSyncEngine.swift */; };
@@ -69,6 +71,8 @@
 		CC0005022F80000000205001 /* ShiftHistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiftHistoryViewModel.swift; sourceTree = "<group>"; };
 		CC0005042F80000000205001 /* EmployeeShiftHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmployeeShiftHistoryView.swift; sourceTree = "<group>"; };
 		CC0006022F90000000205001 /* TabPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabPage.swift; sourceTree = "<group>"; };
+		CC0006062F90000000205001 /* RotaUIBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RotaUIBridge.swift; sourceTree = "<group>"; };
+		CC00060B2F90000000205001 /* RotaOverflowPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RotaOverflowPopover.swift; sourceTree = "<group>"; };
 		CC0007022FA0000000205001 /* ExchangeRateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExchangeRateService.swift; sourceTree = "<group>"; };
 		CC0008022FB0000000205001 /* ExportSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheetView.swift; sourceTree = "<group>"; };
 		CC0009022FC0000000205001 /* AutorotaSyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutorotaSyncEngine.swift; sourceTree = "<group>"; };
@@ -166,6 +170,8 @@
 				5B96751F2F72075A00205001 /* ShiftTemplateListView.swift */,
 				CC0009082FC0000000205001 /* SyncPromptView.swift */,
 				CC0006022F90000000205001 /* TabPage.swift */,
+				CC0006062F90000000205001 /* RotaUIBridge.swift */,
+				CC00060B2F90000000205001 /* RotaOverflowPopover.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -312,6 +318,8 @@
 				CC0005012F80000000205001 /* ShiftHistoryViewModel.swift in Sources */,
 				CC0005032F80000000205001 /* EmployeeShiftHistoryView.swift in Sources */,
 				CC0006012F90000000205001 /* TabPage.swift in Sources */,
+				CC0006052F90000000205001 /* RotaUIBridge.swift in Sources */,
+				CC00060A2F90000000205001 /* RotaOverflowPopover.swift in Sources */,
 				CC0007012FA0000000205001 /* ExchangeRateService.swift in Sources */,
 				CC0008012FB0000000205001 /* ExportSheetView.swift in Sources */,
 				CC0009012FC0000000205001 /* AutorotaSyncEngine.swift in Sources */,
