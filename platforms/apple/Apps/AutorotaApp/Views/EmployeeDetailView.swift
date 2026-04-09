@@ -515,13 +515,13 @@ extension View {
 struct RoleTag: View {
     let name: String
     var body: some View {
-        Text(name)
+        Text(name.isEmpty ? "Any Role" : name)
             .font(.caption2)
             .fontWeight(.medium)
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
             .background(Capsule().fill(.secondary.opacity(0.15)))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(name.isEmpty ? .tertiary : .secondary)
     }
 }
 

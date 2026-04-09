@@ -258,7 +258,7 @@ private struct FlatAssignmentRow: View {
                         .foregroundStyle(.orange)
                 }
             }
-            Text("\(entry.startTime)\u{2013}\(entry.endTime)  \(entry.requiredRole)")
+            Text("\(entry.startTime)\u{2013}\(entry.endTime)  \(entry.requiredRole.isEmpty ? "Any Role" : entry.requiredRole)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -292,7 +292,7 @@ private struct ShiftDisclosureRow: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 8)
-                Text(shift.requiredRole)
+                Text(shift.requiredRole.isEmpty ? "Any Role" : shift.requiredRole)
                     .font(.caption.bold())
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)

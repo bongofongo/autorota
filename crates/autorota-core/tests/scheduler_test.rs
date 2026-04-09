@@ -342,3 +342,40 @@ fn zero_max_capacity_shift_produces_no_assignments() {
     assert!(result.assignments.is_empty());
     assert!(result.warnings.is_empty());
 }
+
+// ─── Wildcard / optional-role tests ─────────────────────────
+
+#[test]
+fn no_role_shift_matches_any_employee() {
+    let emp = make_employee(1, "Alice", "barista", AvailabilityState::Yes);
+    let shift = make_shift(1, date(23), 7, 12, ""); // wildcard shift
+
+    let result = schedule_pure(&[shift], &[emp], &[], &[], 1, week_start());
+
+    assert_eq!(result.assignments.len(), 1);
+    assert_eq!(result.assignments[0].employee_id, 1);
+}
+
+#[test]
+fn no_role_shift_matches_no_role_employee() {
+    let mut emp = make_employee(1, "Alice", "barista", AvailabilityState::Yes);
+    emp.roles.clear(); // employee with no roles
+    let shift = make_shift(1, date(23), 7, 12, ""); // wildcard shift
+
+    let result = schedule_pure(&[shift], &[emp], &[], &[], 1, week_start());
+
+    assert_eq!(result.assignments.len(), 1);
+    assert_eq!(result.assignments[0].employee_id, 1);
+}
+
+#[test]
+fn role_shift_excludes_no_role_employee() {
+    let mut emp = make_employee(1, "Alice", "barista", AvailabilityState::Yes);
+    emp.roles.clear(); // employee with no roles
+    let shift = make_shift(1, date(23), 7, 12, "barista");
+
+    let result = schedule_pure(&[shift], &[emp], &[], &[], 1, week_start());
+
+    assert!(result.assignments.is_empty());
+    assert_eq!(result.warnings.len(), 1);
+}

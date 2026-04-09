@@ -216,7 +216,7 @@ private struct ShiftRecordRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Text(record.requiredRole)
+            Text(record.requiredRole.isEmpty ? "Any Role" : record.requiredRole)
                 .font(.caption)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 2)

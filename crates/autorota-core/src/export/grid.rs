@@ -72,7 +72,12 @@ pub fn build_grids_by_role(
                 employees,
                 templates,
             );
-            (role, grid)
+            let label = if role.is_empty() {
+                "Any Role".to_string()
+            } else {
+                role
+            };
+            (label, grid)
         })
         .collect()
 }

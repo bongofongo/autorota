@@ -31,7 +31,19 @@ pub struct Shift {
     pub max_employees: u32,
 }
 
+impl ShiftTemplate {
+    /// Returns true if this template requires a specific role (not a wildcard).
+    pub fn has_required_role(&self) -> bool {
+        !self.required_role.is_empty()
+    }
+}
+
 impl Shift {
+    /// Returns true if this shift requires a specific role (not a wildcard).
+    pub fn has_required_role(&self) -> bool {
+        !self.required_role.is_empty()
+    }
+
     pub fn duration_hours(&self) -> f32 {
         let start = self.start_time.num_seconds_from_midnight();
         let end = self.end_time.num_seconds_from_midnight();
@@ -104,5 +116,18 @@ mod tests {
         let s = make_shift((7, 0), (15, 0), (2026, 3, 23));
         assert_eq!(s.start_hour(), 7);
         assert_eq!(s.end_hour(), 15);
+    }
+
+    #[test]
+    fn has_required_role_true_for_named_role() {
+        let s = make_shift((7, 0), (12, 0), (2026, 3, 23));
+        assert!(s.has_required_role());
+    }
+
+    #[test]
+    fn has_required_role_false_for_empty() {
+        let mut s = make_shift((7, 0), (12, 0), (2026, 3, 23));
+        s.required_role = "".into();
+        assert!(!s.has_required_role());
     }
 }

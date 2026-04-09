@@ -256,14 +256,10 @@ struct ShiftTemplateEditSheet: View {
                     DatePicker("End", selection: $endTime, displayedComponents: .hourAndMinute)
                 }
                 Section("Role & Staffing") {
-                    if roles.isEmpty {
-                        Text("No roles defined. Add roles in the Templates tab first.")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Picker("Required role", selection: $role) {
-                            ForEach(roles, id: \.id) { r in
-                                Text(r.name).tag(r.name)
-                            }
+                    Picker("Required role", selection: $role) {
+                        Text("Any Role").tag("")
+                        ForEach(roles, id: \.id) { r in
+                            Text(r.name).tag(r.name)
                         }
                     }
                     Stepper("Min staff: \(minStaff)", value: $minStaff, in: 1...20)
@@ -280,7 +276,7 @@ struct ShiftTemplateEditSheet: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
-                        .disabled(name.isEmpty || selectedDays.isEmpty || role.isEmpty)
+                        .disabled(name.isEmpty || selectedDays.isEmpty)
                 }
             }
             .onAppear { prefill() }
@@ -301,8 +297,6 @@ struct ShiftTemplateEditSheet: View {
             role = t.requiredRole
             minStaff = Int(t.minEmployees)
             maxStaff = Int(t.maxEmployees)
-        } else if role.isEmpty, let first = roles.first {
-            role = first.name
         }
     }
 

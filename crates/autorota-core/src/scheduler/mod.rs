@@ -126,8 +126,9 @@ fn is_eligible(
     all_shifts: &HashMap<i64, &Shift>,
     avail_override_map: &HashMap<(i64, NaiveDate), &EmployeeAvailabilityOverride>,
 ) -> bool {
-    // Must have the required role
-    if !employee.has_role(&shift.required_role) {
+    // A wildcard shift (empty role) is open to any employee.
+    // Otherwise the employee must hold the required role.
+    if shift.has_required_role() && !employee.has_role(&shift.required_role) {
         return false;
     }
 

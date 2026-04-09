@@ -117,7 +117,8 @@ struct RotaView: View {
                 Button("OK") { vm.warnings = [] }
             } message: {
                 Text(vm.warnings.map { w in
-                    "\(w.weekday) \(w.startTime)–\(w.endTime) (\(w.requiredRole)): \(w.filled)/\(w.needed) filled"
+                    let roleLabel = w.requiredRole.isEmpty ? "Any Role" : w.requiredRole
+                    return "\(w.weekday) \(w.startTime)–\(w.endTime) (\(roleLabel)): \(w.filled)/\(w.needed) filled"
                 }.joined(separator: "\n"))
             }
             .alert("Error", isPresented: .constant(vm.error != nil)) {
@@ -883,7 +884,7 @@ private struct AddShiftSheet: View {
                 DatePicker("Start Time", selection: $startDate, displayedComponents: .hourAndMinute)
                 DatePicker("End Time", selection: $endDate, displayedComponents: .hourAndMinute)
                 Picker("Role", selection: $selectedRole) {
-                    Text("Select a role").tag("")
+                    Text("Any Role").tag("")
                     ForEach(vm.roles, id: \.id) { role in
                         Text(role.name).tag(role.name)
                     }
@@ -915,7 +916,6 @@ private struct AddShiftSheet: View {
                             dismiss()
                         }
                     }
-                    .disabled(selectedRole.isEmpty)
                 }
             }
         }
