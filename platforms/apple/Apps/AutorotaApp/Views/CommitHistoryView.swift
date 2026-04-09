@@ -75,6 +75,7 @@ struct CommitHistoryView: View {
         case .shifts:
             List {
                 ForEach(vm.latestShiftsByWeek, id: \.weekStart) { group in
+                    let changedIds = vm.changedShiftIdsByWeek[group.weekStart] ?? []
                     DisclosureGroup {
                         let days = shiftsByDay(group.shifts)
                         if days.isEmpty {
@@ -83,13 +84,10 @@ struct CommitHistoryView: View {
                                 .foregroundStyle(.secondary)
                         } else {
                             ForEach(days, id: \.date) { day in
+                                let entries = vm.flatEntries(for: day.shifts, changedIds: changedIds)
                                 DisclosureGroup {
-                                    ForEach(day.shifts) { shift in
-                                        ShiftDisclosureRow(
-                                            shift: shift,
-                                            showWages: false,
-                                            isChanged: vm.changedShiftIdsByWeek[group.weekStart]?.contains(shift.shiftId) ?? false
-                                        )
+                                    ForEach(entries) { entry in
+                                        FlatAssignmentRow(entry: entry)
                                     }
                                 } label: {
                                     HStack {
@@ -237,7 +235,37 @@ private struct CommitDetailSheet: View {
     }
 }
 
-// MARK: - Shift disclosure row
+// MARK: - Flat assignment row (Shifts mode)
+
+private struct FlatAssignmentRow: View {
+    let entry: FlatAssignmentEntry
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                if let name = entry.employeeName {
+                    Text(name)
+                        .font(.subheadline.bold())
+                } else {
+                    Text("Unassigned")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if entry.isChanged {
+                    Image(systemName: "circle.fill")
+                        .font(.system(size: 6))
+                        .foregroundStyle(.orange)
+                }
+            }
+            Text("\(entry.startTime)\u{2013}\(entry.endTime)  \(entry.requiredRole)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
+// MARK: - Shift disclosure row (Commit detail sheet)
 
 private struct ShiftDisclosureRow: View {
     let shift: ShiftData

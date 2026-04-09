@@ -48,6 +48,17 @@ struct AssignmentData: Codable, Identifiable {
     var id: Int64 { assignmentId }
 }
 
+// MARK: - Flat assignment entry (for Shifts-mode flattened list)
+
+struct FlatAssignmentEntry: Identifiable {
+    let id: String
+    let employeeName: String?
+    let startTime: String
+    let endTime: String
+    let requiredRole: String
+    let isChanged: Bool
+}
+
 // MARK: - Shift diff helper
 
 /// Returns true if the live shift differs from the committed snapshot.
@@ -154,6 +165,39 @@ final class CommitHistoryViewModel {
             }
         }
         changedShiftIdsByWeek = result
+    }
+
+    /// Flatten shifts for a given day into one row per assignment (or one "Unassigned" row).
+    func flatEntries(for shifts: [ShiftData], changedIds: Set<Int64>) -> [FlatAssignmentEntry] {
+        var entries: [FlatAssignmentEntry] = []
+        for shift in shifts {
+            let changed = changedIds.contains(shift.shiftId)
+            if shift.assignments.isEmpty {
+                entries.append(FlatAssignmentEntry(
+                    id: "\(shift.shiftId)-unassigned",
+                    employeeName: nil,
+                    startTime: shift.startTime,
+                    endTime: shift.endTime,
+                    requiredRole: shift.requiredRole,
+                    isChanged: changed
+                ))
+            } else {
+                for assignment in shift.assignments {
+                    entries.append(FlatAssignmentEntry(
+                        id: "\(shift.shiftId)-\(assignment.assignmentId)",
+                        employeeName: assignment.employeeName,
+                        startTime: shift.startTime,
+                        endTime: shift.endTime,
+                        requiredRole: shift.requiredRole,
+                        isChanged: changed
+                    ))
+                }
+            }
+        }
+        return entries.sorted {
+            if $0.startTime != $1.startTime { return $0.startTime < $1.startTime }
+            return ($0.employeeName ?? "~") < ($1.employeeName ?? "~")
+        }
     }
 
     /// Commits grouped by week_start for display (Commits mode).
