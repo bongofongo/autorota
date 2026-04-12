@@ -799,6 +799,72 @@ public func FfiConverterTypeFfiAssignment_lower(_ value: FfiAssignment) -> RustB
 }
 
 
+public struct FfiAvailabilityProgress {
+    public var employeeId: Int64
+    public var done: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(employeeId: Int64, done: Bool) {
+        self.employeeId = employeeId
+        self.done = done
+    }
+}
+
+
+
+extension FfiAvailabilityProgress: Equatable, Hashable {
+    public static func ==(lhs: FfiAvailabilityProgress, rhs: FfiAvailabilityProgress) -> Bool {
+        if lhs.employeeId != rhs.employeeId {
+            return false
+        }
+        if lhs.done != rhs.done {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(employeeId)
+        hasher.combine(done)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFfiAvailabilityProgress: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiAvailabilityProgress {
+        return
+            try FfiAvailabilityProgress(
+                employeeId: FfiConverterInt64.read(from: &buf), 
+                done: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FfiAvailabilityProgress, into buf: inout [UInt8]) {
+        FfiConverterInt64.write(value.employeeId, into: &buf)
+        FfiConverterBool.write(value.done, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiAvailabilityProgress_lift(_ buf: RustBuffer) throws -> FfiAvailabilityProgress {
+    return try FfiConverterTypeFfiAvailabilityProgress.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiAvailabilityProgress_lower(_ value: FfiAvailabilityProgress) -> RustBuffer {
+    return FfiConverterTypeFfiAvailabilityProgress.lower(value)
+}
+
+
 public struct FfiBaseSnapshot {
     public var recordId: Int64
     public var snapshot: String
@@ -1361,6 +1427,147 @@ public func FfiConverterTypeFfiEmployeeAvailabilityOverride_lift(_ buf: RustBuff
 #endif
 public func FfiConverterTypeFfiEmployeeAvailabilityOverride_lower(_ value: FfiEmployeeAvailabilityOverride) -> RustBuffer {
     return FfiConverterTypeFfiEmployeeAvailabilityOverride.lower(value)
+}
+
+
+/**
+ * Configuration for exporting a single employee's schedule.
+ */
+public struct FfiEmployeeExportConfig {
+    public var employeeId: Int64
+    /**
+     * "YYYY-MM-DD"
+     */
+    public var startDate: String
+    /**
+     * "YYYY-MM-DD"
+     */
+    public var endDate: String
+    /**
+     * "csv" | "json" | "pdf"
+     */
+    public var format: String
+    /**
+     * "staff_schedule" | "manager_report"
+     */
+    public var profile: String
+    public var showShiftName: Bool
+    public var showTimes: Bool
+    public var showRole: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(employeeId: Int64, 
+        /**
+         * "YYYY-MM-DD"
+         */startDate: String, 
+        /**
+         * "YYYY-MM-DD"
+         */endDate: String, 
+        /**
+         * "csv" | "json" | "pdf"
+         */format: String, 
+        /**
+         * "staff_schedule" | "manager_report"
+         */profile: String, showShiftName: Bool, showTimes: Bool, showRole: Bool) {
+        self.employeeId = employeeId
+        self.startDate = startDate
+        self.endDate = endDate
+        self.format = format
+        self.profile = profile
+        self.showShiftName = showShiftName
+        self.showTimes = showTimes
+        self.showRole = showRole
+    }
+}
+
+
+
+extension FfiEmployeeExportConfig: Equatable, Hashable {
+    public static func ==(lhs: FfiEmployeeExportConfig, rhs: FfiEmployeeExportConfig) -> Bool {
+        if lhs.employeeId != rhs.employeeId {
+            return false
+        }
+        if lhs.startDate != rhs.startDate {
+            return false
+        }
+        if lhs.endDate != rhs.endDate {
+            return false
+        }
+        if lhs.format != rhs.format {
+            return false
+        }
+        if lhs.profile != rhs.profile {
+            return false
+        }
+        if lhs.showShiftName != rhs.showShiftName {
+            return false
+        }
+        if lhs.showTimes != rhs.showTimes {
+            return false
+        }
+        if lhs.showRole != rhs.showRole {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(employeeId)
+        hasher.combine(startDate)
+        hasher.combine(endDate)
+        hasher.combine(format)
+        hasher.combine(profile)
+        hasher.combine(showShiftName)
+        hasher.combine(showTimes)
+        hasher.combine(showRole)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFfiEmployeeExportConfig: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiEmployeeExportConfig {
+        return
+            try FfiEmployeeExportConfig(
+                employeeId: FfiConverterInt64.read(from: &buf), 
+                startDate: FfiConverterString.read(from: &buf), 
+                endDate: FfiConverterString.read(from: &buf), 
+                format: FfiConverterString.read(from: &buf), 
+                profile: FfiConverterString.read(from: &buf), 
+                showShiftName: FfiConverterBool.read(from: &buf), 
+                showTimes: FfiConverterBool.read(from: &buf), 
+                showRole: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FfiEmployeeExportConfig, into buf: inout [UInt8]) {
+        FfiConverterInt64.write(value.employeeId, into: &buf)
+        FfiConverterString.write(value.startDate, into: &buf)
+        FfiConverterString.write(value.endDate, into: &buf)
+        FfiConverterString.write(value.format, into: &buf)
+        FfiConverterString.write(value.profile, into: &buf)
+        FfiConverterBool.write(value.showShiftName, into: &buf)
+        FfiConverterBool.write(value.showTimes, into: &buf)
+        FfiConverterBool.write(value.showRole, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiEmployeeExportConfig_lift(_ buf: RustBuffer) throws -> FfiEmployeeExportConfig {
+    return try FfiConverterTypeFfiEmployeeExportConfig.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiEmployeeExportConfig_lower(_ value: FfiEmployeeExportConfig) -> RustBuffer {
+    return FfiConverterTypeFfiEmployeeExportConfig.lower(value)
 }
 
 
@@ -3658,6 +3865,31 @@ fileprivate struct FfiConverterSequenceTypeFfiAssignment: FfiConverterRustBuffer
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeFfiAvailabilityProgress: FfiConverterRustBuffer {
+    typealias SwiftType = [FfiAvailabilityProgress]
+
+    public static func write(_ value: [FfiAvailabilityProgress], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeFfiAvailabilityProgress.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [FfiAvailabilityProgress] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [FfiAvailabilityProgress]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeFfiAvailabilityProgress.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeFfiBaseSnapshot: FfiConverterRustBuffer {
     typealias SwiftType = [FfiBaseSnapshot]
 
@@ -4141,6 +4373,13 @@ public func deleteWeek(weekStart: String)throws  {try rustCallWithError(FfiConve
     )
 }
 }
+public func exportEmployeeSchedule(config: FfiEmployeeExportConfig)throws  -> FfiExportResult {
+    return try  FfiConverterTypeFfiExportResult.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_export_employee_schedule(
+        FfiConverterTypeFfiEmployeeExportConfig.lower(config),$0
+    )
+})
+}
 public func exportWeekSchedule(weekStart: String, config: FfiExportConfig)throws  -> FfiExportResult {
     return try  FfiConverterTypeFfiExportResult.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_export_week_schedule(
@@ -4276,6 +4515,13 @@ public func listAllShiftTemplateOverrides()throws  -> [FfiShiftTemplateOverride]
     )
 })
 }
+public func listAvailabilityProgress(weekStart: String)throws  -> [FfiAvailabilityProgress] {
+    return try  FfiConverterSequenceTypeFfiAvailabilityProgress.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_list_availability_progress(
+        FfiConverterString.lower(weekStart),$0
+    )
+})
+}
 public func listCommits(rotaId: Int64?)throws  -> [FfiCommit] {
     return try  FfiConverterSequenceTypeFfiCommit.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_list_commits(
@@ -4372,6 +4618,14 @@ public func runSchedule(weekStart: String)throws  -> FfiScheduleResult {
         FfiConverterString.lower(weekStart),$0
     )
 })
+}
+public func setAvailabilityProgress(employeeId: Int64, weekStart: String, done: Bool)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_set_availability_progress(
+        FfiConverterInt64.lower(employeeId),
+        FfiConverterString.lower(weekStart),
+        FfiConverterBool.lower(done),$0
+    )
+}
 }
 public func setSyncMetadata(key: String, value: String)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_set_sync_metadata(
@@ -4546,6 +4800,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_autorota_ffi_checksum_func_delete_week() != 24828) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_autorota_ffi_checksum_func_export_employee_schedule() != 200) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_autorota_ffi_checksum_func_export_week_schedule() != 7973) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -4600,6 +4857,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_autorota_ffi_checksum_func_list_all_shift_template_overrides() != 9399) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_autorota_ffi_checksum_func_list_availability_progress() != 3302) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_autorota_ffi_checksum_func_list_commits() != 43859) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -4637,6 +4897,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_run_schedule() != 48877) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_set_availability_progress() != 31340) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_set_sync_metadata() != 2617) {

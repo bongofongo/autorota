@@ -332,4 +332,25 @@ final class MockAutorotaService: AutorotaServiceProtocol, @unchecked Sendable {
         if let e = errorToThrow { throw e }
         return stubbedExportResult
     }
+
+    func exportEmployeeSchedule(config: FfiEmployeeExportConfig) async throws -> FfiExportResult {
+        callLog.append("exportEmployeeSchedule:\(config.employeeId)")
+        if let e = errorToThrow { throw e }
+        return stubbedExportResult
+    }
+
+    // MARK: - Availability Progress
+
+    var stubbedAvailabilityProgress: [FfiAvailabilityProgress] = []
+
+    func listAvailabilityProgress(weekStart: String) async throws -> [FfiAvailabilityProgress] {
+        callLog.append("listAvailabilityProgress:\(weekStart)")
+        if let e = errorToThrow { throw e }
+        return stubbedAvailabilityProgress
+    }
+
+    func setAvailabilityProgress(employeeId: Int64, weekStart: String, done: Bool) async throws {
+        callLog.append("setAvailabilityProgress:\(employeeId):\(weekStart):\(done)")
+        if let e = errorToThrow { throw e }
+    }
 }

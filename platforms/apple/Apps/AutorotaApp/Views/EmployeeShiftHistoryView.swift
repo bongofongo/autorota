@@ -35,6 +35,9 @@ struct EmployeeShiftHistoryView: View {
             }
         }
         .navigationTitle("Analytics")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
         .task { await vm.load(employeeId: employeeId) }
         .alert("Error", isPresented: .constant(vm.error != nil)) {
             Button("OK") { vm.error = nil }

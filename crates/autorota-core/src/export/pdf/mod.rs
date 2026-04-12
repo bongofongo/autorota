@@ -3,18 +3,14 @@
 
 pub mod by_role;
 pub mod employee;
+pub mod employee_schedule;
 mod theme;
 pub mod weekly;
 
 #[cfg(test)]
 mod tests {
-    use chrono::NaiveDate;
-
     use crate::export::grid::{DaySummary, ExportGrid};
-
-    fn week_start() -> NaiveDate {
-        NaiveDate::from_ymd_opt(2026, 3, 23).unwrap()
-    }
+    use crate::testutil::week_start;
 
     fn sample_grid(row_count: usize) -> ExportGrid {
         ExportGrid {

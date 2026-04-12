@@ -178,4 +178,9 @@ struct LiveAutorotaService: AutorotaServiceProtocol {
     func rotaIsCommitted(rotaId: Int64) async throws -> Bool { try await rotaIsCommittedAsync(rotaId: rotaId) }
 
     func exportWeekSchedule(weekStart: String, config: FfiExportConfig) async throws -> FfiExportResult { try await exportWeekScheduleAsync(weekStart: weekStart, config: config) }
+    func exportEmployeeSchedule(config: FfiEmployeeExportConfig) async throws -> FfiExportResult { try await exportEmployeeScheduleAsync(config: config) }
+
+    // Availability Progress
+    func listAvailabilityProgress(weekStart: String) async throws -> [FfiAvailabilityProgress] { try await listAvailabilityProgressAsync(weekStart: weekStart) }
+    func setAvailabilityProgress(employeeId: Int64, weekStart: String, done: Bool) async throws { try await setAvailabilityProgressAsync(employeeId: employeeId, weekStart: weekStart, done: done) }
 }

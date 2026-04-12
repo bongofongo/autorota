@@ -47,46 +47,25 @@ pub fn score_employee(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::availability::Availability;
-    use chrono::{NaiveDate, NaiveTime, Weekday};
+    use crate::models::availability::{Availability, AvailabilityState};
+    use crate::testutil::{EmployeeBuilder, ShiftBuilder};
+    use chrono::Weekday;
 
     fn make_employee(max_daily: f32, target_weekly: f32) -> Employee {
         let mut avail = Availability::default();
         for h in 6..18 {
             avail.set(Weekday::Mon, h, AvailabilityState::Yes);
         }
-        Employee {
-            id: 1,
-            first_name: "Test".to_string(),
-            last_name: String::new(),
-            nickname: None,
-            roles: vec!["barista".to_string()],
-            start_date: NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
-            target_weekly_hours: target_weekly,
-            weekly_hours_deviation: 6.0,
-            max_daily_hours: max_daily,
-            notes: None,
-            bank_details: None,
-            hourly_wage: None,
-            wage_currency: None,
-            default_availability: Availability::default(),
-            availability: avail,
-            deleted: false,
-        }
+        EmployeeBuilder::new("Test")
+            .id(1)
+            .max_daily(max_daily)
+            .hours(target_weekly)
+            .availability(avail)
+            .build()
     }
 
     fn make_shift() -> Shift {
-        Shift {
-            id: 1,
-            template_id: Some(1),
-            rota_id: 1,
-            date: NaiveDate::from_ymd_opt(2026, 3, 23).unwrap(),
-            start_time: NaiveTime::from_hms_opt(7, 0, 0).unwrap(),
-            end_time: NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
-            required_role: "barista".to_string(),
-            min_employees: 1,
-            max_employees: 1,
-        }
+        ShiftBuilder::new().id(1).build()
     }
 
     #[test]

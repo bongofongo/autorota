@@ -784,7 +784,8 @@ pub fn list_shifts_for_rota(rota_id: i64) -> Result<Vec<FfiShift>, FfiError> {
 // ── Export ───────────────────────────────────────────────────────────────────
 
 use autorota_core::export::config::{
-    CellContentFlags, ExportConfig, ExportFormat, ExportLayout, ExportProfile, PdfTemplate,
+    CellContentFlags, EmployeeExportConfig, ExportConfig, ExportFormat, ExportLayout,
+    ExportProfile, PdfTemplate,
 };
 
 fn parse_export_config(config: FfiExportConfig) -> Result<ExportConfig, FfiError> {
@@ -841,6 +842,62 @@ pub fn export_week_schedule(
                 msg: db_err.to_string(),
             },
             autorota_core::export::ExportError::NoSchedule(msg) => FfiError::NotFound { msg },
+            autorota_core::export::ExportError::EmployeeNotFound(id) => FfiError::NotFound {
+                msg: format!("employee {id} not found"),
+            },
+            autorota_core::export::ExportError::Pdf(msg) => FfiError::InvalidArgument { msg },
+        })?;
+
+    Ok(FfiExportResult {
+        data: result.data,
+        filename: result.filename,
+        mime_type: result.mime_type,
+    })
+}
+
+#[uniffi::export]
+pub fn export_employee_schedule(
+    config: FfiEmployeeExportConfig,
+) -> Result<FfiExportResult, FfiError> {
+    let pool = pool()?;
+    let start_date = parse_date(&config.start_date)?;
+    let end_date = parse_date(&config.end_date)?;
+    let format: ExportFormat = config
+        .format
+        .parse()
+        .map_err(|e: String| FfiError::InvalidArgument { msg: e })?;
+    let profile: ExportProfile = config
+        .profile
+        .parse()
+        .map_err(|e: String| FfiError::InvalidArgument { msg: e })?;
+
+    let core_config = EmployeeExportConfig {
+        employee_id: config.employee_id,
+        format,
+        profile,
+        cell_content: CellContentFlags {
+            show_shift_name: config.show_shift_name,
+            show_times: config.show_times,
+            show_role: config.show_role,
+        },
+    };
+
+    let result = rt()
+        .block_on(autorota_core::export::export_employee_schedule(
+            pool,
+            config.employee_id,
+            start_date,
+            end_date,
+            core_config,
+        ))
+        .map_err(|e| match e {
+            autorota_core::export::ExportError::Db(db_err) => FfiError::Db {
+                msg: db_err.to_string(),
+            },
+            autorota_core::export::ExportError::NoSchedule(msg) => FfiError::NotFound { msg },
+            autorota_core::export::ExportError::EmployeeNotFound(id) => FfiError::NotFound {
+                msg: format!("employee {id} not found"),
+            },
             autorota_core::export::ExportError::Pdf(msg) => FfiError::InvalidArgument { msg },
         })?;
 
@@ -1697,4 +1754,36 @@ pub fn rota_is_committed(rota_id: i64) -> Result<bool, FfiError> {
     let pool = pool()?;
     rt().block_on(queries::rota_has_commits(pool, rota_id))
         .map_err(Into::into)
+}
+
+// ── Availability Progress ────────────────────────────────────────────────────
+
+#[uniffi::export]
+pub fn list_availability_progress(
+    week_start: String,
+) -> Result<Vec<FfiAvailabilityProgress>, FfiError> {
+    let pool = pool()?;
+    let rows = rt()
+        .block_on(queries::list_availability_progress(pool, &week_start))
+        .map_err(FfiError::from)?;
+    Ok(rows
+        .into_iter()
+        .map(|(employee_id, done)| FfiAvailabilityProgress { employee_id, done })
+        .collect())
+}
+
+#[uniffi::export]
+pub fn set_availability_progress(
+    employee_id: i64,
+    week_start: String,
+    done: bool,
+) -> Result<(), FfiError> {
+    let pool = pool()?;
+    rt().block_on(queries::set_availability_progress(
+        pool,
+        employee_id,
+        &week_start,
+        done,
+    ))
+    .map_err(Into::into)
 }

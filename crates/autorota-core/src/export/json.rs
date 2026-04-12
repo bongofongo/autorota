@@ -82,24 +82,73 @@ pub fn render_json(grid: &ExportGrid, config: &ExportConfig, week_start: NaiveDa
     serde_json::to_string_pretty(&export).expect("JSON serialization should not fail")
 }
 
+// ─── Employee schedule JSON ─────────────────────────────────
+
+#[derive(Serialize)]
+struct EmployeeJsonExport {
+    metadata: EmployeeMetadata,
+    columns: Vec<String>,
+    rows: Vec<JsonRow>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    total_cost: Option<f32>,
+}
+
+#[derive(Serialize)]
+struct EmployeeMetadata {
+    employee_name: String,
+    start_date: String,
+    end_date: String,
+    profile: String,
+    generated_at: String,
+}
+
+/// Render a single-employee `ExportGrid` as JSON with employee-specific metadata.
+pub fn render_employee_json(
+    grid: &ExportGrid,
+    employee_name: &str,
+    start_date: chrono::NaiveDate,
+    end_date: chrono::NaiveDate,
+    profile: &super::config::ExportProfile,
+) -> String {
+    let rows = grid
+        .row_headers
+        .iter()
+        .zip(grid.cells.iter())
+        .map(|(header, cells)| JsonRow {
+            header: header.clone(),
+            cells: cells.clone(),
+        })
+        .collect();
+
+    let now = chrono::Local::now();
+
+    let export = EmployeeJsonExport {
+        metadata: EmployeeMetadata {
+            employee_name: employee_name.to_string(),
+            start_date: start_date.format("%Y-%m-%d").to_string(),
+            end_date: end_date.format("%Y-%m-%d").to_string(),
+            profile: profile.to_string(),
+            generated_at: now.format("%Y-%m-%dT%H:%M:%S").to_string(),
+        },
+        columns: grid.column_headers.clone(),
+        rows,
+        total_cost: grid.weekly_total_cost,
+    };
+
+    serde_json::to_string_pretty(&export).expect("JSON serialization should not fail")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::export::config::*;
     use crate::export::grid::DaySummary;
+    use crate::testutil::ExportConfigBuilder;
 
     fn test_config() -> ExportConfig {
-        ExportConfig {
-            layout: ExportLayout::EmployeeByWeekday,
-            format: ExportFormat::Json,
-            profile: ExportProfile::StaffSchedule,
-            cell_content: CellContentFlags {
-                show_shift_name: true,
-                show_times: true,
-                show_role: false,
-            },
-            pdf_template: None,
-        }
+        ExportConfigBuilder::staff()
+            .format(ExportFormat::Json)
+            .build()
     }
 
     #[test]
@@ -128,17 +177,11 @@ mod tests {
 
     #[test]
     fn json_with_totals() {
-        let config = ExportConfig {
-            layout: ExportLayout::ShiftByWeekday,
-            format: ExportFormat::Json,
-            profile: ExportProfile::ManagerReport,
-            cell_content: CellContentFlags {
-                show_shift_name: true,
-                show_times: false,
-                show_role: false,
-            },
-            pdf_template: None,
-        };
+        let config = ExportConfigBuilder::manager()
+            .layout(ExportLayout::ShiftByWeekday)
+            .format(ExportFormat::Json)
+            .hide_times()
+            .build();
 
         let grid = ExportGrid {
             title: "Test".to_string(),

@@ -74,4 +74,9 @@ protocol AutorotaServiceProtocol: Sendable {
 
     // Export
     func exportWeekSchedule(weekStart: String, config: FfiExportConfig) async throws -> FfiExportResult
+    func exportEmployeeSchedule(config: FfiEmployeeExportConfig) async throws -> FfiExportResult
+
+    // Availability Progress
+    func listAvailabilityProgress(weekStart: String) async throws -> [FfiAvailabilityProgress]
+    func setAvailabilityProgress(employeeId: Int64, weekStart: String, done: Bool) async throws
 }

@@ -383,6 +383,12 @@ public func exportWeekScheduleAsync(weekStart: String, config: FfiExportConfig) 
     }.value
 }
 
+public func exportEmployeeScheduleAsync(config: FfiEmployeeExportConfig) async throws -> FfiExportResult {
+    try await Task.detached(priority: .userInitiated) {
+        try exportEmployeeSchedule(config: config)
+    }.value
+}
+
 // MARK: - Sync
 
 public func getPendingSyncRecordsAsync(tableName: String) async throws -> [FfiSyncRecord] {
@@ -436,5 +442,19 @@ public func clearTombstonesAsync(ids: [Int64]) async throws {
 public func countEmployeesAsync() async throws -> Int64 {
     try await Task.detached(priority: .userInitiated) {
         try countEmployees()
+    }.value
+}
+
+// MARK: - Availability Progress
+
+public func listAvailabilityProgressAsync(weekStart: String) async throws -> [FfiAvailabilityProgress] {
+    try await Task.detached(priority: .userInitiated) {
+        try listAvailabilityProgress(weekStart: weekStart)
+    }.value
+}
+
+public func setAvailabilityProgressAsync(employeeId: Int64, weekStart: String, done: Bool) async throws {
+    try await Task.detached(priority: .userInitiated) {
+        try setAvailabilityProgress(employeeId: employeeId, weekStart: weekStart, done: done)
     }.value
 }

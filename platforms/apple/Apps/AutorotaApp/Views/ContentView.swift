@@ -3,6 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @State private var layoutManager = TabLayoutManager()
     @State private var bridge = RotaUIBridge()
+    @State private var employeeBridge = EmployeeUIBridge()
     @State private var selection: TabSelection = .page(.rota)
     @State private var lastPage: TabPage = .rota
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
@@ -15,11 +16,13 @@ struct ContentView: View {
     /// active. Landscape iPhone uses a floating overlay inside `RotaView`
     /// instead, because the iOS 26 floating tab bar leading-aligns in
     /// landscape when a `.search` role tab is present.
+    /// Use `lastPage` (not `selection`) so the dots tab stays visible while
+    /// the `.dots` selection is in flight — otherwise SwiftUI removes the tab
+    /// mid-transition and auto-selects the first tab, causing a visible glitch.
     private var showsDotsTab: Bool {
         #if os(iOS)
         guard verticalSizeClass == .regular else { return false }
-        if case .page(.rota) = selection { return true }
-        return false
+        return lastPage == .rota || lastPage == .employees
         #else
         return false
         #endif
@@ -61,13 +64,20 @@ struct ContentView: View {
         #endif
         .environment(layoutManager)
         .environment(bridge)
+        .environment(employeeBridge)
         .onChange(of: selection) { _, new in
             switch new {
             case .dots:
-                // Always route the overflow menu through the Rota tab.
-                selection = .page(.rota)
-                lastPage = .rota
-                bridge.overflowOpen.toggle()
+                // Route the overflow menu to whichever tab is active.
+                switch lastPage {
+                case .employees:
+                    selection = .page(.employees)
+                    employeeBridge.overflowOpen.toggle()
+                default:
+                    selection = .page(.rota)
+                    lastPage = .rota
+                    bridge.overflowOpen.toggle()
+                }
             case .page(let p):
                 lastPage = p
             }

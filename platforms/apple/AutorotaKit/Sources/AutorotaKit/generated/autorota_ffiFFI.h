@@ -347,6 +347,11 @@ void uniffi_autorota_ffi_fn_func_delete_shift_template_override(int64_t id, Rust
 void uniffi_autorota_ffi_fn_func_delete_week(RustBuffer week_start, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_EXPORT_EMPLOYEE_SCHEDULE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_EXPORT_EMPLOYEE_SCHEDULE
+RustBuffer uniffi_autorota_ffi_fn_func_export_employee_schedule(RustBuffer config, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_EXPORT_WEEK_SCHEDULE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_EXPORT_WEEK_SCHEDULE
 RustBuffer uniffi_autorota_ffi_fn_func_export_week_schedule(RustBuffer week_start, RustBuffer config, RustCallStatus *_Nonnull out_status
@@ -440,6 +445,11 @@ RustBuffer uniffi_autorota_ffi_fn_func_list_all_shift_template_overrides(RustCal
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LIST_AVAILABILITY_PROGRESS
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LIST_AVAILABILITY_PROGRESS
+RustBuffer uniffi_autorota_ffi_fn_func_list_availability_progress(RustBuffer week_start, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LIST_COMMITS
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LIST_COMMITS
 RustBuffer uniffi_autorota_ffi_fn_func_list_commits(RustBuffer rota_id, RustCallStatus *_Nonnull out_status
@@ -506,6 +516,11 @@ int8_t uniffi_autorota_ffi_fn_func_rota_is_committed(int64_t rota_id, RustCallSt
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_RUN_SCHEDULE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_RUN_SCHEDULE
 RustBuffer uniffi_autorota_ffi_fn_func_run_schedule(RustBuffer week_start, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_SET_AVAILABILITY_PROGRESS
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_SET_AVAILABILITY_PROGRESS
+void uniffi_autorota_ffi_fn_func_set_availability_progress(int64_t employee_id, RustBuffer week_start, int8_t done, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_SET_SYNC_METADATA
@@ -977,6 +992,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_delete_week(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_EXPORT_EMPLOYEE_SCHEDULE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_EXPORT_EMPLOYEE_SCHEDULE
+uint16_t uniffi_autorota_ffi_checksum_func_export_employee_schedule(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_EXPORT_WEEK_SCHEDULE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_EXPORT_WEEK_SCHEDULE
 uint16_t uniffi_autorota_ffi_checksum_func_export_week_schedule(void
@@ -1085,6 +1106,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_list_all_shift_template_overrides(voi
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_AVAILABILITY_PROGRESS
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_AVAILABILITY_PROGRESS
+uint16_t uniffi_autorota_ffi_checksum_func_list_availability_progress(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_COMMITS
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_COMMITS
 uint16_t uniffi_autorota_ffi_checksum_func_list_commits(void
@@ -1160,6 +1187,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_rota_is_committed(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_RUN_SCHEDULE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_RUN_SCHEDULE
 uint16_t uniffi_autorota_ffi_checksum_func_run_schedule(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_SET_AVAILABILITY_PROGRESS
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_SET_AVAILABILITY_PROGRESS
+uint16_t uniffi_autorota_ffi_checksum_func_set_availability_progress(void
     
 );
 #endif

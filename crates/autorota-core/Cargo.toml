@@ -13,5 +13,9 @@ thiserror.workspace = true
 base64 = "0.22.1"
 printpdf = "0.3"
 
+[features]
+test-helpers = []
+
 [dev-dependencies]
+autorota-core = { path = ".", features = ["test-helpers"] }
 tempfile = "3"

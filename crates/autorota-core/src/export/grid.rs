@@ -433,17 +433,128 @@ fn build_shift_grid(
     }
 }
 
+/// Build a grid for a single employee's schedule over a date range.
+///
+/// Produces one row per date with a single "Shifts" column. The existing
+/// CSV/JSON renderers consume the resulting `ExportGrid` unchanged.
+pub fn build_single_employee_grid(
+    employee_name: &str,
+    dates: &[NaiveDate],
+    assignments: &[Assignment],
+    shifts: &[Shift],
+    templates: &[ShiftTemplate],
+    flags: &CellContentFlags,
+    is_manager: bool,
+) -> ExportGrid {
+    let tmpl_map: HashMap<i64, &ShiftTemplate> = templates.iter().map(|t| (t.id, t)).collect();
+    let shift_map: HashMap<i64, &Shift> = shifts.iter().map(|s| (s.id, s)).collect();
+
+    let title = if dates.len() == 7 {
+        format!(
+            "Schedule for {} — Week of {}",
+            employee_name,
+            dates[0].format("%Y-%m-%d"),
+        )
+    } else {
+        format!(
+            "Schedule for {} — {} to {}",
+            employee_name,
+            dates
+                .first()
+                .map(|d| d.format("%Y-%m-%d").to_string())
+                .unwrap_or_default(),
+            dates
+                .last()
+                .map(|d| d.format("%Y-%m-%d").to_string())
+                .unwrap_or_default(),
+        )
+    };
+
+    let column_headers = vec!["Shifts".to_string()];
+    let mut row_headers = Vec::with_capacity(dates.len());
+    let mut cells = Vec::with_capacity(dates.len());
+    let mut total_cost = 0.0_f32;
+
+    for date in dates {
+        row_headers.push(date.format("%a %d %b %Y").to_string());
+
+        // Find assignments for this date.
+        let day_assignments: Vec<&Assignment> = assignments
+            .iter()
+            .filter(|a| {
+                shift_map
+                    .get(&a.shift_id)
+                    .map(|s| s.date == *date)
+                    .unwrap_or(false)
+            })
+            .collect();
+
+        if day_assignments.is_empty() {
+            cells.push(vec![String::new()]);
+        } else {
+            let parts: Vec<String> = day_assignments
+                .iter()
+                .filter_map(|a| {
+                    let shift = shift_map.get(&a.shift_id)?;
+                    let shift_name = shift
+                        .template_id
+                        .and_then(|tid| tmpl_map.get(&tid))
+                        .map(|t| t.name.clone())
+                        .unwrap_or_else(|| {
+                            format!(
+                                "{} {}-{}",
+                                shift.required_role,
+                                shift.start_time.format("%H:%M"),
+                                shift.end_time.format("%H:%M"),
+                            )
+                        });
+
+                    let mut line_parts = Vec::new();
+                    if flags.show_shift_name {
+                        line_parts.push(shift_name);
+                    }
+                    if flags.show_times {
+                        line_parts.push(format!(
+                            "{}-{}",
+                            shift.start_time.format("%H:%M"),
+                            shift.end_time.format("%H:%M"),
+                        ));
+                    }
+                    if flags.show_role {
+                        line_parts.push(shift.required_role.clone());
+                    }
+                    let mut text = line_parts.join(" ");
+                    if is_manager {
+                        if let Some(wage) = a.hourly_wage {
+                            let cost = wage * shift.duration_hours();
+                            total_cost += cost;
+                            text.push_str(&format!(" (${cost:.2})"));
+                        }
+                    }
+                    Some(text)
+                })
+                .collect();
+            cells.push(vec![parts.join("\n")]);
+        }
+    }
+
+    ExportGrid {
+        title,
+        column_headers,
+        row_headers,
+        cells,
+        daily_totals: None,
+        weekly_total_cost: if is_manager { Some(total_cost) } else { None },
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use chrono::NaiveTime;
-
-    use crate::models::assignment::AssignmentStatus;
-
     use super::*;
-
-    fn week_start() -> NaiveDate {
-        NaiveDate::from_ymd_opt(2026, 3, 23).unwrap() // Monday
-    }
+    use crate::testutil::{
+        AssignmentBuilder, EmployeeBuilder, ExportConfigBuilder, ShiftBuilder,
+        ShiftTemplateBuilder, week_start,
+    };
 
     fn make_shift(
         id: i64,
@@ -453,17 +564,18 @@ mod tests {
         end: (u32, u32),
         role: &str,
     ) -> Shift {
-        Shift {
-            id,
-            template_id,
-            rota_id: 1,
-            date,
-            start_time: NaiveTime::from_hms_opt(start.0, start.1, 0).unwrap(),
-            end_time: NaiveTime::from_hms_opt(end.0, end.1, 0).unwrap(),
-            required_role: role.to_string(),
-            min_employees: 1,
-            max_employees: 2,
+        let mut b = ShiftBuilder::new()
+            .id(id)
+            .date(date)
+            .times_hm(start, end)
+            .role(role)
+            .capacity(1, 2);
+        if let Some(tid) = template_id {
+            b = b.template(tid);
+        } else {
+            b = b.no_template();
         }
+        b.build()
     }
 
     fn make_template(
@@ -473,79 +585,42 @@ mod tests {
         end: (u32, u32),
         role: &str,
     ) -> ShiftTemplate {
-        ShiftTemplate {
-            id,
-            name: name.to_string(),
-            weekdays: vec![Weekday::Mon, Weekday::Tue],
-            start_time: NaiveTime::from_hms_opt(start.0, start.1, 0).unwrap(),
-            end_time: NaiveTime::from_hms_opt(end.0, end.1, 0).unwrap(),
-            required_role: role.to_string(),
-            min_employees: 1,
-            max_employees: 2,
-            deleted: false,
-        }
+        ShiftTemplateBuilder::new(name)
+            .id(id)
+            .weekdays(&[Weekday::Mon, Weekday::Tue])
+            .times_hm(start, end)
+            .role(role)
+            .capacity(1, 2)
+            .build()
     }
 
     fn make_employee(id: i64, first: &str, last: &str) -> Employee {
-        use crate::models::availability::Availability;
-        Employee {
-            id,
-            first_name: first.to_string(),
-            last_name: last.to_string(),
-            nickname: None,
-            roles: vec!["Barista".to_string()],
-            start_date: week_start(),
-            target_weekly_hours: 40.0,
-            weekly_hours_deviation: 5.0,
-            max_daily_hours: 8.0,
-            notes: None,
-            bank_details: None,
-            hourly_wage: Some(15.0),
-            wage_currency: Some("usd".to_string()),
-            default_availability: Availability::default(),
-            availability: Availability::default(),
-            deleted: false,
-        }
+        EmployeeBuilder::new(first)
+            .id(id)
+            .last_name(last)
+            .role("Barista")
+            .deviation(5.0)
+            .wage(15.0, "usd")
+            .start_date(week_start())
+            .build()
     }
 
     fn make_assignment(id: i64, shift_id: i64, employee_id: i64, wage: Option<f32>) -> Assignment {
-        Assignment {
-            id,
-            rota_id: 1,
-            shift_id,
-            employee_id,
-            status: AssignmentStatus::Confirmed,
-            employee_name: None,
-            hourly_wage: wage,
+        let mut b = AssignmentBuilder::new(shift_id, employee_id)
+            .id(id)
+            .confirmed();
+        if let Some(w) = wage {
+            b = b.wage(w);
         }
+        b.build()
     }
 
     fn staff_config(layout: ExportLayout) -> ExportConfig {
-        ExportConfig {
-            layout,
-            format: super::super::config::ExportFormat::Csv,
-            profile: ExportProfile::StaffSchedule,
-            cell_content: CellContentFlags {
-                show_shift_name: true,
-                show_times: true,
-                show_role: false,
-            },
-            pdf_template: None,
-        }
+        ExportConfigBuilder::staff().layout(layout).build()
     }
 
     fn manager_config(layout: ExportLayout) -> ExportConfig {
-        ExportConfig {
-            layout,
-            format: super::super::config::ExportFormat::Csv,
-            profile: ExportProfile::ManagerReport,
-            cell_content: CellContentFlags {
-                show_shift_name: true,
-                show_times: true,
-                show_role: false,
-            },
-            pdf_template: None,
-        }
+        ExportConfigBuilder::manager().layout(layout).build()
     }
 
     #[test]
@@ -696,32 +771,12 @@ mod tests {
         let assignments = vec![make_assignment(1, 1, 1, None)];
 
         // Only show shift name.
-        let config = ExportConfig {
-            layout: ExportLayout::EmployeeByWeekday,
-            format: super::super::config::ExportFormat::Csv,
-            profile: ExportProfile::StaffSchedule,
-            cell_content: CellContentFlags {
-                show_shift_name: true,
-                show_times: false,
-                show_role: false,
-            },
-            pdf_template: None,
-        };
+        let config = ExportConfigBuilder::staff().hide_times().build();
         let grid = build_grid(&config, ws, &assignments, &shifts, &employees, &templates);
         assert_eq!(grid.cells[0][0], "Morning");
 
         // Show everything.
-        let config = ExportConfig {
-            layout: ExportLayout::EmployeeByWeekday,
-            format: super::super::config::ExportFormat::Csv,
-            profile: ExportProfile::StaffSchedule,
-            cell_content: CellContentFlags {
-                show_shift_name: true,
-                show_times: true,
-                show_role: true,
-            },
-            pdf_template: None,
-        };
+        let config = ExportConfigBuilder::staff().show_role().build();
         let grid = build_grid(&config, ws, &assignments, &shifts, &employees, &templates);
         assert!(grid.cells[0][0].contains("Morning"));
         assert!(grid.cells[0][0].contains("07:00-12:00"));

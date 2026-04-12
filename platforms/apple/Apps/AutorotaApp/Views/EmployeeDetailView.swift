@@ -17,8 +17,13 @@ struct EmployeeDetailView: View {
 
     // Disclosure group expansion state for shifts section
     @State private var lastWeekExpanded = false
-    @State private var thisWeekExpanded = true
-    @State private var nextWeekExpanded = true
+    @State private var thisWeekExpanded = false
+    @State private var nextWeekExpanded = false
+
+    // Custom date range
+    @State private var showCustomRange = false
+    @State private var customStartDate: Date = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date()
+    @State private var customEndDate: Date = Date()
 
     private struct OverrideGroup: Identifiable {
         let items: [FfiEmployeeAvailabilityOverride]
@@ -196,6 +201,79 @@ struct EmployeeDetailView: View {
                         isExpanded: $nextWeekExpanded,
                         showTarget: false
                     )
+
+                    // Custom date range
+                    Button {
+                        withAnimation { showCustomRange.toggle() }
+                    } label: {
+                        HStack {
+                            Label("Custom Range", systemImage: "calendar")
+                            Spacer()
+                            Image(systemName: showCustomRange ? "chevron.down" : "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+
+                    if showCustomRange {
+                        DatePicker("From", selection: $customStartDate, displayedComponents: .date)
+                        DatePicker("To", selection: $customEndDate, displayedComponents: .date)
+
+                        let startStr = Self.isoFmt.string(from: customStartDate)
+                        let endStr = Self.isoFmt.string(from: customEndDate)
+                        let filtered = shiftVM.shifts(from: startStr, to: endStr)
+
+                        if filtered.isEmpty {
+                            Text("No shifts in this range")
+                                .foregroundStyle(.tertiary)
+                                .font(.subheadline)
+                        } else {
+                            let grouped = Dictionary(grouping: filtered, by: \.weekStart)
+                                .sorted { $0.key < $1.key }
+                            let totalHours = filtered.reduce(0) { $0 + $1.durationHours }
+                            let totalCost = filtered.reduce(0) { $0 + ($1.shiftCost ?? 0) }
+
+                            ForEach(grouped, id: \.key) { weekStart, shifts in
+                                let weekHours = shifts.reduce(0) { $0 + $1.durationHours }
+                                DisclosureGroup {
+                                    ForEach(shifts, id: \.assignmentId) { record in
+                                        ShiftRecordRow(
+                                            record: record,
+                                            currencySymbol: currencySymbol,
+                                            convertedCost: convertedCost(record.shiftCost)
+                                        )
+                                    }
+                                } label: {
+                                    HStack {
+                                        Text("Week of \(pretty(weekStart))")
+                                        Spacer()
+                                        Text(fmtHours(weekHours))
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+
+                            HStack {
+                                Text("Total").fontWeight(.medium)
+                                Spacer()
+                                VStack(alignment: .trailing) {
+                                    Text(fmtHours(totalHours))
+                                    if totalCost > 0 {
+                                        let converted = exchangeRates.convert(
+                                            totalCost,
+                                            from: employee.wageCurrency ?? displayCurrency,
+                                            to: displayCurrency
+                                        )
+                                        Text(String(format: "%@%.2f", currencySymbol, converted))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .font(.subheadline)
+                            }
+                        }
+                    }
                 }
             }
 
@@ -266,6 +344,9 @@ struct EmployeeDetailView: View {
             }
         }
         .navigationTitle(employee.displayName)
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
         .task {
             await overrideVM.loadForEmployee(id: employee.id)
             await shiftVM.load(employeeId: employee.id)

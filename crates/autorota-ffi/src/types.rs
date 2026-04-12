@@ -272,6 +272,23 @@ pub struct FfiExportConfig {
     pub pdf_template: Option<String>,
 }
 
+/// Configuration for exporting a single employee's schedule.
+#[derive(Clone, uniffi::Record)]
+pub struct FfiEmployeeExportConfig {
+    pub employee_id: i64,
+    /// "YYYY-MM-DD"
+    pub start_date: String,
+    /// "YYYY-MM-DD"
+    pub end_date: String,
+    /// "csv" | "json" | "pdf"
+    pub format: String,
+    /// "staff_schedule" | "manager_report"
+    pub profile: String,
+    pub show_shift_name: bool,
+    pub show_times: bool,
+    pub show_role: bool,
+}
+
 /// Result of an export operation.
 #[derive(Clone, uniffi::Record)]
 pub struct FfiExportResult {
@@ -308,6 +325,14 @@ pub struct FfiTombstone {
     pub table_name: String,
     pub record_id: i64,
     pub deleted_at: String,
+}
+
+// ── Availability Progress ────────────────────────────────────────────────────
+
+#[derive(Clone, uniffi::Record)]
+pub struct FfiAvailabilityProgress {
+    pub employee_id: i64,
+    pub done: bool,
 }
 
 /// Date-specific modification to a recurring shift template on one calendar date.

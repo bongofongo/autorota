@@ -7,6 +7,7 @@ enum TabPage: String, CaseIterable, Codable, Identifiable {
     case overrides
     case history
     case analytics
+    case export
     case settings
 
     var id: String { rawValue }
@@ -19,6 +20,7 @@ enum TabPage: String, CaseIterable, Codable, Identifiable {
         case .overrides: "Overrides"
         case .history: "History"
         case .analytics: "Analytics"
+        case .export: "Export"
         case .settings: "Menu"
         }
     }
@@ -31,6 +33,7 @@ enum TabPage: String, CaseIterable, Codable, Identifiable {
         case .overrides: "exclamationmark.circle"
         case .history: "clock.arrow.circlepath"
         case .analytics: "chart.bar"
+        case .export: "square.and.arrow.up"
         case .settings: "line.3.horizontal"
         }
     }
@@ -44,12 +47,13 @@ enum TabPage: String, CaseIterable, Codable, Identifiable {
         case .overrides: OverridesTabView()
         case .history: CommitHistoryView()
         case .analytics: AnalyticsView()
+        case .export: ExportTabView()
         case .settings: SettingsView()
         }
     }
 
     /// Pages the user can add/remove from the tab bar. Settings is always pinned.
-    static let configurablePages: [TabPage] = [.rota, .employees, .templates, .overrides, .history, .analytics]
+    static let configurablePages: [TabPage] = [.rota, .employees, .templates, .overrides, .history, .analytics, .export]
 
     #if os(iOS)
     static let defaultTabBar: [TabPage] = [.rota, .employees, .templates]

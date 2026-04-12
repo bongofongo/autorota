@@ -53,25 +53,20 @@ struct RotaView: View {
             }
 
             if showsFloatingDotsButton {
-                GeometryReader { geo in
-                    Button {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
-                            bridge.overflowOpen.toggle()
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.title3.weight(.semibold))
-                            .foregroundStyle(.primary)
-                            .frame(width: 24, height: 24)
-                            .padding(14)
-                            .glassEffect(.regular.interactive(), in: Circle())
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
+                        bridge.overflowOpen.toggle()
                     }
-                    .position(
-                        x: geo.size.width * 0.8,
-                        y: geo.size.height - 28
-                    )
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 24, height: 24)
+                        .padding(14)
+                        .glassEffect(.regular.interactive(), in: Circle())
                 }
-                .allowsHitTesting(true)
+                .padding(.trailing, 20)
+                .padding(.bottom, 12)
             }
 
                 if bridge.overflowOpen {

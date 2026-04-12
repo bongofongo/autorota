@@ -71,19 +71,15 @@ impl Shift {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testutil::ShiftBuilder;
 
     fn make_shift(start: (u32, u32), end: (u32, u32), date: (i32, u32, u32)) -> Shift {
-        Shift {
-            id: 1,
-            template_id: Some(1),
-            rota_id: 1,
-            date: NaiveDate::from_ymd_opt(date.0, date.1, date.2).unwrap(),
-            start_time: NaiveTime::from_hms_opt(start.0, start.1, 0).unwrap(),
-            end_time: NaiveTime::from_hms_opt(end.0, end.1, 0).unwrap(),
-            required_role: "Barista".into(),
-            min_employees: 1,
-            max_employees: 1,
-        }
+        ShiftBuilder::new()
+            .id(1)
+            .date(NaiveDate::from_ymd_opt(date.0, date.1, date.2).unwrap())
+            .times_hm(start, end)
+            .role("Barista")
+            .build()
     }
 
     #[test]

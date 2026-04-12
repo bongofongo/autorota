@@ -141,6 +141,15 @@ pub struct ExportConfig {
     pub pdf_template: Option<PdfTemplate>,
 }
 
+/// Configuration for a single-employee schedule export.
+#[derive(Debug, Clone)]
+pub struct EmployeeExportConfig {
+    pub employee_id: i64,
+    pub format: ExportFormat,
+    pub profile: ExportProfile,
+    pub cell_content: CellContentFlags,
+}
+
 /// Result of an export operation.
 #[derive(Debug, Clone)]
 pub struct ExportResult {

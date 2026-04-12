@@ -17,6 +17,11 @@ struct AvailabilityGridView: View {
     var onVisibleRangeChange: ((Int, Int) -> Void)?
     var onSelectionModeChange: ((Bool) -> Void)?
     var onReset: (() -> Void)?
+    /// When false, the selection-mode toggle is hidden from the built-in toolbar
+    /// (the caller is expected to drive selection mode externally via `externalSelectionMode`).
+    var showSelectionToggle: Bool = true
+    /// Optional external binding to drive selection mode from outside the grid.
+    var externalSelectionMode: Binding<Bool>? = nil
 
     private static let weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
@@ -31,7 +36,10 @@ struct AvailabilityGridView: View {
     private static let headerHeight: CGFloat = 16
 
     // Selection state
-    @State private var isSelectionModeActive = false
+    @State private var _isSelectionModeActive = false
+    private var isSelectionModeActive: Bool {
+        get { externalSelectionMode?.wrappedValue ?? _isSelectionModeActive }
+    }
     @State private var dragAnchorCell: (col: Int, row: Int)?
     @State private var dragCurrentCell: (col: Int, row: Int)?
 
@@ -159,20 +167,17 @@ struct AvailabilityGridView: View {
                 rangePickerContent
             }
             Spacer()
-            Button {
-                isSelectionModeActive.toggle()
-                if !isSelectionModeActive {
-                    dragAnchorCell = nil
-                    dragCurrentCell = nil
+            if showSelectionToggle {
+                Button {
+                    toggleSelectionMode()
+                } label: {
+                    Image(systemName: "rectangle.dashed")
+                        .foregroundStyle(isSelectionModeActive ? .white : .secondary)
+                        .padding(6)
+                        .background(isSelectionModeActive ? Color.blue : Color.clear, in: RoundedRectangle(cornerRadius: 6))
                 }
-                onSelectionModeChange?(isSelectionModeActive)
-            } label: {
-                Image(systemName: "rectangle.dashed")
-                    .foregroundStyle(isSelectionModeActive ? .white : .secondary)
-                    .padding(6)
-                    .background(isSelectionModeActive ? Color.blue : Color.clear, in: RoundedRectangle(cornerRadius: 6))
+                .buttonStyle(.borderless)
             }
-            .buttonStyle(.borderless)
         }
     }
 
@@ -313,6 +318,20 @@ struct AvailabilityGridView: View {
             updated.append(AvailabilitySlot(weekday: weekday, hour: UInt8(hour), state: "Yes"))
         }
         onChange?(updated)
+    }
+
+    private func toggleSelectionMode() {
+        let newValue = !isSelectionModeActive
+        if let binding = externalSelectionMode {
+            binding.wrappedValue = newValue
+        } else {
+            _isSelectionModeActive = newValue
+        }
+        if !newValue {
+            dragAnchorCell = nil
+            dragCurrentCell = nil
+        }
+        onSelectionModeChange?(newValue)
     }
 
     private func cycled(_ state: String) -> String {

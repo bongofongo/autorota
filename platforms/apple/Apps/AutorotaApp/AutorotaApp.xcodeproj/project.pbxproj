@@ -40,6 +40,12 @@
 		CC0011032FE0000000205001 /* HelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0011042FE0000000205001 /* HelpView.swift */; };
 		CC0012012FF0000000205001 /* AnalyticsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0012022FF0000000205001 /* AnalyticsViewModel.swift */; };
 		CC0012032FF0000000205001 /* AnalyticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0012042FF0000000205001 /* AnalyticsView.swift */; };
+		CC0013013000000000205001 /* ExportTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0013023000000000205001 /* ExportTabView.swift */; };
+		CC0014013000000000205001 /* EmployeeExportViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0014023000000000205001 /* EmployeeExportViewModel.swift */; };
+		CC0015013010000000205001 /* EmployeeUIBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0015023010000000205001 /* EmployeeUIBridge.swift */; };
+		CC0015033010000000205001 /* WeeklyAvailabilityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0015043010000000205001 /* WeeklyAvailabilityView.swift */; };
+		CC0016013020000000205001 /* AvailabilityProgressViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0016023020000000205001 /* AvailabilityProgressViewModel.swift */; };
+		CC0016033020000000205001 /* CarouselAvailabilityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0016043020000000205001 /* CarouselAvailabilityView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -87,6 +93,12 @@
 		CC0011042FE0000000205001 /* HelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpView.swift; sourceTree = "<group>"; };
 		CC0012022FF0000000205001 /* AnalyticsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsViewModel.swift; sourceTree = "<group>"; };
 		CC0012042FF0000000205001 /* AnalyticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsView.swift; sourceTree = "<group>"; };
+		CC0013023000000000205001 /* ExportTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportTabView.swift; sourceTree = "<group>"; };
+		CC0014023000000000205001 /* EmployeeExportViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmployeeExportViewModel.swift; sourceTree = "<group>"; };
+		CC0015023010000000205001 /* EmployeeUIBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmployeeUIBridge.swift; sourceTree = "<group>"; };
+		CC0015043010000000205001 /* WeeklyAvailabilityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyAvailabilityView.swift; sourceTree = "<group>"; };
+		CC0016023020000000205001 /* AvailabilityProgressViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvailabilityProgressViewModel.swift; sourceTree = "<group>"; };
+		CC0016043020000000205001 /* CarouselAvailabilityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarouselAvailabilityView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -146,7 +158,9 @@
 			isa = PBXGroup;
 			children = (
 				CC0012022FF0000000205001 /* AnalyticsViewModel.swift */,
+				CC0016023020000000205001 /* AvailabilityProgressViewModel.swift */,
 				CC0010022FD0000000205001 /* CommitHistoryViewModel.swift */,
+				CC0014023000000000205001 /* EmployeeExportViewModel.swift */,
 				5B9675162F72075A00205001 /* EmployeeViewModel.swift */,
 				CC0003022F80000000205001 /* OverrideViewModel.swift */,
 				5B9675312F72075A00205001 /* RoleViewModel.swift */,
@@ -162,12 +176,14 @@
 			children = (
 				CC0012042FF0000000205001 /* AnalyticsView.swift */,
 				5B96751A2F72075A00205001 /* AvailabilityGridView.swift */,
+				CC0016043020000000205001 /* CarouselAvailabilityView.swift */,
 				CC0010042FD0000000205001 /* CommitHistoryView.swift */,
 				5B96751B2F72075A00205001 /* ContentView.swift */,
 				5B96751C2F72075A00205001 /* EmployeeDetailView.swift */,
 				5B96751D2F72075A00205001 /* EmployeeListView.swift */,
 				CC0005042F80000000205001 /* EmployeeShiftHistoryView.swift */,
 				CC0008022FB0000000205001 /* ExportSheetView.swift */,
+				CC0013023000000000205001 /* ExportTabView.swift */,
 				CC0011042FE0000000205001 /* HelpView.swift */,
 				CC0011022FE0000000205001 /* OnboardingView.swift */,
 				CC0003042F80000000205001 /* OverridesTabView.swift */,
@@ -178,6 +194,8 @@
 				CC0006022F90000000205001 /* TabPage.swift */,
 				CC0006062F90000000205001 /* RotaUIBridge.swift */,
 				CC00060B2F90000000205001 /* RotaOverflowPopover.swift */,
+				CC0015023010000000205001 /* EmployeeUIBridge.swift */,
+				CC0015043010000000205001 /* WeeklyAvailabilityView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -338,6 +356,12 @@
 				CC0011032FE0000000205001 /* HelpView.swift in Sources */,
 				CC0012012FF0000000205001 /* AnalyticsViewModel.swift in Sources */,
 				CC0012032FF0000000205001 /* AnalyticsView.swift in Sources */,
+				CC0013013000000000205001 /* ExportTabView.swift in Sources */,
+				CC0014013000000000205001 /* EmployeeExportViewModel.swift in Sources */,
+				CC0015013010000000205001 /* EmployeeUIBridge.swift in Sources */,
+				CC0015033010000000205001 /* WeeklyAvailabilityView.swift in Sources */,
+				CC0016013020000000205001 /* AvailabilityProgressViewModel.swift in Sources */,
+				CC0016033020000000205001 /* CarouselAvailabilityView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

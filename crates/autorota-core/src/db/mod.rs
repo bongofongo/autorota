@@ -184,5 +184,21 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         sqlx::raw_sql(m12).execute(pool).await?;
     }
 
+    // Migration 013: performance indexes (all use IF NOT EXISTS, safe to run unconditionally).
+    let m13 = include_str!("../../migrations/013_perf_indexes.sql");
+    sqlx::raw_sql(m13).execute(pool).await?;
+
+    // Migration 014: availability progress tracking for carousel workflow.
+    let has_availability_progress: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='availability_progress'",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    if !has_availability_progress {
+        let m14 = include_str!("../../migrations/014_availability_progress.sql");
+        sqlx::raw_sql(m14).execute(pool).await?;
+    }
+
     Ok(())
 }

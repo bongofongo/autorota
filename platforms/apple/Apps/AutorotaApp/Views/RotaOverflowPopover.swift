@@ -37,7 +37,7 @@ struct RotaOverflowPopover: View {
     /// which sits just below RotaView's bottom edge.
     private var bottomPadding: CGFloat {
         #if os(iOS)
-        return verticalSizeClass == .compact ? 84 : 12
+        return verticalSizeClass == .compact ? 68 : 12
         #else
         return 12
         #endif

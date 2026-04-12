@@ -65,28 +65,17 @@ impl Employee {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::availability::{Availability, AvailabilityState};
+    use crate::models::availability::AvailabilityState;
+    use crate::testutil::EmployeeBuilder;
     use chrono::Weekday;
 
     fn make_employee() -> Employee {
-        Employee {
-            id: 1,
-            first_name: "Alice".into(),
-            last_name: "Smith".into(),
-            nickname: None,
-            roles: vec!["Barista".into(), "Cashier".into()],
-            start_date: NaiveDate::from_ymd_opt(2026, 1, 1).unwrap(),
-            target_weekly_hours: 30.0,
-            weekly_hours_deviation: 6.0,
-            max_daily_hours: 8.0,
-            notes: None,
-            bank_details: None,
-            hourly_wage: None,
-            wage_currency: None,
-            default_availability: Availability::default(),
-            availability: Availability::default(),
-            deleted: false,
-        }
+        EmployeeBuilder::new("Alice")
+            .id(1)
+            .last_name("Smith")
+            .roles(&["Barista", "Cashier"])
+            .hours(30.0)
+            .build()
     }
 
     #[test]

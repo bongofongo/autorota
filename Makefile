@@ -35,6 +35,8 @@ XCB     := xcodebuild -project $(PROJECT) -scheme $(SCHEME)
 # ─── Rust ────────────────────────────────────────────────────────────────────
 
 .PHONY: rust-test rust-test-unit rust-test-integration rust-fmt rust-clippy lint
+.PHONY: rust-test-one rust-test-scheduler rust-test-models rust-test-export
+.PHONY: rust-test-db rust-test-edge rust-test-loud
 
 rust-test: rust-test-unit rust-test-integration
 
@@ -43,6 +45,32 @@ rust-test-unit:
 
 rust-test-integration:
 	cargo test --test '*' -p autorota-core $(CARGO_TEST_FLAGS)
+
+# Run a single test by name (substring match).
+# Usage: make rust-test-one NAME=single_employee
+rust-test-one:
+	cargo test -p autorota-core $(NAME) $(CARGO_TEST_FLAGS)
+
+# Run tests for a specific module.
+rust-test-scheduler:
+	cargo test -p autorota-core scheduler $(CARGO_TEST_FLAGS)
+
+rust-test-models:
+	cargo test -p autorota-core models $(CARGO_TEST_FLAGS)
+
+rust-test-export:
+	cargo test -p autorota-core export $(CARGO_TEST_FLAGS)
+
+# Run specific integration test files.
+rust-test-db:
+	cargo test --test db_integration -p autorota-core $(CARGO_TEST_FLAGS)
+
+rust-test-edge:
+	cargo test --test edge_cases_test -p autorota-core $(CARGO_TEST_FLAGS)
+
+# Always-verbose test run (shows println! output).
+rust-test-loud:
+	cargo test --lib --workspace -- --nocapture
 
 rust-fmt:
 	cargo fmt --check --all

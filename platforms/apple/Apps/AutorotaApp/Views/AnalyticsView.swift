@@ -5,6 +5,8 @@ import AutorotaKit
 struct AnalyticsView: View {
 
     @State private var vm = AnalyticsViewModel()
+    @Environment(ExchangeRateService.self) private var exchangeRates
+    @AppStorage("appCurrency") private var displayCurrency = "usd"
 
     var body: some View {
         NavigationStack {
@@ -25,8 +27,16 @@ struct AnalyticsView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
-            .task { await vm.load() }
+            .task {
+                vm.exchangeRates = exchangeRates
+                vm.displayCurrency = displayCurrency
+                await vm.load()
+            }
             .refreshable { await vm.load() }
+            .onChange(of: displayCurrency) {
+                vm.displayCurrency = displayCurrency
+                Task { await vm.load() }
+            }
             .onChange(of: vm.selectedPreset) {
                 Task { await vm.load() }
             }
@@ -286,6 +296,7 @@ struct AnalyticsView: View {
     }
 
     private func fmtCost(_ c: Float) -> String {
-        String(format: "$%.2f", c)
+        let sym = exchangeRates.symbol(for: displayCurrency)
+        return String(format: "%@%.2f", sym, c)
     }
 }

@@ -449,6 +449,38 @@ pub async fn get_rota_by_week(
     }
 }
 
+/// Fetch all rotas whose `week_start` falls within the given date range
+/// (inclusive). Calulates the Monday-aligned week boundaries automatically.
+pub async fn get_rotas_in_range(
+    pool: &SqlitePool,
+    start_date: NaiveDate,
+    end_date: NaiveDate,
+) -> Result<Vec<Rota>, sqlx::Error> {
+    use chrono::Datelike;
+
+    // Align to Monday of each bounding week.
+    let first_monday =
+        start_date - chrono::Duration::days(start_date.weekday().num_days_from_monday() as i64);
+    let last_monday =
+        end_date - chrono::Duration::days(end_date.weekday().num_days_from_monday() as i64);
+
+    let rows: Vec<(i64,)> = sqlx::query_as(
+        "SELECT id FROM rotas WHERE week_start >= ? AND week_start <= ? ORDER BY week_start",
+    )
+    .bind(first_monday.to_string())
+    .bind(last_monday.to_string())
+    .fetch_all(pool)
+    .await?;
+
+    let mut rotas = Vec::with_capacity(rows.len());
+    for (id,) in rows {
+        if let Some(rota) = get_rota(pool, id).await? {
+            rotas.push(rota);
+        }
+    }
+    Ok(rotas)
+}
+
 /// Delete a rota and all its data. Deletes all shifts first (which cascades
 /// to assignments via the ON DELETE CASCADE FK), then removes the rota row.
 pub async fn delete_rota(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> {
@@ -1839,5 +1871,40 @@ pub async fn apply_remote_record(
         query = query.bind(&record.fields);
         query.execute(pool).await?;
     }
+    Ok(())
+}
+
+// ── Availability Progress ────────────────────────────────────────────────────
+
+/// List availability-progress flags for a given week.
+pub async fn list_availability_progress(
+    pool: &SqlitePool,
+    week_start: &str,
+) -> Result<Vec<(i64, bool)>, sqlx::Error> {
+    let rows: Vec<(i64, bool)> =
+        sqlx::query_as("SELECT employee_id, done FROM availability_progress WHERE week_start = ?")
+            .bind(week_start)
+            .fetch_all(pool)
+            .await?;
+    Ok(rows)
+}
+
+/// Mark an employee's availability as done/not-done for a given week (upsert).
+pub async fn set_availability_progress(
+    pool: &SqlitePool,
+    employee_id: i64,
+    week_start: &str,
+    done: bool,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "INSERT INTO availability_progress (employee_id, week_start, done)
+         VALUES (?, ?, ?)
+         ON CONFLICT(employee_id, week_start) DO UPDATE SET done = excluded.done",
+    )
+    .bind(employee_id)
+    .bind(week_start)
+    .bind(done)
+    .execute(pool)
+    .await?;
     Ok(())
 }

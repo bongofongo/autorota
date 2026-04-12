@@ -1,155 +1,59 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code when working with code in this repository.
+## What is autorota?
 
-# autorota
+Multi-platform cafe shift scheduling app. Rust `autorota-core` provides the scheduling engine and SQLite database. Frontends: Tauri (desktop/web), SwiftUI (iOS/macOS). Future: Android (Kotlin via UniFFI).
 
-A multi-platform cafe shift scheduling app. Rust `autorota-core` provides the shared scheduling engine and SQLite database. Frontends: Tauri (desktop/web), SwiftUI (iOS/macOS). Future: Android (Kotlin via UniFFI), Linux.
-
-## Purpose
-
-Cafe managers define shifts that need to be filled each week. Employees declare their availability. The scheduler assigns employees to shifts respecting those preferences and any hour limits.
+Cafe managers define shifts. Employees declare availability. The scheduler assigns employees to shifts respecting preferences and hour limits.
 
 ## Core concepts
 
-- **Shift** — a time slot on a specific weekday with start/end time and derived duration. Has a required role/skill and employee capacity (min/max headcount).
-- **Employee** — has roles/skills, weekly/daily hour constraints, and an availability map. Name is split into `first_name`, `last_name`, `nickname` with a `display_name()` helper.
-- **Availability** — hour-by-hour, weekday-keyed map with three states: `Yes`, `Maybe`, `No`. Employees have a default template and a week-specific override.
-- **Assignment** — links one employee to one shift for a specific week. Status: `Proposed | Confirmed | Overridden`.
-- **Rota** — full collection of assignments for a given week; stored as a finalized schedule record.
-- **Role** — a skill/role that employees can hold and shifts can require (stored in `roles` table).
-
-## Scheduling algorithm
-
-Two-pass approach:
-1. **Pre-assignment pass** — apply manual overrides/pins first.
-2. **Greedy assignment pass** — for each remaining shift (hardest-to-fill first), score eligible employees by availability quality (`Yes > Maybe > No`), remaining hour budget, and fairness (fewest hours assigned so far). Tiebreak on that score.
+- **Shift** — weekday time slot with optional role and employee capacity (min/max headcount). Wildcard shifts (no role) accept any employee
+- **Employee** — has roles, weekly/daily hour constraints, availability map, optional wage & currency
+- **Availability** — hour-by-hour, weekday-keyed: `Yes`, `Maybe`, `No`. Default template + date-specific overrides
+- **Override** — two kinds: *employee availability overrides* (date-specific availability replacing the weekly template) and *shift template overrides* (date-specific changes to a template's times, capacity, or cancellation)
+- **Assignment** — links employee to shift for a week. Status: `Proposed | Confirmed | Overridden`. Snapshots employee name and wage at creation
+- **Rota** — all assignments for a given week. Can be finalized to prevent further changes
+- **Role** — skill that employees hold and shifts require (optional on shifts)
+- **Export** — CSV, JSON, and PDF schedule export. Layouts: employee-by-weekday or shift-by-weekday. Profiles: staff schedule (no wages) or manager report (with costs). PDF templates: weekly grid, per-employee, by-role
+- **Staging/Commit** — git-like workflow for past shifts. Stage individual shifts, days, or weeks, then commit with a snapshot for audit history
 
 ## Architecture
 
-**Cargo workspace** with four active crates:
+Cargo workspace: `autorota-core` (models, scheduler, db, export), `autorota-ffi` (UniFFI bindings for Swift/Kotlin), `app-desktop` (Tauri v2). Apple platform under `platforms/apple/` with `AutorotaKit` (SPM package) and `AutorotaApp` (Xcode project). Database: SQLite with 12 auto-applied migrations.
 
-```
-autorota/
-  Cargo.toml
-  Makefile                            # test suite runner (see Dev commands)
-  crates/
-    autorota-core/                    # pure library: models, scheduler, db layer
-      src/
-        models/                       # employee, availability, shift, assignment, rota, role
-        scheduler/                    # mod.rs (algorithm), scoring.rs
-        db/                           # mod.rs (pool + migrations), queries.rs
-      migrations/                     # 001–010 SQL files, embedded at runtime
-      tests/                          # db_integration.rs, scheduler_test.rs, helpers/
-    app-desktop/                      # Tauri v2 desktop shell
-      src/                            # main.ts (single-file UI), styles.css, main.js
-      src-tauri/                      # lib.rs (command handlers), tauri.conf.json
-    autorota-ffi/                     # UniFFI wrapper → Swift/Kotlin bindings
-      src/
-        lib.rs                        # OnceLock<Pool+Runtime>, #[uniffi::export] fns
-        types.rs                      # Ffi* mirror types (#[derive(uniffi::Record)])
-        error.rs                      # FfiError (#[derive(uniffi::Error)])
-        bin/uniffi_bindgen.rs         # bindgen CLI entry point
-  platforms/
-    apple/
-      AutorotaKit/                    # Swift Package (SPM library)
-        Sources/AutorotaKit/
-          generated/                  # committed: autorota_ffi.swift + headers
-          AutorotaKit.swift           # async wrappers, DB init helper, week utilities
-        Tests/AutorotaKitTests/       # SPM integration tests (real FFI)
-        XCFrameworks/                 # gitignored — built by scripts/build_xcframework.sh
-      Apps/AutorotaApp/               # Xcode project (iOS 17 / macOS 14)
-        AutorotaApp/                  # @main entry, assets
-        Services/                     # AutorotaServiceProtocol, LiveAutorotaService, ExchangeRateService
-        ViewModels/                   # RotaViewModel, EmployeeViewModel, ShiftTemplateViewModel, RoleViewModel
-        Views/                        # SwiftUI views
-        AutorotaAppTests/             # ViewModel unit tests using MockAutorotaService
-  scripts/
-    build_xcframework.sh              # full Rust→XCFramework build pipeline
-```
+Scheduling algorithm: two-pass greedy — apply manual overrides first, then assign remaining shifts hardest-to-fill-first using availability quality, hour budget, fairness scoring, and deterministic hash-based tiebreaking.
 
-### Rust layer
+Services layer uses `AutorotaServiceProtocol` for testability. `LiveAutorotaService` wraps FFI and broadcasts `.autorotaDataChanged` notifications on mutations; `MockAutorotaService` for ViewModel unit tests. iCloud sync via `CKSyncEngine` with three-way per-field merge conflict resolution.
 
-All business logic lives in `autorota-core`. `app-desktop/src-tauri` is a thin adapter exposing Tauri commands. The frontend is a single TypeScript file built with Vite.
-
-`AppState` in `src-tauri/src/lib.rs` wraps a `Mutex<SqlitePool>`. The DB file lives in the OS app data directory.
-
-Migrations are embedded in `db/mod.rs` and run automatically on `connect()`.
-
-### autorota-ffi crate
-
-UniFFI 0.28 wrapper exposing the full command surface to Swift (and future Kotlin):
-
-- `crate-type = ["staticlib", "cdylib"]` — `.a` for XCFramework, `.dylib` for binding generation
-- Global `OnceLock<SqlitePool>` + `OnceLock<Runtime>` — all exported fns call `rt().block_on(...)`
-- `Availability` crosses FFI as `Vec<AvailabilitySlot>` (flattened from `HashMap<(Weekday,u8), AvailabilityState>`)
-- All chrono types cross as strings: dates `"YYYY-MM-DD"`, times `"HH:MM"`, weekdays `"Mon"` etc.
-- The `uniffi-bindgen` CLI is in `src/bin/uniffi_bindgen.rs` (not a separate crate)
-
-### Apple platform
-
-- Min deployment: iOS 17 / macOS 14 (for `@Observable`)
-- Services layer uses `AutorotaServiceProtocol` for testability — `LiveAutorotaService` wraps the FFI; `MockAutorotaService` is used in ViewModel unit tests
-- `AutorotaKit.swift` provides async wrappers using `Task.detached` to keep blocking FFI off the main actor
-- `scripts/build_xcframework.sh` compiles for `aarch64-apple-darwin`, `x86_64-apple-darwin`, `aarch64-apple-ios`, `aarch64-apple-ios-sim`; lipo-s macOS slices; assembles XCFramework
-- **`SDKROOT` must be set per target** so `libsqlite3-sys`/cc-rs finds the correct SDK headers
-
-## Wages & currency
-
-Employees have an optional `hourly_wage` and `wage_currency` (e.g. "usd", "gbp", "eur"). Wages are stored in the employee's chosen currency. Assignments snapshot the wage at scheduling time. `shift_cost` is computed at the FFI layer (`hourly_wage × duration`), not stored in DB. The global display currency (`@AppStorage("appCurrency")`) controls what the user sees everywhere — `ExchangeRateService` fetches live rates from `api.frankfurter.dev`, caches in UserDefaults for offline use, and converts between currencies at display time. The `AppCurrency` enum is defined in `SettingsView.swift`.
-
-## Stack
-
-| Concern | Choice |
-|---|---|
-| Async runtime | Tokio |
-| Database | SQLite via SQLx |
-| Desktop | Tauri v2 |
-| iOS / macOS native | SwiftUI (iOS 17 / macOS 14) |
-| Swift bindings | UniFFI 0.28 |
-| Serialization | Serde + serde_json |
-| Frontend build | Vite + TypeScript |
+SwiftUI app features: onboarding flow, configurable tab bar, analytics dashboard (Charts framework), shift history with weekly/monthly breakdowns, commit history with change tracking, PDF/CSV/JSON export with share sheet.
 
 ## Dev commands
 
-All Swift/Xcode tasks use the `make` targets defined in `Makefile` or the XcodeBuildMCP tools — prefer those over raw `xcodebuild` invocations.
-
 ```bash
-# Rust (workspace root)
-cargo fmt
-cargo clippy
-cargo test
-cargo test -p autorota-core                    # core tests only
+cargo fmt && cargo clippy && cargo test   # Rust
 
-# Desktop app (crates/app-desktop/)
-npm run tauri dev      # Vite + Tauri with hot reload
-npm run tauri build    # production build
-
-# Apple platform — build XCFramework first (workspace root)
-make swift-build-xcframework           # release build
-make swift-build-xcframework-debug     # faster debug build
-
-# Swift build checks (compile only, no simulator run)
-make swift-build-check-macos
+make swift-build-xcframework              # build XCFramework (required before Swift tests)
+make swift-build-xcframework-debug        # faster debug build
+make swift-build-check-macos              # compile check only (use after editing Swift)
 make swift-build-check-ios
-make swift-build-check                 # all three platforms
-
-# Swift ViewModel unit tests (mock service, no live FFI)
-make swift-test-app-macos
+make swift-build-check-ipad
+make swift-build-check                    # all three compile checks
+make swift-test-app-macos                 # ViewModel tests (no FFI needed)
 make swift-test-app-ios
-
-# SPM integration tests (real FFI — XCFramework must be built first)
-make swift-test-package
-
-# Full suite
-make test-all
+make swift-test-app-ipad
+make swift-test-package                   # SPM integration tests (needs XCFramework)
+make test-all                             # everything
 ```
 
-## Swift / Xcode tooling
+Set `VERBOSE=1` for full build output. `NOSIGN=1` is set automatically in make targets to disable code signing.
 
-- **Always use the `xcodebuildmcp-cli` skill** before calling any XcodeBuildMCP tools (see AGENTS.md).
-- Use XcodeBuildMCP tools (`build_macos`, `build_sim`, `test_macos`, `test_sim`, etc.) in preference to raw shell `xcodebuild` commands.
-- **After editing Swift files, run only the build-check targets** (`make swift-build-check-macos` or `make swift-build-check-ios`) to verify compilation. Do not run the full simulator test suite just to check that code compiles.
-- ViewModel unit tests (`AutorotaAppTests/`) use `MockAutorotaService` and do not require the XCFramework — they run without rebuilding Rust.
-- SPM integration tests in `AutorotaKit/Tests/` require the XCFramework to be built first.
-- Xcode 26+ is required (as specified in the Makefile).
+## Working conventions
+
+- Use `make` targets or XcodeBuildMCP tools, not raw `xcodebuild`
+- After editing Swift, run build-check targets to verify compilation — not full test suite
+- ViewModel tests use `MockAutorotaService` and don't need the XCFramework
+- SPM integration tests in `AutorotaKit/Tests/` need the XCFramework built first
+- Xcode 26+ required
+- Wages stored per-employee currency; display converted via `ExchangeRateService` using `api.frankfurter.dev`
+- `SDKROOT` must be set per target when building the XCFramework

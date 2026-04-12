@@ -94,6 +94,8 @@ final class AnalyticsViewModel {
     // MARK: - Init
 
     private let service: AutorotaServiceProtocol
+    var exchangeRates: ExchangeRateService?
+    var displayCurrency: String = "usd"
 
     init(service: AutorotaServiceProtocol = LiveAutorotaService()) {
         self.service = service
@@ -153,10 +155,18 @@ final class AnalyticsViewModel {
 
     private func computeAggregates(_ records: [FfiEmployeeShiftRecord], employees: [FfiEmployee]) {
         let targetMap = Dictionary(uniqueKeysWithValues: employees.map { ($0.id, $0.targetWeeklyHours) })
+        let wageCurrencyMap = Dictionary(uniqueKeysWithValues: employees.map { ($0.id, $0.wageCurrency ?? "usd") })
+
+        // Helper to convert a shift cost from the employee's wage currency to display currency
+        let convertCost: (Float?, Int64) -> Float = { cost, employeeId in
+            guard let cost, let rates = self.exchangeRates else { return cost ?? 0 }
+            let from = wageCurrencyMap[employeeId] ?? "usd"
+            return rates.convert(cost, from: from, to: self.displayCurrency)
+        }
 
         // Summary
         totalHours = records.reduce(0) { $0 + $1.durationHours }
-        totalCost = records.reduce(0) { $0 + ($1.shiftCost ?? 0) }
+        totalCost = records.reduce(0) { $0 + convertCost($1.shiftCost, $1.employeeId) }
 
         // Employee summaries
         let distinctWeeks = Set(records.map(\.weekStart)).count
@@ -165,9 +175,10 @@ final class AnalyticsViewModel {
         var empMap: [Int64: EmployeeSummary] = [:]
         for r in records {
             let name = r.employeeName ?? "Unknown"
+            let cost = convertCost(r.shiftCost, r.employeeId)
             if var existing = empMap[r.employeeId] {
                 existing.totalHours += r.durationHours
-                existing.totalEarnings += r.shiftCost ?? 0
+                existing.totalEarnings += cost
                 existing.shiftCount += 1
                 empMap[r.employeeId] = existing
             } else {
@@ -175,7 +186,7 @@ final class AnalyticsViewModel {
                     id: r.employeeId,
                     name: name,
                     totalHours: r.durationHours,
-                    totalEarnings: r.shiftCost ?? 0,
+                    totalEarnings: cost,
                     avgHoursPerWeek: 0,
                     targetWeeklyHours: targetMap[r.employeeId],
                     shiftCount: 1
@@ -226,12 +237,13 @@ final class AnalyticsViewModel {
         // Weekly trends
         var weekMap: [String: WeekTrend] = [:]
         for r in records {
+            let cost = convertCost(r.shiftCost, r.employeeId)
             if var existing = weekMap[r.weekStart] {
                 existing.totalHours += r.durationHours
-                existing.totalCost += r.shiftCost ?? 0
+                existing.totalCost += cost
                 weekMap[r.weekStart] = existing
             } else {
-                weekMap[r.weekStart] = WeekTrend(weekStart: r.weekStart, totalHours: r.durationHours, totalCost: r.shiftCost ?? 0)
+                weekMap[r.weekStart] = WeekTrend(weekStart: r.weekStart, totalHours: r.durationHours, totalCost: cost)
             }
         }
         weeklyTrends = weekMap.values.sorted { $0.weekStart < $1.weekStart }

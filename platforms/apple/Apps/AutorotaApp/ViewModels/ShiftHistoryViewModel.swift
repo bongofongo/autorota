@@ -52,6 +52,12 @@ final class ShiftHistoryViewModel {
         isLoading = false
     }
 
+    func shifts(from startDate: String, to endDate: String) -> [FfiEmployeeShiftRecord] {
+        let all = pastShifts + currentWeekShifts + plannedShifts
+        return all.filter { $0.date >= startDate && $0.date <= endDate }
+            .sorted { $0.date < $1.date }
+    }
+
     private func categorise(_ records: [FfiEmployeeShiftRecord]) {
         let mondayStr = currentWeekStart()
         let cal = Calendar(identifier: .iso8601)

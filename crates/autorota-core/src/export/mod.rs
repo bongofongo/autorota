@@ -9,7 +9,7 @@ use chrono::NaiveDate;
 use sqlx::SqlitePool;
 
 use crate::db::queries;
-use config::{ExportConfig, ExportFormat, ExportResult, PdfTemplate};
+use config::{EmployeeExportConfig, ExportConfig, ExportFormat, ExportResult, PdfTemplate};
 
 /// Errors that can occur during export.
 #[derive(Debug, thiserror::Error)]
@@ -18,6 +18,8 @@ pub enum ExportError {
     Db(#[from] sqlx::Error),
     #[error("no schedule found for week {0}")]
     NoSchedule(String),
+    #[error("employee not found: {0}")]
+    EmployeeNotFound(i64),
     #[error("pdf render error: {0}")]
     Pdf(String),
 }
@@ -122,6 +124,107 @@ pub async fn export_week_schedule(
             };
 
             let filename = format!("rota-{}-{}.pdf", week_start.format("%Y-%m-%d"), template,);
+            Ok(ExportResult {
+                data: base64::engine::general_purpose::STANDARD.encode(&bytes),
+                filename,
+                mime_type: "application/pdf".to_string(),
+            })
+        }
+    }
+}
+
+/// Export a single employee's schedule over a date range.
+pub async fn export_employee_schedule(
+    pool: &SqlitePool,
+    employee_id: i64,
+    start_date: NaiveDate,
+    end_date: NaiveDate,
+    config: EmployeeExportConfig,
+) -> Result<ExportResult, ExportError> {
+    let employee = queries::get_employee(pool, employee_id)
+        .await?
+        .ok_or(ExportError::EmployeeNotFound(employee_id))?;
+
+    let rotas = queries::get_rotas_in_range(pool, start_date, end_date).await?;
+    let templates = queries::list_all_shift_templates(pool).await?;
+
+    // Collect all shifts and assignments across rotas, filtering to the employee.
+    let mut all_shifts = Vec::new();
+    let mut all_assignments = Vec::new();
+    for rota in &rotas {
+        let shifts = queries::list_shifts_for_rota(pool, rota.id).await?;
+        let emp_assignments: Vec<_> = rota
+            .assignments
+            .iter()
+            .filter(|a| a.employee_id == employee_id)
+            .cloned()
+            .collect();
+        all_assignments.extend(emp_assignments);
+        all_shifts.extend(shifts);
+    }
+
+    // Filter shifts to only those within the date range.
+    all_shifts.retain(|s| s.date >= start_date && s.date <= end_date);
+
+    // Build date list for the range.
+    let mut dates = Vec::new();
+    let mut d = start_date;
+    while d <= end_date {
+        dates.push(d);
+        d += chrono::Duration::days(1);
+    }
+
+    let employee_name = employee.display_name();
+    let is_manager = config.profile == config::ExportProfile::ManagerReport;
+
+    let export_grid = grid::build_single_employee_grid(
+        &employee_name,
+        &dates,
+        &all_assignments,
+        &all_shifts,
+        &templates,
+        &config.cell_content,
+        is_manager,
+    );
+
+    match config.format {
+        ExportFormat::Csv | ExportFormat::Json => {
+            let data = match config.format {
+                ExportFormat::Csv => csv::render_csv(&export_grid),
+                ExportFormat::Json => json::render_employee_json(
+                    &export_grid,
+                    &employee_name,
+                    start_date,
+                    end_date,
+                    &config.profile,
+                ),
+                ExportFormat::Pdf => unreachable!(),
+            };
+            let (ext, mime) = match config.format {
+                ExportFormat::Csv => ("csv", "text/csv"),
+                ExportFormat::Json => ("json", "application/json"),
+                ExportFormat::Pdf => unreachable!(),
+            };
+            let filename = format!(
+                "schedule-{}-{}-to-{}.{ext}",
+                employee_name.to_lowercase().replace(' ', "-"),
+                start_date.format("%Y-%m-%d"),
+                end_date.format("%Y-%m-%d"),
+            );
+            Ok(ExportResult {
+                data,
+                filename,
+                mime_type: mime.to_string(),
+            })
+        }
+        ExportFormat::Pdf => {
+            let bytes = pdf::employee_schedule::render(&export_grid).map_err(ExportError::Pdf)?;
+            let filename = format!(
+                "schedule-{}-{}-to-{}.pdf",
+                employee_name.to_lowercase().replace(' ', "-"),
+                start_date.format("%Y-%m-%d"),
+                end_date.format("%Y-%m-%d"),
+            );
             Ok(ExportResult {
                 data: base64::engine::general_purpose::STANDARD.encode(&bytes),
                 filename,
