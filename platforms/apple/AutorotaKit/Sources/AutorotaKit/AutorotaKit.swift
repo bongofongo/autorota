@@ -301,11 +301,35 @@ public func listAllShiftHistoryAsync(startDate: String?, endDate: String?) async
     }.value
 }
 
-// MARK: - Commits
+// MARK: - Saves
 
-public func commitShiftsAsync(rotaId: Int64, shiftIds: [Int64]) async throws -> Int64 {
+public func createSaveAsync(rotaId: Int64) async throws -> Int64 {
     try await Task.detached(priority: .userInitiated) {
-        try commitShifts(rotaId: rotaId, shiftIds: shiftIds)
+        try createSave(rotaId: rotaId)
+    }.value
+}
+
+public func listSavesAsync(rotaId: Int64?) async throws -> [FfiSave] {
+    try await Task.detached(priority: .userInitiated) {
+        try listSaves(rotaId: rotaId)
+    }.value
+}
+
+public func getSaveDetailAsync(saveId: Int64) async throws -> FfiSaveDetail? {
+    try await Task.detached(priority: .userInitiated) {
+        try getSaveDetail(saveId: saveId)
+    }.value
+}
+
+public func rotaHasSavesAsync(rotaId: Int64) async throws -> Bool {
+    try await Task.detached(priority: .userInitiated) {
+        try rotaHasSaves(rotaId: rotaId)
+    }.value
+}
+
+public func restoreToSaveAsync(saveId: Int64) async throws -> FfiRestoreResult {
+    try await Task.detached(priority: .userInitiated) {
+        try restoreToSave(saveId: saveId)
     }.value
 }
 
@@ -315,45 +339,27 @@ public func diffRotaAsync(rotaId: Int64) async throws -> [FfiShiftDiff] {
     }.value
 }
 
-public func listCommitsAsync(rotaId: Int64?) async throws -> [FfiCommit] {
-    try await Task.detached(priority: .userInitiated) {
-        try listCommits(rotaId: rotaId)
-    }.value
-}
-
-public func getCommitDetailAsync(commitId: Int64) async throws -> FfiCommitDetail? {
-    try await Task.detached(priority: .userInitiated) {
-        try getCommitDetail(commitId: commitId)
-    }.value
-}
-
-public func rotaIsCommittedAsync(rotaId: Int64) async throws -> Bool {
-    try await Task.detached(priority: .userInitiated) {
-        try rotaIsCommitted(rotaId: rotaId)
-    }.value
-}
-
-public func restoreToCommitAsync(commitId: Int64) async throws -> FfiRestoreResult {
-    try await Task.detached(priority: .userInitiated) {
-        try restoreToCommit(commitId: commitId)
-    }.value
-}
-
-public func diffRotaDetailedAsync(rotaId: Int64) async throws -> [FfiCommitChangeDetail] {
+public func diffRotaDetailedAsync(rotaId: Int64) async throws -> [FfiChangeDetail] {
     try await Task.detached(priority: .userInitiated) {
         try diffRotaDetailed(rotaId: rotaId)
     }.value
 }
 
-public func diffCommitsDetailedAsync(oldCommitId: Int64, newCommitId: Int64) async throws -> [FfiCommitChangeDetail] {
+public func diffSavesDetailedAsync(oldSaveId: Int64, newSaveId: Int64) async throws -> [FfiChangeDetail] {
     try await Task.detached(priority: .userInitiated) {
-        try diffCommitsDetailed(oldCommitId: oldCommitId, newCommitId: newCommitId)
+        try diffSavesDetailed(oldSaveId: oldSaveId, newSaveId: newSaveId)
     }.value
 }
 
-public func diffCommitVsPreviousAsync(commitId: Int64) async throws -> [FfiCommitChangeDetail] {
+public func diffSaveVsPreviousAsync(saveId: Int64) async throws -> [FfiChangeDetail] {
     try await Task.detached(priority: .userInitiated) {
-        try diffCommitVsPrevious(commitId: commitId)
+        try diffSaveVsPrevious(saveId: saveId)
+    }.value
+}
+
+public func updateSaveLabelAsync(saveId: Int64, label: String?) async throws {
+    try await Task.detached(priority: .userInitiated) {
+        try updateSaveLabel(saveId: saveId, label: label)
     }.value
 }
 
