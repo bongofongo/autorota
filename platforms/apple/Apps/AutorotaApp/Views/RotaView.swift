@@ -25,10 +25,11 @@ struct RotaView: View {
         NavigationStack {
             ZStack(alignment: .bottomTrailing) {
             VStack(spacing: 0) {
-                WeekPickerView(selectedWeek: $vm.selectedWeekStart, category: vm.weekCategory, isCommitted: vm.isCommitted, hasNewChanges: vm.hasNewChanges)
+                WeekPickerView(selectedWeek: $vm.selectedWeekStart, category: vm.weekCategory)
                     .padding(.horizontal)
                     .padding(.vertical, 8)
                     .onChange(of: vm.selectedWeekStart) { _, _ in
+                        Task { await vm.autoSave() }
                         vm.resetModes()
                         Task { await vm.loadSchedule() }
                     }
@@ -54,9 +55,7 @@ struct RotaView: View {
 
             if showsFloatingDotsButton {
                 Button {
-                    if vm.isSelectingForCommit {
-                        vm.exitSelectMode()
-                    } else if vm.isEditMode {
+                    if vm.isEditMode {
                         vm.exitEditMode()
                     } else {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
@@ -64,7 +63,7 @@ struct RotaView: View {
                         }
                     }
                 } label: {
-                    Image(systemName: (vm.isSelectingForCommit || vm.isEditMode) ? "checkmark" : "ellipsis")
+                    Image(systemName: vm.isEditMode ? "checkmark" : "ellipsis")
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(.primary)
                         .frame(width: 24, height: 24)
@@ -87,14 +86,6 @@ struct RotaView: View {
             #endif
             .onDisappear {
                 bridge.overflowOpen = false
-            }
-            .onChange(of: vm.isSelectingForCommit) { _, new in
-                bridge.isSelectingForCommit = new
-            }
-            .onChange(of: bridge.isSelectingForCommit) { _, new in
-                if !new && vm.isSelectingForCommit {
-                    vm.exitSelectMode()
-                }
             }
             .onChange(of: vm.isEditMode) { _, new in
                 bridge.isEditMode = new
@@ -155,14 +146,7 @@ struct RotaView: View {
     private var overflowActions: [RotaOverflowAction] {
         var actions: [RotaOverflowAction] = []
 
-        if vm.isSelectingForCommit {
-            actions.append(RotaOverflowAction(
-                title: "Done selecting",
-                systemImage: "checkmark"
-            ) {
-                vm.exitSelectMode()
-            })
-        } else if vm.isEditMode {
+        if vm.isEditMode {
             // No overflow actions in edit mode — checkmark button exits
         } else {
             if vm.schedule != nil {
@@ -173,14 +157,6 @@ struct RotaView: View {
                 ) {
                     vm.showDeleteScheduleConfirmation = true
                 })
-                if vm.weekHasPastDays {
-                    actions.append(RotaOverflowAction(
-                        title: "Commit",
-                        systemImage: "tray.and.arrow.down"
-                    ) {
-                        vm.enterSelectMode()
-                    })
-                }
                 actions.append(RotaOverflowAction(
                     title: "Edit",
                     systemImage: "pencil"
@@ -211,8 +187,6 @@ struct RotaView: View {
 private struct WeekPickerView: View {
     @Binding var selectedWeek: String
     let category: WeekCategory
-    var isCommitted: Bool = false
-    var hasNewChanges: Bool = false
 
     var body: some View {
         HStack {
@@ -224,17 +198,6 @@ private struct WeekPickerView: View {
                 Text("Week of \(selectedWeek)")
                     .font(.subheadline.bold())
                 CategoryBadge(category: category)
-                if isCommitted {
-                    let label = hasNewChanges ? "New changes" : "Committed"
-                    let color: Color = hasNewChanges ? .orange : .green
-                    Text(label)
-                        .font(.caption2.bold())
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(color.opacity(0.2))
-                        .foregroundStyle(color)
-                        .clipShape(Capsule())
-                }
             }
             Spacer()
             Button(action: { selectedWeek = shifted(by: 1) }) {
@@ -312,28 +275,7 @@ private struct ScheduleGridView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            if vm.isSelectingForCommit {
-                HStack(spacing: 12) {
-                    Image(systemName: "tray.and.arrow.down")
-                    Text("\(vm.selectedCount) shift\(vm.selectedCount == 1 ? "" : "s") selected")
-                        .font(.subheadline)
-                    Spacer()
-                    Button("Select All") {
-                        Task { await vm.selectAllPastShifts() }
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    Button("Commit") {
-                        Task { await vm.commitSelected() }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                    .disabled(!vm.hasSelected)
-                }
-                .padding(.horizontal)
-                .padding(.vertical, 10)
-                .background(.regularMaterial)
-            } else if vm.hasSwapSource {
+            if vm.hasSwapSource {
                 HStack {
                     Image(systemName: "arrow.left.arrow.right")
                     Text("Tap a highlighted employee to swap")
@@ -419,7 +361,7 @@ private struct ScheduleGridView: View {
                             HStack {
                                 Text(day)
                                     .font(.headline)
-                                if vm.isDayPast(day) && !vm.isSelectingForCommit {
+                                if vm.isDayPast(day) {
                                     if vm.isEditMode && !vm.pastUnlocked {
                                         Button {
                                             showUnlockPastConfirmation = true
@@ -436,16 +378,6 @@ private struct ScheduleGridView: View {
                                     }
                                 }
                                 Spacer()
-                                if vm.isSelectingForCommit && vm.isDayPast(day) {
-                                    Button {
-                                        Task { await vm.selectDay(day) }
-                                    } label: {
-                                        Text("Select Day")
-                                            .font(.caption2)
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .controlSize(.mini)
-                                }
                             }
                             .padding(.horizontal)
                             .padding(.vertical, 4)
@@ -489,7 +421,7 @@ private struct ScheduleGridView: View {
             HStack(spacing: 4) {
                 Text(day)
                     .font(.headline)
-                if vm.isDayPast(day) && !vm.isSelectingForCommit {
+                if vm.isDayPast(day) {
                     if vm.isEditMode && !vm.pastUnlocked {
                         Button {
                             showUnlockPastConfirmation = true
@@ -506,16 +438,6 @@ private struct ScheduleGridView: View {
                     }
                 }
                 Spacer()
-                if vm.isSelectingForCommit && vm.isDayPast(day) {
-                    Button {
-                        Task { await vm.selectDay(day) }
-                    } label: {
-                        Text("Select")
-                            .font(.caption2)
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.mini)
-                }
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
@@ -578,24 +500,11 @@ private struct ShiftCard: View {
     var isCompact: Bool = false
 
     private var canEdit: Bool { isEditMode && !isLocked }
-    private var isSelectable: Bool { vm.isSelectingForCommit && vm.isShiftPast(shift) }
-    private var isSelected: Bool { vm.isShiftSelected(shift.id) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             // Header row
             HStack {
-                // Staging checkbox
-                if isSelectable {
-                    Button {
-                        Task { await vm.toggleShiftSelected(shift.id) }
-                    } label: {
-                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(isSelected ? .green : .secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-
                 VStack(alignment: .leading, spacing: 2) {
                     if canEdit {
                         Button(action: onEditTimes) {
@@ -612,18 +521,7 @@ private struct ShiftCard: View {
                         Text("\(shift.startTime) – \(shift.endTime)")
                             .font(.subheadline.bold())
                     }
-                    HStack(spacing: 4) {
-                        RoleTag(name: shift.requiredRole)
-                        if vm.changedShiftIds.contains(shift.id) {
-                            Text("Changed")
-                                .font(.caption2.bold())
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.orange.opacity(0.2))
-                                .foregroundStyle(.orange)
-                                .clipShape(Capsule())
-                        }
-                    }
+                    RoleTag(name: shift.requiredRole)
                 }
                 Spacer()
 

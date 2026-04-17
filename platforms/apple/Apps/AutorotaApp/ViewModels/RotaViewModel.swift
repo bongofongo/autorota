@@ -35,15 +35,8 @@ final class RotaViewModel {
     // Past lock
     var pastUnlocked = false
 
-    // Selection for commit
-    var isSelectingForCommit = false
-    var selectedShiftIds: Set<Int64> = []
-
-    /// Shift IDs that have been modified since their most recent commit snapshot.
-    var changedShiftIds: Set<Int64> = []
-
-    /// True if the rota has been committed at least once AND any shift differs from its latest commit.
-    var hasNewChanges: Bool { isCommitted && !changedShiftIds.isEmpty }
+    /// Tracks whether any mutations have occurred since the last save.
+    var isDirty = false
 
     let service: AutorotaServiceProtocol
 
@@ -75,20 +68,7 @@ final class RotaViewModel {
         } catch {
             self.error = userFacingMessage(error)
         }
-        await refreshChangedShifts()
         isLoading = false
-    }
-
-    /// Compute which shifts in the current schedule differ from their most recent commit snapshot.
-    func refreshChangedShifts() async {
-        changedShiftIds = []
-        guard let schedule, schedule.committed else { return }
-        do {
-            let diffs = try await service.diffRota(rotaId: schedule.rotaId)
-            changedShiftIds = Set(diffs.filter { $0.isNew || $0.isChanged }.map(\.shiftId))
-        } catch {
-            // Non-fatal: leave changedShiftIds empty
-        }
     }
 
     func runSchedule() async {
@@ -104,6 +84,7 @@ final class RotaViewModel {
         do {
             let result = try await service.runSchedule(weekStart: selectedWeekStart)
             warnings = result.warnings
+            isDirty = true
             await loadSchedule()
         } catch {
             self.error = userFacingMessage(error)
@@ -157,6 +138,7 @@ final class RotaViewModel {
         if schedule == nil {
             do {
                 _ = try await service.materialiseWeek(weekStart: selectedWeekStart)
+                isDirty = true
                 await loadSchedule()
             } catch {
                 self.error = userFacingMessage(error)
@@ -175,15 +157,30 @@ final class RotaViewModel {
     func exitEditMode() {
         isEditMode = false
         pastUnlocked = false
+        if isDirty {
+            Task { await autoSave() }
+        }
     }
 
     func resetModes() {
         isEditMode = false
-        isSelectingForCommit = false
         pastUnlocked = false
         showGenerateConfirmation = false
         showDeleteScheduleConfirmation = false
         cancelSwap()
+    }
+
+    // MARK: - Auto-save
+
+    /// Save the current rota state if changes exist.
+    func autoSave() async {
+        guard isDirty, let rotaId = schedule?.rotaId else { return }
+        do {
+            _ = try await service.createSave(rotaId: rotaId)
+            isDirty = false
+        } catch {
+            // Non-fatal: save failed but user can continue editing
+        }
     }
 
     // MARK: - Assignment actions
@@ -191,6 +188,7 @@ final class RotaViewModel {
     func deleteAssignment(id: Int64) async {
         do {
             try await service.deleteAssignment(id: id)
+            isDirty = true
             await loadSchedule()
         } catch {
             self.error = userFacingMessage(error)
@@ -205,6 +203,7 @@ final class RotaViewModel {
                 employeeId: employeeId, status: "Overridden", employeeName: nil, hourlyWage: nil
             )
             _ = try await service.createAssignment(assignment)
+            isDirty = true
             await loadSchedule()
         } catch {
             self.error = userFacingMessage(error)
@@ -216,6 +215,7 @@ final class RotaViewModel {
     func deleteShift(id: Int64) async {
         do {
             try await service.deleteShift(id: id)
+            isDirty = true
             await loadSchedule()
         } catch {
             self.error = userFacingMessage(error)
@@ -225,6 +225,7 @@ final class RotaViewModel {
     func updateShiftTimes(id: Int64, startTime: String, endTime: String) async {
         do {
             try await service.updateShiftTimes(id: id, startTime: startTime, endTime: endTime)
+            isDirty = true
             await loadSchedule()
         } catch {
             self.error = userFacingMessage(error)
@@ -238,6 +239,7 @@ final class RotaViewModel {
                 rotaId: rotaId, date: date, startTime: startTime,
                 endTime: endTime, requiredRole: requiredRole
             )
+            isDirty = true
             await loadSchedule()
         } catch {
             self.error = userFacingMessage(error)
@@ -262,6 +264,7 @@ final class RotaViewModel {
         cancelSwap()
         do {
             try await service.swapAssignments(idA: sourceId, idB: targetAssignmentId)
+            isDirty = true
             await loadSchedule()
         } catch {
             self.error = userFacingMessage(error)
@@ -358,68 +361,6 @@ final class RotaViewModel {
     func availableEmployees(for shiftId: Int64) -> [FfiEmployee] {
         let assignedIds = Set(assignments(for: shiftId).map(\.employeeId))
         return employees.filter { !assignedIds.contains($0.id) }
-    }
-
-    // MARK: - Selection for commit
-
-    /// Whether this rota has been committed at least once.
-    var isCommitted: Bool {
-        schedule?.committed ?? false
-    }
-
-    var selectedCount: Int { selectedShiftIds.count }
-    var hasSelected: Bool { !selectedShiftIds.isEmpty }
-
-    func isShiftSelected(_ shiftId: Int64) -> Bool {
-        selectedShiftIds.contains(shiftId)
-    }
-
-    func toggleShiftSelected(_ shiftId: Int64) {
-        if selectedShiftIds.contains(shiftId) {
-            selectedShiftIds.remove(shiftId)
-        } else {
-            selectedShiftIds.insert(shiftId)
-        }
-    }
-
-    func selectDay(_ weekday: String) {
-        guard let schedule else { return }
-        let date = dateForWeekday(weekday)
-        let dayShiftIds = schedule.shifts.filter { $0.date == date }.map(\.id)
-        selectedShiftIds.formUnion(dayShiftIds)
-    }
-
-    func selectAllPastShifts() {
-        guard let schedule else { return }
-        let today = isoDateString(from: Date())
-        let pastIds = schedule.shifts.filter { $0.date < today }.map(\.id)
-        selectedShiftIds.formUnion(pastIds)
-    }
-
-    func clearSelection() {
-        selectedShiftIds = []
-    }
-
-    func commitSelected() async {
-        guard let rotaId = schedule?.rotaId else { return }
-        do {
-            _ = try await service.commitShifts(rotaId: rotaId, shiftIds: Array(selectedShiftIds))
-            selectedShiftIds = []
-            isSelectingForCommit = false
-            await loadSchedule()
-        } catch {
-            self.error = userFacingMessage(error)
-        }
-    }
-
-    func enterSelectMode() {
-        isSelectingForCommit = true
-        isEditMode = false
-    }
-
-    func exitSelectMode() {
-        isSelectingForCommit = false
-        selectedShiftIds = []
     }
 
     // MARK: - Private helpers
