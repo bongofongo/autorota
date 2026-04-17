@@ -138,8 +138,8 @@ pub struct FfiShiftInfo {
 pub struct FfiWeekSchedule {
     pub rota_id: i64,
     pub week_start: String,
-    /// Whether this rota has at least one commit.
-    pub committed: bool,
+    /// Whether this rota has at least one save.
+    pub has_saves: bool,
     pub entries: Vec<FfiScheduleEntry>,
     pub shifts: Vec<FfiShiftInfo>,
 }
@@ -195,36 +195,38 @@ pub struct FfiEmployeeShiftRecord {
     pub week_start: String,
 }
 
-// ── Commits ──────────────────────────────────────────────────────────────────
+// ── Saves ──────────────────────────────────────────────────────────────────────
 
-/// Result of comparing a live shift against the latest commit snapshot.
+/// Result of comparing a live shift against the latest save snapshot.
 #[derive(Clone, uniffi::Record)]
 pub struct FfiShiftDiff {
     pub shift_id: i64,
-    /// Shift exists in live schedule but not in any commit.
+    /// Shift exists in live schedule but not in any save.
     pub is_new: bool,
     /// Shift exists in both but differs (times, role, capacity, or assignments).
     pub is_changed: bool,
 }
 
-/// A commit record (for list views — excludes the full snapshot JSON).
+/// A save record (for list views — excludes the full snapshot JSON).
 #[derive(Clone, uniffi::Record)]
-pub struct FfiCommit {
+pub struct FfiSave {
     pub id: i64,
     pub rota_id: i64,
-    pub committed_at: String,
+    pub saved_at: String,
     pub summary: String,
+    pub label: Option<String>,
     /// Denormalized from the rota for display convenience.
     pub week_start: String,
 }
 
-/// A commit record with the full snapshot JSON (for detail views).
+/// A save record with the full snapshot JSON (for detail views).
 #[derive(Clone, uniffi::Record)]
-pub struct FfiCommitDetail {
+pub struct FfiSaveDetail {
     pub id: i64,
     pub rota_id: i64,
-    pub committed_at: String,
+    pub saved_at: String,
     pub summary: String,
+    pub label: Option<String>,
     pub week_start: String,
     pub snapshot_json: String,
 }
@@ -233,7 +235,7 @@ pub struct FfiCommitDetail {
 ///
 /// Flattened shape so uniffi records cross the FFI cleanly across all
 /// languages. The `kind` string selects which other fields are meaningful.
-/// See `autorota_core::models::commit::CommitChangeKind` for the full list.
+/// See `autorota_core::models::save::ChangeKind` for the full list.
 ///
 /// Kind values:
 /// - `"shift_added"` — new_* fields populated
@@ -246,7 +248,7 @@ pub struct FfiCommitDetail {
 /// - `"assignment_status_changed"` — employee_id, employee_name, old_status, new_status
 /// - `"employee_moved"` — employee_id, employee_name, from_shift_id, from_start_time, from_end_time
 #[derive(Clone, uniffi::Record)]
-pub struct FfiCommitChangeDetail {
+pub struct FfiChangeDetail {
     pub kind: String,
     pub shift_id: i64,
     /// `"YYYY-MM-DD"` — date of the shift this change is attached to.
@@ -276,14 +278,14 @@ pub struct FfiCommitChangeDetail {
     pub from_end_time: Option<String>,
 }
 
-/// Summary returned by `restore_to_commit`.
+/// Summary returned by `restore_to_save`.
 #[derive(Clone, uniffi::Record)]
 pub struct FfiRestoreResult {
     pub rota_id: i64,
     pub shifts_restored: u32,
     pub assignments_restored: u32,
     /// Assignments in the snapshot that were skipped because the referenced
-    /// employee no longer exists (has been deleted since the commit).
+    /// employee no longer exists (has been deleted since the save).
     pub assignments_skipped: u32,
 }
 

@@ -734,12 +734,12 @@ pub fn get_week_schedule(week_start: String) -> Result<Option<FfiWeekSchedule>, 
             })
             .collect();
 
-        let committed = queries::rota_has_commits(pool, rota.id).await?;
+        let has_saves = queries::rota_has_saves(pool, rota.id).await?;
 
         Ok(Some(FfiWeekSchedule {
             rota_id: rota.id,
             week_start: rota.week_start.to_string(),
-            committed,
+            has_saves,
             entries,
             shifts: shift_infos,
         }))
@@ -1598,12 +1598,12 @@ pub fn list_all_shift_history(
         .map_err(Into::into)
 }
 
-// ── Commits ─────────────────────────────────────────────────────────────────
+// ── Saves ──────────────────────────────────────────────────────────────────────
 
 #[uniffi::export]
-pub fn commit_shifts(rota_id: i64, shift_ids: Vec<i64>) -> Result<i64, FfiError> {
+pub fn create_save(rota_id: i64) -> Result<i64, FfiError> {
     let pool = pool()?;
-    rt().block_on(queries::create_commit(pool, rota_id, &shift_ids))
+    rt().block_on(queries::create_save(pool, rota_id))
         .map_err(Into::into)
 }
 
@@ -1611,7 +1611,7 @@ pub fn commit_shifts(rota_id: i64, shift_ids: Vec<i64>) -> Result<i64, FfiError>
 pub fn diff_rota(rota_id: i64) -> Result<Vec<FfiShiftDiff>, FfiError> {
     let pool = pool()?;
     let result: Result<Vec<FfiShiftDiff>, sqlx::Error> = rt().block_on(async move {
-        let diffs = queries::diff_rota_vs_latest_commit(pool, rota_id).await?;
+        let diffs = queries::diff_rota_vs_latest_save(pool, rota_id).await?;
         Ok(diffs
             .into_iter()
             .map(|d| FfiShiftDiff {
@@ -1625,77 +1625,79 @@ pub fn diff_rota(rota_id: i64) -> Result<Vec<FfiShiftDiff>, FfiError> {
 }
 
 #[uniffi::export]
-pub fn list_commits(rota_id: Option<i64>) -> Result<Vec<FfiCommit>, FfiError> {
+pub fn list_saves(rota_id: Option<i64>) -> Result<Vec<FfiSave>, FfiError> {
     let pool = pool()?;
-    let result: Result<Vec<FfiCommit>, sqlx::Error> = rt().block_on(async move {
-        let commits = queries::list_commits(pool, rota_id).await?;
-        let mut ffi_commits = Vec::new();
-        for c in commits {
+    let result: Result<Vec<FfiSave>, sqlx::Error> = rt().block_on(async move {
+        let saves = queries::list_saves(pool, rota_id).await?;
+        let mut ffi_saves = Vec::new();
+        for s in saves {
             let week_start: Option<String> =
                 sqlx::query_scalar("SELECT week_start FROM rotas WHERE id = ?")
-                    .bind(c.rota_id)
+                    .bind(s.rota_id)
                     .fetch_optional(pool)
                     .await?;
-            // Skip commits whose rota has been deleted (orphaned records).
+            // Skip saves whose rota has been deleted (orphaned records).
             let Some(week_start) = week_start else {
                 continue;
             };
-            ffi_commits.push(FfiCommit {
-                id: c.id,
-                rota_id: c.rota_id,
-                committed_at: c.committed_at,
-                summary: c.summary,
+            ffi_saves.push(FfiSave {
+                id: s.id,
+                rota_id: s.rota_id,
+                saved_at: s.saved_at,
+                summary: s.summary,
+                label: s.label,
                 week_start,
             });
         }
-        Ok(ffi_commits)
+        Ok(ffi_saves)
     });
     result.map_err(Into::into)
 }
 
 #[uniffi::export]
-pub fn get_commit_detail(commit_id: i64) -> Result<Option<FfiCommitDetail>, FfiError> {
+pub fn get_save_detail(save_id: i64) -> Result<Option<FfiSaveDetail>, FfiError> {
     let pool = pool()?;
-    let result: Result<Option<FfiCommitDetail>, sqlx::Error> = rt().block_on(async move {
-        let commit = match queries::get_commit(pool, commit_id).await? {
-            Some(c) => c,
+    let result: Result<Option<FfiSaveDetail>, sqlx::Error> = rt().block_on(async move {
+        let save = match queries::get_save(pool, save_id).await? {
+            Some(s) => s,
             None => return Ok(None),
         };
         let week_start: Option<String> =
             sqlx::query_scalar("SELECT week_start FROM rotas WHERE id = ?")
-                .bind(commit.rota_id)
+                .bind(save.rota_id)
                 .fetch_optional(pool)
                 .await?;
-        // Return None if the rota has been deleted (orphaned commit).
+        // Return None if the rota has been deleted (orphaned save).
         let Some(week_start) = week_start else {
             return Ok(None);
         };
-        Ok(Some(FfiCommitDetail {
-            id: commit.id,
-            rota_id: commit.rota_id,
-            committed_at: commit.committed_at,
-            summary: commit.summary,
+        Ok(Some(FfiSaveDetail {
+            id: save.id,
+            rota_id: save.rota_id,
+            saved_at: save.saved_at,
+            summary: save.summary,
+            label: save.label,
             week_start,
-            snapshot_json: commit.snapshot_json,
+            snapshot_json: save.snapshot_json,
         }))
     });
     result.map_err(Into::into)
 }
 
 #[uniffi::export]
-pub fn rota_is_committed(rota_id: i64) -> Result<bool, FfiError> {
+pub fn rota_has_saves(rota_id: i64) -> Result<bool, FfiError> {
     let pool = pool()?;
-    rt().block_on(queries::rota_has_commits(pool, rota_id))
+    rt().block_on(queries::rota_has_saves(pool, rota_id))
         .map_err(Into::into)
 }
 
-/// Restore the live state of a rota to the snapshot captured by a commit.
+/// Restore the live state of a rota to the snapshot captured by a save.
 /// Existing shifts and assignments for the rota are replaced. Assignments
 /// for employees that no longer exist are skipped; the count is returned.
 #[uniffi::export]
-pub fn restore_to_commit(commit_id: i64) -> Result<FfiRestoreResult, FfiError> {
+pub fn restore_to_save(save_id: i64) -> Result<FfiRestoreResult, FfiError> {
     let pool = pool()?;
-    let result = rt().block_on(queries::restore_from_commit(pool, commit_id))?;
+    let result = rt().block_on(queries::restore_from_save(pool, save_id))?;
     Ok(FfiRestoreResult {
         rota_id: result.rota_id,
         shifts_restored: result.shifts_restored as u32,
@@ -1704,42 +1706,46 @@ pub fn restore_to_commit(commit_id: i64) -> Result<FfiRestoreResult, FfiError> {
     })
 }
 
-/// Detailed diff between the live state of a rota and its latest commit.
-/// Returns an empty vec if nothing has changed since the last commit.
-/// If the rota has no commits yet, every live shift appears as `shift_added`.
 #[uniffi::export]
-pub fn diff_rota_detailed(rota_id: i64) -> Result<Vec<FfiCommitChangeDetail>, FfiError> {
+pub fn update_save_label(save_id: i64, label: Option<String>) -> Result<(), FfiError> {
     let pool = pool()?;
-    let details = rt().block_on(queries::diff_rota_vs_latest_commit_detailed(pool, rota_id))?;
+    rt().block_on(queries::update_save_label(pool, save_id, label.as_deref()))
+        .map_err(Into::into)
+}
+
+/// Detailed diff between the live state of a rota and its latest save.
+/// Returns an empty vec if nothing has changed since the last save.
+/// If the rota has no saves yet, every live shift appears as `shift_added`.
+#[uniffi::export]
+pub fn diff_rota_detailed(rota_id: i64) -> Result<Vec<FfiChangeDetail>, FfiError> {
+    let pool = pool()?;
+    let details = rt().block_on(queries::diff_rota_vs_latest_save_detailed(pool, rota_id))?;
     Ok(details.into_iter().map(change_detail_to_ffi).collect())
 }
 
-/// Detailed diff between two persisted commits.
+/// Detailed diff between two persisted saves.
 #[uniffi::export]
-pub fn diff_commits_detailed(
-    old_commit_id: i64,
-    new_commit_id: i64,
-) -> Result<Vec<FfiCommitChangeDetail>, FfiError> {
+pub fn diff_saves_detailed(
+    old_save_id: i64,
+    new_save_id: i64,
+) -> Result<Vec<FfiChangeDetail>, FfiError> {
     let pool = pool()?;
-    let details =
-        rt().block_on(queries::diff_commits(pool, old_commit_id, new_commit_id))?;
+    let details = rt().block_on(queries::diff_saves(pool, old_save_id, new_save_id))?;
     Ok(details.into_iter().map(change_detail_to_ffi).collect())
 }
 
-/// Detailed diff between a commit and the commit that immediately preceded
-/// it for the same rota. If this is the first commit, every shift is new.
+/// Detailed diff between a save and the save that immediately preceded
+/// it for the same rota. If this is the first save, every shift is new.
 #[uniffi::export]
-pub fn diff_commit_vs_previous(commit_id: i64) -> Result<Vec<FfiCommitChangeDetail>, FfiError> {
+pub fn diff_save_vs_previous(save_id: i64) -> Result<Vec<FfiChangeDetail>, FfiError> {
     let pool = pool()?;
-    let details = rt().block_on(queries::diff_commit_vs_previous(pool, commit_id))?;
+    let details = rt().block_on(queries::diff_save_vs_previous(pool, save_id))?;
     Ok(details.into_iter().map(change_detail_to_ffi).collect())
 }
 
-fn change_detail_to_ffi(
-    d: autorota_core::models::commit::CommitChangeDetail,
-) -> FfiCommitChangeDetail {
-    use autorota_core::models::commit::CommitChangeKind as K;
-    let mut out = FfiCommitChangeDetail {
+fn change_detail_to_ffi(d: autorota_core::models::save::ChangeDetail) -> FfiChangeDetail {
+    use autorota_core::models::save::ChangeKind as K;
+    let mut out = FfiChangeDetail {
         kind: String::new(),
         shift_id: d.shift_id,
         date: d.date,
