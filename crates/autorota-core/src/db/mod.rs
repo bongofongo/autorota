@@ -237,5 +237,17 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         sqlx::raw_sql(m15).execute(pool).await?;
     }
 
+    // Migration 016: rename commits → saves, add label column.
+    let has_commits_table: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='commits'",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    if has_commits_table {
+        let m16 = include_str!("../../migrations/016_rename_commits_to_saves.sql");
+        sqlx::raw_sql(m16).execute(pool).await?;
+    }
+
     Ok(())
 }

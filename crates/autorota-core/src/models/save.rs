@@ -1,31 +1,32 @@
 use serde::{Deserialize, Serialize};
 
-/// A committed snapshot of shift/assignment data at a point in time.
+/// A saved snapshot of shift/assignment data at a point in time.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub struct Save {
     pub id: i64,
     pub rota_id: i64,
-    pub committed_at: String,
+    pub saved_at: String,
     pub summary: String,
     pub snapshot_json: String,
+    pub label: Option<String>,
 }
 
 // ── Snapshot JSON structure ──────────────────────────────────────────────────
 
-/// Top-level snapshot stored as JSON in the `commits.snapshot_json` column.
+/// Top-level snapshot stored as JSON in the `saves.snapshot_json` column.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CommitSnapshot {
+pub struct SaveSnapshot {
     pub week_start: String,
     pub committed_shift_ids: Vec<i64>,
-    pub shifts: Vec<CommitShiftSnapshot>,
+    pub shifts: Vec<SaveShiftSnapshot>,
     pub total_hours: f32,
     pub total_shifts: usize,
     pub unique_employees: usize,
 }
 
-/// Snapshot of a single shift within a commit.
+/// Snapshot of a single shift within a save.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CommitShiftSnapshot {
+pub struct SaveShiftSnapshot {
     pub shift_id: i64,
     pub date: String,
     pub start_time: String,
@@ -33,12 +34,12 @@ pub struct CommitShiftSnapshot {
     pub required_role: String,
     pub min_employees: u32,
     pub max_employees: u32,
-    pub assignments: Vec<CommitAssignmentSnapshot>,
+    pub assignments: Vec<SaveAssignmentSnapshot>,
 }
 
-/// Snapshot of a single assignment within a committed shift.
+/// Snapshot of a single assignment within a saved shift.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CommitAssignmentSnapshot {
+pub struct SaveAssignmentSnapshot {
     pub assignment_id: i64,
     pub employee_id: i64,
     pub employee_name: String,
@@ -49,11 +50,11 @@ pub struct CommitAssignmentSnapshot {
 
 // ── Diff ────────────────────────────────────────────────────────────────────
 
-/// Result of comparing a live shift against the latest commit snapshot.
+/// Result of comparing a live shift against the latest save snapshot.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShiftDiff {
     pub shift_id: i64,
-    /// Shift exists in live schedule but not in any commit.
+    /// Shift exists in live schedule but not in any save.
     pub is_new: bool,
     /// Shift exists in both but differs (times, role, capacity, or assignments).
     pub is_changed: bool,
@@ -68,7 +69,7 @@ pub struct ShiftDiff {
 /// are computed on-demand by `diff_snapshots`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
-pub enum CommitChangeKind {
+pub enum ChangeKind {
     /// A shift was added (exists in new, not in old).
     ShiftAdded {
         start_time: String,
@@ -121,7 +122,7 @@ pub enum CommitChangeKind {
     },
     /// An employee was moved between shifts on the same date — collapsed from
     /// one AssignmentRemoved + one AssignmentAdded. `shift_id` on the parent
-    /// `CommitChangeDetail` refers to the *destination* shift.
+    /// `ChangeDetail` refers to the *destination* shift.
     EmployeeMoved {
         employee_id: i64,
         employee_name: String,
@@ -133,13 +134,13 @@ pub enum CommitChangeKind {
 
 /// A single change attached to a shift on a specific date.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct CommitChangeDetail {
+pub struct ChangeDetail {
     pub shift_id: i64,
     pub date: String,
-    pub kind: CommitChangeKind,
+    pub kind: ChangeKind,
 }
 
-/// Result of restoring a rota from a commit snapshot.
+/// Result of restoring a rota from a save snapshot.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RestoreResult {
     pub rota_id: i64,
@@ -153,27 +154,27 @@ pub struct RestoreResult {
 
 /// Compute detailed changes between two snapshots.
 ///
-/// `old` and `new` can be any two snapshots (e.g. previous commit vs current
-/// commit, or a persisted commit vs a synthesized live-state snapshot). The
+/// `old` and `new` can be any two snapshots (e.g. previous save vs current
+/// save, or a persisted save vs a synthesized live-state snapshot). The
 /// result lists additions, removals, per-shift modifications, and
 /// cross-shift employee moves.
-pub fn diff_snapshots(old: &CommitSnapshot, new: &CommitSnapshot) -> Vec<CommitChangeDetail> {
+pub fn diff_snapshots(old: &SaveSnapshot, new: &SaveSnapshot) -> Vec<ChangeDetail> {
     use std::collections::HashMap;
 
-    let old_by_id: HashMap<i64, &CommitShiftSnapshot> =
+    let old_by_id: HashMap<i64, &SaveShiftSnapshot> =
         old.shifts.iter().map(|s| (s.shift_id, s)).collect();
-    let new_by_id: HashMap<i64, &CommitShiftSnapshot> =
+    let new_by_id: HashMap<i64, &SaveShiftSnapshot> =
         new.shifts.iter().map(|s| (s.shift_id, s)).collect();
 
-    let mut changes: Vec<CommitChangeDetail> = Vec::new();
+    let mut changes: Vec<ChangeDetail> = Vec::new();
 
     // Shifts added (in new, not in old).
     for shift in &new.shifts {
         if !old_by_id.contains_key(&shift.shift_id) {
-            changes.push(CommitChangeDetail {
+            changes.push(ChangeDetail {
                 shift_id: shift.shift_id,
                 date: shift.date.clone(),
-                kind: CommitChangeKind::ShiftAdded {
+                kind: ChangeKind::ShiftAdded {
                     start_time: shift.start_time.clone(),
                     end_time: shift.end_time.clone(),
                     required_role: shift.required_role.clone(),
@@ -184,10 +185,10 @@ pub fn diff_snapshots(old: &CommitSnapshot, new: &CommitSnapshot) -> Vec<CommitC
             // Report its assignments as individual AssignmentAdded entries so
             // the UI can list who was put on the new shift.
             for a in &shift.assignments {
-                changes.push(CommitChangeDetail {
+                changes.push(ChangeDetail {
                     shift_id: shift.shift_id,
                     date: shift.date.clone(),
-                    kind: CommitChangeKind::AssignmentAdded {
+                    kind: ChangeKind::AssignmentAdded {
                         employee_id: a.employee_id,
                         employee_name: a.employee_name.clone(),
                     },
@@ -199,20 +200,20 @@ pub fn diff_snapshots(old: &CommitSnapshot, new: &CommitSnapshot) -> Vec<CommitC
     // Shifts removed (in old, not in new).
     for shift in &old.shifts {
         if !new_by_id.contains_key(&shift.shift_id) {
-            changes.push(CommitChangeDetail {
+            changes.push(ChangeDetail {
                 shift_id: shift.shift_id,
                 date: shift.date.clone(),
-                kind: CommitChangeKind::ShiftRemoved {
+                kind: ChangeKind::ShiftRemoved {
                     start_time: shift.start_time.clone(),
                     end_time: shift.end_time.clone(),
                     required_role: shift.required_role.clone(),
                 },
             });
             for a in &shift.assignments {
-                changes.push(CommitChangeDetail {
+                changes.push(ChangeDetail {
                     shift_id: shift.shift_id,
                     date: shift.date.clone(),
-                    kind: CommitChangeKind::AssignmentRemoved {
+                    kind: ChangeKind::AssignmentRemoved {
                         employee_id: a.employee_id,
                         employee_name: a.employee_name.clone(),
                     },
@@ -230,10 +231,10 @@ pub fn diff_snapshots(old: &CommitSnapshot, new: &CommitSnapshot) -> Vec<CommitC
         if old_shift.start_time != new_shift.start_time
             || old_shift.end_time != new_shift.end_time
         {
-            changes.push(CommitChangeDetail {
+            changes.push(ChangeDetail {
                 shift_id: *shift_id,
                 date: new_shift.date.clone(),
-                kind: CommitChangeKind::ShiftTimeChanged {
+                kind: ChangeKind::ShiftTimeChanged {
                     old_start: old_shift.start_time.clone(),
                     new_start: new_shift.start_time.clone(),
                     old_end: old_shift.end_time.clone(),
@@ -245,10 +246,10 @@ pub fn diff_snapshots(old: &CommitSnapshot, new: &CommitSnapshot) -> Vec<CommitC
         if old_shift.min_employees != new_shift.min_employees
             || old_shift.max_employees != new_shift.max_employees
         {
-            changes.push(CommitChangeDetail {
+            changes.push(ChangeDetail {
                 shift_id: *shift_id,
                 date: new_shift.date.clone(),
-                kind: CommitChangeKind::ShiftCapacityChanged {
+                kind: ChangeKind::ShiftCapacityChanged {
                     old_min: old_shift.min_employees,
                     new_min: new_shift.min_employees,
                     old_max: old_shift.max_employees,
@@ -258,10 +259,10 @@ pub fn diff_snapshots(old: &CommitSnapshot, new: &CommitSnapshot) -> Vec<CommitC
         }
 
         if old_shift.required_role != new_shift.required_role {
-            changes.push(CommitChangeDetail {
+            changes.push(ChangeDetail {
                 shift_id: *shift_id,
                 date: new_shift.date.clone(),
-                kind: CommitChangeKind::ShiftRoleChanged {
+                kind: ChangeKind::ShiftRoleChanged {
                     old_role: old_shift.required_role.clone(),
                     new_role: new_shift.required_role.clone(),
                 },
@@ -269,12 +270,12 @@ pub fn diff_snapshots(old: &CommitSnapshot, new: &CommitSnapshot) -> Vec<CommitC
         }
 
         // Assignment diff indexed by employee_id.
-        let old_emp: HashMap<i64, &CommitAssignmentSnapshot> = old_shift
+        let old_emp: HashMap<i64, &SaveAssignmentSnapshot> = old_shift
             .assignments
             .iter()
             .map(|a| (a.employee_id, a))
             .collect();
-        let new_emp: HashMap<i64, &CommitAssignmentSnapshot> = new_shift
+        let new_emp: HashMap<i64, &SaveAssignmentSnapshot> = new_shift
             .assignments
             .iter()
             .map(|a| (a.employee_id, a))
@@ -282,19 +283,19 @@ pub fn diff_snapshots(old: &CommitSnapshot, new: &CommitSnapshot) -> Vec<CommitC
 
         for (emp_id, new_a) in &new_emp {
             match old_emp.get(emp_id) {
-                None => changes.push(CommitChangeDetail {
+                None => changes.push(ChangeDetail {
                     shift_id: *shift_id,
                     date: new_shift.date.clone(),
-                    kind: CommitChangeKind::AssignmentAdded {
+                    kind: ChangeKind::AssignmentAdded {
                         employee_id: *emp_id,
                         employee_name: new_a.employee_name.clone(),
                     },
                 }),
                 Some(old_a) if old_a.status != new_a.status => {
-                    changes.push(CommitChangeDetail {
+                    changes.push(ChangeDetail {
                         shift_id: *shift_id,
                         date: new_shift.date.clone(),
-                        kind: CommitChangeKind::AssignmentStatusChanged {
+                        kind: ChangeKind::AssignmentStatusChanged {
                             employee_id: *emp_id,
                             employee_name: new_a.employee_name.clone(),
                             old_status: old_a.status.clone(),
@@ -307,10 +308,10 @@ pub fn diff_snapshots(old: &CommitSnapshot, new: &CommitSnapshot) -> Vec<CommitC
         }
         for (emp_id, old_a) in &old_emp {
             if !new_emp.contains_key(emp_id) {
-                changes.push(CommitChangeDetail {
+                changes.push(ChangeDetail {
                     shift_id: *shift_id,
                     date: old_shift.date.clone(),
-                    kind: CommitChangeKind::AssignmentRemoved {
+                    kind: ChangeKind::AssignmentRemoved {
                         employee_id: *emp_id,
                         employee_name: old_a.employee_name.clone(),
                     },
@@ -325,9 +326,9 @@ pub fn diff_snapshots(old: &CommitSnapshot, new: &CommitSnapshot) -> Vec<CommitC
 /// Collapse matching (AssignmentRemoved, AssignmentAdded) pairs with the same
 /// employee on the same date into a single EmployeeMoved entry.
 fn collapse_moves(
-    old_by_id: &std::collections::HashMap<i64, &CommitShiftSnapshot>,
-    changes: Vec<CommitChangeDetail>,
-) -> Vec<CommitChangeDetail> {
+    old_by_id: &std::collections::HashMap<i64, &SaveShiftSnapshot>,
+    changes: Vec<ChangeDetail>,
+) -> Vec<ChangeDetail> {
     use std::collections::{HashMap, HashSet};
 
     // Index by (date, employee_id) → change index.
@@ -335,10 +336,10 @@ fn collapse_moves(
     let mut added_at: HashMap<(String, i64), usize> = HashMap::new();
     for (i, c) in changes.iter().enumerate() {
         match &c.kind {
-            CommitChangeKind::AssignmentRemoved { employee_id, .. } => {
+            ChangeKind::AssignmentRemoved { employee_id, .. } => {
                 removed_at.insert((c.date.clone(), *employee_id), i);
             }
-            CommitChangeKind::AssignmentAdded { employee_id, .. } => {
+            ChangeKind::AssignmentAdded { employee_id, .. } => {
                 added_at.insert((c.date.clone(), *employee_id), i);
             }
             _ => {}
@@ -348,7 +349,7 @@ fn collapse_moves(
     // Indices of changes to suppress because they become part of a Move.
     let mut suppressed: HashSet<usize> = HashSet::new();
     // Indices where a Move should be emitted (destination-shift AssignmentAdded).
-    let mut moves: HashMap<usize, CommitChangeDetail> = HashMap::new();
+    let mut moves: HashMap<usize, ChangeDetail> = HashMap::new();
 
     for (key, &add_idx) in &added_at {
         let Some(&rm_idx) = removed_at.get(key) else {
@@ -360,7 +361,7 @@ fn collapse_moves(
             continue; // same shift — not a move
         }
         let (emp_id, emp_name) = match &add.kind {
-            CommitChangeKind::AssignmentAdded {
+            ChangeKind::AssignmentAdded {
                 employee_id,
                 employee_name,
             } => (*employee_id, employee_name.clone()),
@@ -374,10 +375,10 @@ fn collapse_moves(
         suppressed.insert(rm_idx);
         moves.insert(
             add_idx,
-            CommitChangeDetail {
+            ChangeDetail {
                 shift_id: add.shift_id,
                 date: add.date.clone(),
-                kind: CommitChangeKind::EmployeeMoved {
+                kind: ChangeKind::EmployeeMoved {
                     employee_id: emp_id,
                     employee_name: emp_name,
                     from_shift_id: rm.shift_id,
@@ -388,7 +389,7 @@ fn collapse_moves(
         );
     }
 
-    let mut result: Vec<CommitChangeDetail> = Vec::with_capacity(changes.len());
+    let mut result: Vec<ChangeDetail> = Vec::with_capacity(changes.len());
     for (i, c) in changes.into_iter().enumerate() {
         if suppressed.contains(&i) {
             continue;
@@ -414,9 +415,9 @@ mod diff_tests {
         role: &str,
         min: u32,
         max: u32,
-        assignments: Vec<CommitAssignmentSnapshot>,
-    ) -> CommitShiftSnapshot {
-        CommitShiftSnapshot {
+        assignments: Vec<SaveAssignmentSnapshot>,
+    ) -> SaveShiftSnapshot {
+        SaveShiftSnapshot {
             shift_id: id,
             date: date.to_string(),
             start_time: start.to_string(),
@@ -428,8 +429,8 @@ mod diff_tests {
         }
     }
 
-    fn assign(emp_id: i64, name: &str, status: &str) -> CommitAssignmentSnapshot {
-        CommitAssignmentSnapshot {
+    fn assign(emp_id: i64, name: &str, status: &str) -> SaveAssignmentSnapshot {
+        SaveAssignmentSnapshot {
             assignment_id: 0,
             employee_id: emp_id,
             employee_name: name.to_string(),
@@ -439,8 +440,8 @@ mod diff_tests {
         }
     }
 
-    fn snap(shifts: Vec<CommitShiftSnapshot>) -> CommitSnapshot {
-        CommitSnapshot {
+    fn snap(shifts: Vec<SaveShiftSnapshot>) -> SaveSnapshot {
+        SaveSnapshot {
             week_start: "2026-04-20".to_string(),
             committed_shift_ids: shifts.iter().map(|s| s.shift_id).collect(),
             shifts,
@@ -462,7 +463,7 @@ mod diff_tests {
         let new = snap(vec![shift(1, "2026-04-20", "09:00", "17:00", "barista", 1, 2, vec![])]);
         let d = diff_snapshots(&old, &new);
         assert_eq!(d.len(), 1);
-        assert!(matches!(d[0].kind, CommitChangeKind::ShiftAdded { .. }));
+        assert!(matches!(d[0].kind, ChangeKind::ShiftAdded { .. }));
     }
 
     #[test]
@@ -471,7 +472,7 @@ mod diff_tests {
         let new = snap(vec![]);
         let d = diff_snapshots(&old, &new);
         assert_eq!(d.len(), 1);
-        assert!(matches!(d[0].kind, CommitChangeKind::ShiftRemoved { .. }));
+        assert!(matches!(d[0].kind, ChangeKind::ShiftRemoved { .. }));
     }
 
     #[test]
@@ -480,9 +481,9 @@ mod diff_tests {
         let new = snap(vec![shift(1, "2026-04-20", "09:00", "18:00", "cashier", 2, 3, vec![])]);
         let d = diff_snapshots(&old, &new);
         assert_eq!(d.len(), 3);
-        assert!(d.iter().any(|c| matches!(c.kind, CommitChangeKind::ShiftTimeChanged { .. })));
-        assert!(d.iter().any(|c| matches!(c.kind, CommitChangeKind::ShiftCapacityChanged { .. })));
-        assert!(d.iter().any(|c| matches!(c.kind, CommitChangeKind::ShiftRoleChanged { .. })));
+        assert!(d.iter().any(|c| matches!(c.kind, ChangeKind::ShiftTimeChanged { .. })));
+        assert!(d.iter().any(|c| matches!(c.kind, ChangeKind::ShiftCapacityChanged { .. })));
+        assert!(d.iter().any(|c| matches!(c.kind, ChangeKind::ShiftRoleChanged { .. })));
     }
 
     #[test]
@@ -496,9 +497,9 @@ mod diff_tests {
             vec![assign(10, "Alice", "Confirmed"), assign(12, "Carol", "Confirmed")],
         )]);
         let d = diff_snapshots(&old, &new);
-        assert!(d.iter().any(|c| matches!(&c.kind, CommitChangeKind::AssignmentStatusChanged { employee_id: 10, .. })));
-        assert!(d.iter().any(|c| matches!(&c.kind, CommitChangeKind::AssignmentRemoved { employee_id: 11, .. })));
-        assert!(d.iter().any(|c| matches!(&c.kind, CommitChangeKind::AssignmentAdded { employee_id: 12, .. })));
+        assert!(d.iter().any(|c| matches!(&c.kind, ChangeKind::AssignmentStatusChanged { employee_id: 10, .. })));
+        assert!(d.iter().any(|c| matches!(&c.kind, ChangeKind::AssignmentRemoved { employee_id: 11, .. })));
+        assert!(d.iter().any(|c| matches!(&c.kind, ChangeKind::AssignmentAdded { employee_id: 12, .. })));
     }
 
     #[test]
@@ -515,7 +516,7 @@ mod diff_tests {
         let d = diff_snapshots(&old, &new);
         assert_eq!(d.len(), 1);
         match &d[0].kind {
-            CommitChangeKind::EmployeeMoved {
+            ChangeKind::EmployeeMoved {
                 employee_id: 10,
                 from_shift_id: 1,
                 ..
@@ -538,7 +539,7 @@ mod diff_tests {
         ]);
         let d = diff_snapshots(&old, &new);
         assert_eq!(d.len(), 2);
-        assert!(d.iter().any(|c| matches!(c.kind, CommitChangeKind::AssignmentRemoved { .. })));
-        assert!(d.iter().any(|c| matches!(c.kind, CommitChangeKind::AssignmentAdded { .. })));
+        assert!(d.iter().any(|c| matches!(c.kind, ChangeKind::AssignmentRemoved { .. })));
+        assert!(d.iter().any(|c| matches!(c.kind, ChangeKind::AssignmentAdded { .. })));
     }
 }

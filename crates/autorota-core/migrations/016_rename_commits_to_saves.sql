@@ -1,0 +1,2 @@
+ALTER TABLE commits RENAME TO saves;
+ALTER TABLE saves ADD COLUMN label TEXT;
