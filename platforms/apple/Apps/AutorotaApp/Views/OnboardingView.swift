@@ -20,8 +20,8 @@ private let pages: [OnboardingPage] = [
     ),
     OnboardingPage(
         systemImage: "clock.fill",
-        title: "Shift Templates",
-        description: "Create reusable shift templates with start times, end times, and required roles. Templates save you time each week."
+        title: "Shifts",
+        description: "Define the shifts you run each week with start times, end times, and required roles. Shifts are reused every time you build a rota."
     ),
     OnboardingPage(
         systemImage: "calendar",
@@ -123,7 +123,7 @@ struct OnboardingView: View {
                 .foregroundStyle(.green)
             Text("You're All Set")
                 .font(.largeTitle.bold())
-            Text("Head to the Employees tab to add your first team member, then create shift templates and generate your rota.")
+            Text("Head to the Employees tab to add your first team member, then create shifts and generate your rota.")
                 .font(.title3)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)

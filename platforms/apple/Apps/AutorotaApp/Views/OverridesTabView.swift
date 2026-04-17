@@ -159,7 +159,7 @@ struct OverridesTabView: View {
                     .pickerStyle(.menu)
                 } header: {
                     HStack {
-                        Text("Employee Availability")
+                        Text("Employee Exceptions")
                         Spacer()
                         Button { showingEmpSheet = true } label: { Image(systemName: "plus") }
                             .buttonStyle(.borderless)
@@ -170,7 +170,7 @@ struct OverridesTabView: View {
                     let grouped = groupedByEmployee
                     if grouped.isEmpty {
                         Section {
-                            Text("No overrides")
+                            Text("No exceptions")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -205,7 +205,7 @@ struct OverridesTabView: View {
                     Section {
                         let groups = filteredEmpGroups
                         if groups.isEmpty {
-                            Text("No overrides")
+                            Text("No exceptions")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         } else {
@@ -249,14 +249,14 @@ struct OverridesTabView: View {
                     }
                 } header: {
                     HStack {
-                        Text("Shifts")
+                        Text("Shift Changes")
                         Spacer()
                         Button { showingTmplSheet = true } label: { Image(systemName: "plus") }
                             .buttonStyle(.borderless)
                     }
                 }
             }
-            .navigationTitle("Overrides")
+            .navigationTitle("Exceptions")
             .task {
                 await vm.loadAll()
                 await employeeVM.load()
@@ -356,7 +356,7 @@ private struct TmplOverrideRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
-                Text(templateLookup[ovr.templateId] ?? "Template #\(ovr.templateId)")
+                Text(templateLookup[ovr.templateId] ?? "Shift #\(ovr.templateId)")
                     .fontWeight(.medium)
                 if ovr.cancelled {
                     Text("CANCELLED")
@@ -521,7 +521,7 @@ struct EmployeeAvailabilityOverrideSheet: View {
             #if os(macOS)
             .formStyle(.grouped)
             #endif
-            .navigationTitle(isEditing ? "Edit Override" : "New Override")
+            .navigationTitle(isEditing ? "Edit Exception" : "New Exception")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -728,8 +728,8 @@ struct ShiftTemplateOverrideSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Template") {
-                    Picker("Template", selection: $selectedTemplateId) {
+                Section("Shift") {
+                    Picker("Shift", selection: $selectedTemplateId) {
                         Text("Select…").tag(Optional<Int64>(nil))
                         ForEach(templates, id: \.id) { t in
                             Text(t.name).tag(Optional(t.id))
@@ -740,7 +740,7 @@ struct ShiftTemplateOverrideSheet: View {
                     DatePicker("Date", selection: $date, displayedComponents: .date)
                         .datePickerStyle(.compact)
                 }
-                Section("Override") {
+                Section("Changes") {
                     Toggle("Cancel this shift", isOn: $cancelled)
                     if !cancelled {
                         Toggle("Custom start time", isOn: $useCustomStart)
@@ -769,7 +769,7 @@ struct ShiftTemplateOverrideSheet: View {
             #if os(macOS)
             .formStyle(.grouped)
             #endif
-            .navigationTitle(isEditing ? "Edit Override" : "New Override")
+            .navigationTitle(isEditing ? "Edit Shift Change" : "New Shift Change")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

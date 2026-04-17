@@ -38,25 +38,29 @@ struct CarouselAvailabilityView: View {
                     .padding(.top, 8)
                     .padding(.bottom, 4)
 
-                // Availability grid for current employee
-                TabView(selection: $selectedIndex) {
-                    ForEach(Array(employees.enumerated()), id: \.element.id) { index, employee in
-                        AvailabilityPage(
-                            employee: employee,
-                            slots: slotsFor(employee),
-                            onSlotsChange: { newSlots in
-                                slotsCache[employee.id] = newSlots
-                                var updated = employee
-                                updated.availability = newSlots
-                                Task { await vm.update(updated) }
-                            }
-                        )
-                        .tag(index)
+                if progressVM.allDone(employees: employees) {
+                    AllAvailabilitiesSetView()
+                } else {
+                    // Availability grid for current employee
+                    TabView(selection: $selectedIndex) {
+                        ForEach(Array(employees.enumerated()), id: \.element.id) { index, employee in
+                            AvailabilityPage(
+                                employee: employee,
+                                slots: slotsFor(employee),
+                                onSlotsChange: { newSlots in
+                                    slotsCache[employee.id] = newSlots
+                                    var updated = employee
+                                    updated.availability = newSlots
+                                    Task { await vm.update(updated) }
+                                }
+                            )
+                            .tag(index)
+                        }
                     }
+                    #if os(iOS)
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    #endif
                 }
-                #if os(iOS)
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                #endif
 
             }
             .safeAreaInset(edge: .bottom) {

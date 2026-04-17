@@ -124,11 +124,6 @@ final class MockAutorotaService: AutorotaServiceProtocol, @unchecked Sendable {
         if let e = errorToThrow { throw e }
     }
 
-    func finalizeRota(id: Int64) async throws {
-        callLog.append("finalizeRota:\(id)")
-        if let e = errorToThrow { throw e }
-    }
-
     // MARK: - Assignments
 
     func createAssignment(_ assignment: FfiAssignment) async throws -> Int64 {
@@ -256,53 +251,27 @@ final class MockAutorotaService: AutorotaServiceProtocol, @unchecked Sendable {
         if let e = errorToThrow { throw e }
     }
 
-    // MARK: - Staging & Commits
+    // MARK: - Commits
 
-    var stubbedStagingState = FfiStagingState(rotaId: 0, stagedShiftIds: [], totalStageablePastShiftIds: [])
     var stubbedCommits: [FfiCommit] = []
     var stubbedCommitDetail: FfiCommitDetail? = nil
     var stubbedRotaIsCommitted = false
+    var stubbedDiffResult: [FfiShiftDiff] = []
+    var stubbedDetailedDiffResult: [FfiCommitChangeDetail] = []
+    var stubbedRestoreResult = FfiRestoreResult(
+        rotaId: 1, shiftsRestored: 0, assignmentsRestored: 0, assignmentsSkipped: 0
+    )
 
-    func stageShifts(shiftIds: [Int64]) async throws {
-        callLog.append("stageShifts:\(shiftIds)")
-        if let e = errorToThrow { throw e }
-    }
-
-    func stageDay(rotaId: Int64, date: String) async throws {
-        callLog.append("stageDay:\(rotaId):\(date)")
-        if let e = errorToThrow { throw e }
-    }
-
-    func stageWeek(rotaId: Int64) async throws {
-        callLog.append("stageWeek:\(rotaId)")
-        if let e = errorToThrow { throw e }
-    }
-
-    func unstageShifts(shiftIds: [Int64]) async throws {
-        callLog.append("unstageShifts:\(shiftIds)")
-        if let e = errorToThrow { throw e }
-    }
-
-    func unstageDay(rotaId: Int64, date: String) async throws {
-        callLog.append("unstageDay:\(rotaId):\(date)")
-        if let e = errorToThrow { throw e }
-    }
-
-    func unstageWeek(rotaId: Int64) async throws {
-        callLog.append("unstageWeek:\(rotaId)")
-        if let e = errorToThrow { throw e }
-    }
-
-    func getStagingState(rotaId: Int64) async throws -> FfiStagingState {
-        callLog.append("getStagingState:\(rotaId)")
-        if let e = errorToThrow { throw e }
-        return stubbedStagingState
-    }
-
-    func commitStagedShifts(rotaId: Int64) async throws -> Int64 {
-        callLog.append("commitStagedShifts:\(rotaId)")
+    func commitShifts(rotaId: Int64, shiftIds: [Int64]) async throws -> Int64 {
+        callLog.append("commitShifts:\(rotaId):\(shiftIds)")
         if let e = errorToThrow { throw e }
         return 1
+    }
+
+    func diffRota(rotaId: Int64) async throws -> [FfiShiftDiff] {
+        callLog.append("diffRota:\(rotaId)")
+        if let e = errorToThrow { throw e }
+        return stubbedDiffResult
     }
 
     func listCommits(rotaId: Int64?) async throws -> [FfiCommit] {
@@ -321,6 +290,30 @@ final class MockAutorotaService: AutorotaServiceProtocol, @unchecked Sendable {
         callLog.append("rotaIsCommitted:\(rotaId)")
         if let e = errorToThrow { throw e }
         return stubbedRotaIsCommitted
+    }
+
+    func diffRotaDetailed(rotaId: Int64) async throws -> [FfiCommitChangeDetail] {
+        callLog.append("diffRotaDetailed:\(rotaId)")
+        if let e = errorToThrow { throw e }
+        return stubbedDetailedDiffResult
+    }
+
+    func diffCommitsDetailed(oldCommitId: Int64, newCommitId: Int64) async throws -> [FfiCommitChangeDetail] {
+        callLog.append("diffCommitsDetailed:\(oldCommitId):\(newCommitId)")
+        if let e = errorToThrow { throw e }
+        return stubbedDetailedDiffResult
+    }
+
+    func diffCommitVsPrevious(commitId: Int64) async throws -> [FfiCommitChangeDetail] {
+        callLog.append("diffCommitVsPrevious:\(commitId)")
+        if let e = errorToThrow { throw e }
+        return stubbedDetailedDiffResult
+    }
+
+    func restoreToCommit(commitId: Int64) async throws -> FfiRestoreResult {
+        callLog.append("restoreToCommit:\(commitId)")
+        if let e = errorToThrow { throw e }
+        return stubbedRestoreResult
     }
 
     // MARK: - Export

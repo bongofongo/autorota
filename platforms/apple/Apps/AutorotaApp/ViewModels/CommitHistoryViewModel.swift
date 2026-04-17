@@ -48,6 +48,18 @@ struct AssignmentData: Codable, Identifiable {
     var id: Int64 { assignmentId }
 }
 
+// MARK: - Restore toast
+
+/// Ephemeral message shown after a successful restore. The view observes
+/// `CommitHistoryViewModel.restoreToast` and auto-dismisses after a delay.
+struct RestoreToast: Equatable {
+    let commitSummary: String
+    let weekStart: String
+    let shiftsRestored: Int
+    let assignmentsRestored: Int
+    let assignmentsSkipped: Int
+}
+
 // MARK: - Flat assignment entry (for Shifts-mode flattened list)
 
 struct FlatAssignmentEntry: Identifiable {
@@ -57,25 +69,6 @@ struct FlatAssignmentEntry: Identifiable {
     let endTime: String
     let requiredRole: String
     let isChanged: Bool
-}
-
-// MARK: - Shift diff helper
-
-/// Returns true if the live shift differs from the committed snapshot.
-/// Compares core shift fields and the set of (employeeId, status) assignment pairs.
-func shiftDiffersFromSnapshot(
-    snapshot: ShiftData,
-    liveShift: FfiShiftInfo,
-    liveEntries: [FfiScheduleEntry]
-) -> Bool {
-    if snapshot.startTime != liveShift.startTime { return true }
-    if snapshot.endTime != liveShift.endTime { return true }
-    if snapshot.requiredRole != liveShift.requiredRole { return true }
-    if snapshot.minEmployees != Int(liveShift.minEmployees) { return true }
-    if snapshot.maxEmployees != Int(liveShift.maxEmployees) { return true }
-    let snapPairs = Set(snapshot.assignments.map { "\($0.employeeId)|\($0.status.lowercased())" })
-    let livePairs = Set(liveEntries.map { "\($0.employeeId)|\($0.status.lowercased())" })
-    return snapPairs != livePairs
 }
 
 @Observable
@@ -92,6 +85,16 @@ final class CommitHistoryViewModel {
     /// Shift IDs that have been modified since their latest commit, keyed by week_start.
     var changedShiftIdsByWeek: [String: Set<Int64>] = [:]
 
+    /// Detailed changes vs previous commit, keyed by commit id. Loaded on demand
+    /// when a commit detail sheet opens.
+    var changesByCommitId: [Int64: [FfiCommitChangeDetail]] = [:]
+
+    /// Toast shown after a successful restore. Non-nil = visible.
+    var restoreToast: RestoreToast?
+
+    /// Whether a restore is currently in flight (drives UI spinner + disables button).
+    var isRestoring = false
+
     let service: AutorotaServiceProtocol
 
     init(service: AutorotaServiceProtocol = LiveAutorotaService()) {
@@ -105,7 +108,7 @@ final class CommitHistoryViewModel {
         do {
             commits = try await service.listCommits(rotaId: nil)
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
         isLoading = false
     }
@@ -115,7 +118,7 @@ final class CommitHistoryViewModel {
         do {
             selectedCommitDetail = try await service.getCommitDetail(commitId: id)
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
     }
 
@@ -144,21 +147,15 @@ final class CommitHistoryViewModel {
         }
     }
 
-    /// For each week shown in Shifts mode, fetch the live schedule and diff against the latest snapshot.
+    /// For each week shown in Shifts mode, use Rust-side diff to find changed shifts.
     func refreshChangedShiftsForAllWeeks() async {
         var result: [String: Set<Int64>] = [:]
-        for (weekStart, shifts) in latestShiftsByWeek {
+        // Collect unique rota IDs per week
+        for (weekStart, _) in latestShiftsByWeek {
             do {
                 guard let live = try await service.getWeekSchedule(weekStart: weekStart) else { continue }
-                var changed: Set<Int64> = []
-                let snapshotById = Dictionary(uniqueKeysWithValues: shifts.map { ($0.shiftId, $0) })
-                for liveShift in live.shifts {
-                    guard let snap = snapshotById[liveShift.id] else { continue }
-                    let entries = live.entries.filter { $0.shiftId == liveShift.id }
-                    if shiftDiffersFromSnapshot(snapshot: snap, liveShift: liveShift, liveEntries: entries) {
-                        changed.insert(liveShift.id)
-                    }
-                }
+                let diffs = try await service.diffRota(rotaId: live.rotaId)
+                let changed = Set(diffs.filter { $0.isNew || $0.isChanged }.map { $0.shiftId })
                 result[weekStart] = changed
             } catch {
                 continue
@@ -206,6 +203,40 @@ final class CommitHistoryViewModel {
         return grouped
             .sorted { $0.key > $1.key }
             .map { (weekStart: $0.key, commits: $0.value) }
+    }
+
+    /// Load detailed changes between this commit and the previous commit
+    /// for the same rota. Empty array if this is the first commit.
+    func loadChangesForCommit(id: Int64) async {
+        guard changesByCommitId[id] == nil else { return }
+        do {
+            let changes = try await service.diffCommitVsPrevious(commitId: id)
+            changesByCommitId[id] = changes
+        } catch {
+            self.error = userFacingMessage(error)
+        }
+    }
+
+    /// Restore the rota to the state captured by a commit. On success, posts
+    /// `.autorotaDataChanged` (done by the service) and surfaces a toast.
+    func restoreToCommit(id: Int64, summary: String, weekStart: String) async {
+        guard !isRestoring else { return }
+        isRestoring = true
+        defer { isRestoring = false }
+        do {
+            let result = try await service.restoreToCommit(commitId: id)
+            restoreToast = RestoreToast(
+                commitSummary: summary,
+                weekStart: weekStart,
+                shiftsRestored: Int(result.shiftsRestored),
+                assignmentsRestored: Int(result.assignmentsRestored),
+                assignmentsSkipped: Int(result.assignmentsSkipped)
+            )
+            // After a restore the changed-shift caches are stale.
+            changedShiftIdsByWeek.removeAll()
+        } catch {
+            self.error = userFacingMessage(error)
+        }
     }
 
     /// For each week, the most recently committed version of every shift, deduped by shift_id.

@@ -103,7 +103,6 @@ pub struct FfiRota {
     pub id: i64,
     pub week_start: String,
     pub assignments: Vec<FfiAssignment>,
-    pub finalized: bool,
 }
 
 // ── WeekSchedule (denormalised view returned by get_week_schedule) ────────────
@@ -139,11 +138,8 @@ pub struct FfiShiftInfo {
 pub struct FfiWeekSchedule {
     pub rota_id: i64,
     pub week_start: String,
-    pub finalized: bool,
     /// Whether this rota has at least one commit.
     pub committed: bool,
-    /// Shift IDs that are currently staged for commit.
-    pub staged_shift_ids: Vec<i64>,
     pub entries: Vec<FfiScheduleEntry>,
     pub shifts: Vec<FfiShiftInfo>,
 }
@@ -197,17 +193,18 @@ pub struct FfiEmployeeShiftRecord {
     pub duration_hours: f32,
     /// "YYYY-MM-DD" — Monday of the rota week this shift belongs to.
     pub week_start: String,
-    pub finalized: bool,
 }
 
-// ── Staging & Commits ────────────────────────────────────────────────────────
+// ── Commits ──────────────────────────────────────────────────────────────────
 
-/// Current staging state for a rota.
+/// Result of comparing a live shift against the latest commit snapshot.
 #[derive(Clone, uniffi::Record)]
-pub struct FfiStagingState {
-    pub rota_id: i64,
-    pub staged_shift_ids: Vec<i64>,
-    pub total_stageable_past_shift_ids: Vec<i64>,
+pub struct FfiShiftDiff {
+    pub shift_id: i64,
+    /// Shift exists in live schedule but not in any commit.
+    pub is_new: bool,
+    /// Shift exists in both but differs (times, role, capacity, or assignments).
+    pub is_changed: bool,
 }
 
 /// A commit record (for list views — excludes the full snapshot JSON).
@@ -230,6 +227,64 @@ pub struct FfiCommitDetail {
     pub summary: String,
     pub week_start: String,
     pub snapshot_json: String,
+}
+
+/// One detailed change attached to a shift on a specific date.
+///
+/// Flattened shape so uniffi records cross the FFI cleanly across all
+/// languages. The `kind` string selects which other fields are meaningful.
+/// See `autorota_core::models::commit::CommitChangeKind` for the full list.
+///
+/// Kind values:
+/// - `"shift_added"` — new_* fields populated
+/// - `"shift_removed"` — old_* fields populated
+/// - `"shift_time_changed"` — old_start_time, new_start_time, old_end_time, new_end_time
+/// - `"shift_capacity_changed"` — old_min_employees, new_min_employees, old/new_max_employees
+/// - `"shift_role_changed"` — old_required_role, new_required_role
+/// - `"assignment_added"` — employee_id, employee_name
+/// - `"assignment_removed"` — employee_id, employee_name
+/// - `"assignment_status_changed"` — employee_id, employee_name, old_status, new_status
+/// - `"employee_moved"` — employee_id, employee_name, from_shift_id, from_start_time, from_end_time
+#[derive(Clone, uniffi::Record)]
+pub struct FfiCommitChangeDetail {
+    pub kind: String,
+    pub shift_id: i64,
+    /// `"YYYY-MM-DD"` — date of the shift this change is attached to.
+    pub date: String,
+
+    // Shift fields
+    pub old_start_time: Option<String>,
+    pub new_start_time: Option<String>,
+    pub old_end_time: Option<String>,
+    pub new_end_time: Option<String>,
+    pub old_required_role: Option<String>,
+    pub new_required_role: Option<String>,
+    pub old_min_employees: Option<u32>,
+    pub new_min_employees: Option<u32>,
+    pub old_max_employees: Option<u32>,
+    pub new_max_employees: Option<u32>,
+
+    // Assignment fields
+    pub employee_id: Option<i64>,
+    pub employee_name: Option<String>,
+    pub old_status: Option<String>,
+    pub new_status: Option<String>,
+
+    // Move fields (destination shift_id is on the top-level `shift_id`)
+    pub from_shift_id: Option<i64>,
+    pub from_start_time: Option<String>,
+    pub from_end_time: Option<String>,
+}
+
+/// Summary returned by `restore_to_commit`.
+#[derive(Clone, uniffi::Record)]
+pub struct FfiRestoreResult {
+    pub rota_id: i64,
+    pub shifts_restored: u32,
+    pub assignments_restored: u32,
+    /// Assignments in the snapshot that were skipped because the referenced
+    /// employee no longer exists (has been deleted since the commit).
+    pub assignments_skipped: u32,
 }
 
 // ── Overrides ─────────────────────────────────────────────────────────────────

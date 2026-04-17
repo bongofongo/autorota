@@ -1031,6 +1031,240 @@ public func FfiConverterTypeFfiCommit_lower(_ value: FfiCommit) -> RustBuffer {
 
 
 /**
+ * One detailed change attached to a shift on a specific date.
+ *
+ * Flattened shape so uniffi records cross the FFI cleanly across all
+ * languages. The `kind` string selects which other fields are meaningful.
+ * See `autorota_core::models::commit::CommitChangeKind` for the full list.
+ *
+ * Kind values:
+ * - `"shift_added"` — new_* fields populated
+ * - `"shift_removed"` — old_* fields populated
+ * - `"shift_time_changed"` — old_start_time, new_start_time, old_end_time, new_end_time
+ * - `"shift_capacity_changed"` — old_min_employees, new_min_employees, old/new_max_employees
+ * - `"shift_role_changed"` — old_required_role, new_required_role
+ * - `"assignment_added"` — employee_id, employee_name
+ * - `"assignment_removed"` — employee_id, employee_name
+ * - `"assignment_status_changed"` — employee_id, employee_name, old_status, new_status
+ * - `"employee_moved"` — employee_id, employee_name, from_shift_id, from_start_time, from_end_time
+ */
+public struct FfiCommitChangeDetail {
+    public var kind: String
+    public var shiftId: Int64
+    /**
+     * `"YYYY-MM-DD"` — date of the shift this change is attached to.
+     */
+    public var date: String
+    public var oldStartTime: String?
+    public var newStartTime: String?
+    public var oldEndTime: String?
+    public var newEndTime: String?
+    public var oldRequiredRole: String?
+    public var newRequiredRole: String?
+    public var oldMinEmployees: UInt32?
+    public var newMinEmployees: UInt32?
+    public var oldMaxEmployees: UInt32?
+    public var newMaxEmployees: UInt32?
+    public var employeeId: Int64?
+    public var employeeName: String?
+    public var oldStatus: String?
+    public var newStatus: String?
+    public var fromShiftId: Int64?
+    public var fromStartTime: String?
+    public var fromEndTime: String?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(kind: String, shiftId: Int64, 
+        /**
+         * `"YYYY-MM-DD"` — date of the shift this change is attached to.
+         */date: String, oldStartTime: String?, newStartTime: String?, oldEndTime: String?, newEndTime: String?, oldRequiredRole: String?, newRequiredRole: String?, oldMinEmployees: UInt32?, newMinEmployees: UInt32?, oldMaxEmployees: UInt32?, newMaxEmployees: UInt32?, employeeId: Int64?, employeeName: String?, oldStatus: String?, newStatus: String?, fromShiftId: Int64?, fromStartTime: String?, fromEndTime: String?) {
+        self.kind = kind
+        self.shiftId = shiftId
+        self.date = date
+        self.oldStartTime = oldStartTime
+        self.newStartTime = newStartTime
+        self.oldEndTime = oldEndTime
+        self.newEndTime = newEndTime
+        self.oldRequiredRole = oldRequiredRole
+        self.newRequiredRole = newRequiredRole
+        self.oldMinEmployees = oldMinEmployees
+        self.newMinEmployees = newMinEmployees
+        self.oldMaxEmployees = oldMaxEmployees
+        self.newMaxEmployees = newMaxEmployees
+        self.employeeId = employeeId
+        self.employeeName = employeeName
+        self.oldStatus = oldStatus
+        self.newStatus = newStatus
+        self.fromShiftId = fromShiftId
+        self.fromStartTime = fromStartTime
+        self.fromEndTime = fromEndTime
+    }
+}
+
+
+
+extension FfiCommitChangeDetail: Equatable, Hashable {
+    public static func ==(lhs: FfiCommitChangeDetail, rhs: FfiCommitChangeDetail) -> Bool {
+        if lhs.kind != rhs.kind {
+            return false
+        }
+        if lhs.shiftId != rhs.shiftId {
+            return false
+        }
+        if lhs.date != rhs.date {
+            return false
+        }
+        if lhs.oldStartTime != rhs.oldStartTime {
+            return false
+        }
+        if lhs.newStartTime != rhs.newStartTime {
+            return false
+        }
+        if lhs.oldEndTime != rhs.oldEndTime {
+            return false
+        }
+        if lhs.newEndTime != rhs.newEndTime {
+            return false
+        }
+        if lhs.oldRequiredRole != rhs.oldRequiredRole {
+            return false
+        }
+        if lhs.newRequiredRole != rhs.newRequiredRole {
+            return false
+        }
+        if lhs.oldMinEmployees != rhs.oldMinEmployees {
+            return false
+        }
+        if lhs.newMinEmployees != rhs.newMinEmployees {
+            return false
+        }
+        if lhs.oldMaxEmployees != rhs.oldMaxEmployees {
+            return false
+        }
+        if lhs.newMaxEmployees != rhs.newMaxEmployees {
+            return false
+        }
+        if lhs.employeeId != rhs.employeeId {
+            return false
+        }
+        if lhs.employeeName != rhs.employeeName {
+            return false
+        }
+        if lhs.oldStatus != rhs.oldStatus {
+            return false
+        }
+        if lhs.newStatus != rhs.newStatus {
+            return false
+        }
+        if lhs.fromShiftId != rhs.fromShiftId {
+            return false
+        }
+        if lhs.fromStartTime != rhs.fromStartTime {
+            return false
+        }
+        if lhs.fromEndTime != rhs.fromEndTime {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(kind)
+        hasher.combine(shiftId)
+        hasher.combine(date)
+        hasher.combine(oldStartTime)
+        hasher.combine(newStartTime)
+        hasher.combine(oldEndTime)
+        hasher.combine(newEndTime)
+        hasher.combine(oldRequiredRole)
+        hasher.combine(newRequiredRole)
+        hasher.combine(oldMinEmployees)
+        hasher.combine(newMinEmployees)
+        hasher.combine(oldMaxEmployees)
+        hasher.combine(newMaxEmployees)
+        hasher.combine(employeeId)
+        hasher.combine(employeeName)
+        hasher.combine(oldStatus)
+        hasher.combine(newStatus)
+        hasher.combine(fromShiftId)
+        hasher.combine(fromStartTime)
+        hasher.combine(fromEndTime)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFfiCommitChangeDetail: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiCommitChangeDetail {
+        return
+            try FfiCommitChangeDetail(
+                kind: FfiConverterString.read(from: &buf), 
+                shiftId: FfiConverterInt64.read(from: &buf), 
+                date: FfiConverterString.read(from: &buf), 
+                oldStartTime: FfiConverterOptionString.read(from: &buf), 
+                newStartTime: FfiConverterOptionString.read(from: &buf), 
+                oldEndTime: FfiConverterOptionString.read(from: &buf), 
+                newEndTime: FfiConverterOptionString.read(from: &buf), 
+                oldRequiredRole: FfiConverterOptionString.read(from: &buf), 
+                newRequiredRole: FfiConverterOptionString.read(from: &buf), 
+                oldMinEmployees: FfiConverterOptionUInt32.read(from: &buf), 
+                newMinEmployees: FfiConverterOptionUInt32.read(from: &buf), 
+                oldMaxEmployees: FfiConverterOptionUInt32.read(from: &buf), 
+                newMaxEmployees: FfiConverterOptionUInt32.read(from: &buf), 
+                employeeId: FfiConverterOptionInt64.read(from: &buf), 
+                employeeName: FfiConverterOptionString.read(from: &buf), 
+                oldStatus: FfiConverterOptionString.read(from: &buf), 
+                newStatus: FfiConverterOptionString.read(from: &buf), 
+                fromShiftId: FfiConverterOptionInt64.read(from: &buf), 
+                fromStartTime: FfiConverterOptionString.read(from: &buf), 
+                fromEndTime: FfiConverterOptionString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FfiCommitChangeDetail, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.kind, into: &buf)
+        FfiConverterInt64.write(value.shiftId, into: &buf)
+        FfiConverterString.write(value.date, into: &buf)
+        FfiConverterOptionString.write(value.oldStartTime, into: &buf)
+        FfiConverterOptionString.write(value.newStartTime, into: &buf)
+        FfiConverterOptionString.write(value.oldEndTime, into: &buf)
+        FfiConverterOptionString.write(value.newEndTime, into: &buf)
+        FfiConverterOptionString.write(value.oldRequiredRole, into: &buf)
+        FfiConverterOptionString.write(value.newRequiredRole, into: &buf)
+        FfiConverterOptionUInt32.write(value.oldMinEmployees, into: &buf)
+        FfiConverterOptionUInt32.write(value.newMinEmployees, into: &buf)
+        FfiConverterOptionUInt32.write(value.oldMaxEmployees, into: &buf)
+        FfiConverterOptionUInt32.write(value.newMaxEmployees, into: &buf)
+        FfiConverterOptionInt64.write(value.employeeId, into: &buf)
+        FfiConverterOptionString.write(value.employeeName, into: &buf)
+        FfiConverterOptionString.write(value.oldStatus, into: &buf)
+        FfiConverterOptionString.write(value.newStatus, into: &buf)
+        FfiConverterOptionInt64.write(value.fromShiftId, into: &buf)
+        FfiConverterOptionString.write(value.fromStartTime, into: &buf)
+        FfiConverterOptionString.write(value.fromEndTime, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiCommitChangeDetail_lift(_ buf: RustBuffer) throws -> FfiCommitChangeDetail {
+    return try FfiConverterTypeFfiCommitChangeDetail.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiCommitChangeDetail_lower(_ value: FfiCommitChangeDetail) -> RustBuffer {
+    return FfiConverterTypeFfiCommitChangeDetail.lower(value)
+}
+
+
+/**
  * A commit record with the full snapshot JSON (for detail views).
  */
 public struct FfiCommitDetail {
@@ -1618,7 +1852,6 @@ public struct FfiEmployeeShiftRecord {
      * "YYYY-MM-DD" — Monday of the rota week this shift belongs to.
      */
     public var weekStart: String
-    public var finalized: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -1649,7 +1882,7 @@ public struct FfiEmployeeShiftRecord {
          */durationHours: Float, 
         /**
          * "YYYY-MM-DD" — Monday of the rota week this shift belongs to.
-         */weekStart: String, finalized: Bool) {
+         */weekStart: String) {
         self.assignmentId = assignmentId
         self.rotaId = rotaId
         self.shiftId = shiftId
@@ -1665,7 +1898,6 @@ public struct FfiEmployeeShiftRecord {
         self.requiredRole = requiredRole
         self.durationHours = durationHours
         self.weekStart = weekStart
-        self.finalized = finalized
     }
 }
 
@@ -1718,9 +1950,6 @@ extension FfiEmployeeShiftRecord: Equatable, Hashable {
         if lhs.weekStart != rhs.weekStart {
             return false
         }
-        if lhs.finalized != rhs.finalized {
-            return false
-        }
         return true
     }
 
@@ -1740,7 +1969,6 @@ extension FfiEmployeeShiftRecord: Equatable, Hashable {
         hasher.combine(requiredRole)
         hasher.combine(durationHours)
         hasher.combine(weekStart)
-        hasher.combine(finalized)
     }
 }
 
@@ -1766,8 +1994,7 @@ public struct FfiConverterTypeFfiEmployeeShiftRecord: FfiConverterRustBuffer {
                 endTime: FfiConverterString.read(from: &buf), 
                 requiredRole: FfiConverterString.read(from: &buf), 
                 durationHours: FfiConverterFloat.read(from: &buf), 
-                weekStart: FfiConverterString.read(from: &buf), 
-                finalized: FfiConverterBool.read(from: &buf)
+                weekStart: FfiConverterString.read(from: &buf)
         )
     }
 
@@ -1787,7 +2014,6 @@ public struct FfiConverterTypeFfiEmployeeShiftRecord: FfiConverterRustBuffer {
         FfiConverterString.write(value.requiredRole, into: &buf)
         FfiConverterFloat.write(value.durationHours, into: &buf)
         FfiConverterString.write(value.weekStart, into: &buf)
-        FfiConverterBool.write(value.finalized, into: &buf)
     }
 }
 
@@ -2086,6 +2312,99 @@ public func FfiConverterTypeFfiMergeConflict_lower(_ value: FfiMergeConflict) ->
 
 
 /**
+ * Summary returned by `restore_to_commit`.
+ */
+public struct FfiRestoreResult {
+    public var rotaId: Int64
+    public var shiftsRestored: UInt32
+    public var assignmentsRestored: UInt32
+    /**
+     * Assignments in the snapshot that were skipped because the referenced
+     * employee no longer exists (has been deleted since the commit).
+     */
+    public var assignmentsSkipped: UInt32
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(rotaId: Int64, shiftsRestored: UInt32, assignmentsRestored: UInt32, 
+        /**
+         * Assignments in the snapshot that were skipped because the referenced
+         * employee no longer exists (has been deleted since the commit).
+         */assignmentsSkipped: UInt32) {
+        self.rotaId = rotaId
+        self.shiftsRestored = shiftsRestored
+        self.assignmentsRestored = assignmentsRestored
+        self.assignmentsSkipped = assignmentsSkipped
+    }
+}
+
+
+
+extension FfiRestoreResult: Equatable, Hashable {
+    public static func ==(lhs: FfiRestoreResult, rhs: FfiRestoreResult) -> Bool {
+        if lhs.rotaId != rhs.rotaId {
+            return false
+        }
+        if lhs.shiftsRestored != rhs.shiftsRestored {
+            return false
+        }
+        if lhs.assignmentsRestored != rhs.assignmentsRestored {
+            return false
+        }
+        if lhs.assignmentsSkipped != rhs.assignmentsSkipped {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(rotaId)
+        hasher.combine(shiftsRestored)
+        hasher.combine(assignmentsRestored)
+        hasher.combine(assignmentsSkipped)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFfiRestoreResult: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiRestoreResult {
+        return
+            try FfiRestoreResult(
+                rotaId: FfiConverterInt64.read(from: &buf), 
+                shiftsRestored: FfiConverterUInt32.read(from: &buf), 
+                assignmentsRestored: FfiConverterUInt32.read(from: &buf), 
+                assignmentsSkipped: FfiConverterUInt32.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FfiRestoreResult, into buf: inout [UInt8]) {
+        FfiConverterInt64.write(value.rotaId, into: &buf)
+        FfiConverterUInt32.write(value.shiftsRestored, into: &buf)
+        FfiConverterUInt32.write(value.assignmentsRestored, into: &buf)
+        FfiConverterUInt32.write(value.assignmentsSkipped, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiRestoreResult_lift(_ buf: RustBuffer) throws -> FfiRestoreResult {
+    return try FfiConverterTypeFfiRestoreResult.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiRestoreResult_lower(_ value: FfiRestoreResult) -> RustBuffer {
+    return FfiConverterTypeFfiRestoreResult.lower(value)
+}
+
+
+/**
  * FFI-safe mirror types for all autorota-core models.
  *
  * Chrono types are flattened to `String`:
@@ -2165,15 +2484,13 @@ public struct FfiRota {
     public var id: Int64
     public var weekStart: String
     public var assignments: [FfiAssignment]
-    public var finalized: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(id: Int64, weekStart: String, assignments: [FfiAssignment], finalized: Bool) {
+    public init(id: Int64, weekStart: String, assignments: [FfiAssignment]) {
         self.id = id
         self.weekStart = weekStart
         self.assignments = assignments
-        self.finalized = finalized
     }
 }
 
@@ -2190,9 +2507,6 @@ extension FfiRota: Equatable, Hashable {
         if lhs.assignments != rhs.assignments {
             return false
         }
-        if lhs.finalized != rhs.finalized {
-            return false
-        }
         return true
     }
 
@@ -2200,7 +2514,6 @@ extension FfiRota: Equatable, Hashable {
         hasher.combine(id)
         hasher.combine(weekStart)
         hasher.combine(assignments)
-        hasher.combine(finalized)
     }
 }
 
@@ -2214,8 +2527,7 @@ public struct FfiConverterTypeFfiRota: FfiConverterRustBuffer {
             try FfiRota(
                 id: FfiConverterInt64.read(from: &buf), 
                 weekStart: FfiConverterString.read(from: &buf), 
-                assignments: FfiConverterSequenceTypeFfiAssignment.read(from: &buf), 
-                finalized: FfiConverterBool.read(from: &buf)
+                assignments: FfiConverterSequenceTypeFfiAssignment.read(from: &buf)
         )
     }
 
@@ -2223,7 +2535,6 @@ public struct FfiConverterTypeFfiRota: FfiConverterRustBuffer {
         FfiConverterInt64.write(value.id, into: &buf)
         FfiConverterString.write(value.weekStart, into: &buf)
         FfiConverterSequenceTypeFfiAssignment.write(value.assignments, into: &buf)
-        FfiConverterBool.write(value.finalized, into: &buf)
     }
 }
 
@@ -2566,6 +2877,95 @@ public func FfiConverterTypeFfiShift_lift(_ buf: RustBuffer) throws -> FfiShift 
 #endif
 public func FfiConverterTypeFfiShift_lower(_ value: FfiShift) -> RustBuffer {
     return FfiConverterTypeFfiShift.lower(value)
+}
+
+
+/**
+ * Result of comparing a live shift against the latest commit snapshot.
+ */
+public struct FfiShiftDiff {
+    public var shiftId: Int64
+    /**
+     * Shift exists in live schedule but not in any commit.
+     */
+    public var isNew: Bool
+    /**
+     * Shift exists in both but differs (times, role, capacity, or assignments).
+     */
+    public var isChanged: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(shiftId: Int64, 
+        /**
+         * Shift exists in live schedule but not in any commit.
+         */isNew: Bool, 
+        /**
+         * Shift exists in both but differs (times, role, capacity, or assignments).
+         */isChanged: Bool) {
+        self.shiftId = shiftId
+        self.isNew = isNew
+        self.isChanged = isChanged
+    }
+}
+
+
+
+extension FfiShiftDiff: Equatable, Hashable {
+    public static func ==(lhs: FfiShiftDiff, rhs: FfiShiftDiff) -> Bool {
+        if lhs.shiftId != rhs.shiftId {
+            return false
+        }
+        if lhs.isNew != rhs.isNew {
+            return false
+        }
+        if lhs.isChanged != rhs.isChanged {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(shiftId)
+        hasher.combine(isNew)
+        hasher.combine(isChanged)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFfiShiftDiff: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiShiftDiff {
+        return
+            try FfiShiftDiff(
+                shiftId: FfiConverterInt64.read(from: &buf), 
+                isNew: FfiConverterBool.read(from: &buf), 
+                isChanged: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FfiShiftDiff, into buf: inout [UInt8]) {
+        FfiConverterInt64.write(value.shiftId, into: &buf)
+        FfiConverterBool.write(value.isNew, into: &buf)
+        FfiConverterBool.write(value.isChanged, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiShiftDiff_lift(_ buf: RustBuffer) throws -> FfiShiftDiff {
+    return try FfiConverterTypeFfiShiftDiff.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiShiftDiff_lower(_ value: FfiShiftDiff) -> RustBuffer {
+    return FfiConverterTypeFfiShiftDiff.lower(value)
 }
 
 
@@ -3054,83 +3454,6 @@ public func FfiConverterTypeFfiShortfallWarning_lower(_ value: FfiShortfallWarni
 }
 
 
-/**
- * Current staging state for a rota.
- */
-public struct FfiStagingState {
-    public var rotaId: Int64
-    public var stagedShiftIds: [Int64]
-    public var totalStageablePastShiftIds: [Int64]
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(rotaId: Int64, stagedShiftIds: [Int64], totalStageablePastShiftIds: [Int64]) {
-        self.rotaId = rotaId
-        self.stagedShiftIds = stagedShiftIds
-        self.totalStageablePastShiftIds = totalStageablePastShiftIds
-    }
-}
-
-
-
-extension FfiStagingState: Equatable, Hashable {
-    public static func ==(lhs: FfiStagingState, rhs: FfiStagingState) -> Bool {
-        if lhs.rotaId != rhs.rotaId {
-            return false
-        }
-        if lhs.stagedShiftIds != rhs.stagedShiftIds {
-            return false
-        }
-        if lhs.totalStageablePastShiftIds != rhs.totalStageablePastShiftIds {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(rotaId)
-        hasher.combine(stagedShiftIds)
-        hasher.combine(totalStageablePastShiftIds)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeFfiStagingState: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiStagingState {
-        return
-            try FfiStagingState(
-                rotaId: FfiConverterInt64.read(from: &buf), 
-                stagedShiftIds: FfiConverterSequenceInt64.read(from: &buf), 
-                totalStageablePastShiftIds: FfiConverterSequenceInt64.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: FfiStagingState, into buf: inout [UInt8]) {
-        FfiConverterInt64.write(value.rotaId, into: &buf)
-        FfiConverterSequenceInt64.write(value.stagedShiftIds, into: &buf)
-        FfiConverterSequenceInt64.write(value.totalStageablePastShiftIds, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeFfiStagingState_lift(_ buf: RustBuffer) throws -> FfiStagingState {
-    return try FfiConverterTypeFfiStagingState.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeFfiStagingState_lower(_ value: FfiStagingState) -> RustBuffer {
-    return FfiConverterTypeFfiStagingState.lower(value)
-}
-
-
 public struct FfiSyncRecord {
     public var tableName: String
     public var recordId: Int64
@@ -3298,32 +3621,22 @@ public func FfiConverterTypeFfiTombstone_lower(_ value: FfiTombstone) -> RustBuf
 public struct FfiWeekSchedule {
     public var rotaId: Int64
     public var weekStart: String
-    public var finalized: Bool
     /**
      * Whether this rota has at least one commit.
      */
     public var committed: Bool
-    /**
-     * Shift IDs that are currently staged for commit.
-     */
-    public var stagedShiftIds: [Int64]
     public var entries: [FfiScheduleEntry]
     public var shifts: [FfiShiftInfo]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(rotaId: Int64, weekStart: String, finalized: Bool, 
+    public init(rotaId: Int64, weekStart: String, 
         /**
          * Whether this rota has at least one commit.
-         */committed: Bool, 
-        /**
-         * Shift IDs that are currently staged for commit.
-         */stagedShiftIds: [Int64], entries: [FfiScheduleEntry], shifts: [FfiShiftInfo]) {
+         */committed: Bool, entries: [FfiScheduleEntry], shifts: [FfiShiftInfo]) {
         self.rotaId = rotaId
         self.weekStart = weekStart
-        self.finalized = finalized
         self.committed = committed
-        self.stagedShiftIds = stagedShiftIds
         self.entries = entries
         self.shifts = shifts
     }
@@ -3339,13 +3652,7 @@ extension FfiWeekSchedule: Equatable, Hashable {
         if lhs.weekStart != rhs.weekStart {
             return false
         }
-        if lhs.finalized != rhs.finalized {
-            return false
-        }
         if lhs.committed != rhs.committed {
-            return false
-        }
-        if lhs.stagedShiftIds != rhs.stagedShiftIds {
             return false
         }
         if lhs.entries != rhs.entries {
@@ -3360,9 +3667,7 @@ extension FfiWeekSchedule: Equatable, Hashable {
     public func hash(into hasher: inout Hasher) {
         hasher.combine(rotaId)
         hasher.combine(weekStart)
-        hasher.combine(finalized)
         hasher.combine(committed)
-        hasher.combine(stagedShiftIds)
         hasher.combine(entries)
         hasher.combine(shifts)
     }
@@ -3378,9 +3683,7 @@ public struct FfiConverterTypeFfiWeekSchedule: FfiConverterRustBuffer {
             try FfiWeekSchedule(
                 rotaId: FfiConverterInt64.read(from: &buf), 
                 weekStart: FfiConverterString.read(from: &buf), 
-                finalized: FfiConverterBool.read(from: &buf), 
                 committed: FfiConverterBool.read(from: &buf), 
-                stagedShiftIds: FfiConverterSequenceInt64.read(from: &buf), 
                 entries: FfiConverterSequenceTypeFfiScheduleEntry.read(from: &buf), 
                 shifts: FfiConverterSequenceTypeFfiShiftInfo.read(from: &buf)
         )
@@ -3389,9 +3692,7 @@ public struct FfiConverterTypeFfiWeekSchedule: FfiConverterRustBuffer {
     public static func write(_ value: FfiWeekSchedule, into buf: inout [UInt8]) {
         FfiConverterInt64.write(value.rotaId, into: &buf)
         FfiConverterString.write(value.weekStart, into: &buf)
-        FfiConverterBool.write(value.finalized, into: &buf)
         FfiConverterBool.write(value.committed, into: &buf)
-        FfiConverterSequenceInt64.write(value.stagedShiftIds, into: &buf)
         FfiConverterSequenceTypeFfiScheduleEntry.write(value.entries, into: &buf)
         FfiConverterSequenceTypeFfiShiftInfo.write(value.shifts, into: &buf)
     }
@@ -3427,7 +3728,6 @@ public enum FfiError {
     )
     case InvalidArgument(msg: String
     )
-    case AlreadyFinalized
 }
 
 
@@ -3453,7 +3753,6 @@ public struct FfiConverterTypeFfiError: FfiConverterRustBuffer {
         case 3: return .InvalidArgument(
             msg: try FfiConverterString.read(from: &buf)
             )
-        case 4: return .AlreadyFinalized
 
          default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -3480,10 +3779,6 @@ public struct FfiConverterTypeFfiError: FfiConverterRustBuffer {
             writeInt(&buf, Int32(3))
             FfiConverterString.write(msg, into: &buf)
             
-        
-        case .AlreadyFinalized:
-            writeInt(&buf, Int32(4))
-        
         }
     }
 }
@@ -3940,6 +4235,31 @@ fileprivate struct FfiConverterSequenceTypeFfiCommit: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeFfiCommitChangeDetail: FfiConverterRustBuffer {
+    typealias SwiftType = [FfiCommitChangeDetail]
+
+    public static func write(_ value: [FfiCommitChangeDetail], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeFfiCommitChangeDetail.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [FfiCommitChangeDetail] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [FfiCommitChangeDetail]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeFfiCommitChangeDetail.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeFfiEmployee: FfiConverterRustBuffer {
     typealias SwiftType = [FfiEmployee]
 
@@ -4082,6 +4402,31 @@ fileprivate struct FfiConverterSequenceTypeFfiShift: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeFfiShift.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeFfiShiftDiff: FfiConverterRustBuffer {
+    typealias SwiftType = [FfiShiftDiff]
+
+    public static func write(_ value: [FfiShiftDiff], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeFfiShiftDiff.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [FfiShiftDiff] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [FfiShiftDiff]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeFfiShiftDiff.read(from: &buf))
         }
         return seq
     }
@@ -4248,10 +4593,11 @@ public func clearTombstones(ids: [Int64])throws  {try rustCallWithError(FfiConve
     )
 }
 }
-public func commitStagedShifts(rotaId: Int64)throws  -> Int64 {
+public func commitShifts(rotaId: Int64, shiftIds: [Int64])throws  -> Int64 {
     return try  FfiConverterInt64.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
-    uniffi_autorota_ffi_fn_func_commit_staged_shifts(
-        FfiConverterInt64.lower(rotaId),$0
+    uniffi_autorota_ffi_fn_func_commit_shifts(
+        FfiConverterInt64.lower(rotaId),
+        FfiConverterSequenceInt64.lower(shiftIds),$0
     )
 })
 }
@@ -4373,6 +4719,47 @@ public func deleteWeek(weekStart: String)throws  {try rustCallWithError(FfiConve
     )
 }
 }
+/**
+ * Detailed diff between a commit and the commit that immediately preceded
+ * it for the same rota. If this is the first commit, every shift is new.
+ */
+public func diffCommitVsPrevious(commitId: Int64)throws  -> [FfiCommitChangeDetail] {
+    return try  FfiConverterSequenceTypeFfiCommitChangeDetail.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_diff_commit_vs_previous(
+        FfiConverterInt64.lower(commitId),$0
+    )
+})
+}
+/**
+ * Detailed diff between two persisted commits.
+ */
+public func diffCommitsDetailed(oldCommitId: Int64, newCommitId: Int64)throws  -> [FfiCommitChangeDetail] {
+    return try  FfiConverterSequenceTypeFfiCommitChangeDetail.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_diff_commits_detailed(
+        FfiConverterInt64.lower(oldCommitId),
+        FfiConverterInt64.lower(newCommitId),$0
+    )
+})
+}
+public func diffRota(rotaId: Int64)throws  -> [FfiShiftDiff] {
+    return try  FfiConverterSequenceTypeFfiShiftDiff.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_diff_rota(
+        FfiConverterInt64.lower(rotaId),$0
+    )
+})
+}
+/**
+ * Detailed diff between the live state of a rota and its latest commit.
+ * Returns an empty vec if nothing has changed since the last commit.
+ * If the rota has no commits yet, every live shift appears as `shift_added`.
+ */
+public func diffRotaDetailed(rotaId: Int64)throws  -> [FfiCommitChangeDetail] {
+    return try  FfiConverterSequenceTypeFfiCommitChangeDetail.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_diff_rota_detailed(
+        FfiConverterInt64.lower(rotaId),$0
+    )
+})
+}
 public func exportEmployeeSchedule(config: FfiEmployeeExportConfig)throws  -> FfiExportResult {
     return try  FfiConverterTypeFfiExportResult.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_export_employee_schedule(
@@ -4387,12 +4774,6 @@ public func exportWeekSchedule(weekStart: String, config: FfiExportConfig)throws
         FfiConverterTypeFfiExportConfig.lower(config),$0
     )
 })
-}
-public func finalizeRota(id: Int64)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
-    uniffi_autorota_ffi_fn_func_finalize_rota(
-        FfiConverterInt64.lower(id),$0
-    )
-}
 }
 public func getBaseSnapshots(tableName: String, recordIds: [Int64])throws  -> [FfiBaseSnapshot] {
     return try  FfiConverterSequenceTypeFfiBaseSnapshot.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
@@ -4456,13 +4837,6 @@ public func getShiftTemplateOverride(templateId: Int64, date: String)throws  -> 
     uniffi_autorota_ffi_fn_func_get_shift_template_override(
         FfiConverterInt64.lower(templateId),
         FfiConverterString.lower(date),$0
-    )
-})
-}
-public func getStagingState(rotaId: Int64)throws  -> FfiStagingState {
-    return try  FfiConverterTypeFfiStagingState.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
-    uniffi_autorota_ffi_fn_func_get_staging_state(
-        FfiConverterInt64.lower(rotaId),$0
     )
 })
 }
@@ -4601,6 +4975,18 @@ public func moveAssignment(id: Int64, newShiftId: Int64)throws  {try rustCallWit
     )
 }
 }
+/**
+ * Restore the live state of a rota to the snapshot captured by a commit.
+ * Existing shifts and assignments for the rota are replaced. Assignments
+ * for employees that no longer exist are skipped; the count is returned.
+ */
+public func restoreToCommit(commitId: Int64)throws  -> FfiRestoreResult {
+    return try  FfiConverterTypeFfiRestoreResult.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_restore_to_commit(
+        FfiConverterInt64.lower(commitId),$0
+    )
+})
+}
 public func rotaIsCommitted(rotaId: Int64)throws  -> Bool {
     return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_rota_is_committed(
@@ -4634,48 +5020,10 @@ public func setSyncMetadata(key: String, value: String)throws  {try rustCallWith
     )
 }
 }
-public func stageDay(rotaId: Int64, date: String)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
-    uniffi_autorota_ffi_fn_func_stage_day(
-        FfiConverterInt64.lower(rotaId),
-        FfiConverterString.lower(date),$0
-    )
-}
-}
-public func stageShifts(shiftIds: [Int64])throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
-    uniffi_autorota_ffi_fn_func_stage_shifts(
-        FfiConverterSequenceInt64.lower(shiftIds),$0
-    )
-}
-}
-public func stageWeek(rotaId: Int64)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
-    uniffi_autorota_ffi_fn_func_stage_week(
-        FfiConverterInt64.lower(rotaId),$0
-    )
-}
-}
 public func swapAssignments(idA: Int64, idB: Int64)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_swap_assignments(
         FfiConverterInt64.lower(idA),
         FfiConverterInt64.lower(idB),$0
-    )
-}
-}
-public func unstageDay(rotaId: Int64, date: String)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
-    uniffi_autorota_ffi_fn_func_unstage_day(
-        FfiConverterInt64.lower(rotaId),
-        FfiConverterString.lower(date),$0
-    )
-}
-}
-public func unstageShifts(shiftIds: [Int64])throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
-    uniffi_autorota_ffi_fn_func_unstage_shifts(
-        FfiConverterSequenceInt64.lower(shiftIds),$0
-    )
-}
-}
-public func unstageWeek(rotaId: Int64)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
-    uniffi_autorota_ffi_fn_func_unstage_week(
-        FfiConverterInt64.lower(rotaId),$0
     )
 }
 }
@@ -4749,7 +5097,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_autorota_ffi_checksum_func_clear_tombstones() != 33976) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_autorota_ffi_checksum_func_commit_staged_shifts() != 10931) {
+    if (uniffi_autorota_ffi_checksum_func_commit_shifts() != 30466) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_count_employees() != 39440) {
@@ -4800,13 +5148,22 @@ private var initializationResult: InitializationResult = {
     if (uniffi_autorota_ffi_checksum_func_delete_week() != 24828) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_autorota_ffi_checksum_func_diff_commit_vs_previous() != 55871) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_diff_commits_detailed() != 6199) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_diff_rota() != 12565) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_diff_rota_detailed() != 58353) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_autorota_ffi_checksum_func_export_employee_schedule() != 200) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_export_week_schedule() != 7973) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_autorota_ffi_checksum_func_finalize_rota() != 14644) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_get_base_snapshots() != 29408) {
@@ -4834,9 +5191,6 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_get_shift_template_override() != 29428) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_autorota_ffi_checksum_func_get_staging_state() != 49823) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_get_sync_metadata() != 32899) {
@@ -4893,6 +5247,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_autorota_ffi_checksum_func_move_assignment() != 47939) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_autorota_ffi_checksum_func_restore_to_commit() != 20045) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_autorota_ffi_checksum_func_rota_is_committed() != 55815) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -4905,25 +5262,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_autorota_ffi_checksum_func_set_sync_metadata() != 2617) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_autorota_ffi_checksum_func_stage_day() != 8525) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_autorota_ffi_checksum_func_stage_shifts() != 2715) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_autorota_ffi_checksum_func_stage_week() != 16991) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_autorota_ffi_checksum_func_swap_assignments() != 10327) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_autorota_ffi_checksum_func_unstage_day() != 59214) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_autorota_ffi_checksum_func_unstage_shifts() != 61055) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_autorota_ffi_checksum_func_unstage_week() != 2380) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_update_assignment_status() != 34587) {

@@ -31,8 +31,7 @@ struct AnalyticsViewModelTests {
             endTime: "17:00",
             requiredRole: role,
             durationHours: durationHours,
-            weekStart: weekStart,
-            finalized: false
+            weekStart: weekStart
         )
     }
 

@@ -72,11 +72,6 @@ struct LiveAutorotaService: AutorotaServiceProtocol {
         try await deleteWeekAsync(weekStart: weekStart)
         NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
     }
-    func finalizeRota(id: Int64) async throws {
-        try await finalizeRotaAsync(id: id)
-        NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
-    }
-
     func createAssignment(_ assignment: FfiAssignment) async throws -> Int64 {
         let id = try await createAssignmentAsync(assignment)
         NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
@@ -142,40 +137,30 @@ struct LiveAutorotaService: AutorotaServiceProtocol {
         NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
     }
 
-    // Staging & Commits
-    func stageShifts(shiftIds: [Int64]) async throws {
-        try await stageShiftsAsync(shiftIds: shiftIds)
-        NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
-    }
-    func stageDay(rotaId: Int64, date: String) async throws {
-        try await stageDayAsync(rotaId: rotaId, date: date)
-        NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
-    }
-    func stageWeek(rotaId: Int64) async throws {
-        try await stageWeekAsync(rotaId: rotaId)
-        NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
-    }
-    func unstageShifts(shiftIds: [Int64]) async throws {
-        try await unstageShiftsAsync(shiftIds: shiftIds)
-        NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
-    }
-    func unstageDay(rotaId: Int64, date: String) async throws {
-        try await unstageDayAsync(rotaId: rotaId, date: date)
-        NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
-    }
-    func unstageWeek(rotaId: Int64) async throws {
-        try await unstageWeekAsync(rotaId: rotaId)
-        NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
-    }
-    func getStagingState(rotaId: Int64) async throws -> FfiStagingState { try await getStagingStateAsync(rotaId: rotaId) }
-    func commitStagedShifts(rotaId: Int64) async throws -> Int64 {
-        let id = try await commitStagedShiftsAsync(rotaId: rotaId)
+    // Commits
+    func commitShifts(rotaId: Int64, shiftIds: [Int64]) async throws -> Int64 {
+        let id = try await commitShiftsAsync(rotaId: rotaId, shiftIds: shiftIds)
         NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
         return id
+    }
+    func diffRota(rotaId: Int64) async throws -> [FfiShiftDiff] { try await diffRotaAsync(rotaId: rotaId) }
+    func diffRotaDetailed(rotaId: Int64) async throws -> [FfiCommitChangeDetail] {
+        try await diffRotaDetailedAsync(rotaId: rotaId)
+    }
+    func diffCommitsDetailed(oldCommitId: Int64, newCommitId: Int64) async throws -> [FfiCommitChangeDetail] {
+        try await diffCommitsDetailedAsync(oldCommitId: oldCommitId, newCommitId: newCommitId)
+    }
+    func diffCommitVsPrevious(commitId: Int64) async throws -> [FfiCommitChangeDetail] {
+        try await diffCommitVsPreviousAsync(commitId: commitId)
     }
     func listCommits(rotaId: Int64?) async throws -> [FfiCommit] { try await listCommitsAsync(rotaId: rotaId) }
     func getCommitDetail(commitId: Int64) async throws -> FfiCommitDetail? { try await getCommitDetailAsync(commitId: commitId) }
     func rotaIsCommitted(rotaId: Int64) async throws -> Bool { try await rotaIsCommittedAsync(rotaId: rotaId) }
+    func restoreToCommit(commitId: Int64) async throws -> FfiRestoreResult {
+        let result = try await restoreToCommitAsync(commitId: commitId)
+        NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
+        return result
+    }
 
     func exportWeekSchedule(weekStart: String, config: FfiExportConfig) async throws -> FfiExportResult { try await exportWeekScheduleAsync(weekStart: weekStart, config: config) }
     func exportEmployeeSchedule(config: FfiEmployeeExportConfig) async throws -> FfiExportResult { try await exportEmployeeScheduleAsync(config: config) }

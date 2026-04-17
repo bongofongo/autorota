@@ -59,7 +59,7 @@ struct ShiftTemplateListView: View {
                 // ── Shifts ───────────────────────────────────
                 Section {
                     if vm.templates.isEmpty && !vm.isLoading {
-                        Text("No shift templates yet")
+                        Text("No shifts yet")
                             .foregroundStyle(.tertiary)
                             .font(.subheadline)
                     }
@@ -104,7 +104,7 @@ struct ShiftTemplateListView: View {
                 }
                 .headerProminence(.increased)
             }
-            .navigationTitle("Templates")
+            .navigationTitle("Shifts")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
@@ -238,7 +238,7 @@ struct ShiftTemplateEditSheet: View {
         NavigationStack {
             Form {
                 Section("Name") {
-                    TextField("Template name", text: $name)
+                    TextField("Shift name", text: $name)
                 }
                 Section("Days") {
                     ForEach(Self.allDays, id: \.self) { day in
@@ -271,7 +271,7 @@ struct ShiftTemplateEditSheet: View {
             #if os(macOS)
             .formStyle(.grouped)
             #endif
-            .navigationTitle(isEditing ? "Edit Template" : "New Template")
+            .navigationTitle(isEditing ? "Edit Shift" : "New Shift")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {

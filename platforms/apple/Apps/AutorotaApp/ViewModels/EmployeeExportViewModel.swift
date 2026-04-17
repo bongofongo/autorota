@@ -55,7 +55,7 @@ final class EmployeeExportViewModel {
                 selectedEmployeeId = employees.first?.id
             }
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
         isLoading = false
     }
@@ -117,7 +117,7 @@ final class EmployeeExportViewModel {
             isExporting = false
             return result
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
             isExporting = false
             return nil
         }

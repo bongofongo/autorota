@@ -7,4 +7,6 @@ import SwiftUI
 @Observable
 final class RotaUIBridge {
     var overflowOpen: Bool = false
+    var isSelectingForCommit: Bool = false
+    var isEditMode: Bool = false
 }

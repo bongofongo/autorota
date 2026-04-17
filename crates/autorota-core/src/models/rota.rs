@@ -8,5 +8,4 @@ pub struct Rota {
     /// The Monday of the week this rota covers.
     pub week_start: NaiveDate,
     pub assignments: Vec<Assignment>,
-    pub finalized: bool,
 }

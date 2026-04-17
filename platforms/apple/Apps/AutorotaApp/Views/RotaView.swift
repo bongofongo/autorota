@@ -54,11 +54,17 @@ struct RotaView: View {
 
             if showsFloatingDotsButton {
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
-                        bridge.overflowOpen.toggle()
+                    if vm.isSelectingForCommit {
+                        vm.exitSelectMode()
+                    } else if vm.isEditMode {
+                        vm.exitEditMode()
+                    } else {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
+                            bridge.overflowOpen.toggle()
+                        }
                     }
                 } label: {
-                    Image(systemName: "ellipsis")
+                    Image(systemName: (vm.isSelectingForCommit || vm.isEditMode) ? "checkmark" : "ellipsis")
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(.primary)
                         .frame(width: 24, height: 24)
@@ -82,12 +88,28 @@ struct RotaView: View {
             .onDisappear {
                 bridge.overflowOpen = false
             }
+            .onChange(of: vm.isSelectingForCommit) { _, new in
+                bridge.isSelectingForCommit = new
+            }
+            .onChange(of: bridge.isSelectingForCommit) { _, new in
+                if !new && vm.isSelectingForCommit {
+                    vm.exitSelectMode()
+                }
+            }
+            .onChange(of: vm.isEditMode) { _, new in
+                bridge.isEditMode = new
+            }
+            .onChange(of: bridge.isEditMode) { _, new in
+                if !new && vm.isEditMode {
+                    vm.exitEditMode()
+                }
+            }
             .animation(.spring(response: 0.3, dampingFraction: 0.78), value: bridge.overflowOpen)
             .alert(
                 "No schedule for \(vm.weekDateRangeLabel)",
                 isPresented: $vm.showGenerateConfirmation
             ) {
-                Button("Use existing shift templates") {
+                Button("Use existing shifts") {
                     Task { await vm.createFromTemplate() }
                 }
                 Button("Create empty schedule") {
@@ -133,23 +155,17 @@ struct RotaView: View {
     private var overflowActions: [RotaOverflowAction] {
         var actions: [RotaOverflowAction] = []
 
-        if vm.isStagingMode {
+        if vm.isSelectingForCommit {
             actions.append(RotaOverflowAction(
-                title: "Done staging",
+                title: "Done selecting",
                 systemImage: "checkmark"
             ) {
-                vm.exitStagingMode()
+                vm.exitSelectMode()
             })
         } else if vm.isEditMode {
-            if vm.weekHasPastDays {
-                actions.append(RotaOverflowAction(
-                    title: vm.pastUnlocked ? "Lock past days" : "Unlock past days",
-                    systemImage: vm.pastUnlocked ? "lock.fill" : "lock.open.fill"
-                ) {
-                    vm.pastUnlocked.toggle()
-                })
-            }
-            if vm.weekCategory != .future {
+            // No overflow actions in edit mode — checkmark button exits
+        } else {
+            if vm.schedule != nil {
                 actions.append(RotaOverflowAction(
                     title: "Delete schedule",
                     systemImage: "trash",
@@ -157,21 +173,12 @@ struct RotaView: View {
                 ) {
                     vm.showDeleteScheduleConfirmation = true
                 })
-            }
-            actions.append(RotaOverflowAction(
-                title: "Done editing",
-                systemImage: "checkmark"
-            ) {
-                vm.exitEditMode()
-            })
-        } else {
-            if vm.schedule != nil {
                 if vm.weekHasPastDays {
                     actions.append(RotaOverflowAction(
-                        title: "Stage",
+                        title: "Commit",
                         systemImage: "tray.and.arrow.down"
                     ) {
-                        vm.enterStagingMode()
+                        vm.enterSelectMode()
                     })
                 }
                 actions.append(RotaOverflowAction(
@@ -287,6 +294,7 @@ private struct ScheduleGridView: View {
     @State private var shiftForTimeEdit: FfiShiftInfo?
     @State private var dayForNewShift: SheetDate?
     @State private var shiftToDelete: Int64?
+    @State private var showUnlockPastConfirmation = false
 
     private var activeDays: [String] {
         vm.allWeekdays.filter { day in
@@ -304,23 +312,23 @@ private struct ScheduleGridView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            if vm.isStagingMode {
+            if vm.isSelectingForCommit {
                 HStack(spacing: 12) {
                     Image(systemName: "tray.and.arrow.down")
-                    Text("\(vm.stagedCount) shift\(vm.stagedCount == 1 ? "" : "s") staged")
+                    Text("\(vm.selectedCount) shift\(vm.selectedCount == 1 ? "" : "s") selected")
                         .font(.subheadline)
                     Spacer()
-                    Button("Stage All") {
-                        Task { await vm.stageAllPast() }
+                    Button("Select All") {
+                        Task { await vm.selectAllPastShifts() }
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
                     Button("Commit") {
-                        Task { await vm.commitStaged() }
+                        Task { await vm.commitSelected() }
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
-                    .disabled(!vm.hasStaged)
+                    .disabled(!vm.hasSelected)
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 10)
@@ -363,6 +371,17 @@ private struct ScheduleGridView: View {
         } message: {
             Text("This shift and all its assignments will be permanently deleted.")
         }
+        .alert(
+            "Unlock past days?",
+            isPresented: $showUnlockPastConfirmation
+        ) {
+            Button("Unlock", role: .destructive) {
+                vm.pastUnlocked = true
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Past days are locked to prevent accidental edits. Unlock them to make changes.")
+        }
     }
 
     // MARK: Portrait layout
@@ -400,17 +419,28 @@ private struct ScheduleGridView: View {
                             HStack {
                                 Text(day)
                                     .font(.headline)
-                                if vm.isDayPast(day) && !vm.isStagingMode {
-                                    Image(systemName: vm.pastUnlocked ? "lock.open" : "lock")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                if vm.isDayPast(day) && !vm.isSelectingForCommit {
+                                    if vm.isEditMode && !vm.pastUnlocked {
+                                        Button {
+                                            showUnlockPastConfirmation = true
+                                        } label: {
+                                            Image(systemName: "lock")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        .buttonStyle(.plain)
+                                    } else {
+                                        Image(systemName: vm.pastUnlocked ? "lock.open" : "lock")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
                                 }
                                 Spacer()
-                                if vm.isStagingMode && vm.isDayPast(day) {
+                                if vm.isSelectingForCommit && vm.isDayPast(day) {
                                     Button {
-                                        Task { await vm.stageDay(day) }
+                                        Task { await vm.selectDay(day) }
                                     } label: {
-                                        Text("Stage Day")
+                                        Text("Select Day")
                                             .font(.caption2)
                                     }
                                     .buttonStyle(.bordered)
@@ -459,17 +489,28 @@ private struct ScheduleGridView: View {
             HStack(spacing: 4) {
                 Text(day)
                     .font(.headline)
-                if vm.isDayPast(day) && !vm.isStagingMode {
-                    Image(systemName: vm.pastUnlocked ? "lock.open" : "lock")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                if vm.isDayPast(day) && !vm.isSelectingForCommit {
+                    if vm.isEditMode && !vm.pastUnlocked {
+                        Button {
+                            showUnlockPastConfirmation = true
+                        } label: {
+                            Image(systemName: "lock")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    } else {
+                        Image(systemName: vm.pastUnlocked ? "lock.open" : "lock")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 Spacer()
-                if vm.isStagingMode && vm.isDayPast(day) {
+                if vm.isSelectingForCommit && vm.isDayPast(day) {
                     Button {
-                        Task { await vm.stageDay(day) }
+                        Task { await vm.selectDay(day) }
                     } label: {
-                        Text("Stage")
+                        Text("Select")
                             .font(.caption2)
                     }
                     .buttonStyle(.bordered)
@@ -537,20 +578,20 @@ private struct ShiftCard: View {
     var isCompact: Bool = false
 
     private var canEdit: Bool { isEditMode && !isLocked }
-    private var isStageable: Bool { vm.isStagingMode && vm.isShiftPast(shift) }
-    private var isStaged: Bool { vm.isShiftStaged(shift.id) }
+    private var isSelectable: Bool { vm.isSelectingForCommit && vm.isShiftPast(shift) }
+    private var isSelected: Bool { vm.isShiftSelected(shift.id) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             // Header row
             HStack {
                 // Staging checkbox
-                if isStageable {
+                if isSelectable {
                     Button {
-                        Task { await vm.toggleShiftStaged(shift.id) }
+                        Task { await vm.toggleShiftSelected(shift.id) }
                     } label: {
-                        Image(systemName: isStaged ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(isStaged ? .green : .secondary)
+                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(isSelected ? .green : .secondary)
                     }
                     .buttonStyle(.plain)
                 }

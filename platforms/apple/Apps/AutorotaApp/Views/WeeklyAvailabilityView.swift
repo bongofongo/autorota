@@ -89,25 +89,35 @@ struct WeeklyAvailabilityView: View {
 
     @ViewBuilder
     private var gridLayout: some View {
-        ScrollView {
-            Text(weekLabel)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.secondary)
-                .padding(.top, 8)
-
-            LazyVGrid(columns: columns, alignment: .leading, spacing: 16) {
-                ForEach(vm.employees, id: \.id) { employee in
-                    AvailabilityCard(
-                        employee: employee,
-                        vm: vm,
-                        progressVM: progressVM,
-                        weekStartString: weekStartString
-                    )
-                    .frame(maxHeight: .infinity, alignment: .top)
-                }
+        if progressVM.allDone(employees: vm.employees) {
+            VStack {
+                Text(weekLabel)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 8)
+                AllAvailabilitiesSetView()
             }
-            .padding(.horizontal, 12)
-            .padding(.bottom, 20)
+        } else {
+            ScrollView {
+                Text(weekLabel)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 8)
+
+                LazyVGrid(columns: columns, alignment: .leading, spacing: 16) {
+                    ForEach(vm.employees, id: \.id) { employee in
+                        AvailabilityCard(
+                            employee: employee,
+                            vm: vm,
+                            progressVM: progressVM,
+                            weekStartString: weekStartString
+                        )
+                        .frame(maxHeight: .infinity, alignment: .top)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 20)
+            }
         }
     }
 }

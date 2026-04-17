@@ -39,8 +39,7 @@ CREATE TABLE IF NOT EXISTS shift_templates (
 
 CREATE TABLE IF NOT EXISTS rotas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    week_start TEXT NOT NULL,
-    finalized INTEGER NOT NULL DEFAULT 0
+    week_start TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS shifts (
@@ -393,12 +392,8 @@ async fn full_scheduling_flow() {
         .await
         .unwrap();
 
-    // Finalize the rota
-    queries::finalize_rota(&pool, rota_id).await.unwrap();
-
     // Fetch the rota and verify everything is there
     let rota = queries::get_rota(&pool, rota_id).await.unwrap().unwrap();
-    assert!(rota.finalized);
     assert_eq!(rota.week_start, week_start);
     assert_eq!(rota.assignments.len(), 1);
     assert_eq!(rota.assignments[0].status, AssignmentStatus::Confirmed);
@@ -931,7 +926,6 @@ async fn list_employee_shift_history_returns_joined_records() {
     assert_eq!(rec.date, helpers::date(23));
     assert_eq!(rec.required_role, "barista");
     assert_eq!(rec.week_start, week);
-    assert!(!rec.finalized);
     assert!((rec.duration_hours() - 8.0).abs() < 0.01);
 
     // Employee with no assignments returns empty

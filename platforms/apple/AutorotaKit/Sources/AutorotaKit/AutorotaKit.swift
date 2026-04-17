@@ -145,12 +145,6 @@ public func deleteWeekAsync(weekStart: String) async throws {
     }.value
 }
 
-public func finalizeRotaAsync(id: Int64) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try finalizeRota(id: id)
-    }.value
-}
-
 public func updateAssignmentStatusAsync(id: Int64, status: String) async throws {
     try await Task.detached(priority: .userInitiated) {
         try updateAssignmentStatus(id: id, status: status)
@@ -307,53 +301,17 @@ public func listAllShiftHistoryAsync(startDate: String?, endDate: String?) async
     }.value
 }
 
-// MARK: - Staging & Commits
+// MARK: - Commits
 
-public func stageShiftsAsync(shiftIds: [Int64]) async throws {
+public func commitShiftsAsync(rotaId: Int64, shiftIds: [Int64]) async throws -> Int64 {
     try await Task.detached(priority: .userInitiated) {
-        try stageShifts(shiftIds: shiftIds)
+        try commitShifts(rotaId: rotaId, shiftIds: shiftIds)
     }.value
 }
 
-public func stageDayAsync(rotaId: Int64, date: String) async throws {
+public func diffRotaAsync(rotaId: Int64) async throws -> [FfiShiftDiff] {
     try await Task.detached(priority: .userInitiated) {
-        try stageDay(rotaId: rotaId, date: date)
-    }.value
-}
-
-public func stageWeekAsync(rotaId: Int64) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try stageWeek(rotaId: rotaId)
-    }.value
-}
-
-public func unstageShiftsAsync(shiftIds: [Int64]) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try unstageShifts(shiftIds: shiftIds)
-    }.value
-}
-
-public func unstageDayAsync(rotaId: Int64, date: String) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try unstageDay(rotaId: rotaId, date: date)
-    }.value
-}
-
-public func unstageWeekAsync(rotaId: Int64) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try unstageWeek(rotaId: rotaId)
-    }.value
-}
-
-public func getStagingStateAsync(rotaId: Int64) async throws -> FfiStagingState {
-    try await Task.detached(priority: .userInitiated) {
-        try getStagingState(rotaId: rotaId)
-    }.value
-}
-
-public func commitStagedShiftsAsync(rotaId: Int64) async throws -> Int64 {
-    try await Task.detached(priority: .userInitiated) {
-        try commitStagedShifts(rotaId: rotaId)
+        try diffRota(rotaId: rotaId)
     }.value
 }
 
@@ -372,6 +330,30 @@ public func getCommitDetailAsync(commitId: Int64) async throws -> FfiCommitDetai
 public func rotaIsCommittedAsync(rotaId: Int64) async throws -> Bool {
     try await Task.detached(priority: .userInitiated) {
         try rotaIsCommitted(rotaId: rotaId)
+    }.value
+}
+
+public func restoreToCommitAsync(commitId: Int64) async throws -> FfiRestoreResult {
+    try await Task.detached(priority: .userInitiated) {
+        try restoreToCommit(commitId: commitId)
+    }.value
+}
+
+public func diffRotaDetailedAsync(rotaId: Int64) async throws -> [FfiCommitChangeDetail] {
+    try await Task.detached(priority: .userInitiated) {
+        try diffRotaDetailed(rotaId: rotaId)
+    }.value
+}
+
+public func diffCommitsDetailedAsync(oldCommitId: Int64, newCommitId: Int64) async throws -> [FfiCommitChangeDetail] {
+    try await Task.detached(priority: .userInitiated) {
+        try diffCommitsDetailed(oldCommitId: oldCommitId, newCommitId: newCommitId)
+    }.value
+}
+
+public func diffCommitVsPreviousAsync(commitId: Int64) async throws -> [FfiCommitChangeDetail] {
+    try await Task.detached(priority: .userInitiated) {
+        try diffCommitVsPrevious(commitId: commitId)
     }.value
 }
 

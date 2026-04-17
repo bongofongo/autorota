@@ -306,7 +306,7 @@ struct EmployeeDetailView: View {
                 }
             }
 
-            Section("Date Overrides") {
+            Section("Exceptions") {
                 if overrideVM.isLoading {
                     ProgressView()
                 } else {
@@ -338,7 +338,7 @@ struct EmployeeDetailView: View {
                             }
                         }
                     }
-                    Button("Add Date Override") { showingAddOverride = true }
+                    Button("Add Exception") { showingAddOverride = true }
                         .foregroundStyle(.tint)
                 }
             }
@@ -408,7 +408,7 @@ struct EmployeeEditSheet: View {
     @State private var defaultExpanded = false
     @State private var nextWeekExpanded = true
 
-    // Visible hour range — shared by both grids, set via the Default Availability picker
+    // Visible hour range — shared by both grids, set via the Regular Hours picker
     @State private var defaultVisibleStart = 6
     @State private var defaultVisibleEnd = 22
 
@@ -428,7 +428,7 @@ struct EmployeeEditSheet: View {
                 }
                 Section("Roles") {
                     if roleVM.roles.isEmpty {
-                        Text("No roles defined. Add roles in the Templates tab.")
+                        Text("No roles defined. Add roles in the Shifts tab.")
                             .foregroundStyle(.secondary)
                     }
                     ForEach(roleVM.roles, id: \.id) { role in
@@ -513,7 +513,7 @@ struct EmployeeEditSheet: View {
                         withAnimation { defaultExpanded.toggle() }
                     } label: {
                         HStack {
-                            Text("Default").foregroundStyle(.primary)
+                            Text("Regular Hours").foregroundStyle(.primary)
                             Spacer()
                             Image(systemName: defaultExpanded ? "chevron.down" : "chevron.right")
                                 .font(.caption)

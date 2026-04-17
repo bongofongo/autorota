@@ -16,8 +16,8 @@ enum TabPage: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .rota: "Rota"
         case .employees: "Employees"
-        case .templates: "Templates"
-        case .overrides: "Overrides"
+        case .templates: "Shifts"
+        case .overrides: "Exceptions"
         case .history: "History"
         case .analytics: "Analytics"
         case .export: "Export"

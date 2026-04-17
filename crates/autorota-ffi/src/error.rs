@@ -10,13 +10,19 @@ pub enum FfiError {
 
     #[error("invalid argument: {msg}")]
     InvalidArgument { msg: String },
-
-    #[error("already finalized")]
-    AlreadyFinalized,
 }
 
 impl From<sqlx::Error> for FfiError {
     fn from(e: sqlx::Error) -> Self {
-        FfiError::Db { msg: e.to_string() }
+        let msg = match &e {
+            sqlx::Error::RowNotFound => {
+                "A referenced record no longer exists. It may have been deleted.".to_string()
+            }
+            sqlx::Error::Database(db_err) => {
+                format!("Database error: {}", db_err.message())
+            }
+            _ => e.to_string(),
+        };
+        FfiError::Db { msg }
     }
 }

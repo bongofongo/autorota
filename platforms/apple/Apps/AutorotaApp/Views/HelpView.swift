@@ -8,7 +8,7 @@ struct HelpView: View {
                     .font(.title3)
                 VStack(alignment: .leading, spacing: 8) {
                     helpStep(number: 1, text: "Add your employees and their roles")
-                    helpStep(number: 2, text: "Create shift templates for each day")
+                    helpStep(number: 2, text: "Create shifts for each day")
                     helpStep(number: 3, text: "Generate a rota for any week")
                 }
                 .font(.title3)
@@ -31,13 +31,13 @@ struct HelpView: View {
             )
 
             helpSection(
-                title: "Shift Templates",
+                title: "Shifts",
                 icon: "clock",
                 items: [
-                    "Templates define the shifts you use each week.",
+                    "Shifts define the slots you schedule each week.",
                     "Set a name, start time, end time, and day of the week.",
                     "Choose which roles are needed and how many staff.",
-                    "Templates are reused every time you generate a rota.",
+                    "Shifts are reused every time you generate a rota.",
                 ]
             )
 
@@ -54,13 +54,13 @@ struct HelpView: View {
             )
 
             helpSection(
-                title: "Overrides",
+                title: "Exceptions",
                 icon: "exclamationmark.circle",
                 items: [
-                    "Use overrides for one-off changes to a specific date.",
+                    "Use exceptions for one-off changes to a specific date.",
                     "Pin an employee to a shift or exclude them from one.",
-                    "Override an employee's availability for a single day.",
-                    "Overrides take priority over the generated schedule.",
+                    "Change an employee's availability for a single day.",
+                    "Exceptions take priority over the generated schedule.",
                 ]
             )
 

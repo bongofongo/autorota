@@ -400,14 +400,13 @@ impl Default for RotaBuilder {
 impl RotaBuilder {
     /// Create a rota builder.
     ///
-    /// Defaults: Monday 2026-03-23, empty assignments, not finalized.
+    /// Defaults: Monday 2026-03-23, empty assignments.
     pub fn new() -> Self {
         Self {
             inner: Rota {
                 id: next_id(&NEXT_ROTA_ID),
                 week_start: NaiveDate::from_ymd_opt(2026, 3, 23).unwrap(),
                 assignments: vec![],
-                finalized: false,
             },
         }
     }
@@ -419,11 +418,6 @@ impl RotaBuilder {
 
     pub fn week(mut self, date: NaiveDate) -> Self {
         self.inner.week_start = date;
-        self
-    }
-
-    pub fn finalized(mut self) -> Self {
-        self.inner.finalized = true;
         self
     }
 
@@ -562,7 +556,6 @@ impl EmployeeShiftRecordBuilder {
                 end_time: NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
                 required_role: "barista".to_string(),
                 week_start: NaiveDate::from_ymd_opt(2026, 3, 23).unwrap(),
-                finalized: false,
             },
         }
     }
@@ -595,11 +588,6 @@ impl EmployeeShiftRecordBuilder {
 
     pub fn confirmed(mut self) -> Self {
         self.inner.status = AssignmentStatus::Confirmed;
-        self
-    }
-
-    pub fn finalized(mut self) -> Self {
-        self.inner.finalized = true;
         self
     }
 

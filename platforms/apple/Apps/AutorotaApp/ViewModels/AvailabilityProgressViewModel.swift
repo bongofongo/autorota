@@ -22,7 +22,7 @@ final class AvailabilityProgressViewModel {
             let rows = try await service.listAvailabilityProgress(weekStart: weekStart)
             doneSet = Set(rows.filter(\.done).map(\.employeeId))
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
         isLoading = false
     }
@@ -32,7 +32,7 @@ final class AvailabilityProgressViewModel {
         do {
             try await service.setAvailabilityProgress(employeeId: employeeId, weekStart: weekStart, done: true)
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
     }
 
@@ -41,12 +41,16 @@ final class AvailabilityProgressViewModel {
         do {
             try await service.setAvailabilityProgress(employeeId: employeeId, weekStart: weekStart, done: false)
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
     }
 
     func isDone(_ employeeId: Int64) -> Bool {
         doneSet.contains(employeeId)
+    }
+
+    func allDone(employees: [FfiEmployee]) -> Bool {
+        !employees.isEmpty && employees.allSatisfy { isDone($0.id) }
     }
 
     /// Returns the index of the next not-done employee after `currentIndex`, wrapping around.

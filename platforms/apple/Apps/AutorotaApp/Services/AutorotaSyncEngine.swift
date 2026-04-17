@@ -31,7 +31,7 @@ final class AutorotaSyncEngine: @unchecked Sendable {
             logger.info("CKSyncEngine started")
         } catch {
             logger.error("Failed to start CKSyncEngine: \(error)")
-            status = .error(error.localizedDescription)
+            status = .error(userFacingMessage(error))
         }
     }
 

@@ -265,22 +265,6 @@ async fn schedule_rota_not_found() {
     }
 }
 
-#[tokio::test]
-async fn schedule_finalized_rota_rejected() {
-    let pool = test_pool().await;
-
-    let rota_id = queries::insert_rota(&pool, week_start()).await.unwrap();
-    queries::finalize_rota(&pool, rota_id).await.unwrap();
-
-    let result = schedule(&pool, rota_id).await;
-
-    assert!(result.is_err());
-    match result.unwrap_err() {
-        SchedulerError::AlreadyFinalized(id) => assert_eq!(id, rota_id),
-        other => panic!("expected AlreadyFinalized, got: {other}"),
-    }
-}
-
 // ─── Edge-case tests ───────────────────────────────────────────────────────
 
 #[tokio::test]

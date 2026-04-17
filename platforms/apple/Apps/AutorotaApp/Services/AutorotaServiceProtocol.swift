@@ -28,7 +28,6 @@ protocol AutorotaServiceProtocol: Sendable {
     func materialiseWeek(weekStart: String) async throws -> Int64
     func createEmptyWeek(weekStart: String) async throws -> Int64
     func deleteWeek(weekStart: String) async throws
-    func finalizeRota(id: Int64) async throws
 
     // Assignments
     func createAssignment(_ assignment: FfiAssignment) async throws -> Int64
@@ -59,18 +58,16 @@ protocol AutorotaServiceProtocol: Sendable {
     func listAllShiftTemplateOverrides() async throws -> [FfiShiftTemplateOverride]
     func deleteShiftTemplateOverride(id: Int64) async throws
 
-    // Staging & Commits
-    func stageShifts(shiftIds: [Int64]) async throws
-    func stageDay(rotaId: Int64, date: String) async throws
-    func stageWeek(rotaId: Int64) async throws
-    func unstageShifts(shiftIds: [Int64]) async throws
-    func unstageDay(rotaId: Int64, date: String) async throws
-    func unstageWeek(rotaId: Int64) async throws
-    func getStagingState(rotaId: Int64) async throws -> FfiStagingState
-    func commitStagedShifts(rotaId: Int64) async throws -> Int64
+    // Commits
+    func commitShifts(rotaId: Int64, shiftIds: [Int64]) async throws -> Int64
+    func diffRota(rotaId: Int64) async throws -> [FfiShiftDiff]
+    func diffRotaDetailed(rotaId: Int64) async throws -> [FfiCommitChangeDetail]
+    func diffCommitsDetailed(oldCommitId: Int64, newCommitId: Int64) async throws -> [FfiCommitChangeDetail]
+    func diffCommitVsPrevious(commitId: Int64) async throws -> [FfiCommitChangeDetail]
     func listCommits(rotaId: Int64?) async throws -> [FfiCommit]
     func getCommitDetail(commitId: Int64) async throws -> FfiCommitDetail?
     func rotaIsCommitted(rotaId: Int64) async throws -> Bool
+    func restoreToCommit(commitId: Int64) async throws -> FfiRestoreResult
 
     // Export
     func exportWeekSchedule(weekStart: String, config: FfiExportConfig) async throws -> FfiExportResult

@@ -20,7 +20,7 @@ final class RoleViewModel {
         do {
             roles = try await service.listRoles()
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
         isLoading = false
     }
@@ -30,7 +30,7 @@ final class RoleViewModel {
             _ = try await service.createRole(name: name)
             await load()
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
     }
 
@@ -39,7 +39,7 @@ final class RoleViewModel {
             try await service.updateRole(id: id, name: name)
             await load()
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
     }
 
@@ -48,7 +48,7 @@ final class RoleViewModel {
             try await service.deleteRole(id: id)
             await load()
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
     }
 }

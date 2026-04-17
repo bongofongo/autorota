@@ -243,7 +243,6 @@ fn rota_to_ffi(r: Rota) -> FfiRota {
         id: r.id,
         week_start: r.week_start.to_string(),
         assignments: r.assignments.into_iter().map(assignment_to_ffi).collect(),
-        finalized: r.finalized,
     }
 }
 
@@ -408,13 +407,6 @@ pub fn create_rota(week_start: String) -> Result<i64, FfiError> {
     let pool = pool()?;
     let date = parse_date(&week_start)?;
     rt().block_on(queries::insert_rota(pool, date))
-        .map_err(FfiError::from)
-}
-
-#[uniffi::export]
-pub fn finalize_rota(id: i64) -> Result<(), FfiError> {
-    let pool = pool()?;
-    rt().block_on(queries::finalize_rota(pool, id))
         .map_err(FfiError::from)
 }
 
@@ -642,11 +634,6 @@ pub fn run_schedule(week_start: String) -> Result<FfiScheduleResult, FfiError> {
     let rota_id: Result<i64, sqlx::Error> = rt().block_on(async move {
         match queries::get_rota_by_week(pool, date).await? {
             Some(existing) => {
-                if existing.finalized {
-                    return Err(sqlx::Error::Protocol(
-                        "this week's rota is already finalized".into(),
-                    ));
-                }
                 queries::delete_proposed_assignments(pool, existing.id).await?;
                 queries::delete_shifts_for_rota(pool, existing.id).await?;
                 queries::materialise_shifts(pool, existing.id, date).await?;
@@ -664,14 +651,7 @@ pub fn run_schedule(week_start: String) -> Result<FfiScheduleResult, FfiError> {
     // Step 2: run scheduler
     let result = rt()
         .block_on(autorota_core::scheduler::schedule(pool, rota_id))
-        .map_err(|e| match e {
-            autorota_core::scheduler::SchedulerError::AlreadyFinalized(_) => {
-                FfiError::AlreadyFinalized
-            }
-            other => FfiError::Db {
-                msg: other.to_string(),
-            },
-        })?;
+        .map_err(|e| FfiError::Db { msg: e.to_string() })?;
 
     Ok(FfiScheduleResult {
         assignments: result
@@ -755,14 +735,11 @@ pub fn get_week_schedule(week_start: String) -> Result<Option<FfiWeekSchedule>, 
             .collect();
 
         let committed = queries::rota_has_commits(pool, rota.id).await?;
-        let staged_shift_ids = queries::list_staged_shift_ids(pool, rota.id).await?;
 
         Ok(Some(FfiWeekSchedule {
             rota_id: rota.id,
             week_start: rota.week_start.to_string(),
-            finalized: rota.finalized,
             committed,
-            staged_shift_ids,
             entries,
             shifts: shift_infos,
         }))
@@ -1335,7 +1312,6 @@ mod tests {
         // ── Get Week Schedule (empty) ──
         let schedule = get_week_schedule(week_start.into()).unwrap().unwrap();
         assert_eq!(schedule.rota_id, rota_id);
-        assert!(!schedule.finalized);
         assert_eq!(schedule.shifts.len(), 1);
         assert!(schedule.entries.is_empty());
 
@@ -1374,11 +1350,6 @@ mod tests {
         assert_eq!(schedule.entries.len(), 1);
         assert_eq!(schedule.entries[0].employee_name, "Ally");
         assert_eq!(schedule.entries[0].status, "Confirmed");
-
-        // ── Finalize ──
-        finalize_rota(rota_id).unwrap();
-        let final_schedule = get_week_schedule(week_start.into()).unwrap().unwrap();
-        assert!(final_schedule.finalized);
 
         // ── Soft delete employee ──
         delete_employee(emp_id).unwrap();
@@ -1601,7 +1572,6 @@ fn shift_record_to_ffi(r: EmployeeShiftRecord) -> FfiEmployeeShiftRecord {
         required_role: r.required_role,
         duration_hours: duration,
         week_start: r.week_start.to_string(),
-        finalized: r.finalized,
     }
 }
 
@@ -1628,76 +1598,30 @@ pub fn list_all_shift_history(
         .map_err(Into::into)
 }
 
-// ── Staging & Commits ───────────────────────────────────────────────────────
+// ── Commits ─────────────────────────────────────────────────────────────────
 
 #[uniffi::export]
-pub fn stage_shifts(shift_ids: Vec<i64>) -> Result<(), FfiError> {
+pub fn commit_shifts(rota_id: i64, shift_ids: Vec<i64>) -> Result<i64, FfiError> {
     let pool = pool()?;
-    let today = Local::now().date_naive();
-    rt().block_on(queries::stage_shifts(pool, &shift_ids, today))
+    rt().block_on(queries::create_commit(pool, rota_id, &shift_ids))
         .map_err(Into::into)
 }
 
 #[uniffi::export]
-pub fn stage_day(rota_id: i64, date: String) -> Result<(), FfiError> {
+pub fn diff_rota(rota_id: i64) -> Result<Vec<FfiShiftDiff>, FfiError> {
     let pool = pool()?;
-    let d = parse_date(&date)?;
-    let today = Local::now().date_naive();
-    rt().block_on(queries::stage_day(pool, rota_id, d, today))
-        .map_err(Into::into)
-}
-
-#[uniffi::export]
-pub fn stage_week(rota_id: i64) -> Result<(), FfiError> {
-    let pool = pool()?;
-    let today = Local::now().date_naive();
-    rt().block_on(queries::stage_week(pool, rota_id, today))
-        .map_err(Into::into)
-}
-
-#[uniffi::export]
-pub fn unstage_shifts(shift_ids: Vec<i64>) -> Result<(), FfiError> {
-    let pool = pool()?;
-    rt().block_on(queries::unstage_shifts(pool, &shift_ids))
-        .map_err(Into::into)
-}
-
-#[uniffi::export]
-pub fn unstage_day(rota_id: i64, date: String) -> Result<(), FfiError> {
-    let pool = pool()?;
-    let d = parse_date(&date)?;
-    rt().block_on(queries::unstage_day(pool, rota_id, d))
-        .map_err(Into::into)
-}
-
-#[uniffi::export]
-pub fn unstage_week(rota_id: i64) -> Result<(), FfiError> {
-    let pool = pool()?;
-    rt().block_on(queries::unstage_week(pool, rota_id))
-        .map_err(Into::into)
-}
-
-#[uniffi::export]
-pub fn get_staging_state(rota_id: i64) -> Result<FfiStagingState, FfiError> {
-    let pool = pool()?;
-    let today = Local::now().date_naive();
-    let result: Result<FfiStagingState, sqlx::Error> = rt().block_on(async move {
-        let staged = queries::list_staged_shift_ids(pool, rota_id).await?;
-        let past = queries::list_past_shift_ids(pool, rota_id, today).await?;
-        Ok(FfiStagingState {
-            rota_id,
-            staged_shift_ids: staged,
-            total_stageable_past_shift_ids: past,
-        })
+    let result: Result<Vec<FfiShiftDiff>, sqlx::Error> = rt().block_on(async move {
+        let diffs = queries::diff_rota_vs_latest_commit(pool, rota_id).await?;
+        Ok(diffs
+            .into_iter()
+            .map(|d| FfiShiftDiff {
+                shift_id: d.shift_id,
+                is_new: d.is_new,
+                is_changed: d.is_changed,
+            })
+            .collect())
     });
     result.map_err(Into::into)
-}
-
-#[uniffi::export]
-pub fn commit_staged_shifts(rota_id: i64) -> Result<i64, FfiError> {
-    let pool = pool()?;
-    rt().block_on(queries::create_commit(pool, rota_id))
-        .map_err(Into::into)
 }
 
 #[uniffi::export]
@@ -1707,11 +1631,15 @@ pub fn list_commits(rota_id: Option<i64>) -> Result<Vec<FfiCommit>, FfiError> {
         let commits = queries::list_commits(pool, rota_id).await?;
         let mut ffi_commits = Vec::new();
         for c in commits {
-            let week_start: String =
+            let week_start: Option<String> =
                 sqlx::query_scalar("SELECT week_start FROM rotas WHERE id = ?")
                     .bind(c.rota_id)
-                    .fetch_one(pool)
+                    .fetch_optional(pool)
                     .await?;
+            // Skip commits whose rota has been deleted (orphaned records).
+            let Some(week_start) = week_start else {
+                continue;
+            };
             ffi_commits.push(FfiCommit {
                 id: c.id,
                 rota_id: c.rota_id,
@@ -1733,10 +1661,15 @@ pub fn get_commit_detail(commit_id: i64) -> Result<Option<FfiCommitDetail>, FfiE
             Some(c) => c,
             None => return Ok(None),
         };
-        let week_start: String = sqlx::query_scalar("SELECT week_start FROM rotas WHERE id = ?")
-            .bind(commit.rota_id)
-            .fetch_one(pool)
-            .await?;
+        let week_start: Option<String> =
+            sqlx::query_scalar("SELECT week_start FROM rotas WHERE id = ?")
+                .bind(commit.rota_id)
+                .fetch_optional(pool)
+                .await?;
+        // Return None if the rota has been deleted (orphaned commit).
+        let Some(week_start) = week_start else {
+            return Ok(None);
+        };
         Ok(Some(FfiCommitDetail {
             id: commit.id,
             rota_id: commit.rota_id,
@@ -1754,6 +1687,178 @@ pub fn rota_is_committed(rota_id: i64) -> Result<bool, FfiError> {
     let pool = pool()?;
     rt().block_on(queries::rota_has_commits(pool, rota_id))
         .map_err(Into::into)
+}
+
+/// Restore the live state of a rota to the snapshot captured by a commit.
+/// Existing shifts and assignments for the rota are replaced. Assignments
+/// for employees that no longer exist are skipped; the count is returned.
+#[uniffi::export]
+pub fn restore_to_commit(commit_id: i64) -> Result<FfiRestoreResult, FfiError> {
+    let pool = pool()?;
+    let result = rt().block_on(queries::restore_from_commit(pool, commit_id))?;
+    Ok(FfiRestoreResult {
+        rota_id: result.rota_id,
+        shifts_restored: result.shifts_restored as u32,
+        assignments_restored: result.assignments_restored as u32,
+        assignments_skipped: result.assignments_skipped as u32,
+    })
+}
+
+/// Detailed diff between the live state of a rota and its latest commit.
+/// Returns an empty vec if nothing has changed since the last commit.
+/// If the rota has no commits yet, every live shift appears as `shift_added`.
+#[uniffi::export]
+pub fn diff_rota_detailed(rota_id: i64) -> Result<Vec<FfiCommitChangeDetail>, FfiError> {
+    let pool = pool()?;
+    let details = rt().block_on(queries::diff_rota_vs_latest_commit_detailed(pool, rota_id))?;
+    Ok(details.into_iter().map(change_detail_to_ffi).collect())
+}
+
+/// Detailed diff between two persisted commits.
+#[uniffi::export]
+pub fn diff_commits_detailed(
+    old_commit_id: i64,
+    new_commit_id: i64,
+) -> Result<Vec<FfiCommitChangeDetail>, FfiError> {
+    let pool = pool()?;
+    let details =
+        rt().block_on(queries::diff_commits(pool, old_commit_id, new_commit_id))?;
+    Ok(details.into_iter().map(change_detail_to_ffi).collect())
+}
+
+/// Detailed diff between a commit and the commit that immediately preceded
+/// it for the same rota. If this is the first commit, every shift is new.
+#[uniffi::export]
+pub fn diff_commit_vs_previous(commit_id: i64) -> Result<Vec<FfiCommitChangeDetail>, FfiError> {
+    let pool = pool()?;
+    let details = rt().block_on(queries::diff_commit_vs_previous(pool, commit_id))?;
+    Ok(details.into_iter().map(change_detail_to_ffi).collect())
+}
+
+fn change_detail_to_ffi(
+    d: autorota_core::models::commit::CommitChangeDetail,
+) -> FfiCommitChangeDetail {
+    use autorota_core::models::commit::CommitChangeKind as K;
+    let mut out = FfiCommitChangeDetail {
+        kind: String::new(),
+        shift_id: d.shift_id,
+        date: d.date,
+        old_start_time: None,
+        new_start_time: None,
+        old_end_time: None,
+        new_end_time: None,
+        old_required_role: None,
+        new_required_role: None,
+        old_min_employees: None,
+        new_min_employees: None,
+        old_max_employees: None,
+        new_max_employees: None,
+        employee_id: None,
+        employee_name: None,
+        old_status: None,
+        new_status: None,
+        from_shift_id: None,
+        from_start_time: None,
+        from_end_time: None,
+    };
+    match d.kind {
+        K::ShiftAdded {
+            start_time,
+            end_time,
+            required_role,
+            min_employees,
+            max_employees,
+        } => {
+            out.kind = "shift_added".into();
+            out.new_start_time = Some(start_time);
+            out.new_end_time = Some(end_time);
+            out.new_required_role = Some(required_role);
+            out.new_min_employees = Some(min_employees);
+            out.new_max_employees = Some(max_employees);
+        }
+        K::ShiftRemoved {
+            start_time,
+            end_time,
+            required_role,
+        } => {
+            out.kind = "shift_removed".into();
+            out.old_start_time = Some(start_time);
+            out.old_end_time = Some(end_time);
+            out.old_required_role = Some(required_role);
+        }
+        K::ShiftTimeChanged {
+            old_start,
+            new_start,
+            old_end,
+            new_end,
+        } => {
+            out.kind = "shift_time_changed".into();
+            out.old_start_time = Some(old_start);
+            out.new_start_time = Some(new_start);
+            out.old_end_time = Some(old_end);
+            out.new_end_time = Some(new_end);
+        }
+        K::ShiftCapacityChanged {
+            old_min,
+            new_min,
+            old_max,
+            new_max,
+        } => {
+            out.kind = "shift_capacity_changed".into();
+            out.old_min_employees = Some(old_min);
+            out.new_min_employees = Some(new_min);
+            out.old_max_employees = Some(old_max);
+            out.new_max_employees = Some(new_max);
+        }
+        K::ShiftRoleChanged { old_role, new_role } => {
+            out.kind = "shift_role_changed".into();
+            out.old_required_role = Some(old_role);
+            out.new_required_role = Some(new_role);
+        }
+        K::AssignmentAdded {
+            employee_id,
+            employee_name,
+        } => {
+            out.kind = "assignment_added".into();
+            out.employee_id = Some(employee_id);
+            out.employee_name = Some(employee_name);
+        }
+        K::AssignmentRemoved {
+            employee_id,
+            employee_name,
+        } => {
+            out.kind = "assignment_removed".into();
+            out.employee_id = Some(employee_id);
+            out.employee_name = Some(employee_name);
+        }
+        K::AssignmentStatusChanged {
+            employee_id,
+            employee_name,
+            old_status,
+            new_status,
+        } => {
+            out.kind = "assignment_status_changed".into();
+            out.employee_id = Some(employee_id);
+            out.employee_name = Some(employee_name);
+            out.old_status = Some(old_status);
+            out.new_status = Some(new_status);
+        }
+        K::EmployeeMoved {
+            employee_id,
+            employee_name,
+            from_shift_id,
+            from_start_time,
+            from_end_time,
+        } => {
+            out.kind = "employee_moved".into();
+            out.employee_id = Some(employee_id);
+            out.employee_name = Some(employee_name);
+            out.from_shift_id = Some(from_shift_id);
+            out.from_start_time = Some(from_start_time);
+            out.from_end_time = Some(from_end_time);
+        }
+    }
+    out
 }
 
 // ── Availability Progress ────────────────────────────────────────────────────

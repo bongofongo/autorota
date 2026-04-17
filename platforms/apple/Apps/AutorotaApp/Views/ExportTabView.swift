@@ -233,7 +233,7 @@ struct ExportTabView: View {
             }
             #endif
         } catch {
-            vm.error = error.localizedDescription
+            vm.error = userFacingMessage(error)
         }
     }
 

@@ -36,8 +36,6 @@ pub enum SchedulerError {
     Db(#[from] sqlx::Error),
     #[error("rota not found: {0}")]
     RotaNotFound(i64),
-    #[error("rota {0} is already finalized")]
-    AlreadyFinalized(i64),
 }
 
 /// Mutable state accumulated during a scheduling run.
@@ -348,10 +346,6 @@ pub async fn schedule(
     let rota = queries::get_rota(pool, rota_id)
         .await?
         .ok_or(SchedulerError::RotaNotFound(rota_id))?;
-
-    if rota.finalized {
-        return Err(SchedulerError::AlreadyFinalized(rota_id));
-    }
 
     let shifts = queries::list_shifts_for_rota(pool, rota_id).await?;
     let employees = queries::list_employees(pool).await?;

@@ -27,8 +27,8 @@ struct RotaViewModelTests {
 
     private func makeSchedule(shifts: [FfiShiftInfo] = [], entries: [FfiScheduleEntry] = []) -> FfiWeekSchedule {
         FfiWeekSchedule(
-            rotaId: 1, weekStart: "2026-03-23", finalized: false,
-            committed: false, stagedShiftIds: [],
+            rotaId: 1, weekStart: "2026-03-23",
+            committed: false,
             entries: entries, shifts: shifts
         )
     }

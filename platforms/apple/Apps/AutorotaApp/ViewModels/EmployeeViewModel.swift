@@ -21,7 +21,7 @@ final class EmployeeViewModel {
         do {
             employees = try await service.listEmployees()
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
         isLoading = false
     }
@@ -31,7 +31,7 @@ final class EmployeeViewModel {
             _ = try await service.createEmployee(employee)
             await load()
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
     }
 
@@ -40,7 +40,7 @@ final class EmployeeViewModel {
             try await service.updateEmployee(employee)
             await load()
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
     }
 
@@ -49,7 +49,7 @@ final class EmployeeViewModel {
             try await service.deleteEmployee(id: id)
             await load()
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
     }
 }

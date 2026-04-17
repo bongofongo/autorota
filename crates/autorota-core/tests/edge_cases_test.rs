@@ -514,59 +514,6 @@ async fn seed_rota_with_past_shifts(pool: &sqlx::SqlitePool) -> (i64, Vec<i64>) 
     (rota_id, ids)
 }
 
-#[tokio::test]
-async fn stage_and_unstage_shifts_roundtrip() {
-    let pool = test_pool().await;
-    let (rota_id, ids) = seed_rota_with_past_shifts(&pool).await;
-    let today = date(30); // all shifts are in the past
-
-    queries::stage_shifts(&pool, &ids, today).await.unwrap();
-    let staged = queries::list_staged_shift_ids(&pool, rota_id)
-        .await
-        .unwrap();
-    assert_eq!(staged.len(), 3);
-
-    queries::unstage_shifts(&pool, &ids[..1]).await.unwrap();
-    let staged = queries::list_staged_shift_ids(&pool, rota_id)
-        .await
-        .unwrap();
-    assert_eq!(staged.len(), 2);
-}
-
-#[tokio::test]
-async fn stage_day_marks_only_that_day() {
-    let pool = test_pool().await;
-    let (rota_id, _ids) = seed_rota_with_past_shifts(&pool).await;
-    let today = date(30);
-
-    queries::stage_day(&pool, rota_id, date(24), today)
-        .await
-        .unwrap();
-    let staged = queries::list_staged_shift_ids(&pool, rota_id)
-        .await
-        .unwrap();
-    assert_eq!(staged.len(), 1);
-}
-
-#[tokio::test]
-async fn stage_week_marks_all_past_shifts_in_rota() {
-    let pool = test_pool().await;
-    let (rota_id, _ids) = seed_rota_with_past_shifts(&pool).await;
-    let today = date(30);
-
-    queries::stage_week(&pool, rota_id, today).await.unwrap();
-    let staged = queries::list_staged_shift_ids(&pool, rota_id)
-        .await
-        .unwrap();
-    assert_eq!(staged.len(), 3);
-
-    queries::unstage_week(&pool, rota_id).await.unwrap();
-    let staged = queries::list_staged_shift_ids(&pool, rota_id)
-        .await
-        .unwrap();
-    assert!(staged.is_empty());
-}
-
 // ─────────────────────────────────────────────────────────────
 // E. Commits
 // ─────────────────────────────────────────────────────────────
@@ -575,9 +522,8 @@ async fn stage_week_marks_all_past_shifts_in_rota() {
 async fn create_commit_and_retrieve() {
     let pool = test_pool().await;
     let (rota_id, ids) = seed_rota_with_past_shifts(&pool).await;
-    queries::stage_shifts(&pool, &ids, date(30)).await.unwrap();
 
-    let commit_id = queries::create_commit(&pool, rota_id).await.unwrap();
+    let commit_id = queries::create_commit(&pool, rota_id, &ids).await.unwrap();
     assert!(commit_id > 0);
 
     let got = queries::get_commit(&pool, commit_id)
@@ -587,12 +533,15 @@ async fn create_commit_and_retrieve() {
     assert_eq!(got.rota_id, rota_id);
     assert!(got.summary.contains("3 shifts"));
     assert!(got.snapshot_json.contains("committed_shift_ids"));
+}
 
-    // create_commit should clear staging
-    let staged = queries::list_staged_shift_ids(&pool, rota_id)
-        .await
-        .unwrap();
-    assert!(staged.is_empty());
+#[tokio::test]
+async fn create_commit_rejects_empty_shift_ids() {
+    let pool = test_pool().await;
+    let (rota_id, _ids) = seed_rota_with_past_shifts(&pool).await;
+
+    let result = queries::create_commit(&pool, rota_id, &[]).await;
+    assert!(result.is_err(), "empty shift_ids should be rejected");
 }
 
 #[tokio::test]
@@ -600,16 +549,14 @@ async fn list_commits_orders_newest_first() {
     let pool = test_pool().await;
     let (rota_id, ids) = seed_rota_with_past_shifts(&pool).await;
 
-    queries::stage_shifts(&pool, &ids[..1], date(30))
+    let c1 = queries::create_commit(&pool, rota_id, &ids[..1])
         .await
         .unwrap();
-    let c1 = queries::create_commit(&pool, rota_id).await.unwrap();
     // Ensure distinct timestamps.
     tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
-    queries::stage_shifts(&pool, &ids[1..2], date(30))
+    let c2 = queries::create_commit(&pool, rota_id, &ids[1..2])
         .await
         .unwrap();
-    let c2 = queries::create_commit(&pool, rota_id).await.unwrap();
 
     let commits = queries::list_commits(&pool, Some(rota_id)).await.unwrap();
     assert_eq!(commits.len(), 2);
@@ -623,9 +570,35 @@ async fn rota_has_commits_reflects_state() {
     let (rota_id, ids) = seed_rota_with_past_shifts(&pool).await;
     assert!(!queries::rota_has_commits(&pool, rota_id).await.unwrap());
 
-    queries::stage_shifts(&pool, &ids, date(30)).await.unwrap();
-    queries::create_commit(&pool, rota_id).await.unwrap();
+    queries::create_commit(&pool, rota_id, &ids).await.unwrap();
     assert!(queries::rota_has_commits(&pool, rota_id).await.unwrap());
+}
+
+#[tokio::test]
+async fn diff_rota_shows_all_new_when_no_commits() {
+    let pool = test_pool().await;
+    let (rota_id, ids) = seed_rota_with_past_shifts(&pool).await;
+
+    let diffs = queries::diff_rota_vs_latest_commit(&pool, rota_id)
+        .await
+        .unwrap();
+    assert_eq!(diffs.len(), ids.len());
+    assert!(diffs.iter().all(|d| d.is_new && !d.is_changed));
+}
+
+#[tokio::test]
+async fn diff_rota_detects_no_changes_after_commit() {
+    let pool = test_pool().await;
+    let (rota_id, ids) = seed_rota_with_past_shifts(&pool).await;
+
+    queries::create_commit(&pool, rota_id, &ids).await.unwrap();
+    let diffs = queries::diff_rota_vs_latest_commit(&pool, rota_id)
+        .await
+        .unwrap();
+    assert!(
+        diffs.is_empty(),
+        "no diffs after committing identical state"
+    );
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -703,6 +676,245 @@ async fn local_update_resets_sync_status_after_mark_synced() {
 
     let (status, _, _) = query_sync_status(&pool, "employees", emp_id).await;
     assert_eq!(status, 0, "local update must reset sync_status to pending");
+}
+
+// ─────────────────────────────────────────────────────────────
+// G. Orphaned commit handling (History page bug fix)
+// ─────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn list_commits_skips_orphaned_commits_with_deleted_rota() {
+    let pool = test_pool().await;
+    let (rota_id, ids) = seed_rota_with_past_shifts(&pool).await;
+
+    let commit_id = queries::create_commit(&pool, rota_id, &ids).await.unwrap();
+    assert!(commit_id > 0);
+
+    // Verify commit exists
+    let commits = queries::list_commits(&pool, None).await.unwrap();
+    assert_eq!(commits.len(), 1);
+
+    // Delete the rota — this should also delete commits
+    queries::delete_rota(&pool, rota_id).await.unwrap();
+
+    // Commits should be gone
+    let commits = queries::list_commits(&pool, None).await.unwrap();
+    assert!(
+        commits.is_empty(),
+        "commits should be deleted when rota is deleted"
+    );
+}
+
+#[tokio::test]
+async fn get_commit_returns_none_for_orphaned_commit() {
+    let pool = test_pool().await;
+    let (rota_id, ids) = seed_rota_with_past_shifts(&pool).await;
+
+    let commit_id = queries::create_commit(&pool, rota_id, &ids).await.unwrap();
+
+    // Verify commit exists
+    let commit = queries::get_commit(&pool, commit_id).await.unwrap();
+    assert!(commit.is_some());
+
+    // Delete the rota
+    queries::delete_rota(&pool, rota_id).await.unwrap();
+
+    // Commit should be gone
+    let commit = queries::get_commit(&pool, commit_id).await.unwrap();
+    assert!(
+        commit.is_none(),
+        "orphaned commit should not be retrievable after rota deletion"
+    );
+}
+
+#[tokio::test]
+async fn delete_rota_removes_associated_commits() {
+    let pool = test_pool().await;
+    let (rota_id, ids) = seed_rota_with_past_shifts(&pool).await;
+
+    // Create two commits for this rota
+    queries::create_commit(&pool, rota_id, &ids[..1])
+        .await
+        .unwrap();
+    queries::create_commit(&pool, rota_id, &ids[1..2])
+        .await
+        .unwrap();
+
+    let before = queries::list_commits(&pool, Some(rota_id)).await.unwrap();
+    assert_eq!(before.len(), 2, "should have 2 commits before deletion");
+
+    // Delete the rota
+    queries::delete_rota(&pool, rota_id).await.unwrap();
+
+    // All commits for this rota should be gone
+    let after_all = queries::list_commits(&pool, None).await.unwrap();
+    assert!(
+        after_all.is_empty(),
+        "all commits should be deleted with their rota"
+    );
+}
+
+// ─────────────────────────────────────────────────────────────
+// H. Commit restore + status promotion
+// ─────────────────────────────────────────────────────────────
+
+async fn seed_rota_with_assignments(
+    pool: &sqlx::SqlitePool,
+) -> (i64, Vec<i64>, Vec<i64>) {
+    let rota_id = queries::insert_rota(pool, week_start()).await.unwrap();
+
+    // Employees
+    let alice = queries::insert_employee(
+        pool,
+        &make_employee(0, "Alice", "barista", AvailabilityState::Yes),
+    )
+    .await
+    .unwrap();
+    let bob = queries::insert_employee(
+        pool,
+        &make_employee(0, "Bob", "barista", AvailabilityState::Yes),
+    )
+    .await
+    .unwrap();
+
+    // Shifts
+    let mut shift_ids = Vec::new();
+    for day_n in [23u32, 24, 25] {
+        let mut s = make_shift(0, date(day_n), 7, 12, "barista");
+        s.rota_id = rota_id;
+        s.template_id = None;
+        let id = queries::insert_shift(pool, &s).await.unwrap();
+        shift_ids.push(id);
+    }
+
+    // Assignments: Alice on day 23 (Proposed), Bob on day 24 (Confirmed)
+    let a1 = queries::insert_assignment(
+        pool,
+        &Assignment {
+            id: 0,
+            rota_id,
+            shift_id: shift_ids[0],
+            employee_id: alice,
+            status: AssignmentStatus::Proposed,
+            employee_name: Some("Alice".into()),
+            hourly_wage: None,
+        },
+    )
+    .await
+    .unwrap();
+    let a2 = queries::insert_assignment(
+        pool,
+        &Assignment {
+            id: 0,
+            rota_id,
+            shift_id: shift_ids[1],
+            employee_id: bob,
+            status: AssignmentStatus::Confirmed,
+            employee_name: Some("Bob".into()),
+            hourly_wage: None,
+        },
+    )
+    .await
+    .unwrap();
+
+    (rota_id, shift_ids, vec![a1, a2])
+}
+
+#[tokio::test]
+async fn create_commit_auto_promotes_proposed_to_confirmed() {
+    let pool = test_pool().await;
+    let (rota_id, shift_ids, assignment_ids) = seed_rota_with_assignments(&pool).await;
+
+    // Before commit: one Proposed, one Confirmed.
+    let before = queries::list_assignments_for_rota(&pool, rota_id)
+        .await
+        .unwrap();
+    let statuses: Vec<_> = before.iter().map(|a| a.status).collect();
+    assert!(statuses.contains(&AssignmentStatus::Proposed));
+    assert!(statuses.contains(&AssignmentStatus::Confirmed));
+
+    queries::create_commit(&pool, rota_id, &shift_ids)
+        .await
+        .unwrap();
+
+    // After commit: both should be Confirmed.
+    let after = queries::list_assignments_for_rota(&pool, rota_id)
+        .await
+        .unwrap();
+    for a in &after {
+        assert_eq!(
+            a.status,
+            AssignmentStatus::Confirmed,
+            "assignment {} should be Confirmed after commit",
+            a.id
+        );
+    }
+    // Silence unused warning.
+    let _ = assignment_ids;
+}
+
+#[tokio::test]
+async fn restore_from_commit_recreates_shifts_and_assignments() {
+    let pool = test_pool().await;
+    let (rota_id, shift_ids, _) = seed_rota_with_assignments(&pool).await;
+
+    let commit_id = queries::create_commit(&pool, rota_id, &shift_ids)
+        .await
+        .unwrap();
+
+    // Mutate live state: delete one shift, add a new ad-hoc shift.
+    queries::delete_shift(&pool, shift_ids[0]).await.unwrap();
+    let mut new_shift = make_shift(0, date(26), 14, 18, "barista");
+    new_shift.rota_id = rota_id;
+    new_shift.template_id = None;
+    queries::insert_shift(&pool, &new_shift).await.unwrap();
+
+    // Restore.
+    let result = queries::restore_from_commit(&pool, commit_id)
+        .await
+        .unwrap();
+    assert_eq!(result.rota_id, rota_id);
+    assert_eq!(result.shifts_restored, 3);
+    assert_eq!(result.assignments_restored, 2);
+    assert_eq!(result.assignments_skipped, 0);
+
+    // Live state should match snapshot: 3 shifts, 2 assignments.
+    let shifts_after = queries::list_shifts_for_rota(&pool, rota_id).await.unwrap();
+    assert_eq!(shifts_after.len(), 3);
+    let assignments_after = queries::list_assignments_for_rota(&pool, rota_id)
+        .await
+        .unwrap();
+    assert_eq!(assignments_after.len(), 2);
+}
+
+#[tokio::test]
+async fn restore_from_commit_skips_assignments_for_deleted_employees() {
+    let pool = test_pool().await;
+    let (rota_id, shift_ids, _) = seed_rota_with_assignments(&pool).await;
+
+    let commit_id = queries::create_commit(&pool, rota_id, &shift_ids)
+        .await
+        .unwrap();
+
+    // Delete Alice (the employee on shift_ids[0]).
+    let emp_rows: Vec<(i64, String)> = sqlx::query_as("SELECT id, first_name FROM employees")
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    let alice_id = emp_rows
+        .iter()
+        .find(|(_, name)| name == "Alice")
+        .map(|(id, _)| *id)
+        .unwrap();
+    queries::delete_employee(&pool, alice_id).await.unwrap();
+
+    let result = queries::restore_from_commit(&pool, commit_id)
+        .await
+        .unwrap();
+    assert_eq!(result.shifts_restored, 3);
+    // Only Bob's assignment restored; Alice's skipped.
+    assert_eq!(result.assignments_restored, 1);
+    assert_eq!(result.assignments_skipped, 1);
 }
 
 // Silence unused-import warnings if any helper goes unused in the future.

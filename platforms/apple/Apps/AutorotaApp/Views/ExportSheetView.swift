@@ -184,7 +184,7 @@ struct ExportSheetView: View {
             dismiss()
             #endif
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
 
         isExporting = false

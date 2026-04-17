@@ -194,14 +194,6 @@ async fn create_rota(state: State<'_, AppState>, week_start: String) -> Result<i
         .map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-async fn finalize_rota(state: State<'_, AppState>, id: i64) -> Result<(), String> {
-    let pool = get_pool(&state).await?;
-    queries::finalize_rota(&pool, id)
-        .await
-        .map_err(|e| e.to_string())
-}
-
 // ─── Assignments ─────────────────────────────────────────────
 
 #[tauri::command]
@@ -432,9 +424,6 @@ async fn run_schedule(
         .map_err(|e| e.to_string())?
     {
         Some(existing) => {
-            if existing.finalized {
-                return Err("This week's rota is already finalized".to_string());
-            }
             println!(
                 "[run_schedule] Reusing existing rota_id={}, clearing assignments and re-materialising shifts",
                 existing.id
@@ -551,7 +540,6 @@ async fn get_week_schedule(
     Ok(Some(WeekSchedule {
         rota_id: rota.id,
         week_start: rota.week_start.to_string(),
-        finalized: rota.finalized,
         entries,
         shifts: shift_infos,
     }))
@@ -588,7 +576,6 @@ struct ShiftInfo {
 struct WeekSchedule {
     rota_id: i64,
     week_start: String,
-    finalized: bool,
     entries: Vec<ScheduleEntry>,
     shifts: Vec<ShiftInfo>,
 }
@@ -612,7 +599,6 @@ struct TauriEmployeeShiftRecord {
     required_role: String,
     duration_hours: f32,
     week_start: String,
-    finalized: bool,
 }
 
 fn shift_record_to_tauri(r: EmployeeShiftRecord) -> TauriEmployeeShiftRecord {
@@ -634,7 +620,6 @@ fn shift_record_to_tauri(r: EmployeeShiftRecord) -> TauriEmployeeShiftRecord {
         required_role: r.required_role,
         duration_hours: duration,
         week_start: r.week_start.to_string(),
-        finalized: r.finalized,
     }
 }
 
@@ -926,7 +911,6 @@ pub fn run() {
             get_rota,
             get_rota_by_week,
             create_rota,
-            finalize_rota,
             create_assignment,
             update_assignment_status,
             move_assignment,

@@ -13,10 +13,10 @@ Cafe managers define shifts. Employees declare availability. The scheduler assig
 - **Availability** — hour-by-hour, weekday-keyed: `Yes`, `Maybe`, `No`. Default template + date-specific overrides
 - **Override** — two kinds: *employee availability overrides* (date-specific availability replacing the weekly template) and *shift template overrides* (date-specific changes to a template's times, capacity, or cancellation)
 - **Assignment** — links employee to shift for a week. Status: `Proposed | Confirmed | Overridden`. Snapshots employee name and wage at creation
-- **Rota** — all assignments for a given week. Can be finalized to prevent further changes
+- **Rota** — all assignments for a given week. Can be committed to create immutable history snapshots
 - **Role** — skill that employees hold and shifts require (optional on shifts)
 - **Export** — CSV, JSON, and PDF schedule export. Layouts: employee-by-weekday or shift-by-weekday. Profiles: staff schedule (no wages) or manager report (with costs). PDF templates: weekly grid, per-employee, by-role
-- **Staging/Commit** — git-like workflow for past shifts. Stage individual shifts, days, or weeks, then commit with a snapshot for audit history
+- **Commit** — select past shifts in UI, then commit to create an immutable snapshot for audit history. Diff computed in Rust, not Swift
 
 ## Architecture
 

@@ -35,9 +35,9 @@ final class RotaViewModel {
     // Past lock
     var pastUnlocked = false
 
-    // Staging
-    var isStagingMode = false
-    var stagedShiftIds: Set<Int64> = []
+    // Selection for commit
+    var isSelectingForCommit = false
+    var selectedShiftIds: Set<Int64> = []
 
     /// Shift IDs that have been modified since their most recent commit snapshot.
     var changedShiftIds: Set<Int64> = []
@@ -72,13 +72,8 @@ final class RotaViewModel {
         error = nil
         do {
             schedule = try await service.getWeekSchedule(weekStart: selectedWeekStart)
-            if let s = schedule {
-                stagedShiftIds = Set(s.stagedShiftIds)
-            } else {
-                stagedShiftIds = []
-            }
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
         await refreshChangedShifts()
         isLoading = false
@@ -89,31 +84,8 @@ final class RotaViewModel {
         changedShiftIds = []
         guard let schedule, schedule.committed else { return }
         do {
-            let commits = try await service.listCommits(rotaId: schedule.rotaId)
-            // Walk newest → oldest, accumulating latest snapshot per shift_id.
-            let ordered = commits.sorted { $0.committedAt > $1.committedAt }
-            var latestSnapshotByShift: [Int64: ShiftData] = [:]
-            let needed = Set(schedule.shifts.map(\.id))
-            let decoder = JSONDecoder()
-            decoder.keyDecodingStrategy = .convertFromSnakeCase
-            for commit in ordered {
-                if Set(latestSnapshotByShift.keys).isSuperset(of: needed) { break }
-                guard let detail = try await service.getCommitDetail(commitId: commit.id) else { continue }
-                guard let data = detail.snapshotJson.data(using: .utf8),
-                      let snap = try? decoder.decode(SnapshotData.self, from: data) else { continue }
-                for shift in snap.shifts where latestSnapshotByShift[shift.shiftId] == nil {
-                    latestSnapshotByShift[shift.shiftId] = shift
-                }
-            }
-            var changed: Set<Int64> = []
-            for liveShift in schedule.shifts {
-                guard let snap = latestSnapshotByShift[liveShift.id] else { continue }
-                let entries = schedule.entries.filter { $0.shiftId == liveShift.id }
-                if shiftDiffersFromSnapshot(snapshot: snap, liveShift: liveShift, liveEntries: entries) {
-                    changed.insert(liveShift.id)
-                }
-            }
-            changedShiftIds = changed
+            let diffs = try await service.diffRota(rotaId: schedule.rotaId)
+            changedShiftIds = Set(diffs.filter { $0.isNew || $0.isChanged }.map(\.shiftId))
         } catch {
             // Non-fatal: leave changedShiftIds empty
         }
@@ -134,7 +106,7 @@ final class RotaViewModel {
             warnings = result.warnings
             await loadSchedule()
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
         isScheduling = false
     }
@@ -148,7 +120,7 @@ final class RotaViewModel {
             _ = try await service.materialiseWeek(weekStart: selectedWeekStart)
             await loadSchedule()
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
         isScheduling = false
     }
@@ -161,7 +133,7 @@ final class RotaViewModel {
             schedule = nil
             exitEditMode()
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
     }
 
@@ -174,7 +146,7 @@ final class RotaViewModel {
             _ = try await service.createEmptyWeek(weekStart: selectedWeekStart)
             await loadSchedule()
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
         isScheduling = false
     }
@@ -187,7 +159,7 @@ final class RotaViewModel {
                 _ = try await service.materialiseWeek(weekStart: selectedWeekStart)
                 await loadSchedule()
             } catch {
-                self.error = error.localizedDescription
+                self.error = userFacingMessage(error)
                 return
             }
         }
@@ -195,7 +167,7 @@ final class RotaViewModel {
             employees = try await service.listEmployees()
             roles = try await service.listRoles()
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
         isEditMode = true
     }
@@ -207,7 +179,7 @@ final class RotaViewModel {
 
     func resetModes() {
         isEditMode = false
-        isStagingMode = false
+        isSelectingForCommit = false
         pastUnlocked = false
         showGenerateConfirmation = false
         showDeleteScheduleConfirmation = false
@@ -221,7 +193,7 @@ final class RotaViewModel {
             try await service.deleteAssignment(id: id)
             await loadSchedule()
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
     }
 
@@ -235,7 +207,7 @@ final class RotaViewModel {
             _ = try await service.createAssignment(assignment)
             await loadSchedule()
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
     }
 
@@ -246,7 +218,7 @@ final class RotaViewModel {
             try await service.deleteShift(id: id)
             await loadSchedule()
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
     }
 
@@ -255,7 +227,7 @@ final class RotaViewModel {
             try await service.updateShiftTimes(id: id, startTime: startTime, endTime: endTime)
             await loadSchedule()
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
     }
 
@@ -268,7 +240,7 @@ final class RotaViewModel {
             )
             await loadSchedule()
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
     }
 
@@ -292,7 +264,7 @@ final class RotaViewModel {
             try await service.swapAssignments(idA: sourceId, idB: targetAssignmentId)
             await loadSchedule()
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
     }
 
@@ -388,105 +360,66 @@ final class RotaViewModel {
         return employees.filter { !assignedIds.contains($0.id) }
     }
 
-    // MARK: - Staging
+    // MARK: - Selection for commit
 
     /// Whether this rota has been committed at least once.
     var isCommitted: Bool {
         schedule?.committed ?? false
     }
 
-    var stagedCount: Int { stagedShiftIds.count }
-    var hasStaged: Bool { !stagedShiftIds.isEmpty }
+    var selectedCount: Int { selectedShiftIds.count }
+    var hasSelected: Bool { !selectedShiftIds.isEmpty }
 
-    func isShiftStaged(_ shiftId: Int64) -> Bool {
-        stagedShiftIds.contains(shiftId)
+    func isShiftSelected(_ shiftId: Int64) -> Bool {
+        selectedShiftIds.contains(shiftId)
     }
 
-    func toggleShiftStaged(_ shiftId: Int64) async {
-        do {
-            if stagedShiftIds.contains(shiftId) {
-                try await service.unstageShifts(shiftIds: [shiftId])
-                stagedShiftIds.remove(shiftId)
-            } else {
-                try await service.stageShifts(shiftIds: [shiftId])
-                stagedShiftIds.insert(shiftId)
-            }
-        } catch {
-            self.error = error.localizedDescription
+    func toggleShiftSelected(_ shiftId: Int64) {
+        if selectedShiftIds.contains(shiftId) {
+            selectedShiftIds.remove(shiftId)
+        } else {
+            selectedShiftIds.insert(shiftId)
         }
     }
 
-    func stageDay(_ weekday: String) async {
-        guard let rotaId = schedule?.rotaId else { return }
+    func selectDay(_ weekday: String) {
+        guard let schedule else { return }
         let date = dateForWeekday(weekday)
-        do {
-            try await service.stageDay(rotaId: rotaId, date: date)
-            await loadStagingState()
-        } catch {
-            self.error = error.localizedDescription
-        }
+        let dayShiftIds = schedule.shifts.filter { $0.date == date }.map(\.id)
+        selectedShiftIds.formUnion(dayShiftIds)
     }
 
-    func unstageDay(_ weekday: String) async {
-        guard let rotaId = schedule?.rotaId else { return }
-        let date = dateForWeekday(weekday)
-        do {
-            try await service.unstageDay(rotaId: rotaId, date: date)
-            await loadStagingState()
-        } catch {
-            self.error = error.localizedDescription
-        }
+    func selectAllPastShifts() {
+        guard let schedule else { return }
+        let today = isoDateString(from: Date())
+        let pastIds = schedule.shifts.filter { $0.date < today }.map(\.id)
+        selectedShiftIds.formUnion(pastIds)
     }
 
-    func stageAllPast() async {
-        guard let rotaId = schedule?.rotaId else { return }
-        do {
-            try await service.stageWeek(rotaId: rotaId)
-            await loadStagingState()
-        } catch {
-            self.error = error.localizedDescription
-        }
+    func clearSelection() {
+        selectedShiftIds = []
     }
 
-    func unstageAll() async {
+    func commitSelected() async {
         guard let rotaId = schedule?.rotaId else { return }
         do {
-            try await service.unstageWeek(rotaId: rotaId)
-            stagedShiftIds = []
-        } catch {
-            self.error = error.localizedDescription
-        }
-    }
-
-    func commitStaged() async {
-        guard let rotaId = schedule?.rotaId else { return }
-        do {
-            _ = try await service.commitStagedShifts(rotaId: rotaId)
-            stagedShiftIds = []
-            isStagingMode = false
+            _ = try await service.commitShifts(rotaId: rotaId, shiftIds: Array(selectedShiftIds))
+            selectedShiftIds = []
+            isSelectingForCommit = false
             await loadSchedule()
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
     }
 
-    func enterStagingMode() {
-        isStagingMode = true
+    func enterSelectMode() {
+        isSelectingForCommit = true
         isEditMode = false
     }
 
-    func exitStagingMode() {
-        isStagingMode = false
-    }
-
-    private func loadStagingState() async {
-        guard let rotaId = schedule?.rotaId else { return }
-        do {
-            let state = try await service.getStagingState(rotaId: rotaId)
-            stagedShiftIds = Set(state.stagedShiftIds)
-        } catch {
-            self.error = error.localizedDescription
-        }
+    func exitSelectMode() {
+        isSelectingForCommit = false
+        selectedShiftIds = []
     }
 
     // MARK: - Private helpers

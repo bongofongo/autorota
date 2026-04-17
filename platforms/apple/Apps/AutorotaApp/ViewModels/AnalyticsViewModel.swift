@@ -112,7 +112,7 @@ final class AnalyticsViewModel {
             let employees = try await service.listEmployees()
             computeAggregates(records, employees: employees)
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
         isLoading = false
     }

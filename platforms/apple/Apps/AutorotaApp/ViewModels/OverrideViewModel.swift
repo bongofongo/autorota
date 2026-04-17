@@ -25,7 +25,7 @@ final class OverrideViewModel {
             employeeAvailabilityOverrides = try await empOverrides
             shiftTemplateOverrides = try await tmplOverrides
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
         isLoading = false
     }
@@ -36,7 +36,7 @@ final class OverrideViewModel {
         do {
             employeeAvailabilityOverrides = try await service.listEmployeeAvailabilityOverrides(employeeId: id)
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
         isLoading = false
     }
@@ -45,7 +45,7 @@ final class OverrideViewModel {
         do {
             _ = try await service.upsertEmployeeAvailabilityOverride(o)
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
     }
 
@@ -54,7 +54,7 @@ final class OverrideViewModel {
             try await service.deleteEmployeeAvailabilityOverride(id: id)
             employeeAvailabilityOverrides.removeAll { $0.id == id }
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
     }
 
@@ -62,7 +62,7 @@ final class OverrideViewModel {
         do {
             _ = try await service.upsertShiftTemplateOverride(o)
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
     }
 
@@ -71,7 +71,7 @@ final class OverrideViewModel {
             try await service.deleteShiftTemplateOverride(id: id)
             shiftTemplateOverrides.removeAll { $0.id == id }
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
     }
 }

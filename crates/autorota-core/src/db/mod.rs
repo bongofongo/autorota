@@ -180,8 +180,32 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     .await?;
 
     if !has_commits_table {
-        let m12 = include_str!("../../migrations/012_staging_commits.sql");
-        sqlx::raw_sql(m12).execute(pool).await?;
+        // The migration SQL references r.finalized, which only exists on
+        // schemas created by migration 001. Guard against old schemas where
+        // the column was never added (e.g. very old DBs migrated forward).
+        let has_finalized_col: bool = sqlx::query_scalar(
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('rotas') WHERE name = 'finalized'",
+        )
+        .fetch_one(pool)
+        .await?;
+
+        if has_finalized_col {
+            let m12 = include_str!("../../migrations/012_staging_commits.sql");
+            sqlx::raw_sql(m12).execute(pool).await?;
+        } else {
+            // Just create the commits table without migrating finalized rotas.
+            sqlx::raw_sql(
+                "CREATE TABLE IF NOT EXISTS commits (
+                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    rota_id         INTEGER NOT NULL REFERENCES rotas(id) ON DELETE CASCADE,
+                    committed_at    TEXT    NOT NULL,
+                    summary         TEXT    NOT NULL,
+                    snapshot_json   TEXT    NOT NULL
+                );",
+            )
+            .execute(pool)
+            .await?;
+        }
     }
 
     // Migration 013: performance indexes (all use IF NOT EXISTS, safe to run unconditionally).
@@ -198,6 +222,19 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     if !has_availability_progress {
         let m14 = include_str!("../../migrations/014_availability_progress.sql");
         sqlx::raw_sql(m14).execute(pool).await?;
+    }
+
+    // Migration 015: drop staged_shifts table (staging replaced by UI-only selection).
+    // The finalized column is left in the DB schema but ignored by code.
+    let has_staged_shifts: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='staged_shifts'",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    if has_staged_shifts {
+        let m15 = include_str!("../../migrations/015_remove_finalized_staging.sql");
+        sqlx::raw_sql(m15).execute(pool).await?;
     }
 
     Ok(())

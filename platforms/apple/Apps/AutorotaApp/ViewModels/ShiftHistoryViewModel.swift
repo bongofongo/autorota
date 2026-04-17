@@ -47,7 +47,7 @@ final class ShiftHistoryViewModel {
             let records = try await service.listEmployeeShiftHistory(employeeId: employeeId)
             categorise(records)
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
         isLoading = false
     }

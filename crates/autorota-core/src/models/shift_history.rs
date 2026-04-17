@@ -19,7 +19,6 @@ pub struct EmployeeShiftRecord {
     pub end_time: NaiveTime,
     pub required_role: String,
     pub week_start: NaiveDate,
-    pub finalized: bool,
 }
 
 impl EmployeeShiftRecord {

@@ -21,7 +21,7 @@ final class ShiftTemplateViewModel {
         do {
             templates = try await service.listShiftTemplates()
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
         isLoading = false
     }
@@ -31,7 +31,7 @@ final class ShiftTemplateViewModel {
             _ = try await service.createShiftTemplate(template)
             await load()
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
     }
 
@@ -40,7 +40,7 @@ final class ShiftTemplateViewModel {
             try await service.updateShiftTemplate(template)
             await load()
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
     }
 
@@ -49,7 +49,7 @@ final class ShiftTemplateViewModel {
             try await service.deleteShiftTemplate(id: id)
             await load()
         } catch {
-            self.error = error.localizedDescription
+            self.error = userFacingMessage(error)
         }
     }
 }
