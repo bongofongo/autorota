@@ -16,6 +16,7 @@ crates/app-desktop/dist/
 # Local agent tooling state
 .claude/
 .superpowers/
+.worktrees/
 
 # Xcode export options (contain signing identities / team IDs)
 platforms/apple/ExportOptions*.plist
