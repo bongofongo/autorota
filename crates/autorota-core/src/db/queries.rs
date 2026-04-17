@@ -3,9 +3,9 @@ use sqlx::SqlitePool;
 
 use crate::models::assignment::{Assignment, AssignmentStatus};
 use crate::models::availability::Availability;
-use crate::models::commit::{
-    diff_snapshots, Commit, CommitAssignmentSnapshot, CommitChangeDetail, CommitShiftSnapshot,
-    CommitSnapshot, RestoreResult, ShiftDiff,
+use crate::models::save::{
+    diff_snapshots, Save, SaveAssignmentSnapshot, ChangeDetail, SaveShiftSnapshot,
+    SaveSnapshot, RestoreResult, ShiftDiff,
 };
 use crate::models::employee::Employee;
 use crate::models::overrides::{
@@ -515,8 +515,8 @@ pub async fn delete_rota(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> 
         .execute(pool)
         .await?;
 
-    // Delete any commits for this rota.
-    sqlx::query("DELETE FROM commits WHERE rota_id = ?")
+    // Delete any saves for this rota.
+    sqlx::query("DELETE FROM saves WHERE rota_id = ?")
         .bind(id)
         .execute(pool)
         .await?;
@@ -1242,37 +1242,20 @@ pub async fn list_all_shift_history(
     Ok(rows.into_iter().filter_map(shift_record_from_row).collect())
 }
 
-// ─── Commits ──────────��─────────────────────────────────────
+// ─── Saves ────────────────────────────────────────────────────
 
-/// Create a commit from the given shift IDs for a rota.
-/// Returns the new commit ID.
-pub async fn create_commit(
+/// Create a save snapshot for all shifts in the rota.
+/// Returns the new save ID.
+pub async fn create_save(
     pool: &SqlitePool,
     rota_id: i64,
-    shift_ids: &[i64],
 ) -> Result<i64, sqlx::Error> {
-    if shift_ids.is_empty() {
-        return Err(sqlx::Error::Protocol("no shifts to commit".to_string()));
-    }
-
     let week_start_str: String = sqlx::query_scalar("SELECT week_start FROM rotas WHERE id = ?")
         .bind(rota_id)
         .fetch_one(pool)
         .await?;
 
-    let placeholders: String = shift_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-
-    let shift_sql = format!(
-        "SELECT id, template_id, rota_id, date, start_time, end_time, required_role, min_employees, max_employees
-         FROM shifts WHERE id IN ({}) ORDER BY date, start_time",
-        placeholders
-    );
-    let mut shift_query = sqlx::query_as::<_, ShiftRow>(&shift_sql);
-    for &sid in shift_ids {
-        shift_query = shift_query.bind(sid);
-    }
-    let shift_rows: Vec<ShiftRow> = shift_query.fetch_all(pool).await?;
-    let shifts: Vec<Shift> = shift_rows.into_iter().filter_map(shift_from_row).collect();
+    let shifts = list_shifts_for_rota(pool, rota_id).await?;
 
     // Batch-load wage currencies for all employees referenced in assignments.
     let all_assignments = list_assignments_for_rota(pool, rota_id).await?;
@@ -1303,11 +1286,11 @@ pub async fn create_commit(
             .filter(|a| a.shift_id == shift.id)
             .collect();
 
-        let assignment_snapshots: Vec<CommitAssignmentSnapshot> = assignments
+        let assignment_snapshots: Vec<SaveAssignmentSnapshot> = assignments
             .iter()
             .map(|a| {
                 all_employee_ids.insert(a.employee_id);
-                CommitAssignmentSnapshot {
+                SaveAssignmentSnapshot {
                     assignment_id: a.id,
                     employee_id: a.employee_id,
                     employee_name: a.employee_name.clone().unwrap_or_default(),
@@ -1320,7 +1303,7 @@ pub async fn create_commit(
 
         total_hours += shift.duration_hours();
 
-        snapshot_shifts.push(CommitShiftSnapshot {
+        snapshot_shifts.push(SaveShiftSnapshot {
             shift_id: shift.id,
             date: shift.date.to_string(),
             start_time: shift.start_time.format("%H:%M").to_string(),
@@ -1332,9 +1315,10 @@ pub async fn create_commit(
         });
     }
 
-    let snapshot = CommitSnapshot {
+    let committed_shift_ids: Vec<i64> = shifts.iter().map(|s| s.id).collect();
+    let snapshot = SaveSnapshot {
         week_start: week_start_str,
-        committed_shift_ids: shift_ids.to_vec(),
+        committed_shift_ids,
         shifts: snapshot_shifts,
         total_hours,
         total_shifts: shifts.len(),
@@ -1344,38 +1328,23 @@ pub async fn create_commit(
     let snapshot_json =
         serde_json::to_string(&snapshot).map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
 
-    let summary = generate_commit_summary(shifts.len(), all_employee_ids.len(), total_hours);
+    let summary = generate_save_summary(shifts.len(), all_employee_ids.len(), total_hours);
     let now = chrono::Utc::now().to_rfc3339();
 
-    // Insert the commit and promote any Proposed assignments in the same
-    // transaction so a committed rota cannot be silently wiped by a later
-    // scheduler regeneration.
-    let mut tx = pool.begin().await?;
-    let commit_id: i64 = sqlx::query_scalar(
-        "INSERT INTO commits (rota_id, committed_at, summary, snapshot_json) VALUES (?, ?, ?, ?) RETURNING id",
+    let save_id: i64 = sqlx::query_scalar(
+        "INSERT INTO saves (rota_id, committed_at, summary, snapshot_json, label) VALUES (?, ?, ?, ?, NULL) RETURNING id",
     )
     .bind(rota_id)
     .bind(&now)
     .bind(&summary)
     .bind(&snapshot_json)
-    .fetch_one(&mut *tx)
+    .fetch_one(pool)
     .await?;
 
-    sqlx::query(
-        "UPDATE assignments SET status = 'Confirmed', last_modified = ?, sync_status = 0
-         WHERE rota_id = ? AND status = 'Proposed'",
-    )
-    .bind(&now)
-    .bind(rota_id)
-    .execute(&mut *tx)
-    .await?;
-
-    tx.commit().await?;
-
-    Ok(commit_id)
+    Ok(save_id)
 }
 
-fn generate_commit_summary(
+fn generate_save_summary(
     total_shifts: usize,
     unique_employees: usize,
     total_hours: f32,
@@ -1390,82 +1359,83 @@ fn generate_commit_summary(
     )
 }
 
-/// List commits, optionally filtered by rota_id. Ordered by committed_at DESC.
-pub async fn list_commits(
+/// List saves, optionally filtered by rota_id. Ordered by committed_at DESC.
+pub async fn list_saves(
     pool: &SqlitePool,
     rota_id: Option<i64>,
-) -> Result<Vec<Commit>, sqlx::Error> {
+) -> Result<Vec<Save>, sqlx::Error> {
     match rota_id {
         Some(rid) => {
-            let rows: Vec<(i64, i64, String, String, String)> = sqlx::query_as(
-                "SELECT id, rota_id, committed_at, summary, snapshot_json
-                 FROM commits WHERE rota_id = ? ORDER BY committed_at DESC",
+            let rows: Vec<(i64, i64, String, String, String, Option<String>)> = sqlx::query_as(
+                "SELECT id, rota_id, committed_at, summary, snapshot_json, label
+                 FROM saves WHERE rota_id = ? ORDER BY committed_at DESC",
             )
             .bind(rid)
             .fetch_all(pool)
             .await?;
-            Ok(rows.into_iter().map(commit_from_row).collect())
+            Ok(rows.into_iter().map(save_from_row).collect())
         }
         None => {
-            let rows: Vec<(i64, i64, String, String, String)> = sqlx::query_as(
-                "SELECT id, rota_id, committed_at, summary, snapshot_json
-                 FROM commits ORDER BY committed_at DESC",
+            let rows: Vec<(i64, i64, String, String, String, Option<String>)> = sqlx::query_as(
+                "SELECT id, rota_id, committed_at, summary, snapshot_json, label
+                 FROM saves ORDER BY committed_at DESC",
             )
             .fetch_all(pool)
             .await?;
-            Ok(rows.into_iter().map(commit_from_row).collect())
+            Ok(rows.into_iter().map(save_from_row).collect())
         }
     }
 }
 
-/// Get a single commit by ID.
-pub async fn get_commit(pool: &SqlitePool, id: i64) -> Result<Option<Commit>, sqlx::Error> {
-    let row: Option<(i64, i64, String, String, String)> = sqlx::query_as(
-        "SELECT id, rota_id, committed_at, summary, snapshot_json FROM commits WHERE id = ?",
+/// Get a single save by ID.
+pub async fn get_save(pool: &SqlitePool, id: i64) -> Result<Option<Save>, sqlx::Error> {
+    let row: Option<(i64, i64, String, String, String, Option<String>)> = sqlx::query_as(
+        "SELECT id, rota_id, committed_at, summary, snapshot_json, label FROM saves WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(pool)
     .await?;
-    Ok(row.map(commit_from_row))
+    Ok(row.map(save_from_row))
 }
 
-/// Check if a rota has any commits.
-pub async fn rota_has_commits(pool: &SqlitePool, rota_id: i64) -> Result<bool, sqlx::Error> {
-    let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM commits WHERE rota_id = ?)")
+/// Check if a rota has any saves.
+pub async fn rota_has_saves(pool: &SqlitePool, rota_id: i64) -> Result<bool, sqlx::Error> {
+    let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM saves WHERE rota_id = ?)")
         .bind(rota_id)
         .fetch_one(pool)
         .await?;
     Ok(exists)
 }
 
-fn commit_from_row(row: (i64, i64, String, String, String)) -> Commit {
-    let (id, rota_id, committed_at, summary, snapshot_json) = row;
-    Commit {
+fn save_from_row(row: (i64, i64, String, String, String, Option<String>)) -> Save {
+    let (id, rota_id, saved_at, summary, snapshot_json, label) = row;
+    Save {
         id,
         rota_id,
-        committed_at,
+        saved_at,
         summary,
         snapshot_json,
+        label,
     }
 }
 
-/// Compare live shifts for a rota against the latest commit snapshot.
+/// Compare live shifts for a rota against the latest save snapshot.
 /// Returns a diff entry for each live shift that is new or changed.
-pub async fn diff_rota_vs_latest_commit(
+pub async fn diff_rota_vs_latest_save(
     pool: &SqlitePool,
     rota_id: i64,
 ) -> Result<Vec<ShiftDiff>, sqlx::Error> {
-    // Fetch latest commit for this rota.
-    let latest: Option<(i64, i64, String, String, String)> = sqlx::query_as(
-        "SELECT id, rota_id, committed_at, summary, snapshot_json
-         FROM commits WHERE rota_id = ? ORDER BY committed_at DESC LIMIT 1",
+    // Fetch latest save for this rota.
+    let latest: Option<(i64, i64, String, String, String, Option<String>)> = sqlx::query_as(
+        "SELECT id, rota_id, committed_at, summary, snapshot_json, label
+         FROM saves WHERE rota_id = ? ORDER BY committed_at DESC LIMIT 1",
     )
     .bind(rota_id)
     .fetch_optional(pool)
     .await?;
 
     let Some(row) = latest else {
-        // No commits yet — every shift is "new".
+        // No saves yet — every shift is "new".
         let shifts = list_shifts_for_rota(pool, rota_id).await?;
         return Ok(shifts
             .into_iter()
@@ -1477,12 +1447,12 @@ pub async fn diff_rota_vs_latest_commit(
             .collect());
     };
 
-    let commit = commit_from_row(row);
-    let snapshot: CommitSnapshot = serde_json::from_str(&commit.snapshot_json)
+    let save = save_from_row(row);
+    let snapshot: SaveSnapshot = serde_json::from_str(&save.snapshot_json)
         .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
 
     // Build lookup from snapshot: shift_id → snapshot shift.
-    let snap_by_id: HashMap<i64, &CommitShiftSnapshot> =
+    let snap_by_id: HashMap<i64, &SaveShiftSnapshot> =
         snapshot.shifts.iter().map(|s| (s.shift_id, s)).collect();
 
     // Get live state.
@@ -1534,41 +1504,21 @@ pub async fn diff_rota_vs_latest_commit(
     Ok(diffs)
 }
 
-/// Build a `CommitSnapshot` from the live state of a rota without persisting
-/// a commit. Used by detailed-diff queries so live state can be compared
+/// Build a `SaveSnapshot` from the live state of a rota without persisting
+/// a save. Used by detailed-diff queries so live state can be compared
 /// against a persisted snapshot with the same pure `diff_snapshots` function.
 ///
-/// `shift_ids = None` includes every shift currently in the rota.
+/// Always snapshots all shifts currently in the rota.
 pub async fn snapshot_from_live(
     pool: &SqlitePool,
     rota_id: i64,
-    shift_ids: Option<&[i64]>,
-) -> Result<CommitSnapshot, sqlx::Error> {
+) -> Result<SaveSnapshot, sqlx::Error> {
     let week_start_str: String = sqlx::query_scalar("SELECT week_start FROM rotas WHERE id = ?")
         .bind(rota_id)
         .fetch_one(pool)
         .await?;
 
-    let shifts: Vec<Shift> = match shift_ids {
-        Some(ids) if !ids.is_empty() => {
-            let placeholders: String = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-            let sql = format!(
-                "SELECT id, template_id, rota_id, date, start_time, end_time, required_role, min_employees, max_employees
-                 FROM shifts WHERE id IN ({}) ORDER BY date, start_time",
-                placeholders
-            );
-            let mut q = sqlx::query_as::<_, ShiftRow>(&sql);
-            for &sid in ids {
-                q = q.bind(sid);
-            }
-            q.fetch_all(pool)
-                .await?
-                .into_iter()
-                .filter_map(shift_from_row)
-                .collect()
-        }
-        _ => list_shifts_for_rota(pool, rota_id).await?,
-    };
+    let shifts = list_shifts_for_rota(pool, rota_id).await?;
 
     let all_assignments = list_assignments_for_rota(pool, rota_id).await?;
 
@@ -1595,12 +1545,12 @@ pub async fn snapshot_from_live(
     let mut total_hours: f32 = 0.0;
 
     for shift in &shifts {
-        let assignment_snapshots: Vec<CommitAssignmentSnapshot> = all_assignments
+        let assignment_snapshots: Vec<SaveAssignmentSnapshot> = all_assignments
             .iter()
             .filter(|a| a.shift_id == shift.id)
             .map(|a| {
                 all_employee_ids.insert(a.employee_id);
-                CommitAssignmentSnapshot {
+                SaveAssignmentSnapshot {
                     assignment_id: a.id,
                     employee_id: a.employee_id,
                     employee_name: a.employee_name.clone().unwrap_or_default(),
@@ -1613,7 +1563,7 @@ pub async fn snapshot_from_live(
 
         total_hours += shift.duration_hours();
 
-        snapshot_shifts.push(CommitShiftSnapshot {
+        snapshot_shifts.push(SaveShiftSnapshot {
             shift_id: shift.id,
             date: shift.date.to_string(),
             start_time: shift.start_time.format("%H:%M").to_string(),
@@ -1626,7 +1576,7 @@ pub async fn snapshot_from_live(
     }
 
     let committed_shift_ids = shifts.iter().map(|s| s.id).collect();
-    Ok(CommitSnapshot {
+    Ok(SaveSnapshot {
         week_start: week_start_str,
         committed_shift_ids,
         shifts: snapshot_shifts,
@@ -1636,26 +1586,26 @@ pub async fn snapshot_from_live(
     })
 }
 
-/// Detailed diff between the live state of a rota and its latest commit.
-/// If no commit exists yet, every live shift appears as `ShiftAdded`.
-pub async fn diff_rota_vs_latest_commit_detailed(
+/// Detailed diff between the live state of a rota and its latest save.
+/// If no save exists yet, every live shift appears as `ShiftAdded`.
+pub async fn diff_rota_vs_latest_save_detailed(
     pool: &SqlitePool,
     rota_id: i64,
-) -> Result<Vec<CommitChangeDetail>, sqlx::Error> {
-    let latest: Option<(i64, i64, String, String, String)> = sqlx::query_as(
-        "SELECT id, rota_id, committed_at, summary, snapshot_json
-         FROM commits WHERE rota_id = ? ORDER BY committed_at DESC LIMIT 1",
+) -> Result<Vec<ChangeDetail>, sqlx::Error> {
+    let latest: Option<(i64, i64, String, String, String, Option<String>)> = sqlx::query_as(
+        "SELECT id, rota_id, committed_at, summary, snapshot_json, label
+         FROM saves WHERE rota_id = ? ORDER BY committed_at DESC LIMIT 1",
     )
     .bind(rota_id)
     .fetch_optional(pool)
     .await?;
 
-    let live = snapshot_from_live(pool, rota_id, None).await?;
+    let live = snapshot_from_live(pool, rota_id).await?;
 
     let old = match latest {
         Some(row) => {
-            let commit = commit_from_row(row);
-            serde_json::from_str(&commit.snapshot_json)
+            let save = save_from_row(row);
+            serde_json::from_str(&save.snapshot_json)
                 .map_err(|e| sqlx::Error::Protocol(e.to_string()))?
         }
         None => empty_snapshot(&live.week_start),
@@ -1664,54 +1614,54 @@ pub async fn diff_rota_vs_latest_commit_detailed(
     Ok(diff_snapshots(&old, &live))
 }
 
-/// Detailed diff between two persisted commits.
-pub async fn diff_commits(
+/// Detailed diff between two persisted saves.
+pub async fn diff_saves(
     pool: &SqlitePool,
-    old_commit_id: i64,
-    new_commit_id: i64,
-) -> Result<Vec<CommitChangeDetail>, sqlx::Error> {
-    let old_commit = get_commit(pool, old_commit_id)
+    old_save_id: i64,
+    new_save_id: i64,
+) -> Result<Vec<ChangeDetail>, sqlx::Error> {
+    let old_save = get_save(pool, old_save_id)
         .await?
         .ok_or_else(|| sqlx::Error::RowNotFound)?;
-    let new_commit = get_commit(pool, new_commit_id)
+    let new_save = get_save(pool, new_save_id)
         .await?
         .ok_or_else(|| sqlx::Error::RowNotFound)?;
 
-    let old_snap: CommitSnapshot = serde_json::from_str(&old_commit.snapshot_json)
+    let old_snap: SaveSnapshot = serde_json::from_str(&old_save.snapshot_json)
         .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
-    let new_snap: CommitSnapshot = serde_json::from_str(&new_commit.snapshot_json)
+    let new_snap: SaveSnapshot = serde_json::from_str(&new_save.snapshot_json)
         .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
 
     Ok(diff_snapshots(&old_snap, &new_snap))
 }
 
-/// Detailed diff between a commit and the commit that immediately preceded
-/// it (by committed_at) for the same rota. If this is the first commit for
+/// Detailed diff between a save and the save that immediately preceded
+/// it (by committed_at) for the same rota. If this is the first save for
 /// the rota, the diff is against an empty snapshot (every shift is new).
-pub async fn diff_commit_vs_previous(
+pub async fn diff_save_vs_previous(
     pool: &SqlitePool,
-    commit_id: i64,
-) -> Result<Vec<CommitChangeDetail>, sqlx::Error> {
-    let commit = get_commit(pool, commit_id)
+    save_id: i64,
+) -> Result<Vec<ChangeDetail>, sqlx::Error> {
+    let save = get_save(pool, save_id)
         .await?
         .ok_or_else(|| sqlx::Error::RowNotFound)?;
 
-    let prev: Option<(i64, i64, String, String, String)> = sqlx::query_as(
-        "SELECT id, rota_id, committed_at, summary, snapshot_json
-         FROM commits WHERE rota_id = ? AND committed_at < ?
+    let prev: Option<(i64, i64, String, String, String, Option<String>)> = sqlx::query_as(
+        "SELECT id, rota_id, committed_at, summary, snapshot_json, label
+         FROM saves WHERE rota_id = ? AND committed_at < ?
          ORDER BY committed_at DESC LIMIT 1",
     )
-    .bind(commit.rota_id)
-    .bind(&commit.committed_at)
+    .bind(save.rota_id)
+    .bind(&save.saved_at)
     .fetch_optional(pool)
     .await?;
 
-    let new_snap: CommitSnapshot = serde_json::from_str(&commit.snapshot_json)
+    let new_snap: SaveSnapshot = serde_json::from_str(&save.snapshot_json)
         .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
-    let old_snap: CommitSnapshot = match prev {
+    let old_snap: SaveSnapshot = match prev {
         Some(row) => {
-            let c = commit_from_row(row);
-            serde_json::from_str(&c.snapshot_json)
+            let s = save_from_row(row);
+            serde_json::from_str(&s.snapshot_json)
                 .map_err(|e| sqlx::Error::Protocol(e.to_string()))?
         }
         None => empty_snapshot(&new_snap.week_start),
@@ -1720,8 +1670,8 @@ pub async fn diff_commit_vs_previous(
     Ok(diff_snapshots(&old_snap, &new_snap))
 }
 
-fn empty_snapshot(week_start: &str) -> CommitSnapshot {
-    CommitSnapshot {
+fn empty_snapshot(week_start: &str) -> SaveSnapshot {
+    SaveSnapshot {
         week_start: week_start.to_string(),
         committed_shift_ids: vec![],
         shifts: vec![],
@@ -1731,7 +1681,21 @@ fn empty_snapshot(week_start: &str) -> CommitSnapshot {
     }
 }
 
-/// Restore a rota to the state captured by a commit.
+/// Set or clear the label on a save.
+pub async fn update_save_label(
+    pool: &SqlitePool,
+    save_id: i64,
+    label: Option<&str>,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE saves SET label = ? WHERE id = ?")
+        .bind(label)
+        .bind(save_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// Restore a rota to the state captured by a save.
 ///
 /// Transactional: the entire operation is atomic. Existing shifts for the
 /// rota are deleted (cascading to their assignments), then shifts and
@@ -1748,16 +1712,16 @@ fn empty_snapshot(week_start: &str) -> CommitSnapshot {
 ///   the removal on other devices.
 /// - New shift/assignment rows have `sync_status = 0` (dirty) so they sync
 ///   out normally.
-pub async fn restore_from_commit(
+pub async fn restore_from_save(
     pool: &SqlitePool,
-    commit_id: i64,
+    save_id: i64,
 ) -> Result<RestoreResult, sqlx::Error> {
-    let commit = get_commit(pool, commit_id)
+    let save = get_save(pool, save_id)
         .await?
         .ok_or_else(|| sqlx::Error::RowNotFound)?;
-    let snapshot: CommitSnapshot = serde_json::from_str(&commit.snapshot_json)
+    let snapshot: SaveSnapshot = serde_json::from_str(&save.snapshot_json)
         .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
-    let rota_id = commit.rota_id;
+    let rota_id = save.rota_id;
 
     let mut tx = pool.begin().await?;
 
@@ -1834,7 +1798,7 @@ pub async fn restore_from_commit(
     }
 
     // Load active (non-deleted) employee IDs so we can skip assignments for
-    // employees that have been removed or soft-deleted since the commit.
+    // employees that have been removed or soft-deleted since the save.
     let existing_emp_ids: Vec<i64> =
         sqlx::query_scalar("SELECT id FROM employees WHERE deleted = 0")
             .fetch_all(&mut *tx)
