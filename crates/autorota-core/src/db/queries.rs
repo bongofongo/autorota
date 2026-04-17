@@ -1257,6 +1257,12 @@ pub async fn create_save(
 
     let shifts = list_shifts_for_rota(pool, rota_id).await?;
 
+    if shifts.is_empty() {
+        return Err(sqlx::Error::Protocol(
+            "cannot create save: rota has no shifts".into(),
+        ));
+    }
+
     // Batch-load wage currencies for all employees referenced in assignments.
     let all_assignments = list_assignments_for_rota(pool, rota_id).await?;
     let employee_ids: Vec<i64> = all_assignments
