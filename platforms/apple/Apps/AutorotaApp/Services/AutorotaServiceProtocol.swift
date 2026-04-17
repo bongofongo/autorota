@@ -58,16 +58,17 @@ protocol AutorotaServiceProtocol: Sendable {
     func listAllShiftTemplateOverrides() async throws -> [FfiShiftTemplateOverride]
     func deleteShiftTemplateOverride(id: Int64) async throws
 
-    // Commits
-    func commitShifts(rotaId: Int64, shiftIds: [Int64]) async throws -> Int64
+    // Saves
+    func createSave(rotaId: Int64) async throws -> Int64
     func diffRota(rotaId: Int64) async throws -> [FfiShiftDiff]
-    func diffRotaDetailed(rotaId: Int64) async throws -> [FfiCommitChangeDetail]
-    func diffCommitsDetailed(oldCommitId: Int64, newCommitId: Int64) async throws -> [FfiCommitChangeDetail]
-    func diffCommitVsPrevious(commitId: Int64) async throws -> [FfiCommitChangeDetail]
-    func listCommits(rotaId: Int64?) async throws -> [FfiCommit]
-    func getCommitDetail(commitId: Int64) async throws -> FfiCommitDetail?
-    func rotaIsCommitted(rotaId: Int64) async throws -> Bool
-    func restoreToCommit(commitId: Int64) async throws -> FfiRestoreResult
+    func diffRotaDetailed(rotaId: Int64) async throws -> [FfiChangeDetail]
+    func listSaves(rotaId: Int64?) async throws -> [FfiSave]
+    func getSaveDetail(saveId: Int64) async throws -> FfiSaveDetail?
+    func rotaHasSaves(rotaId: Int64) async throws -> Bool
+    func diffSavesDetailed(oldSaveId: Int64, newSaveId: Int64) async throws -> [FfiChangeDetail]
+    func diffSaveVsPrevious(saveId: Int64) async throws -> [FfiChangeDetail]
+    func restoreToSave(saveId: Int64) async throws -> FfiRestoreResult
+    func updateSaveLabel(saveId: Int64, label: String?) async throws
 
     // Export
     func exportWeekSchedule(weekStart: String, config: FfiExportConfig) async throws -> FfiExportResult

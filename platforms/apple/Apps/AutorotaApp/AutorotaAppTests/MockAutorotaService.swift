@@ -251,19 +251,19 @@ final class MockAutorotaService: AutorotaServiceProtocol, @unchecked Sendable {
         if let e = errorToThrow { throw e }
     }
 
-    // MARK: - Commits
+    // MARK: - Saves
 
-    var stubbedCommits: [FfiCommit] = []
-    var stubbedCommitDetail: FfiCommitDetail? = nil
-    var stubbedRotaIsCommitted = false
+    var stubbedSaves: [FfiSave] = []
+    var stubbedSaveDetail: FfiSaveDetail? = nil
+    var stubbedHasSaves = false
     var stubbedDiffResult: [FfiShiftDiff] = []
-    var stubbedDetailedDiffResult: [FfiCommitChangeDetail] = []
+    var stubbedDetailedDiffResult: [FfiChangeDetail] = []
     var stubbedRestoreResult = FfiRestoreResult(
         rotaId: 1, shiftsRestored: 0, assignmentsRestored: 0, assignmentsSkipped: 0
     )
 
-    func commitShifts(rotaId: Int64, shiftIds: [Int64]) async throws -> Int64 {
-        callLog.append("commitShifts:\(rotaId):\(shiftIds)")
+    func createSave(rotaId: Int64) async throws -> Int64 {
+        callLog.append("createSave:\(rotaId)")
         if let e = errorToThrow { throw e }
         return 1
     }
@@ -274,46 +274,51 @@ final class MockAutorotaService: AutorotaServiceProtocol, @unchecked Sendable {
         return stubbedDiffResult
     }
 
-    func listCommits(rotaId: Int64?) async throws -> [FfiCommit] {
-        callLog.append("listCommits:\(String(describing: rotaId))")
+    func listSaves(rotaId: Int64?) async throws -> [FfiSave] {
+        callLog.append("listSaves:\(String(describing: rotaId))")
         if let e = errorToThrow { throw e }
-        return stubbedCommits
+        return stubbedSaves
     }
 
-    func getCommitDetail(commitId: Int64) async throws -> FfiCommitDetail? {
-        callLog.append("getCommitDetail:\(commitId)")
+    func getSaveDetail(saveId: Int64) async throws -> FfiSaveDetail? {
+        callLog.append("getSaveDetail:\(saveId)")
         if let e = errorToThrow { throw e }
-        return stubbedCommitDetail
+        return stubbedSaveDetail
     }
 
-    func rotaIsCommitted(rotaId: Int64) async throws -> Bool {
-        callLog.append("rotaIsCommitted:\(rotaId)")
+    func rotaHasSaves(rotaId: Int64) async throws -> Bool {
+        callLog.append("rotaHasSaves:\(rotaId)")
         if let e = errorToThrow { throw e }
-        return stubbedRotaIsCommitted
+        return stubbedHasSaves
     }
 
-    func diffRotaDetailed(rotaId: Int64) async throws -> [FfiCommitChangeDetail] {
+    func diffRotaDetailed(rotaId: Int64) async throws -> [FfiChangeDetail] {
         callLog.append("diffRotaDetailed:\(rotaId)")
         if let e = errorToThrow { throw e }
         return stubbedDetailedDiffResult
     }
 
-    func diffCommitsDetailed(oldCommitId: Int64, newCommitId: Int64) async throws -> [FfiCommitChangeDetail] {
-        callLog.append("diffCommitsDetailed:\(oldCommitId):\(newCommitId)")
+    func diffSavesDetailed(oldSaveId: Int64, newSaveId: Int64) async throws -> [FfiChangeDetail] {
+        callLog.append("diffSavesDetailed:\(oldSaveId):\(newSaveId)")
         if let e = errorToThrow { throw e }
         return stubbedDetailedDiffResult
     }
 
-    func diffCommitVsPrevious(commitId: Int64) async throws -> [FfiCommitChangeDetail] {
-        callLog.append("diffCommitVsPrevious:\(commitId)")
+    func diffSaveVsPrevious(saveId: Int64) async throws -> [FfiChangeDetail] {
+        callLog.append("diffSaveVsPrevious:\(saveId)")
         if let e = errorToThrow { throw e }
         return stubbedDetailedDiffResult
     }
 
-    func restoreToCommit(commitId: Int64) async throws -> FfiRestoreResult {
-        callLog.append("restoreToCommit:\(commitId)")
+    func restoreToSave(saveId: Int64) async throws -> FfiRestoreResult {
+        callLog.append("restoreToSave:\(saveId)")
         if let e = errorToThrow { throw e }
         return stubbedRestoreResult
+    }
+
+    func updateSaveLabel(saveId: Int64, label: String?) async throws {
+        callLog.append("updateSaveLabel:\(saveId):\(label ?? "nil")")
+        if let e = errorToThrow { throw e }
     }
 
     // MARK: - Export

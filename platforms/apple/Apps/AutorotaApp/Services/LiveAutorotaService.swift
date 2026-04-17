@@ -137,29 +137,32 @@ struct LiveAutorotaService: AutorotaServiceProtocol {
         NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
     }
 
-    // Commits
-    func commitShifts(rotaId: Int64, shiftIds: [Int64]) async throws -> Int64 {
-        let id = try await commitShiftsAsync(rotaId: rotaId, shiftIds: shiftIds)
+    // Saves
+    func createSave(rotaId: Int64) async throws -> Int64 {
+        let id = try await createSaveAsync(rotaId: rotaId)
         NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
         return id
     }
     func diffRota(rotaId: Int64) async throws -> [FfiShiftDiff] { try await diffRotaAsync(rotaId: rotaId) }
-    func diffRotaDetailed(rotaId: Int64) async throws -> [FfiCommitChangeDetail] {
+    func diffRotaDetailed(rotaId: Int64) async throws -> [FfiChangeDetail] {
         try await diffRotaDetailedAsync(rotaId: rotaId)
     }
-    func diffCommitsDetailed(oldCommitId: Int64, newCommitId: Int64) async throws -> [FfiCommitChangeDetail] {
-        try await diffCommitsDetailedAsync(oldCommitId: oldCommitId, newCommitId: newCommitId)
+    func listSaves(rotaId: Int64?) async throws -> [FfiSave] { try await listSavesAsync(rotaId: rotaId) }
+    func getSaveDetail(saveId: Int64) async throws -> FfiSaveDetail? { try await getSaveDetailAsync(saveId: saveId) }
+    func rotaHasSaves(rotaId: Int64) async throws -> Bool { try await rotaHasSavesAsync(rotaId: rotaId) }
+    func diffSavesDetailed(oldSaveId: Int64, newSaveId: Int64) async throws -> [FfiChangeDetail] {
+        try await diffSavesDetailedAsync(oldSaveId: oldSaveId, newSaveId: newSaveId)
     }
-    func diffCommitVsPrevious(commitId: Int64) async throws -> [FfiCommitChangeDetail] {
-        try await diffCommitVsPreviousAsync(commitId: commitId)
+    func diffSaveVsPrevious(saveId: Int64) async throws -> [FfiChangeDetail] {
+        try await diffSaveVsPreviousAsync(saveId: saveId)
     }
-    func listCommits(rotaId: Int64?) async throws -> [FfiCommit] { try await listCommitsAsync(rotaId: rotaId) }
-    func getCommitDetail(commitId: Int64) async throws -> FfiCommitDetail? { try await getCommitDetailAsync(commitId: commitId) }
-    func rotaIsCommitted(rotaId: Int64) async throws -> Bool { try await rotaIsCommittedAsync(rotaId: rotaId) }
-    func restoreToCommit(commitId: Int64) async throws -> FfiRestoreResult {
-        let result = try await restoreToCommitAsync(commitId: commitId)
+    func restoreToSave(saveId: Int64) async throws -> FfiRestoreResult {
+        let result = try await restoreToSaveAsync(saveId: saveId)
         NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
         return result
+    }
+    func updateSaveLabel(saveId: Int64, label: String?) async throws {
+        try await updateSaveLabelAsync(saveId: saveId, label: label)
     }
 
     func exportWeekSchedule(weekStart: String, config: FfiExportConfig) async throws -> FfiExportResult { try await exportWeekScheduleAsync(weekStart: weekStart, config: config) }
