@@ -68,7 +68,7 @@ struct HelpView: View {
                 title: "History",
                 icon: "clock.arrow.circlepath",
                 items: [
-                    "View a log of all committed schedule changes.",
+                    "View a log of all saved schedule changes.",
                     "See what was changed and when.",
                     "Useful for tracking edits over time.",
                 ]

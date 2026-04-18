@@ -83,8 +83,8 @@ final class ActivityLogViewModel {
                     rotaId: saves[idx].rotaId,
                     savedAt: saves[idx].savedAt,
                     summary: saves[idx].summary,
-                    weekStart: saves[idx].weekStart,
-                    label: finalLabel
+                    label: finalLabel,
+                    weekStart: saves[idx].weekStart
                 )
             }
         } catch {

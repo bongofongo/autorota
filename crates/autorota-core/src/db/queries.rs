@@ -3,16 +3,16 @@ use sqlx::SqlitePool;
 
 use crate::models::assignment::{Assignment, AssignmentStatus};
 use crate::models::availability::Availability;
-use crate::models::save::{
-    diff_snapshots, Save, SaveAssignmentSnapshot, ChangeDetail, SaveShiftSnapshot,
-    SaveSnapshot, RestoreResult, ShiftDiff,
-};
 use crate::models::employee::Employee;
 use crate::models::overrides::{
     DayAvailability, EmployeeAvailabilityOverride, ShiftTemplateOverride,
 };
 use crate::models::role::Role;
 use crate::models::rota::Rota;
+use crate::models::save::{
+    ChangeDetail, RestoreResult, Save, SaveAssignmentSnapshot, SaveShiftSnapshot, SaveSnapshot,
+    ShiftDiff, diff_snapshots,
+};
 use crate::models::shift::{Shift, ShiftTemplate};
 use crate::models::shift_history::EmployeeShiftRecord;
 use crate::models::sync::{BaseSnapshot, SyncRecord, Tombstone};
@@ -1246,10 +1246,7 @@ pub async fn list_all_shift_history(
 
 /// Create a save snapshot for all shifts in the rota.
 /// Returns the new save ID.
-pub async fn create_save(
-    pool: &SqlitePool,
-    rota_id: i64,
-) -> Result<i64, sqlx::Error> {
+pub async fn create_save(pool: &SqlitePool, rota_id: i64) -> Result<i64, sqlx::Error> {
     let week_start_str: String = sqlx::query_scalar("SELECT week_start FROM rotas WHERE id = ?")
         .bind(rota_id)
         .fetch_one(pool)
@@ -1321,10 +1318,10 @@ pub async fn create_save(
         });
     }
 
-    let committed_shift_ids: Vec<i64> = shifts.iter().map(|s| s.id).collect();
+    let saved_shift_ids: Vec<i64> = shifts.iter().map(|s| s.id).collect();
     let snapshot = SaveSnapshot {
         week_start: week_start_str,
-        committed_shift_ids,
+        saved_shift_ids,
         shifts: snapshot_shifts,
         total_hours,
         total_shifts: shifts.len(),
@@ -1338,7 +1335,7 @@ pub async fn create_save(
     let now = chrono::Utc::now().to_rfc3339();
 
     let save_id: i64 = sqlx::query_scalar(
-        "INSERT INTO saves (rota_id, committed_at, summary, snapshot_json, label) VALUES (?, ?, ?, ?, NULL) RETURNING id",
+        "INSERT INTO saves (rota_id, saved_at, summary, snapshot_json, label) VALUES (?, ?, ?, ?, NULL) RETURNING id",
     )
     .bind(rota_id)
     .bind(&now)
@@ -1350,11 +1347,7 @@ pub async fn create_save(
     Ok(save_id)
 }
 
-fn generate_save_summary(
-    total_shifts: usize,
-    unique_employees: usize,
-    total_hours: f32,
-) -> String {
+fn generate_save_summary(total_shifts: usize, unique_employees: usize, total_hours: f32) -> String {
     format!(
         "{} shift{}, {} employee{}, {:.0}h",
         total_shifts,
@@ -1365,16 +1358,13 @@ fn generate_save_summary(
     )
 }
 
-/// List saves, optionally filtered by rota_id. Ordered by committed_at DESC.
-pub async fn list_saves(
-    pool: &SqlitePool,
-    rota_id: Option<i64>,
-) -> Result<Vec<Save>, sqlx::Error> {
+/// List saves, optionally filtered by rota_id. Ordered by saved_at DESC.
+pub async fn list_saves(pool: &SqlitePool, rota_id: Option<i64>) -> Result<Vec<Save>, sqlx::Error> {
     match rota_id {
         Some(rid) => {
             let rows: Vec<(i64, i64, String, String, String, Option<String>)> = sqlx::query_as(
-                "SELECT id, rota_id, committed_at, summary, snapshot_json, label
-                 FROM saves WHERE rota_id = ? ORDER BY committed_at DESC",
+                "SELECT id, rota_id, saved_at, summary, snapshot_json, label
+                 FROM saves WHERE rota_id = ? ORDER BY saved_at DESC",
             )
             .bind(rid)
             .fetch_all(pool)
@@ -1383,8 +1373,8 @@ pub async fn list_saves(
         }
         None => {
             let rows: Vec<(i64, i64, String, String, String, Option<String>)> = sqlx::query_as(
-                "SELECT id, rota_id, committed_at, summary, snapshot_json, label
-                 FROM saves ORDER BY committed_at DESC",
+                "SELECT id, rota_id, saved_at, summary, snapshot_json, label
+                 FROM saves ORDER BY saved_at DESC",
             )
             .fetch_all(pool)
             .await?;
@@ -1396,7 +1386,7 @@ pub async fn list_saves(
 /// Get a single save by ID.
 pub async fn get_save(pool: &SqlitePool, id: i64) -> Result<Option<Save>, sqlx::Error> {
     let row: Option<(i64, i64, String, String, String, Option<String>)> = sqlx::query_as(
-        "SELECT id, rota_id, committed_at, summary, snapshot_json, label FROM saves WHERE id = ?",
+        "SELECT id, rota_id, saved_at, summary, snapshot_json, label FROM saves WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(pool)
@@ -1433,8 +1423,8 @@ pub async fn diff_rota_vs_latest_save(
 ) -> Result<Vec<ShiftDiff>, sqlx::Error> {
     // Fetch latest save for this rota.
     let latest: Option<(i64, i64, String, String, String, Option<String>)> = sqlx::query_as(
-        "SELECT id, rota_id, committed_at, summary, snapshot_json, label
-         FROM saves WHERE rota_id = ? ORDER BY committed_at DESC LIMIT 1",
+        "SELECT id, rota_id, saved_at, summary, snapshot_json, label
+         FROM saves WHERE rota_id = ? ORDER BY saved_at DESC LIMIT 1",
     )
     .bind(rota_id)
     .fetch_optional(pool)
@@ -1581,10 +1571,10 @@ pub async fn snapshot_from_live(
         });
     }
 
-    let committed_shift_ids = shifts.iter().map(|s| s.id).collect();
+    let saved_shift_ids = shifts.iter().map(|s| s.id).collect();
     Ok(SaveSnapshot {
         week_start: week_start_str,
-        committed_shift_ids,
+        saved_shift_ids,
         shifts: snapshot_shifts,
         total_hours,
         total_shifts: shifts.len(),
@@ -1599,8 +1589,8 @@ pub async fn diff_rota_vs_latest_save_detailed(
     rota_id: i64,
 ) -> Result<Vec<ChangeDetail>, sqlx::Error> {
     let latest: Option<(i64, i64, String, String, String, Option<String>)> = sqlx::query_as(
-        "SELECT id, rota_id, committed_at, summary, snapshot_json, label
-         FROM saves WHERE rota_id = ? ORDER BY committed_at DESC LIMIT 1",
+        "SELECT id, rota_id, saved_at, summary, snapshot_json, label
+         FROM saves WHERE rota_id = ? ORDER BY saved_at DESC LIMIT 1",
     )
     .bind(rota_id)
     .fetch_optional(pool)
@@ -1642,7 +1632,7 @@ pub async fn diff_saves(
 }
 
 /// Detailed diff between a save and the save that immediately preceded
-/// it (by committed_at) for the same rota. If this is the first save for
+/// it (by saved_at) for the same rota. If this is the first save for
 /// the rota, the diff is against an empty snapshot (every shift is new).
 pub async fn diff_save_vs_previous(
     pool: &SqlitePool,
@@ -1653,9 +1643,9 @@ pub async fn diff_save_vs_previous(
         .ok_or_else(|| sqlx::Error::RowNotFound)?;
 
     let prev: Option<(i64, i64, String, String, String, Option<String>)> = sqlx::query_as(
-        "SELECT id, rota_id, committed_at, summary, snapshot_json, label
-         FROM saves WHERE rota_id = ? AND committed_at < ?
-         ORDER BY committed_at DESC LIMIT 1",
+        "SELECT id, rota_id, saved_at, summary, snapshot_json, label
+         FROM saves WHERE rota_id = ? AND saved_at < ?
+         ORDER BY saved_at DESC LIMIT 1",
     )
     .bind(save.rota_id)
     .bind(&save.saved_at)
@@ -1679,7 +1669,7 @@ pub async fn diff_save_vs_previous(
 fn empty_snapshot(week_start: &str) -> SaveSnapshot {
     SaveSnapshot {
         week_start: week_start.to_string(),
-        committed_shift_ids: vec![],
+        saved_shift_ids: vec![],
         shifts: vec![],
         total_hours: 0.0,
         total_shifts: 0,

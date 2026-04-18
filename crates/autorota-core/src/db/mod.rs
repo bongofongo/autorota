@@ -249,5 +249,17 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         sqlx::raw_sql(m16).execute(pool).await?;
     }
 
+    // Migration 017: rename committed_at → saved_at in saves table.
+    let has_committed_at: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) > 0 FROM pragma_table_info('saves') WHERE name = 'committed_at'",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    if has_committed_at {
+        let m17 = include_str!("../../migrations/017_rename_committed_at_to_saved_at.sql");
+        sqlx::raw_sql(m17).execute(pool).await?;
+    }
+
     Ok(())
 }

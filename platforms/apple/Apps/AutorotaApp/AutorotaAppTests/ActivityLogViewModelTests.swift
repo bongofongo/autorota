@@ -16,8 +16,8 @@ struct ActivityLogViewModelTests {
             rotaId: rotaId,
             savedAt: "2026-03-30T12:00:00Z",
             summary: "2 shifts, 1 employee, 8h",
-            weekStart: weekStart,
-            label: label
+            label: label,
+            weekStart: weekStart
         )
     }
 

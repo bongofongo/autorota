@@ -17,7 +17,8 @@ pub struct Save {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SaveSnapshot {
     pub week_start: String,
-    pub committed_shift_ids: Vec<i64>,
+    #[serde(rename = "committed_shift_ids", alias = "saved_shift_ids")]
+    pub saved_shift_ids: Vec<i64>,
     pub shifts: Vec<SaveShiftSnapshot>,
     pub total_hours: f32,
     pub total_shifts: usize,
@@ -99,10 +100,7 @@ pub enum ChangeKind {
         new_max: u32,
     },
     /// A shift's required role changed.
-    ShiftRoleChanged {
-        old_role: String,
-        new_role: String,
-    },
+    ShiftRoleChanged { old_role: String, new_role: String },
     /// An employee was assigned to a shift.
     AssignmentAdded {
         employee_id: i64,
@@ -228,8 +226,7 @@ pub fn diff_snapshots(old: &SaveSnapshot, new: &SaveSnapshot) -> Vec<ChangeDetai
             continue;
         };
 
-        if old_shift.start_time != new_shift.start_time
-            || old_shift.end_time != new_shift.end_time
+        if old_shift.start_time != new_shift.start_time || old_shift.end_time != new_shift.end_time
         {
             changes.push(ChangeDetail {
                 shift_id: *shift_id,
@@ -443,7 +440,7 @@ mod diff_tests {
     fn snap(shifts: Vec<SaveShiftSnapshot>) -> SaveSnapshot {
         SaveSnapshot {
             week_start: "2026-04-20".to_string(),
-            committed_shift_ids: shifts.iter().map(|s| s.shift_id).collect(),
+            saved_shift_ids: shifts.iter().map(|s| s.shift_id).collect(),
             shifts,
             total_hours: 0.0,
             total_shifts: 0,
@@ -453,14 +450,32 @@ mod diff_tests {
 
     #[test]
     fn no_changes_returns_empty() {
-        let s = snap(vec![shift(1, "2026-04-20", "09:00", "17:00", "barista", 1, 2, vec![])]);
+        let s = snap(vec![shift(
+            1,
+            "2026-04-20",
+            "09:00",
+            "17:00",
+            "barista",
+            1,
+            2,
+            vec![],
+        )]);
         assert!(diff_snapshots(&s, &s).is_empty());
     }
 
     #[test]
     fn detects_new_shift() {
         let old = snap(vec![]);
-        let new = snap(vec![shift(1, "2026-04-20", "09:00", "17:00", "barista", 1, 2, vec![])]);
+        let new = snap(vec![shift(
+            1,
+            "2026-04-20",
+            "09:00",
+            "17:00",
+            "barista",
+            1,
+            2,
+            vec![],
+        )]);
         let d = diff_snapshots(&old, &new);
         assert_eq!(d.len(), 1);
         assert!(matches!(d[0].kind, ChangeKind::ShiftAdded { .. }));
@@ -468,7 +483,16 @@ mod diff_tests {
 
     #[test]
     fn detects_removed_shift() {
-        let old = snap(vec![shift(1, "2026-04-20", "09:00", "17:00", "barista", 1, 2, vec![])]);
+        let old = snap(vec![shift(
+            1,
+            "2026-04-20",
+            "09:00",
+            "17:00",
+            "barista",
+            1,
+            2,
+            vec![],
+        )]);
         let new = snap(vec![]);
         let d = diff_snapshots(&old, &new);
         assert_eq!(d.len(), 1);
@@ -477,41 +501,122 @@ mod diff_tests {
 
     #[test]
     fn detects_time_capacity_role_changes() {
-        let old = snap(vec![shift(1, "2026-04-20", "09:00", "17:00", "barista", 1, 2, vec![])]);
-        let new = snap(vec![shift(1, "2026-04-20", "09:00", "18:00", "cashier", 2, 3, vec![])]);
+        let old = snap(vec![shift(
+            1,
+            "2026-04-20",
+            "09:00",
+            "17:00",
+            "barista",
+            1,
+            2,
+            vec![],
+        )]);
+        let new = snap(vec![shift(
+            1,
+            "2026-04-20",
+            "09:00",
+            "18:00",
+            "cashier",
+            2,
+            3,
+            vec![],
+        )]);
         let d = diff_snapshots(&old, &new);
         assert_eq!(d.len(), 3);
-        assert!(d.iter().any(|c| matches!(c.kind, ChangeKind::ShiftTimeChanged { .. })));
-        assert!(d.iter().any(|c| matches!(c.kind, ChangeKind::ShiftCapacityChanged { .. })));
-        assert!(d.iter().any(|c| matches!(c.kind, ChangeKind::ShiftRoleChanged { .. })));
+        assert!(
+            d.iter()
+                .any(|c| matches!(c.kind, ChangeKind::ShiftTimeChanged { .. }))
+        );
+        assert!(
+            d.iter()
+                .any(|c| matches!(c.kind, ChangeKind::ShiftCapacityChanged { .. }))
+        );
+        assert!(
+            d.iter()
+                .any(|c| matches!(c.kind, ChangeKind::ShiftRoleChanged { .. }))
+        );
     }
 
     #[test]
     fn detects_assignment_add_remove_status() {
         let old = snap(vec![shift(
-            1, "2026-04-20", "09:00", "17:00", "barista", 1, 2,
-            vec![assign(10, "Alice", "Proposed"), assign(11, "Bob", "Confirmed")],
+            1,
+            "2026-04-20",
+            "09:00",
+            "17:00",
+            "barista",
+            1,
+            2,
+            vec![
+                assign(10, "Alice", "Proposed"),
+                assign(11, "Bob", "Confirmed"),
+            ],
         )]);
         let new = snap(vec![shift(
-            1, "2026-04-20", "09:00", "17:00", "barista", 1, 2,
-            vec![assign(10, "Alice", "Confirmed"), assign(12, "Carol", "Confirmed")],
+            1,
+            "2026-04-20",
+            "09:00",
+            "17:00",
+            "barista",
+            1,
+            2,
+            vec![
+                assign(10, "Alice", "Confirmed"),
+                assign(12, "Carol", "Confirmed"),
+            ],
         )]);
         let d = diff_snapshots(&old, &new);
-        assert!(d.iter().any(|c| matches!(&c.kind, ChangeKind::AssignmentStatusChanged { employee_id: 10, .. })));
-        assert!(d.iter().any(|c| matches!(&c.kind, ChangeKind::AssignmentRemoved { employee_id: 11, .. })));
-        assert!(d.iter().any(|c| matches!(&c.kind, ChangeKind::AssignmentAdded { employee_id: 12, .. })));
+        assert!(d.iter().any(|c| matches!(
+            &c.kind,
+            ChangeKind::AssignmentStatusChanged {
+                employee_id: 10,
+                ..
+            }
+        )));
+        assert!(d.iter().any(|c| matches!(
+            &c.kind,
+            ChangeKind::AssignmentRemoved {
+                employee_id: 11,
+                ..
+            }
+        )));
+        assert!(d.iter().any(|c| matches!(
+            &c.kind,
+            ChangeKind::AssignmentAdded {
+                employee_id: 12,
+                ..
+            }
+        )));
     }
 
     #[test]
     fn collapses_same_day_move() {
         // Alice moves from shift 1 to shift 2 on the same date.
         let old = snap(vec![
-            shift(1, "2026-04-20", "09:00", "13:00", "barista", 1, 1, vec![assign(10, "Alice", "Confirmed")]),
+            shift(
+                1,
+                "2026-04-20",
+                "09:00",
+                "13:00",
+                "barista",
+                1,
+                1,
+                vec![assign(10, "Alice", "Confirmed")],
+            ),
             shift(2, "2026-04-20", "14:00", "18:00", "cashier", 1, 1, vec![]),
         ]);
         let new = snap(vec![
             shift(1, "2026-04-20", "09:00", "13:00", "barista", 1, 1, vec![]),
-            shift(2, "2026-04-20", "14:00", "18:00", "cashier", 1, 1, vec![assign(10, "Alice", "Confirmed")]),
+            shift(
+                2,
+                "2026-04-20",
+                "14:00",
+                "18:00",
+                "cashier",
+                1,
+                1,
+                vec![assign(10, "Alice", "Confirmed")],
+            ),
         ]);
         let d = diff_snapshots(&old, &new);
         assert_eq!(d.len(), 1);
@@ -530,16 +635,40 @@ mod diff_tests {
     fn does_not_collapse_across_dates() {
         // Alice removed from shift 1 on Mon, added to shift 2 on Tue — NOT a move.
         let old = snap(vec![
-            shift(1, "2026-04-20", "09:00", "13:00", "barista", 1, 1, vec![assign(10, "Alice", "Confirmed")]),
+            shift(
+                1,
+                "2026-04-20",
+                "09:00",
+                "13:00",
+                "barista",
+                1,
+                1,
+                vec![assign(10, "Alice", "Confirmed")],
+            ),
             shift(2, "2026-04-21", "14:00", "18:00", "cashier", 1, 1, vec![]),
         ]);
         let new = snap(vec![
             shift(1, "2026-04-20", "09:00", "13:00", "barista", 1, 1, vec![]),
-            shift(2, "2026-04-21", "14:00", "18:00", "cashier", 1, 1, vec![assign(10, "Alice", "Confirmed")]),
+            shift(
+                2,
+                "2026-04-21",
+                "14:00",
+                "18:00",
+                "cashier",
+                1,
+                1,
+                vec![assign(10, "Alice", "Confirmed")],
+            ),
         ]);
         let d = diff_snapshots(&old, &new);
         assert_eq!(d.len(), 2);
-        assert!(d.iter().any(|c| matches!(c.kind, ChangeKind::AssignmentRemoved { .. })));
-        assert!(d.iter().any(|c| matches!(c.kind, ChangeKind::AssignmentAdded { .. })));
+        assert!(
+            d.iter()
+                .any(|c| matches!(c.kind, ChangeKind::AssignmentRemoved { .. }))
+        );
+        assert!(
+            d.iter()
+                .any(|c| matches!(c.kind, ChangeKind::AssignmentAdded { .. }))
+        );
     }
 }

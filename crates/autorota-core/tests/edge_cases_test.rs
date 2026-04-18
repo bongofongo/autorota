@@ -526,10 +526,7 @@ async fn create_save_and_retrieve() {
     let save_id = queries::create_save(&pool, rota_id).await.unwrap();
     assert!(save_id > 0);
 
-    let got = queries::get_save(&pool, save_id)
-        .await
-        .unwrap()
-        .unwrap();
+    let got = queries::get_save(&pool, save_id).await.unwrap().unwrap();
     assert_eq!(got.rota_id, rota_id);
     assert!(got.summary.contains("3 shifts"));
     assert!(got.snapshot_json.contains("committed_shift_ids"));
@@ -616,10 +613,7 @@ async fn diff_rota_detects_no_changes_after_save() {
     let diffs = queries::diff_rota_vs_latest_save(&pool, rota_id)
         .await
         .unwrap();
-    assert!(
-        diffs.is_empty(),
-        "no diffs after saving identical state"
-    );
+    assert!(diffs.is_empty(), "no diffs after saving identical state");
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -775,9 +769,7 @@ async fn delete_rota_removes_associated_saves() {
 // H. Save restore
 // ─────────────────────────────────────────────────────────────
 
-async fn seed_rota_with_assignments(
-    pool: &sqlx::SqlitePool,
-) -> (i64, Vec<i64>, Vec<i64>) {
+async fn seed_rota_with_assignments(pool: &sqlx::SqlitePool) -> (i64, Vec<i64>, Vec<i64>) {
     let rota_id = queries::insert_rota(pool, week_start()).await.unwrap();
 
     // Employees
@@ -856,9 +848,7 @@ async fn restore_from_save_recreates_shifts_and_assignments() {
     queries::insert_shift(&pool, &new_shift).await.unwrap();
 
     // Restore.
-    let result = queries::restore_from_save(&pool, save_id)
-        .await
-        .unwrap();
+    let result = queries::restore_from_save(&pool, save_id).await.unwrap();
     assert_eq!(result.rota_id, rota_id);
     assert_eq!(result.shifts_restored, 3);
     assert_eq!(result.assignments_restored, 2);
@@ -892,9 +882,7 @@ async fn restore_from_save_skips_assignments_for_deleted_employees() {
         .unwrap();
     queries::delete_employee(&pool, alice_id).await.unwrap();
 
-    let result = queries::restore_from_save(&pool, save_id)
-        .await
-        .unwrap();
+    let result = queries::restore_from_save(&pool, save_id).await.unwrap();
     assert_eq!(result.shifts_restored, 3);
     // Only Bob's assignment restored; Alice's skipped.
     assert_eq!(result.assignments_restored, 1);

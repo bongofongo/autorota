@@ -48,7 +48,11 @@ struct ActivityLogView: View {
                 }
             }
         }
+        #if os(iOS)
         .listStyle(.insetGrouped)
+        #else
+        .listStyle(.inset)
+        #endif
         .refreshable { await vm.loadSaves() }
     }
 }
@@ -79,7 +83,7 @@ private struct SaveEntryView: View {
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
                                     .background(Color.accentColor.opacity(0.15))
-                                    .foregroundStyle(.accent)
+                                    .foregroundStyle(Color.accentColor)
                                     .clipShape(Capsule())
                             }
                         }
