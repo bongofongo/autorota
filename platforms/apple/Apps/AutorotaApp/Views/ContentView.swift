@@ -43,8 +43,8 @@ struct ContentView: View {
             #if os(iOS)
             if showsDotsTab {
                 Tab(
-                    (bridge.isSelectingForSave || bridge.isEditMode) ? "Done" : "More",
-                    systemImage: (bridge.isSelectingForSave || bridge.isEditMode) ? "checkmark" : "ellipsis",
+                    bridge.isEditMode ? "Done" : "More",
+                    systemImage: bridge.isEditMode ? "checkmark" : "ellipsis",
                     value: TabSelection.dots,
                     role: .search
                 ) {
@@ -76,9 +76,7 @@ struct ContentView: View {
                 default:
                     selection = .page(.rota)
                     lastPage = .rota
-                    if bridge.isSelectingForSave {
-                        bridge.isSelectingForSave = false
-                    } else if bridge.isEditMode {
+                    if bridge.isEditMode {
                         bridge.isEditMode = false
                     } else {
                         bridge.overflowOpen.toggle()

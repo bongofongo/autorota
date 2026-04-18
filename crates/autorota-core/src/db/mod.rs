@@ -238,15 +238,37 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     }
 
     // Migration 016: rename commits → saves, add label column.
+    // Guard: only run if `commits` exists AND `saves` does not (avoids conflict
+    // when migration 012's CREATE TABLE IF NOT EXISTS re-creates `commits` after
+    // a previous run already renamed it).
     let has_commits_table: bool = sqlx::query_scalar(
         "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='commits'",
     )
     .fetch_one(pool)
     .await?;
+    let has_saves_table: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='saves'",
+    )
+    .fetch_one(pool)
+    .await?;
 
-    if has_commits_table {
+    if has_commits_table && !has_saves_table {
         let m16 = include_str!("../../migrations/016_rename_commits_to_saves.sql");
         sqlx::raw_sql(m16).execute(pool).await?;
+    } else if has_commits_table && has_saves_table {
+        // Both exist (migration 012 re-created `commits` after a previous rename).
+        // Drop the stale `commits` table and ensure `saves` has the label column.
+        sqlx::raw_sql("DROP TABLE commits").execute(pool).await?;
+        let has_label: bool = sqlx::query_scalar(
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('saves') WHERE name = 'label'",
+        )
+        .fetch_one(pool)
+        .await?;
+        if !has_label {
+            sqlx::raw_sql("ALTER TABLE saves ADD COLUMN label TEXT")
+                .execute(pool)
+                .await?;
+        }
     }
 
     // Migration 017: rename committed_at → saved_at in saves table.
