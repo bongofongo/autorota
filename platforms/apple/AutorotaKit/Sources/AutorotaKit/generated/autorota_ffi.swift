@@ -1377,18 +1377,30 @@ public struct FfiEmployeeAvailabilityOverride {
     public var date: String
     public var availability: [DayAvailabilitySlot]
     public var notes: String?
+    /**
+     * "manual" | "exception". Exception rows appear in the Exceptions
+     * UI; manual rows are per-date edits via the availability grid and
+     * do not.
+     */
+    public var source: String
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(id: Int64, employeeId: Int64, 
         /**
          * "YYYY-MM-DD"
-         */date: String, availability: [DayAvailabilitySlot], notes: String?) {
+         */date: String, availability: [DayAvailabilitySlot], notes: String?, 
+        /**
+         * "manual" | "exception". Exception rows appear in the Exceptions
+         * UI; manual rows are per-date edits via the availability grid and
+         * do not.
+         */source: String) {
         self.id = id
         self.employeeId = employeeId
         self.date = date
         self.availability = availability
         self.notes = notes
+        self.source = source
     }
 }
 
@@ -1411,6 +1423,9 @@ extension FfiEmployeeAvailabilityOverride: Equatable, Hashable {
         if lhs.notes != rhs.notes {
             return false
         }
+        if lhs.source != rhs.source {
+            return false
+        }
         return true
     }
 
@@ -1420,6 +1435,7 @@ extension FfiEmployeeAvailabilityOverride: Equatable, Hashable {
         hasher.combine(date)
         hasher.combine(availability)
         hasher.combine(notes)
+        hasher.combine(source)
     }
 }
 
@@ -1435,7 +1451,8 @@ public struct FfiConverterTypeFfiEmployeeAvailabilityOverride: FfiConverterRustB
                 employeeId: FfiConverterInt64.read(from: &buf), 
                 date: FfiConverterString.read(from: &buf), 
                 availability: FfiConverterSequenceTypeDayAvailabilitySlot.read(from: &buf), 
-                notes: FfiConverterOptionString.read(from: &buf)
+                notes: FfiConverterOptionString.read(from: &buf), 
+                source: FfiConverterString.read(from: &buf)
         )
     }
 
@@ -1445,6 +1462,7 @@ public struct FfiConverterTypeFfiEmployeeAvailabilityOverride: FfiConverterRustB
         FfiConverterString.write(value.date, into: &buf)
         FfiConverterSequenceTypeDayAvailabilitySlot.write(value.availability, into: &buf)
         FfiConverterOptionString.write(value.notes, into: &buf)
+        FfiConverterString.write(value.source, into: &buf)
     }
 }
 

@@ -19,6 +19,7 @@ struct OverridesTabView: View {
     @State private var editingTmplOverride: FfiShiftTemplateOverride? = nil
     @State private var empViewMode: EmpViewMode = .allByDate
     @State private var expandedEmployees: Set<Int64> = []
+    @State private var expandedGroups: Set<String> = []
 
     enum EmpViewMode: String, CaseIterable, Identifiable {
         case allByDate = "All · Soonest Date"
@@ -48,8 +49,12 @@ struct OverridesTabView: View {
     }()
 
     private var employeeOverrideGroups: [EmpOverrideGroup] {
+        // Exceptions tab shows only user-classified exception rows.
+        // Manual per-date edits (made via the availability grid) still live
+        // in the same table but are not exceptions and must not appear here.
+        let exceptionsOnly = vm.employeeAvailabilityOverrides.filter { $0.source == "exception" }
         // Group by employee, then split into runs of consecutive days.
-        let byEmp = Dictionary(grouping: vm.employeeAvailabilityOverrides, by: { $0.employeeId })
+        let byEmp = Dictionary(grouping: exceptionsOnly, by: { $0.employeeId })
         var groups: [EmpOverrideGroup] = []
         let cal = Calendar(identifier: .iso8601)
         for (_, list) in byEmp {
@@ -116,32 +121,87 @@ struct OverridesTabView: View {
         Dictionary(uniqueKeysWithValues: templateVM.templates.map { ($0.id, $0.name) })
     }
 
+    private func availabilityColor(for slots: [DayAvailabilitySlot]) -> Color {
+        guard !slots.isEmpty else { return .gray }
+        let hasNo = slots.contains { $0.state == "No" }
+        let hasMaybe = slots.contains { $0.state == "Maybe" }
+        let hasYes = slots.contains { $0.state == "Yes" }
+        if hasNo && !hasYes && !hasMaybe { return .red }
+        if hasMaybe || (hasYes && hasNo) { return .yellow }
+        return .green
+    }
+
     @ViewBuilder
     private func empOverrideGroupButton(group: EmpOverrideGroup) -> some View {
-        Button {
-            if let first = group.items.first { editingEmpOverride = first }
-        } label: {
-            EmpOverrideGroupRow(group: group, employeeLookup: employeeLookup)
-        }
-        .buttonStyle(.plain)
-        .contextMenu {
-            if let first = group.items.first {
-                Button {
-                    editingEmpOverride = first
-                } label: {
-                    Label(group.isRange ? "Edit First Day" : "Edit", systemImage: "pencil")
-                }
-            }
-            Button(role: .destructive) {
-                Task {
-                    for ovr in group.items {
-                        await vm.deleteEmployeeOverride(id: ovr.id)
+        if group.isRange {
+            DisclosureGroup(
+                isExpanded: Binding(
+                    get: { expandedGroups.contains(group.id) },
+                    set: { exp in
+                        if exp { expandedGroups.insert(group.id) }
+                        else { expandedGroups.remove(group.id) }
                     }
-                    await vm.loadAll()
+                )
+            ) {
+                ForEach(group.items) { ovr in
+                    Button { editingEmpOverride = ovr } label: {
+                        EmpOverrideDayRow(ovr: ovr, color: availabilityColor(for: ovr.availability))
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu {
+                        Button { editingEmpOverride = ovr } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                        Button(role: .destructive) {
+                            Task {
+                                await vm.deleteEmployeeOverride(id: ovr.id)
+                                await vm.loadAll()
+                            }
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
                 }
             } label: {
-                Label(group.isRange ? "Delete All (\(group.items.count))" : "Delete",
-                      systemImage: "trash")
+                EmpOverrideGroupRow(group: group, employeeLookup: employeeLookup)
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            Task {
+                                for ovr in group.items {
+                                    await vm.deleteEmployeeOverride(id: ovr.id)
+                                }
+                                await vm.loadAll()
+                            }
+                        } label: {
+                            Label("Delete All (\(group.items.count))", systemImage: "trash")
+                        }
+                    }
+            }
+        } else {
+            Button {
+                if let first = group.items.first { editingEmpOverride = first }
+            } label: {
+                EmpOverrideGroupRow(group: group, employeeLookup: employeeLookup)
+            }
+            .buttonStyle(.plain)
+            .contextMenu {
+                if let first = group.items.first {
+                    Button {
+                        editingEmpOverride = first
+                    } label: {
+                        Label("Edit", systemImage: "pencil")
+                    }
+                }
+                Button(role: .destructive) {
+                    Task {
+                        for ovr in group.items {
+                            await vm.deleteEmployeeOverride(id: ovr.id)
+                        }
+                        await vm.loadAll()
+                    }
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
             }
         }
     }
@@ -328,6 +388,46 @@ private struct EmpOverrideGroupRow: View {
     }
 }
 
+private struct EmpOverrideDayRow: View {
+    let ovr: FfiEmployeeAvailabilityOverride
+    let color: Color
+
+    private static let displayFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEE d MMM"
+        return f
+    }()
+
+    private static let isoFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+
+    private var pretty: String {
+        guard let d = Self.isoFmt.date(from: ovr.date) else { return ovr.date }
+        return Self.displayFmt.string(from: d)
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Circle()
+                .fill(color)
+                .frame(width: 10, height: 10)
+            Text(pretty)
+                .font(.subheadline)
+            Spacer()
+            if let notes = ovr.notes, !notes.isEmpty {
+                Text(notes)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+    }
+}
+
 private struct EmpOverrideRow: View {
     let ovr: FfiEmployeeAvailabilityOverride
     let employeeLookup: [Int64: String]
@@ -398,6 +498,8 @@ struct EmployeeAvailabilityOverrideSheet: View {
     let employees: [FfiEmployee]
     var existing: FfiEmployeeAvailabilityOverride?
     var preselectedEmployeeId: Int64? = nil
+    var preselectedStartDate: Date? = nil
+    var preselectedEndDate: Date? = nil
 
     @Environment(\.dismiss) private var dismiss
     @State private var selectedEmployeeId: Int64?
@@ -411,6 +513,9 @@ struct EmployeeAvailabilityOverrideSheet: View {
     @State private var endDate: Date = Calendar.current.date(byAdding: .day, value: 6, to: Date()) ?? Date()
     @State private var slotsByDate: [String: [AvailabilitySlot]] = [:]
     @State private var currentDateIndex = 0
+    @State private var showLongRangeWarning = false
+
+    private static let softMaxDaysInRange = 84  // 12 weeks
 
     private var isEditing: Bool { existing != nil }
 
@@ -471,7 +576,7 @@ struct EmployeeAvailabilityOverrideSheet: View {
     }
 
     private func notAvailableSlots(for weekday: String) -> [AvailabilitySlot] {
-        (6...21).map { AvailabilitySlot(weekday: weekday, hour: UInt8($0), state: "No") }
+        (0...23).map { AvailabilitySlot(weekday: weekday, hour: UInt8($0), state: "No") }
     }
 
     var body: some View {
@@ -489,7 +594,22 @@ struct EmployeeAvailabilityOverrideSheet: View {
                 Section("Date") {
                     if !isEditing {
                         Toggle("Date Range", isOn: $isDateRange.animation())
-                            .onChange(of: isDateRange) { _, _ in currentDateIndex = 0 }
+                            .onChange(of: isDateRange) { _, newVal in
+                                currentDateIndex = 0
+                                if newVal {
+                                    // Entering range mode — seed start date's slots from the
+                                    // single-day buffer so they aren't silently discarded.
+                                    let key = Self.dateFmt.string(from: date)
+                                    if slotsByDate[key] == nil, !slots.isEmpty {
+                                        slotsByDate[key] = slots
+                                    }
+                                } else {
+                                    // Leaving range mode — pull the anchor date's slots back
+                                    // into the single-day buffer so the user doesn't lose edits.
+                                    let key = Self.dateFmt.string(from: date)
+                                    slots = slotsByDate[key] ?? slots
+                                }
+                            }
                     }
                     DatePicker(isDateRange ? "Start" : "Date",
                                selection: $date, displayedComponents: .date)
@@ -527,11 +647,17 @@ struct EmployeeAvailabilityOverrideSheet: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }
+                    Button("Save") { attemptSave() }
                         .disabled(selectedEmployeeId == nil)
                 }
             }
             .onAppear { prefill() }
+            .alert("Long date range", isPresented: $showLongRangeWarning) {
+                Button("Cancel", role: .cancel) {}
+                Button("Save anyway") { save() }
+            } message: {
+                Text("This exception covers \(datesInRange.count) days (more than \(Self.softMaxDaysInRange / 7) weeks). Long ranges can be hard to manage — are you sure?")
+            }
         }
         #if os(macOS)
         .frame(minWidth: 480, idealWidth: 560, minHeight: 500, idealHeight: 650)
@@ -636,6 +762,13 @@ struct EmployeeAvailabilityOverrideSheet: View {
 
     private func prefill() {
         if let preId = preselectedEmployeeId { selectedEmployeeId = preId }
+        if let start = preselectedStartDate {
+            date = start
+            if let end = preselectedEndDate, end > start {
+                endDate = end
+                isDateRange = true
+            }
+        }
         guard let ovr = existing else { return }
         selectedEmployeeId = ovr.employeeId
         let parsedDate = Self.dateFmt.date(from: ovr.date) ?? Date()
@@ -643,6 +776,14 @@ struct EmployeeAvailabilityOverrideSheet: View {
         let wd = weekday(for: parsedDate)
         slots = ovr.availability.map { AvailabilitySlot(weekday: wd, hour: $0.hour, state: $0.state) }
         notes = ovr.notes ?? ""
+    }
+
+    private func attemptSave() {
+        if isDateRange && datesInRange.count > Self.softMaxDaysInRange {
+            showLongRangeWarning = true
+        } else {
+            save()
+        }
     }
 
     private func save() {
@@ -661,7 +802,8 @@ struct EmployeeAvailabilityOverrideSheet: View {
                         employeeId: empId,
                         date: key,
                         availability: daySlots,
-                        notes: notes.isEmpty ? nil : notes
+                        notes: notes.isEmpty ? nil : notes,
+                        source: "exception"
                     )
                     await vm.upsertEmployeeOverride(ovr)
                 }
@@ -677,7 +819,8 @@ struct EmployeeAvailabilityOverrideSheet: View {
                 employeeId: empId,
                 date: Self.dateFmt.string(from: date),
                 availability: daySlots,
-                notes: notes.isEmpty ? nil : notes
+                notes: notes.isEmpty ? nil : notes,
+                source: "exception"
             )
             Task {
                 await vm.upsertEmployeeOverride(ovr)

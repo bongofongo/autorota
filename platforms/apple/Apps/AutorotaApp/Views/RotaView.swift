@@ -259,13 +259,6 @@ private struct ScheduleGridView: View {
     @State private var shiftToDelete: Int64?
     @State private var showUnlockPastConfirmation = false
 
-    private var activeDays: [String] {
-        vm.allWeekdays.filter { day in
-            !(vm.shiftsByDay.first(where: { $0.weekday == day })?.shifts ?? []).isEmpty
-                || vm.isEditMode
-        }
-    }
-
     var body: some View {
         GeometryReader { geo in
             if geo.size.width > geo.size.height {
@@ -333,57 +326,62 @@ private struct ScheduleGridView: View {
             LazyVStack(alignment: .leading, spacing: 12, pinnedViews: [.sectionHeaders]) {
                 ForEach(vm.allWeekdays, id: \.self) { day in
                     let shifts = vm.shiftsByDay.first(where: { $0.weekday == day })?.shifts ?? []
-                    if !shifts.isEmpty || vm.isEditMode {
-                        Section {
-                            ForEach(shifts, id: \.id) { shift in
-                                let locked = vm.isShiftLocked(shift)
-                                ShiftCard(
-                                    shift: shift,
-                                    assignments: vm.assignments(for: shift.id),
-                                    vm: vm,
-                                    isEditMode: vm.isEditMode,
-                                    isLocked: locked,
-                                    onAddEmployee: { shiftForEmployeePicker = shift },
-                                    onEditTimes: { shiftForTimeEdit = shift },
-                                    onDeleteShift: { shiftToDelete = shift.id }
-                                )
-                            }
-                            if vm.isEditMode && !vm.isDayLocked(day) {
-                                Button {
-                                    dayForNewShift = SheetDate(vm.dateForWeekday(day))
-                                } label: {
-                                    Label("Add Shift", systemImage: "plus.circle")
-                                        .font(.subheadline)
-                                }
+                    Section {
+                        ForEach(shifts, id: \.id) { shift in
+                            let locked = vm.isShiftLocked(shift)
+                            ShiftCard(
+                                shift: shift,
+                                assignments: vm.assignments(for: shift.id),
+                                vm: vm,
+                                isEditMode: vm.isEditMode,
+                                isLocked: locked,
+                                onAddEmployee: { shiftForEmployeePicker = shift },
+                                onEditTimes: { shiftForTimeEdit = shift },
+                                onDeleteShift: { shiftToDelete = shift.id }
+                            )
+                        }
+                        if shifts.isEmpty && !vm.isEditMode {
+                            Text("No shifts")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                                .italic()
                                 .padding(.horizontal)
+                        }
+                        if vm.isEditMode && !vm.isDayLocked(day) {
+                            Button {
+                                dayForNewShift = SheetDate(vm.dateForWeekday(day))
+                            } label: {
+                                Label("Add Shift", systemImage: "plus.circle")
+                                    .font(.subheadline)
                             }
-                        } header: {
-                            HStack {
-                                Text(day)
-                                    .font(.headline)
-                                if vm.isDayPast(day) {
-                                    if vm.isEditMode && !vm.pastUnlocked {
-                                        Button {
-                                            showUnlockPastConfirmation = true
-                                        } label: {
-                                            Image(systemName: "lock")
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        .buttonStyle(.plain)
-                                    } else {
-                                        Image(systemName: vm.pastUnlocked ? "lock.open" : "lock")
+                            .padding(.horizontal)
+                        }
+                    } header: {
+                        HStack {
+                            Text(day)
+                                .font(.headline)
+                            if vm.isDayPast(day) {
+                                if vm.isEditMode && !vm.pastUnlocked {
+                                    Button {
+                                        showUnlockPastConfirmation = true
+                                    } label: {
+                                        Image(systemName: "lock")
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                     }
+                                    .buttonStyle(.plain)
+                                } else {
+                                    Image(systemName: vm.pastUnlocked ? "lock.open" : "lock")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
                                 }
-                                Spacer()
                             }
-                            .padding(.horizontal)
-                            .padding(.vertical, 4)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(.regularMaterial)
+                            Spacer()
                         }
+                        .padding(.horizontal)
+                        .padding(.vertical, 4)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(.regularMaterial)
                     }
                 }
             }
@@ -397,14 +395,14 @@ private struct ScheduleGridView: View {
         let columnMinWidth: CGFloat = 150
         let columnSpacing: CGFloat = 8
         let outerPadding: CGFloat = 8
-        let count = CGFloat(max(activeDays.count, 1))
+        let count = CGFloat(max(vm.allWeekdays.count, 1))
         let totalSpacing = (count - 1) * columnSpacing + outerPadding * 2
         let columnWidth = max(columnMinWidth, (availableWidth - totalSpacing) / count)
 
         return ScrollView(.vertical) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: columnSpacing) {
-                    ForEach(activeDays, id: \.self) { day in
+                    ForEach(vm.allWeekdays, id: \.self) { day in
                         dayColumn(day: day, width: columnWidth)
                     }
                 }

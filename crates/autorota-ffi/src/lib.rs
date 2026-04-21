@@ -8,7 +8,7 @@ use autorota_core::models::assignment::{Assignment, AssignmentStatus};
 use autorota_core::models::availability::{Availability, AvailabilityState};
 use autorota_core::models::employee::Employee;
 use autorota_core::models::overrides::{
-    DayAvailability, EmployeeAvailabilityOverride, ShiftTemplateOverride,
+    DayAvailability, EmployeeAvailabilityOverride, OverrideSource, ShiftTemplateOverride,
 };
 use autorota_core::models::rota::Rota;
 use autorota_core::models::shift::{Shift, ShiftTemplate};
@@ -1397,6 +1397,7 @@ fn employee_avail_override_to_ffi(
         date: o.date.to_string(),
         availability: day_availability_to_slots(&o.availability),
         notes: o.notes,
+        source: o.source.as_str().to_string(),
     }
 }
 
@@ -1409,6 +1410,7 @@ fn ffi_to_employee_avail_override(
         date: parse_date(&o.date)?,
         availability: slots_to_day_availability(o.availability)?,
         notes: o.notes,
+        source: OverrideSource::parse(&o.source),
     })
 }
 

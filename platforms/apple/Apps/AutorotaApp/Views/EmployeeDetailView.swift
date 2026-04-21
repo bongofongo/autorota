@@ -25,6 +25,15 @@ struct EmployeeDetailView: View {
     @State private var customStartDate: Date = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date()
     @State private var customEndDate: Date = Date()
 
+    @State private var availabilityWeekOffset: Int = 1
+
+    static let weekdayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    private static let weekRangeFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMM d"
+        return f
+    }()
+
     private struct OverrideGroup: Identifiable {
         let items: [FfiEmployeeAvailabilityOverride]
         var id: String { "\(items.first?.date ?? "")-\(items.count)" }
@@ -47,7 +56,12 @@ struct EmployeeDetailView: View {
     }()
 
     private var groupedOverrides: [OverrideGroup] {
-        let sorted = overrideVM.employeeAvailabilityOverrides.sorted { $0.date < $1.date }
+        // The detail view's Exceptions list only surfaces rows explicitly
+        // classified as exceptions. Manual per-date edits (written by the
+        // Actual availability grid) share the same table but are not
+        // exceptions and must stay hidden here.
+        let exceptions = overrideVM.employeeAvailabilityOverrides.filter { $0.source == "exception" }
+        let sorted = exceptions.sorted { $0.date < $1.date }
         let cal = Calendar(identifier: .iso8601)
         var groups: [OverrideGroup] = []
         var run: [FfiEmployeeAvailabilityOverride] = []
@@ -125,6 +139,52 @@ struct EmployeeDetailView: View {
 
     private func convertedCost(_ cost: Float?) -> Float? {
         cost.map { exchangeRates.convert($0, from: employee.wageCurrency ?? displayCurrency, to: displayCurrency) }
+    }
+
+    private func mondayOfWeek(offset: Int) -> Date {
+        let cal = Calendar(identifier: .iso8601)
+        let monday = cal.date(from: cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date()))!
+        return cal.date(byAdding: .weekOfYear, value: offset, to: monday)!
+    }
+
+    private func weekDays(offset: Int) -> [(weekday: String, date: Date, iso: String)] {
+        let cal = Calendar(identifier: .iso8601)
+        let mon = mondayOfWeek(offset: offset)
+        return (0..<7).map { i in
+            let d = cal.date(byAdding: .day, value: i, to: mon)!
+            return (Self.weekdayOrder[i], d, Self.isoFmt.string(from: d))
+        }
+    }
+
+    private var overrideByDate: [String: FfiEmployeeAvailabilityOverride] {
+        Dictionary(overrideVM.employeeAvailabilityOverrides.map { ($0.date, $0) },
+                   uniquingKeysWith: { a, _ in a })
+    }
+
+    /// Merge default template with per-date overrides into weekday-keyed slots for a specific week.
+    private func mergedActualSlots(for days: [(weekday: String, date: Date, iso: String)]) -> [AvailabilitySlot] {
+        var slots: [AvailabilitySlot] = []
+        for (wd, _, iso) in days {
+            if let ovr = overrideByDate[iso] {
+                for s in ovr.availability {
+                    slots.append(AvailabilitySlot(weekday: wd, hour: s.hour, state: s.state))
+                }
+            } else {
+                for s in employee.defaultAvailability where s.weekday == wd {
+                    slots.append(AvailabilitySlot(weekday: wd, hour: s.hour, state: s.state))
+                }
+            }
+        }
+        return slots
+    }
+
+    private var todayStartOfDay: Date {
+        Calendar(identifier: .iso8601).startOfDay(for: Date())
+    }
+
+    private func actualWeekLabel(days: [(weekday: String, date: Date, iso: String)]) -> String {
+        guard let first = days.first?.date, let last = days.last?.date else { return "" }
+        return "\(Self.weekRangeFmt.string(from: first)) – \(Self.weekRangeFmt.string(from: last))"
     }
 
     @ViewBuilder
@@ -283,14 +343,60 @@ struct EmployeeDetailView: View {
                 }
             }
 
-            Section("Availability — Week of \(weekStart(weeksFromNow: 1))") {
-                let range = AvailabilityGridView.inferredVisibleRange(from: employee.availability)
+            Section {
+                let days = weekDays(offset: availabilityWeekOffset)
+                let merged = mergedActualSlots(for: days)
+                let range = AvailabilityGridView.inferredVisibleRange(from: merged)
+                // Orange outline marks exceptions only. Manual per-date edits
+                // also sit in overrideByDate (so the grid renders the right
+                // actual availability) but must not display as exceptions.
+                let outlined = Set(days.filter { overrideByDate[$0.iso]?.source == "exception" }.map { $0.weekday })
+                let readOnly = Set(days.filter { $0.date < todayStartOfDay }.map { $0.weekday })
+                let subheaders = Dictionary(uniqueKeysWithValues: days.map { ($0.weekday, Self.weekRangeFmt.string(from: $0.date).components(separatedBy: " ").last ?? "") })
+
+                HStack {
+                    Button { availabilityWeekOffset -= 1 } label: {
+                        Image(systemName: "chevron.left")
+                    }
+                    .buttonStyle(.borderless)
+                    Spacer()
+                    VStack(spacing: 1) {
+                        Text(actualWeekLabel(days: days))
+                            .font(.subheadline).fontWeight(.medium)
+                        if availabilityWeekOffset == 0 {
+                            Text("This week").font(.caption2).foregroundStyle(.secondary)
+                        } else if availabilityWeekOffset == 1 {
+                            Text("Next week").font(.caption2).foregroundStyle(.secondary)
+                        } else if availabilityWeekOffset == -1 {
+                            Text("Last week").font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                    Button { availabilityWeekOffset += 1 } label: {
+                        Image(systemName: "chevron.right")
+                    }
+                    .buttonStyle(.borderless)
+                }
+
                 AvailabilityGridView(
-                    slots: employee.availability,
+                    slots: merged,
                     isEditable: false,
                     visibleHourStart: range.start,
-                    visibleHourEnd: range.end
+                    visibleHourEnd: range.end,
+                    outlinedWeekdays: outlined,
+                    readOnlyWeekdays: readOnly,
+                    weekdaySubheaders: subheaders
                 )
+
+                if !outlined.isEmpty {
+                    HStack(spacing: 6) {
+                        Circle().fill(Color.orange).frame(width: 8, height: 8)
+                        Text("Orange outline = exception for that day")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("Availability")
             }
 
             Section("Analytics") {
@@ -356,7 +462,9 @@ struct EmployeeDetailView: View {
                 Button("Edit") { showingEditSheet = true }
             }
         }
-        .sheet(isPresented: $showingEditSheet) {
+        .sheet(isPresented: $showingEditSheet, onDismiss: {
+            Task { await overrideVM.loadForEmployee(id: employee.id) }
+        }) {
             EmployeeEditSheet(viewModel: viewModel, existing: employee, onDelete: { dismiss() })
         }
         .sheet(isPresented: $showingAddOverride, onDismiss: { Task { await overrideVM.loadForEmployee(id: employee.id) } }) {
@@ -388,6 +496,7 @@ struct EmployeeEditSheet: View {
     @State private var showingDeleteConfirmation = false
 
     @State private var roleVM = RoleViewModel()
+    @State private var overrideVM = OverrideViewModel()
     @State private var firstName = ""
     @State private var lastName = ""
     @State private var nickname = ""
@@ -400,15 +509,20 @@ struct EmployeeEditSheet: View {
     @State private var hourlyWageText = ""
     @State private var wageCurrency: String = AppCurrency.usd.rawValue
 
-    // Dual availability state
+    // Availability state
     @State private var defaultAvailabilitySlots: [AvailabilitySlot] = []
-    @State private var nextWeekSlots: [AvailabilitySlot] = []
 
-    // DisclosureGroup expansion state
-    @State private var defaultExpanded = false
-    @State private var nextWeekExpanded = true
+    enum AvailMode: String, CaseIterable, Identifiable {
+        case `default` = "Default"
+        case actual = "Actual"
+        var id: String { rawValue }
+    }
+    @State private var availabilityMode: AvailMode = .actual
+    @State private var actualWeekOffset: Int = 1
+    /// ISO date → edited day slots (staged). Reflects a delta over existing overrides.
+    @State private var actualEditsByDate: [String: [DayAvailabilitySlot]] = [:]
 
-    // Visible hour range — shared by both grids, set via the Regular Hours picker
+    // Visible hour range — shared by both grids, set via the Default range picker
     @State private var defaultVisibleStart = 6
     @State private var defaultVisibleEnd = 22
 
@@ -416,6 +530,86 @@ struct EmployeeEditSheet: View {
     @State private var selectionModeActive = false
 
     private var isEditing: Bool { existing != nil }
+
+    private static let sheetDateFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+
+    private static let sheetWeekRangeFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMM d"
+        return f
+    }()
+
+    private func sheetMondayOfWeek(offset: Int) -> Date {
+        let cal = Calendar(identifier: .iso8601)
+        let monday = cal.date(from: cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date()))!
+        return cal.date(byAdding: .weekOfYear, value: offset, to: monday)!
+    }
+
+    private func sheetWeekDays(offset: Int) -> [(weekday: String, date: Date, iso: String)] {
+        let cal = Calendar(identifier: .iso8601)
+        let mon = sheetMondayOfWeek(offset: offset)
+        return (0..<7).map { i in
+            let d = cal.date(byAdding: .day, value: i, to: mon)!
+            return (EmployeeDetailView.weekdayOrder[i], d, Self.sheetDateFmt.string(from: d))
+        }
+    }
+
+    private var sheetOverrideByIso: [String: FfiEmployeeAvailabilityOverride] {
+        Dictionary(overrideVM.employeeAvailabilityOverrides.map { ($0.date, $0) },
+                   uniquingKeysWith: { a, _ in a })
+    }
+
+    /// Merged weekday-keyed slots for the visible week: edits > overrides > default template.
+    private func mergedActualSlotsForEdit(offset: Int) -> [AvailabilitySlot] {
+        let days = sheetWeekDays(offset: offset)
+        var out: [AvailabilitySlot] = []
+        for (wd, _, iso) in days {
+            if let edits = actualEditsByDate[iso] {
+                for s in edits {
+                    out.append(AvailabilitySlot(weekday: wd, hour: s.hour, state: s.state))
+                }
+            } else if let ovr = sheetOverrideByIso[iso] {
+                for s in ovr.availability {
+                    out.append(AvailabilitySlot(weekday: wd, hour: s.hour, state: s.state))
+                }
+            } else {
+                for s in defaultAvailabilitySlots where s.weekday == wd {
+                    out.append(s)
+                }
+            }
+        }
+        return out
+    }
+
+    /// Diff new grid output against the merged baseline and stage per-date edits.
+    private func applyActualEdit(newSlots: [AvailabilitySlot]) {
+        let days = sheetWeekDays(offset: actualWeekOffset)
+        for (wd, _, iso) in days {
+            let newDay = newSlots
+                .filter { $0.weekday == wd }
+                .map { DayAvailabilitySlot(hour: $0.hour, state: $0.state) }
+                .sorted { $0.hour < $1.hour }
+            let baseline: [DayAvailabilitySlot]
+            if let edits = actualEditsByDate[iso] {
+                baseline = edits.sorted { $0.hour < $1.hour }
+            } else if let ovr = sheetOverrideByIso[iso] {
+                baseline = ovr.availability.sorted { $0.hour < $1.hour }
+            } else {
+                baseline = defaultAvailabilitySlots
+                    .filter { $0.weekday == wd }
+                    .map { DayAvailabilitySlot(hour: $0.hour, state: $0.state) }
+                    .sorted { $0.hour < $1.hour }
+            }
+            if newDay != baseline {
+                actualEditsByDate[iso] = newDay
+            }
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -482,47 +676,15 @@ struct EmployeeEditSheet: View {
                 }
 
                 Section("Availability") {
-                    // Manual expand/collapse keeps the grid as a direct Section row
-                    // (same level as read-only view), so GeometryReader gets the same width.
-                    Button {
-                        withAnimation { nextWeekExpanded.toggle() }
-                    } label: {
-                        HStack {
-                            Text("Next Week").foregroundStyle(.primary)
-                            Spacer()
-                            Image(systemName: nextWeekExpanded ? "chevron.down" : "chevron.right")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                    Picker("Mode", selection: $availabilityMode) {
+                        ForEach(AvailMode.allCases) { m in
+                            Text(m.rawValue).tag(m)
                         }
                     }
-                    .buttonStyle(.plain)
+                    .pickerStyle(.segmented)
 
-                    if nextWeekExpanded {
-                        AvailabilityGridView(
-                            slots: nextWeekSlots,
-                            isEditable: true,
-                            visibleHourStart: defaultVisibleStart,
-                            visibleHourEnd: defaultVisibleEnd,
-                            onChange: { nextWeekSlots = $0 },
-                            onSelectionModeChange: { selectionModeActive = $0 },
-                            onReset: { nextWeekSlots = defaultAvailabilitySlots }
-                        )
-                    }
-
-                    Button {
-                        withAnimation { defaultExpanded.toggle() }
-                    } label: {
-                        HStack {
-                            Text("Regular Hours").foregroundStyle(.primary)
-                            Spacer()
-                            Image(systemName: defaultExpanded ? "chevron.down" : "chevron.right")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .buttonStyle(.plain)
-
-                    if defaultExpanded {
+                    switch availabilityMode {
+                    case .default:
                         AvailabilityGridView(
                             slots: defaultAvailabilitySlots,
                             isEditable: true,
@@ -535,6 +697,73 @@ struct EmployeeEditSheet: View {
                                 defaultVisibleEnd = end
                             },
                             onSelectionModeChange: { selectionModeActive = $0 }
+                        )
+                    case .actual:
+                        let days = sheetWeekDays(offset: actualWeekOffset)
+                        let merged = mergedActualSlotsForEdit(offset: actualWeekOffset)
+                        // Orange outline marks *exceptions* only — not normal
+                        // per-date edits. A staged edit from this sheet is a
+                        // manual edit and never outlines. An existing row shows
+                        // only if its source is "exception".
+                        let outlined = Set(days.compactMap { day -> String? in
+                            if actualEditsByDate[day.iso] != nil {
+                                // User is editing this day manually — no outline, whatever they do.
+                                return nil
+                            }
+                            return sheetOverrideByIso[day.iso]?.source == "exception" ? day.weekday : nil
+                        })
+                        let subheaders = Dictionary(uniqueKeysWithValues: days.map {
+                            ($0.weekday, Self.sheetWeekRangeFmt.string(from: $0.date).components(separatedBy: " ").last ?? "")
+                        })
+
+                        HStack {
+                            Button { actualWeekOffset -= 1 } label: {
+                                Image(systemName: "chevron.left")
+                            }
+                            .buttonStyle(.borderless)
+                            Spacer()
+                            VStack(spacing: 1) {
+                                if let first = days.first?.date, let last = days.last?.date {
+                                    Text("\(Self.sheetWeekRangeFmt.string(from: first)) – \(Self.sheetWeekRangeFmt.string(from: last))")
+                                        .font(.subheadline).fontWeight(.medium)
+                                }
+                                if actualWeekOffset == 0 {
+                                    Text("This week").font(.caption2).foregroundStyle(.secondary)
+                                } else if actualWeekOffset == 1 {
+                                    Text("Next week").font(.caption2).foregroundStyle(.secondary)
+                                } else if actualWeekOffset == -1 {
+                                    Text("Last week").font(.caption2).foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer()
+                            Button { actualWeekOffset += 1 } label: {
+                                Image(systemName: "chevron.right")
+                            }
+                            .buttonStyle(.borderless)
+                        }
+
+                        AvailabilityGridView(
+                            slots: merged,
+                            isEditable: true,
+                            visibleHourStart: defaultVisibleStart,
+                            visibleHourEnd: defaultVisibleEnd,
+                            onChange: { applyActualEdit(newSlots: $0) },
+                            onSelectionModeChange: { selectionModeActive = $0 },
+                            onReset: {
+                                // Reset to default template for every date in visible week.
+                                // Staged values matching default are deleted on Save, clearing
+                                // any existing per-date overrides for this week.
+                                for d in days {
+                                    let wd = d.weekday
+                                    let defaultDay = defaultAvailabilitySlots
+                                        .filter { $0.weekday == wd }
+                                        .map { DayAvailabilitySlot(hour: $0.hour, state: $0.state) }
+                                        .sorted { $0.hour < $1.hour }
+                                    actualEditsByDate[d.iso] = defaultDay
+                                }
+                            },
+                            outlinedWeekdays: outlined,
+                            weekdaySubheaders: subheaders
                         )
                     }
                 }
@@ -584,7 +813,10 @@ struct EmployeeEditSheet: View {
                 if existing == nil { wageCurrency = displayCurrency }
                 prefill()
             }
-            .task { await roleVM.load() }
+            .task {
+                await roleVM.load()
+                if let e = existing { await overrideVM.loadForEmployee(id: e.id) }
+            }
         }
         #if os(macOS)
         .frame(minWidth: 560, idealWidth: 640, minHeight: 550, idealHeight: 700)
@@ -613,7 +845,6 @@ struct EmployeeEditSheet: View {
             hourlyWageText = ""
         }
         defaultAvailabilitySlots = e.defaultAvailability
-        nextWeekSlots = e.availability
         let range = AvailabilityGridView.inferredVisibleRange(from: e.defaultAvailability)
         defaultVisibleStart = range.start
         defaultVisibleEnd = range.end
@@ -625,8 +856,6 @@ struct EmployeeEditSheet: View {
 
         let finalDefault = AvailabilityGridView.slotsWithOutOfRangeSetToNo(
             slots: defaultAvailabilitySlots, start: defaultVisibleStart, end: defaultVisibleEnd)
-        let finalNextWeek = AvailabilityGridView.slotsWithOutOfRangeSetToNo(
-            slots: nextWeekSlots, start: defaultVisibleStart, end: defaultVisibleEnd)
 
         let trimmedFirst = firstName.trimmingCharacters(in: .whitespaces)
         let trimmedLast = lastName.trimmingCharacters(in: .whitespaces)
@@ -634,6 +863,8 @@ struct EmployeeEditSheet: View {
         let displayWage: Float? = Float(hourlyWageText.trimmingCharacters(in: .whitespaces))
         // Convert from display currency back to the employee's storage currency
         let parsedWage: Float? = displayWage.map { exchangeRates.convert($0, from: displayCurrency, to: wageCurrency) }
+        // Keep `availability` mirrored to `defaultAvailability` so scheduler's weekday
+        // fallback matches the template for any week without an override.
         let emp = FfiEmployee(
             id: existing?.id ?? 0,
             firstName: trimmedFirst,
@@ -650,15 +881,67 @@ struct EmployeeEditSheet: View {
             hourlyWage: parsedWage,
             wageCurrency: parsedWage != nil ? wageCurrency : nil,
             defaultAvailability: finalDefault,
-            availability: finalNextWeek,
+            availability: finalDefault,
             deleted: false
         )
 
         Task {
+            let savedEmpId: Int64
             if isEditing {
                 await viewModel.update(emp)
+                savedEmpId = emp.id
             } else {
                 await viewModel.create(emp)
+                // Skip override persistence for brand-new employees — UI can't have staged
+                // edits against an employee that didn't exist yet, but the guard is defensive.
+                dismiss()
+                return
+            }
+
+            // Persist staged per-date edits as overrides (create/update/delete).
+            let defaultForWeekday: (String) -> [DayAvailabilitySlot] = { wd in
+                finalDefault
+                    .filter { $0.weekday == wd }
+                    .map { DayAvailabilitySlot(hour: $0.hour, state: $0.state) }
+                    .sorted { $0.hour < $1.hour }
+            }
+            let wdMap: [Int: String] = [2: "Mon", 3: "Tue", 4: "Wed", 5: "Thu", 6: "Fri", 7: "Sat", 1: "Sun"]
+            let cal = Calendar(identifier: .iso8601)
+            let existingByIso = Dictionary(
+                overrideVM.employeeAvailabilityOverrides.map { ($0.date, $0) },
+                uniquingKeysWith: { a, _ in a }
+            )
+            for (iso, editedDay) in actualEditsByDate {
+                guard let date = Self.sheetDateFmt.date(from: iso) else { continue }
+                let wd = wdMap[cal.component(.weekday, from: date)] ?? "Mon"
+                let sortedEdit = editedDay.sorted { $0.hour < $1.hour }
+                let defaultDay = defaultForWeekday(wd)
+                let existing = existingByIso[iso]
+                if sortedEdit == defaultDay {
+                    // Staged edit reconciles to the default template. Only
+                    // delete when the existing row is a *manual* per-date
+                    // edit. Exceptions — deliberately classified via the
+                    // Exceptions UI — must not be silently deleted when the
+                    // user happens to edit that day back to default.
+                    if let ex = existing, ex.source != "exception" {
+                        await overrideVM.deleteEmployeeOverride(id: ex.id)
+                    }
+                } else {
+                    // Preserve the original classification on conflict: if
+                    // editing an existing exception row, the backend's
+                    // ON CONFLICT preserves source. For brand-new rows
+                    // written by this sheet, tag them "manual".
+                    let source = existing?.source ?? "manual"
+                    let ovr = FfiEmployeeAvailabilityOverride(
+                        id: existing?.id ?? 0,
+                        employeeId: savedEmpId,
+                        date: iso,
+                        availability: sortedEdit,
+                        notes: existing?.notes,
+                        source: source
+                    )
+                    await overrideVM.upsertEmployeeOverride(ovr)
+                }
             }
             dismiss()
         }

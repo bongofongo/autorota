@@ -4,7 +4,7 @@ use autorota_core::models::assignment::{Assignment, AssignmentStatus};
 use autorota_core::models::availability::AvailabilityState;
 use autorota_core::models::employee::Employee;
 use autorota_core::models::overrides::{
-    DayAvailability, EmployeeAvailabilityOverride, ShiftTemplateOverride,
+    DayAvailability, EmployeeAvailabilityOverride, OverrideSource, ShiftTemplateOverride,
 };
 use autorota_core::models::role::Role;
 use autorota_core::models::rota::Rota;
@@ -647,6 +647,13 @@ struct TauriEmployeeAvailabilityOverride {
     /// {"8":"Yes","9":"Maybe",...}
     availability: HashMap<String, String>,
     notes: Option<String>,
+    /// "manual" | "exception". Absent defaults to "exception".
+    #[serde(default = "default_override_source_tauri")]
+    source: String,
+}
+
+fn default_override_source_tauri() -> String {
+    "exception".to_string()
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Clone)]
@@ -683,6 +690,7 @@ fn tauri_to_employee_avail_override(
         date,
         availability: avail,
         notes: dto.notes,
+        source: OverrideSource::parse(&dto.source),
     })
 }
 
@@ -701,6 +709,7 @@ fn employee_avail_override_to_tauri(
         date: ovr.date.to_string(),
         availability: avail_map,
         notes: ovr.notes,
+        source: ovr.source.as_str().to_string(),
     }
 }
 

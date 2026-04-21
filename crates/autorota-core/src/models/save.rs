@@ -126,6 +126,31 @@ pub struct SaveSnapshot {
     pub total_hours: f32,
     pub total_shifts: usize,
     pub unique_employees: usize,
+    /// Employee availability overrides that fell within this rota's week at
+    /// save time. Frozen here so historical regeneration/analytics isn't
+    /// distorted by later edits to the live overrides table. `#[serde(default)]`
+    /// keeps older snapshots (written before this field existed) deserializable.
+    #[serde(default)]
+    pub avail_overrides: Vec<SaveEmployeeAvailabilityOverrideSnapshot>,
+}
+
+/// Snapshot of one employee availability override within a save.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SaveEmployeeAvailabilityOverrideSnapshot {
+    pub employee_id: i64,
+    pub date: String,
+    /// Raw JSON of `DayAvailability` — string-keyed hour → state map, exactly
+    /// as stored in `employee_availability_overrides.availability`.
+    pub availability_json: String,
+    pub notes: Option<String>,
+    /// "manual" | "exception". Defaults to "exception" when absent so
+    /// pre-upgrade snapshots keep their current semantics.
+    #[serde(default = "default_override_source")]
+    pub source: String,
+}
+
+fn default_override_source() -> String {
+    "exception".to_string()
 }
 
 /// Snapshot of a single shift within a save.
@@ -587,6 +612,7 @@ mod diff_tests {
             total_hours: 0.0,
             total_shifts: 0,
             unique_employees: 0,
+            avail_overrides: vec![],
         }
     }
 

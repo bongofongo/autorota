@@ -11,7 +11,7 @@ use crate::models::assignment::{Assignment, AssignmentStatus};
 use crate::models::availability::{Availability, AvailabilityState};
 use crate::models::employee::Employee;
 use crate::models::overrides::{
-    DayAvailability, EmployeeAvailabilityOverride, ShiftTemplateOverride,
+    DayAvailability, EmployeeAvailabilityOverride, OverrideSource, ShiftTemplateOverride,
 };
 use crate::models::rota::Rota;
 use crate::models::shift::{Shift, ShiftTemplate};
@@ -446,12 +446,18 @@ impl EmployeeOverrideBuilder {
                 date,
                 availability: DayAvailability::default(),
                 notes: None,
+                source: OverrideSource::Exception,
             },
         }
     }
 
     pub fn id(mut self, id: i64) -> Self {
         self.inner.id = id;
+        self
+    }
+
+    pub fn source(mut self, s: OverrideSource) -> Self {
+        self.inner.source = s;
         self
     }
 

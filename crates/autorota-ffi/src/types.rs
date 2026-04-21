@@ -313,6 +313,10 @@ pub struct FfiEmployeeAvailabilityOverride {
     pub date: String,
     pub availability: Vec<DayAvailabilitySlot>,
     pub notes: Option<String>,
+    /// "manual" | "exception". Exception rows appear in the Exceptions
+    /// UI; manual rows are per-date edits via the availability grid and
+    /// do not.
+    pub source: String,
 }
 
 // ── Export ────────────────────────────────────────────────────────────────────

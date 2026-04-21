@@ -22,8 +22,22 @@ struct AvailabilityGridView: View {
     var showSelectionToggle: Bool = true
     /// Optional external binding to drive selection mode from outside the grid.
     var externalSelectionMode: Binding<Bool>? = nil
+    /// Weekdays whose columns should be outlined (e.g. days with an override on the current week).
+    var outlinedWeekdays: Set<String> = []
+    /// Color used for the outline around `outlinedWeekdays` columns.
+    var columnOutlineColor: Color = .orange
+    /// Weekdays whose cells are rendered read-only even when `isEditable` is true (e.g. past dates).
+    var readOnlyWeekdays: Set<String> = []
+    /// Optional per-weekday header labels (e.g. date strings "20"). Rendered beneath the day name.
+    var weekdaySubheaders: [String: String] = [:]
 
     private static let weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    private static let subheaderHeight: CGFloat = 12
+
+    /// Header row height including the optional subheader (date number).
+    private var effectiveHeaderHeight: CGFloat {
+        weekdaySubheaders.isEmpty ? Self.headerHeight : Self.headerHeight + Self.subheaderHeight
+    }
 
     private var displayedWeekdays: [String] {
         guard let limit = limitToWeekdays else { return Self.weekdays }
@@ -111,45 +125,79 @@ struct AvailabilityGridView: View {
     // MARK: - Grid content
 
     private func gridContent(cellWidth: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: Self.spacing) {
-            // Header row
-            HStack(spacing: Self.spacing) {
-                Text("").frame(width: Self.hourLabelWidth)
-                ForEach(displayedWeekdays, id: \.self) { day in
-                    Text(day)
-                        .font(.caption2.bold())
-                        .frame(width: cellWidth)
-                        .multilineTextAlignment(.center)
-                }
-            }
-
-            // Hour rows
-            ForEach(displayedHours, id: \.self) { hour in
-                let inRange = hour >= visibleHourStart && hour <= visibleHourEnd
+        ZStack(alignment: .topLeading) {
+            VStack(alignment: .leading, spacing: Self.spacing) {
+                // Header row
                 HStack(spacing: Self.spacing) {
-                    Text(String(format: "%02d", hour))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .frame(width: Self.hourLabelWidth, alignment: .trailing)
-
+                    Text("").frame(width: Self.hourLabelWidth)
                     ForEach(displayedWeekdays, id: \.self) { day in
-                        let key = "\(day):\(hour)"
-                        let state = inRange ? (lookup[key] ?? "Maybe") : "No"
-                        CellView(
-                            state: state,
-                            isEditable: isEditable && inRange && !isSelectionModeActive,
-                            isDimmed: !inRange,
-                            cellWidth: cellWidth
-                        ) {
-                            if isEditable && inRange && !isSelectionModeActive {
-                                toggle(weekday: day, hour: hour)
+                        VStack(spacing: 0) {
+                            Text(day)
+                                .font(.caption2.bold())
+                            if let sub = weekdaySubheaders[day] {
+                                Text(sub)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .frame(width: cellWidth, height: effectiveHeaderHeight)
+                        .multilineTextAlignment(.center)
+                    }
+                }
+                .frame(height: effectiveHeaderHeight)
+
+                // Hour rows
+                ForEach(displayedHours, id: \.self) { hour in
+                    let inRange = hour >= visibleHourStart && hour <= visibleHourEnd
+                    HStack(spacing: Self.spacing) {
+                        Text(String(format: "%02d", hour))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .frame(width: Self.hourLabelWidth, alignment: .trailing)
+
+                        ForEach(displayedWeekdays, id: \.self) { day in
+                            let key = "\(day):\(hour)"
+                            let state = inRange ? (lookup[key] ?? "Maybe") : "No"
+                            let dayReadOnly = readOnlyWeekdays.contains(day)
+                            CellView(
+                                state: state,
+                                isEditable: isEditable && inRange && !isSelectionModeActive && !dayReadOnly,
+                                isDimmed: !inRange || dayReadOnly,
+                                cellWidth: cellWidth
+                            ) {
+                                if isEditable && inRange && !isSelectionModeActive && !dayReadOnly {
+                                    toggle(weekday: day, hour: hour)
+                                }
                             }
                         }
                     }
                 }
             }
+            .padding(.vertical, 4)
+
+            // Column outlines overlay
+            if !outlinedWeekdays.isEmpty {
+                columnOutlineOverlay(cellWidth: cellWidth)
+                    .allowsHitTesting(false)
+            }
         }
-        .padding(.vertical, 4)
+    }
+
+    private func columnOutlineOverlay(cellWidth: CGFloat) -> some View {
+        let verticalPadding: CGFloat = 4
+        let rows = CGFloat(displayedHours.count)
+        let totalHeight = effectiveHeaderHeight + Self.spacing + rows * (Self.rowHeight + Self.spacing) - Self.spacing
+        return ZStack(alignment: .topLeading) {
+            ForEach(Array(displayedWeekdays.enumerated()), id: \.offset) { idx, day in
+                if outlinedWeekdays.contains(day) {
+                    let x = Self.hourLabelWidth + Self.spacing + CGFloat(idx) * (cellWidth + Self.spacing)
+                    RoundedRectangle(cornerRadius: 4)
+                        .strokeBorder(columnOutlineColor, lineWidth: 1.5)
+                        .frame(width: cellWidth + 4, height: totalHeight + 4)
+                        .position(x: x + cellWidth / 2, y: verticalPadding + totalHeight / 2)
+                }
+            }
+        }
     }
 
     // MARK: - Toolbar with selection toggle and range picker
@@ -220,7 +268,7 @@ struct AvailabilityGridView: View {
     ) -> some View {
         let verticalPadding: CGFloat = 4
         let x = Self.hourLabelWidth + Self.spacing + CGFloat(rect.minCol) * (cellWidth + Self.spacing)
-        let y = verticalPadding + Self.headerHeight + Self.spacing + CGFloat(rect.minRow) * (Self.rowHeight + Self.spacing)
+        let y = verticalPadding + effectiveHeaderHeight + Self.spacing + CGFloat(rect.minRow) * (Self.rowHeight + Self.spacing)
         let w = CGFloat(rect.maxCol - rect.minCol + 1) * (cellWidth + Self.spacing) - Self.spacing
         let h = CGFloat(rect.maxRow - rect.minRow + 1) * (Self.rowHeight + Self.spacing) - Self.spacing
 
@@ -239,7 +287,7 @@ struct AvailabilityGridView: View {
     private func cellAt(point: CGPoint, cellWidth: CGFloat) -> (col: Int, row: Int)? {
         let verticalPadding: CGFloat = 4
         let adjustedX = point.x - Self.hourLabelWidth - Self.spacing
-        let adjustedY = point.y - verticalPadding - Self.headerHeight - Self.spacing
+        let adjustedY = point.y - verticalPadding - effectiveHeaderHeight - Self.spacing
 
         let col = Int(adjustedX / (cellWidth + Self.spacing))
         let row = Int(adjustedY / (Self.rowHeight + Self.spacing))
@@ -344,7 +392,7 @@ struct AvailabilityGridView: View {
 
     private var gridHeight: CGFloat {
         let rows = CGFloat(displayedHours.count)
-        return Self.headerHeight + Self.spacing + rows * (Self.rowHeight + Self.spacing)
+        return effectiveHeaderHeight + Self.spacing + rows * (Self.rowHeight + Self.spacing)
     }
 
     private func cellWidth(for totalWidth: CGFloat) -> CGFloat {

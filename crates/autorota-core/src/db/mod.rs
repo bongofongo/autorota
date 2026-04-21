@@ -309,5 +309,19 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         sqlx::raw_sql(m19).execute(pool).await?;
     }
 
+    // Migration 020: per-row `source` on employee_availability_overrides —
+    // distinguishes `exception` (created via Exceptions UI) from `manual`
+    // (normal per-date edit through the availability grid).
+    let has_ovr_source: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) > 0 FROM pragma_table_info('employee_availability_overrides') WHERE name = 'source'",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    if !has_ovr_source {
+        let m20 = include_str!("../../migrations/020_override_source.sql");
+        sqlx::raw_sql(m20).execute(pool).await?;
+    }
+
     Ok(())
 }

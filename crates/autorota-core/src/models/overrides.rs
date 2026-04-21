@@ -71,6 +71,40 @@ impl DayAvailability {
     }
 }
 
+/// Where an override originated. `Exception` rows are user-classified
+/// deviations entered through the Exceptions UI and surfaced in the
+/// exceptions list. `Manual` rows are normal per-date edits made through
+/// the availability grid — they still drive the scheduler but do not
+/// appear as exceptions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum OverrideSource {
+    Manual,
+    Exception,
+}
+
+impl Default for OverrideSource {
+    fn default() -> Self {
+        Self::Exception
+    }
+}
+
+impl OverrideSource {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Manual => "manual",
+            Self::Exception => "exception",
+        }
+    }
+
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "manual" => Self::Manual,
+            _ => Self::Exception,
+        }
+    }
+}
+
 /// Date-specific availability override for a single employee on a specific calendar date.
 ///
 /// When the scheduler processes a shift on this date, it uses `availability` instead of
@@ -82,6 +116,8 @@ pub struct EmployeeAvailabilityOverride {
     pub date: NaiveDate,
     pub availability: DayAvailability,
     pub notes: Option<String>,
+    #[serde(default)]
+    pub source: OverrideSource,
 }
 
 /// Date-specific modification to a recurring shift template on a specific calendar date.

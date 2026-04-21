@@ -6,7 +6,7 @@ use crate::models::availability::AvailabilityState;
 use crate::models::employee::Employee;
 use crate::models::overrides::EmployeeAvailabilityOverride;
 use crate::models::shift::Shift;
-use chrono::NaiveDate;
+use chrono::{Datelike, NaiveDate};
 use std::collections::{HashMap, HashSet};
 
 // ─── Types ───────────────────────────────────────────────────
@@ -133,6 +133,17 @@ fn is_eligible(
     // Must not have No availability for any hour of the shift.
     // Use date-specific override when present, otherwise fall back to weekly availability.
     let avail = if let Some(ovr) = avail_override_map.get(&(employee.id, shift.date)) {
+        // Invariant: the override's stored date must describe the same calendar
+        // day as the shift. If it doesn't, the DB row is corrupt (raw edit or a
+        // broken sync merge) and the override would silently apply to the wrong
+        // weekday. Debug-only assertion — release builds trust the map key.
+        debug_assert_eq!(
+            ovr.date.weekday(),
+            shift.date.weekday(),
+            "override weekday does not match shift weekday: override date = {}, shift date = {}",
+            ovr.date,
+            shift.date
+        );
         ovr.availability
             .for_window(shift.start_hour(), shift.end_hour())
     } else {
@@ -350,7 +361,10 @@ pub async fn schedule(
     let shifts = queries::list_shifts_for_rota(pool, rota_id).await?;
     let employees = queries::list_employees(pool).await?;
     let existing = queries::list_assignments_for_rota(pool, rota_id).await?;
-    let avail_overrides = queries::list_all_employee_availability_overrides(pool).await?;
+    let week_end = rota.week_start + chrono::Duration::days(7);
+    let avail_overrides =
+        queries::list_employee_availability_overrides_in_range(pool, rota.week_start, week_end)
+            .await?;
 
     let result = schedule_pure(
         &shifts,

@@ -5,13 +5,14 @@ use crate::models::assignment::{Assignment, AssignmentStatus};
 use crate::models::availability::Availability;
 use crate::models::employee::Employee;
 use crate::models::overrides::{
-    DayAvailability, EmployeeAvailabilityOverride, ShiftTemplateOverride,
+    DayAvailability, EmployeeAvailabilityOverride, OverrideSource, ShiftTemplateOverride,
 };
 use crate::models::role::Role;
 use crate::models::rota::Rota;
 use crate::models::save::{
-    ChangeDetail, RestoreResult, Save, SaveAssignmentSnapshot, SaveShiftSnapshot, SaveSnapshot,
-    ShiftDiff, diff_snapshots,
+    ChangeDetail, RestoreResult, Save, SaveAssignmentSnapshot,
+    SaveEmployeeAvailabilityOverrideSnapshot, SaveShiftSnapshot, SaveSnapshot, ShiftDiff,
+    diff_snapshots,
 };
 use crate::models::shift::{Shift, ShiftTemplate};
 use crate::models::shift_history::EmployeeShiftRecord;
@@ -917,9 +918,14 @@ pub async fn upsert_employee_availability_override(
 ) -> Result<i64, sqlx::Error> {
     let avail_json = ovr.availability.to_json().unwrap_or_default();
     let now = chrono::Utc::now().to_rfc3339();
+    // `source` is NOT updated on conflict — once a row is classified as
+    // "exception" (via the Exceptions UI) we do not want a subsequent edit
+    // through the regular availability grid to silently downgrade it to
+    // "manual". Upgrades from manual → exception likewise preserve whatever
+    // the UI originally chose.
     let id: i64 = sqlx::query_scalar(
-        "INSERT INTO employee_availability_overrides (employee_id, date, availability, notes, last_modified, sync_status)
-         VALUES (?, ?, ?, ?, ?, 0)
+        "INSERT INTO employee_availability_overrides (employee_id, date, availability, notes, source, last_modified, sync_status)
+         VALUES (?, ?, ?, ?, ?, ?, 0)
          ON CONFLICT(employee_id, date) DO UPDATE SET availability = excluded.availability, notes = excluded.notes, last_modified = excluded.last_modified, sync_status = 0
          RETURNING id",
     )
@@ -927,6 +933,7 @@ pub async fn upsert_employee_availability_override(
     .bind(ovr.date.to_string())
     .bind(&avail_json)
     .bind(&ovr.notes)
+    .bind(ovr.source.as_str())
     .bind(&now)
     .fetch_one(pool)
     .await?;
@@ -938,8 +945,8 @@ pub async fn get_employee_availability_override(
     employee_id: i64,
     date: NaiveDate,
 ) -> Result<Option<EmployeeAvailabilityOverride>, sqlx::Error> {
-    let row: Option<(i64, i64, String, String, Option<String>)> = sqlx::query_as(
-        "SELECT id, employee_id, date, availability, notes
+    let row: Option<(i64, i64, String, String, Option<String>, String)> = sqlx::query_as(
+        "SELECT id, employee_id, date, availability, notes, source
          FROM employee_availability_overrides WHERE employee_id = ? AND date = ?",
     )
     .bind(employee_id)
@@ -953,8 +960,8 @@ pub async fn list_employee_availability_overrides_for_employee(
     pool: &SqlitePool,
     employee_id: i64,
 ) -> Result<Vec<EmployeeAvailabilityOverride>, sqlx::Error> {
-    let rows: Vec<(i64, i64, String, String, Option<String>)> = sqlx::query_as(
-        "SELECT id, employee_id, date, availability, notes
+    let rows: Vec<(i64, i64, String, String, Option<String>, String)> = sqlx::query_as(
+        "SELECT id, employee_id, date, availability, notes, source
          FROM employee_availability_overrides WHERE employee_id = ? ORDER BY date",
     )
     .bind(employee_id)
@@ -969,10 +976,36 @@ pub async fn list_employee_availability_overrides_for_employee(
 pub async fn list_all_employee_availability_overrides(
     pool: &SqlitePool,
 ) -> Result<Vec<EmployeeAvailabilityOverride>, sqlx::Error> {
-    let rows: Vec<(i64, i64, String, String, Option<String>)> = sqlx::query_as(
-        "SELECT id, employee_id, date, availability, notes
+    let rows: Vec<(i64, i64, String, String, Option<String>, String)> = sqlx::query_as(
+        "SELECT id, employee_id, date, availability, notes, source
          FROM employee_availability_overrides ORDER BY date, employee_id",
     )
+    .fetch_all(pool)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .filter_map(employee_avail_override_from_row)
+        .collect())
+}
+
+/// List employee availability overrides whose date falls within `[start, end)`.
+/// Used by the scheduler so a single rota week doesn't pay for every historical
+/// override in memory.
+pub async fn list_employee_availability_overrides_in_range(
+    pool: &SqlitePool,
+    start: NaiveDate,
+    end: NaiveDate,
+) -> Result<Vec<EmployeeAvailabilityOverride>, sqlx::Error> {
+    let start_str = start.format("%Y-%m-%d").to_string();
+    let end_str = end.format("%Y-%m-%d").to_string();
+    let rows: Vec<(i64, i64, String, String, Option<String>, String)> = sqlx::query_as(
+        "SELECT id, employee_id, date, availability, notes, source
+         FROM employee_availability_overrides
+         WHERE date >= ? AND date < ?
+         ORDER BY date, employee_id",
+    )
+    .bind(&start_str)
+    .bind(&end_str)
     .fetch_all(pool)
     .await?;
     Ok(rows
@@ -994,15 +1027,16 @@ pub async fn delete_employee_availability_override(
 }
 
 fn employee_avail_override_from_row(
-    row: (i64, i64, String, String, Option<String>),
+    row: (i64, i64, String, String, Option<String>, String),
 ) -> Option<EmployeeAvailabilityOverride> {
-    let (id, employee_id, date_str, avail_json, notes) = row;
+    let (id, employee_id, date_str, avail_json, notes, source) = row;
     Some(EmployeeAvailabilityOverride {
         id,
         employee_id,
         date: NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").ok()?,
         availability: DayAvailability::from_json(&avail_json).unwrap_or_default(),
         notes,
+        source: OverrideSource::parse(&source),
     })
 }
 
@@ -1320,6 +1354,7 @@ pub async fn create_save(pool: &SqlitePool, rota_id: i64) -> Result<i64, sqlx::E
     }
 
     let saved_shift_ids: Vec<i64> = shifts.iter().map(|s| s.id).collect();
+    let avail_overrides = collect_week_override_snapshots(pool, &week_start_str).await?;
     let snapshot = SaveSnapshot {
         week_start: week_start_str,
         saved_shift_ids,
@@ -1327,6 +1362,7 @@ pub async fn create_save(pool: &SqlitePool, rota_id: i64) -> Result<i64, sqlx::E
         total_hours,
         total_shifts: shifts.len(),
         unique_employees: all_employee_ids.len(),
+        avail_overrides,
     };
 
     let snapshot_json =
@@ -1705,6 +1741,7 @@ pub async fn snapshot_from_live(
     }
 
     let saved_shift_ids = shifts.iter().map(|s| s.id).collect();
+    let avail_overrides = collect_week_override_snapshots(pool, &week_start_str).await?;
     Ok(SaveSnapshot {
         week_start: week_start_str,
         saved_shift_ids,
@@ -1712,7 +1749,36 @@ pub async fn snapshot_from_live(
         total_hours,
         total_shifts: shifts.len(),
         unique_employees: all_employee_ids.len(),
+        avail_overrides,
     })
+}
+
+/// Fetch employee availability overrides that fall within the 7-day window
+/// starting at `week_start_str` and convert them to their snapshot form.
+/// Returned list is empty when parsing fails — snapshots tolerate missing data.
+async fn collect_week_override_snapshots(
+    pool: &SqlitePool,
+    week_start_str: &str,
+) -> Result<Vec<SaveEmployeeAvailabilityOverrideSnapshot>, sqlx::Error> {
+    let Ok(week_start) = NaiveDate::parse_from_str(week_start_str, "%Y-%m-%d") else {
+        return Ok(vec![]);
+    };
+    let week_end = week_start + chrono::Duration::days(7);
+    let overrides =
+        list_employee_availability_overrides_in_range(pool, week_start, week_end).await?;
+    Ok(overrides
+        .into_iter()
+        .map(|o| SaveEmployeeAvailabilityOverrideSnapshot {
+            employee_id: o.employee_id,
+            date: o.date.format("%Y-%m-%d").to_string(),
+            availability_json: o
+                .availability
+                .to_json()
+                .unwrap_or_else(|_| "{}".to_string()),
+            notes: o.notes,
+            source: o.source.as_str().to_string(),
+        })
+        .collect())
 }
 
 /// Detailed diff between the live state of a rota and its latest save.
@@ -1807,6 +1873,7 @@ fn empty_snapshot(week_start: &str) -> SaveSnapshot {
         total_hours: 0.0,
         total_shifts: 0,
         unique_employees: 0,
+        avail_overrides: vec![],
     }
 }
 
@@ -2163,6 +2230,7 @@ pub fn syncable_columns(table_name: &str) -> Vec<&'static str> {
             "date",
             "availability",
             "notes",
+            "source",
             "last_modified",
         ],
         "shift_template_overrides" => vec![

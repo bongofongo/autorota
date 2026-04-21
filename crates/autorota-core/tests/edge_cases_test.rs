@@ -14,7 +14,7 @@ use autorota_core::db::queries;
 use autorota_core::models::assignment::{Assignment, AssignmentStatus};
 use autorota_core::models::availability::AvailabilityState;
 use autorota_core::models::overrides::{
-    DayAvailability, EmployeeAvailabilityOverride, ShiftTemplateOverride,
+    DayAvailability, EmployeeAvailabilityOverride, OverrideSource, ShiftTemplateOverride,
 };
 use autorota_core::models::shift::ShiftTemplate;
 use autorota_core::scheduler::schedule_pure;
@@ -135,6 +135,7 @@ fn availability_override_no_beats_default_yes() {
         date: date(23),
         availability: day,
         notes: None,
+        source: OverrideSource::Exception,
     };
 
     let result = schedule_pure(&[shift], &[emp], &[], &[ovr], 1, week_start());
@@ -158,6 +159,7 @@ fn availability_override_partial_window_excludes_employee() {
         date: date(23),
         availability: day,
         notes: None,
+        source: OverrideSource::Exception,
     };
 
     let result = schedule_pure(&[shift], &[emp], &[], &[ovr], 1, week_start());
@@ -216,6 +218,7 @@ async fn availability_override_upsert_and_get_roundtrip() {
         date: date(23),
         availability: day,
         notes: Some("vacation".into()),
+        source: OverrideSource::Exception,
     };
     let id = queries::upsert_employee_availability_override(&pool, &ovr)
         .await
@@ -247,6 +250,7 @@ async fn availability_override_upsert_replaces_existing() {
         date: date(23),
         availability: day,
         notes: None,
+        source: OverrideSource::Exception,
     };
     queries::upsert_employee_availability_override(&pool, &ovr1)
         .await
@@ -260,6 +264,7 @@ async fn availability_override_upsert_replaces_existing() {
         date: date(23),
         availability: day2,
         notes: Some("changed".into()),
+        source: OverrideSource::Exception,
     };
     queries::upsert_employee_availability_override(&pool, &ovr2)
         .await
@@ -295,6 +300,7 @@ async fn availability_override_list_for_employee() {
             date: date(day_n),
             availability: DayAvailability::default(),
             notes: None,
+            source: OverrideSource::Exception,
         };
         queries::upsert_employee_availability_override(&pool, &ovr)
             .await
@@ -326,6 +332,7 @@ async fn availability_override_delete_removes_row() {
         date: date(23),
         availability: DayAvailability::default(),
         notes: None,
+        source: OverrideSource::Exception,
     };
     let id = queries::upsert_employee_availability_override(&pool, &ovr)
         .await
@@ -338,6 +345,48 @@ async fn availability_override_delete_removes_row() {
         .await
         .unwrap();
     assert!(got.is_none());
+}
+
+#[tokio::test]
+async fn availability_override_upsert_preserves_source_on_conflict() {
+    // Seed an exception, then upsert with the same (employee, date) but
+    // source = Manual. The stored source must remain Exception — we do
+    // not want a normal availability-grid edit to downgrade a row the
+    // user deliberately classified via the Exceptions UI.
+    let pool = test_pool().await;
+    let emp_id = queries::insert_employee(&pool, &make_simple_employee("Alice"))
+        .await
+        .unwrap();
+
+    let exception = EmployeeAvailabilityOverride {
+        id: 0,
+        employee_id: emp_id,
+        date: date(23),
+        availability: DayAvailability::default(),
+        notes: Some("vacation".into()),
+        source: OverrideSource::Exception,
+    };
+    queries::upsert_employee_availability_override(&pool, &exception)
+        .await
+        .unwrap();
+
+    let manual_edit = EmployeeAvailabilityOverride {
+        id: 0,
+        employee_id: emp_id,
+        date: date(23),
+        availability: DayAvailability::default(),
+        notes: None,
+        source: OverrideSource::Manual,
+    };
+    queries::upsert_employee_availability_override(&pool, &manual_edit)
+        .await
+        .unwrap();
+
+    let got = queries::get_employee_availability_override(&pool, emp_id, date(23))
+        .await
+        .unwrap()
+        .expect("override should exist");
+    assert_eq!(got.source, OverrideSource::Exception);
 }
 
 // ─────────────────────────────────────────────────────────────

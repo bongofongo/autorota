@@ -89,6 +89,8 @@ interface EmployeeAvailabilityOverride {
   /** {"8":"Yes","9":"Maybe",...} */
   availability: Record<string, string>;
   notes: string | null;
+  /** "manual" | "exception" */
+  source: string;
 }
 
 interface ShiftTemplateOverride {
@@ -1110,7 +1112,7 @@ async function renderEmployeeDetailView() {
       const notes = (document.getElementById("date-ovr-notes") as HTMLInputElement).value.trim() || null;
       const availability = readDayAvailGrid(gridWrap);
       await invoke("upsert_employee_availability_override", {
-        override_: { id: existing?.id ?? 0, employee_id: empId, date, availability, notes },
+        override_: { id: existing?.id ?? 0, employee_id: empId, date, availability, notes, source: "exception" },
       });
       wrap.innerHTML = "";
       await refreshDateOvrList();
@@ -2415,7 +2417,7 @@ async function renderOverridesView(): Promise<void> {
       const notes = (document.getElementById("emp-ovr-notes") as HTMLInputElement).value.trim() || null;
       const availability = readDayAvailGrid(gridWrap);
       await invoke("upsert_employee_availability_override", {
-        override_: { id: existing?.id ?? 0, employee_id: employeeId, date, availability, notes },
+        override_: { id: existing?.id ?? 0, employee_id: employeeId, date, availability, notes, source: "exception" },
       });
       wrap.innerHTML = "";
       await fetchAllOverrides();
