@@ -283,5 +283,31 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         sqlx::raw_sql(m17).execute(pool).await?;
     }
 
+    // Migration 018: per-save tag table (replaces single `label` column — label
+    // is left in place as a dead column so we don't need a table rebuild).
+    let has_save_tags: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='save_tags'",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    if !has_save_tags {
+        let m18 = include_str!("../../migrations/018_save_tags.sql");
+        sqlx::raw_sql(m18).execute(pool).await?;
+    }
+
+    // Migration 019: per-save `restored_at` timestamp — promotes a restored
+    // save to the top of its week and drives the red "Restored" badge.
+    let has_restored_at: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) > 0 FROM pragma_table_info('saves') WHERE name = 'restored_at'",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    if !has_restored_at {
+        let m19 = include_str!("../../migrations/019_save_restored_at.sql");
+        sqlx::raw_sql(m19).execute(pool).await?;
+    }
+
     Ok(())
 }

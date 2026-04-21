@@ -1308,6 +1308,7 @@ pub async fn create_save(pool: &SqlitePool, rota_id: i64) -> Result<i64, sqlx::E
 
         snapshot_shifts.push(SaveShiftSnapshot {
             shift_id: shift.id,
+            template_id: shift.template_id,
             date: shift.date.to_string(),
             start_time: shift.start_time.format("%H:%M").to_string(),
             end_time: shift.end_time.format("%H:%M").to_string(),
@@ -1335,7 +1336,7 @@ pub async fn create_save(pool: &SqlitePool, rota_id: i64) -> Result<i64, sqlx::E
     let now = chrono::Utc::now().to_rfc3339();
 
     let save_id: i64 = sqlx::query_scalar(
-        "INSERT INTO saves (rota_id, saved_at, summary, snapshot_json, label) VALUES (?, ?, ?, ?, NULL) RETURNING id",
+        "INSERT INTO saves (rota_id, saved_at, summary, snapshot_json) VALUES (?, ?, ?, ?) RETURNING id",
     )
     .bind(rota_id)
     .bind(&now)
@@ -1360,38 +1361,51 @@ fn generate_save_summary(total_shifts: usize, unique_employees: usize, total_hou
 
 /// List saves, optionally filtered by rota_id. Ordered by saved_at DESC.
 pub async fn list_saves(pool: &SqlitePool, rota_id: Option<i64>) -> Result<Vec<Save>, sqlx::Error> {
-    match rota_id {
+    let rows: Vec<(i64, i64, String, String, String, Option<String>)> = match rota_id {
         Some(rid) => {
-            let rows: Vec<(i64, i64, String, String, String, Option<String>)> = sqlx::query_as(
-                "SELECT id, rota_id, saved_at, summary, snapshot_json, label
-                 FROM saves WHERE rota_id = ? ORDER BY saved_at DESC",
+            sqlx::query_as(
+                "SELECT id, rota_id, saved_at, summary, snapshot_json, restored_at
+             FROM saves WHERE rota_id = ?
+             ORDER BY COALESCE(restored_at, saved_at) DESC",
             )
             .bind(rid)
             .fetch_all(pool)
-            .await?;
-            Ok(rows.into_iter().map(save_from_row).collect())
+            .await?
         }
         None => {
-            let rows: Vec<(i64, i64, String, String, String, Option<String>)> = sqlx::query_as(
-                "SELECT id, rota_id, saved_at, summary, snapshot_json, label
-                 FROM saves ORDER BY saved_at DESC",
+            sqlx::query_as(
+                "SELECT id, rota_id, saved_at, summary, snapshot_json, restored_at
+             FROM saves
+             ORDER BY COALESCE(restored_at, saved_at) DESC",
             )
             .fetch_all(pool)
-            .await?;
-            Ok(rows.into_iter().map(save_from_row).collect())
+            .await?
+        }
+    };
+
+    let mut saves: Vec<Save> = rows.into_iter().map(save_from_row).collect();
+    let ids: Vec<i64> = saves.iter().map(|s| s.id).collect();
+    let tags_by_save = load_tags_for_saves(pool, &ids).await?;
+    for save in &mut saves {
+        if let Some(tags) = tags_by_save.get(&save.id) {
+            save.tags = tags.clone();
         }
     }
+    Ok(saves)
 }
 
 /// Get a single save by ID.
 pub async fn get_save(pool: &SqlitePool, id: i64) -> Result<Option<Save>, sqlx::Error> {
     let row: Option<(i64, i64, String, String, String, Option<String>)> = sqlx::query_as(
-        "SELECT id, rota_id, saved_at, summary, snapshot_json, label FROM saves WHERE id = ?",
+        "SELECT id, rota_id, saved_at, summary, snapshot_json, restored_at FROM saves WHERE id = ?",
     )
     .bind(id)
     .fetch_optional(pool)
     .await?;
-    Ok(row.map(save_from_row))
+    let Some(row) = row else { return Ok(None) };
+    let mut save = save_from_row(row);
+    save.tags = list_save_tags(pool, save.id).await?;
+    Ok(Some(save))
 }
 
 /// Check if a rota has any saves.
@@ -1404,15 +1418,133 @@ pub async fn rota_has_saves(pool: &SqlitePool, rota_id: i64) -> Result<bool, sql
 }
 
 fn save_from_row(row: (i64, i64, String, String, String, Option<String>)) -> Save {
-    let (id, rota_id, saved_at, summary, snapshot_json, label) = row;
+    let (id, rota_id, saved_at, summary, snapshot_json, restored_at) = row;
     Save {
         id,
         rota_id,
         saved_at,
         summary,
         snapshot_json,
-        label,
+        tags: Vec::new(),
+        restored_at,
     }
+}
+
+/// List tags for a single save, ordered by position.
+pub async fn list_save_tags(pool: &SqlitePool, save_id: i64) -> Result<Vec<String>, sqlx::Error> {
+    let rows: Vec<(String,)> =
+        sqlx::query_as("SELECT tag FROM save_tags WHERE save_id = ? ORDER BY position ASC")
+            .bind(save_id)
+            .fetch_all(pool)
+            .await?;
+    Ok(rows.into_iter().map(|r| r.0).collect())
+}
+
+/// Batch-load tags for many saves. Returns a map keyed by save_id.
+async fn load_tags_for_saves(
+    pool: &SqlitePool,
+    save_ids: &[i64],
+) -> Result<HashMap<i64, Vec<String>>, sqlx::Error> {
+    if save_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let placeholders = vec!["?"; save_ids.len()].join(",");
+    let sql = format!(
+        "SELECT save_id, tag FROM save_tags WHERE save_id IN ({placeholders}) \
+         ORDER BY save_id, position ASC",
+    );
+    let mut q = sqlx::query_as::<_, (i64, String)>(&sql);
+    for id in save_ids {
+        q = q.bind(id);
+    }
+    let rows = q.fetch_all(pool).await?;
+    let mut map: HashMap<i64, Vec<String>> = HashMap::new();
+    for (save_id, tag) in rows {
+        map.entry(save_id).or_default().push(tag);
+    }
+    Ok(map)
+}
+
+/// Error returned from tag mutations. Wraps domain errors + raw sqlx errors.
+#[derive(Debug)]
+pub enum SaveTagError {
+    Validation(crate::models::save::TagError),
+    Db(sqlx::Error),
+}
+
+impl From<sqlx::Error> for SaveTagError {
+    fn from(e: sqlx::Error) -> Self {
+        SaveTagError::Db(e)
+    }
+}
+
+impl From<crate::models::save::TagError> for SaveTagError {
+    fn from(e: crate::models::save::TagError) -> Self {
+        SaveTagError::Validation(e)
+    }
+}
+
+impl std::fmt::Display for SaveTagError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SaveTagError::Validation(e) => write!(f, "{e}"),
+            SaveTagError::Db(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+impl std::error::Error for SaveTagError {}
+
+/// Add a tag to a save. Validates the input, enforces the per-save max,
+/// and rejects case-insensitive duplicates.
+pub async fn add_save_tag(
+    pool: &SqlitePool,
+    save_id: i64,
+    raw_tag: &str,
+) -> Result<(), SaveTagError> {
+    use crate::models::save::{TAG_MAX_PER_SAVE, TagError, validate_tag};
+
+    let value = validate_tag(raw_tag)?;
+
+    let existing: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT tag, position FROM save_tags WHERE save_id = ? ORDER BY position ASC",
+    )
+    .bind(save_id)
+    .fetch_all(pool)
+    .await?;
+
+    if existing.len() >= TAG_MAX_PER_SAVE {
+        return Err(TagError::MaxReached.into());
+    }
+
+    let lower = value.to_lowercase();
+    if existing.iter().any(|(t, _)| t.to_lowercase() == lower) {
+        return Err(TagError::Duplicate.into());
+    }
+
+    let next_position = existing.last().map(|(_, p)| p + 1).unwrap_or(0);
+    sqlx::query("INSERT INTO save_tags (save_id, position, tag) VALUES (?, ?, ?)")
+        .bind(save_id)
+        .bind(next_position)
+        .bind(&value)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// Remove a tag from a save by exact case-insensitive match.
+/// No-op if the tag is not present.
+pub async fn remove_save_tag(
+    pool: &SqlitePool,
+    save_id: i64,
+    tag: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM save_tags WHERE save_id = ? AND LOWER(tag) = LOWER(?)")
+        .bind(save_id)
+        .bind(tag)
+        .execute(pool)
+        .await?;
+    Ok(())
 }
 
 /// Compare live shifts for a rota against the latest save snapshot.
@@ -1423,7 +1555,7 @@ pub async fn diff_rota_vs_latest_save(
 ) -> Result<Vec<ShiftDiff>, sqlx::Error> {
     // Fetch latest save for this rota.
     let latest: Option<(i64, i64, String, String, String, Option<String>)> = sqlx::query_as(
-        "SELECT id, rota_id, saved_at, summary, snapshot_json, label
+        "SELECT id, rota_id, saved_at, summary, snapshot_json, restored_at
          FROM saves WHERE rota_id = ? ORDER BY saved_at DESC LIMIT 1",
     )
     .bind(rota_id)
@@ -1561,6 +1693,7 @@ pub async fn snapshot_from_live(
 
         snapshot_shifts.push(SaveShiftSnapshot {
             shift_id: shift.id,
+            template_id: shift.template_id,
             date: shift.date.to_string(),
             start_time: shift.start_time.format("%H:%M").to_string(),
             end_time: shift.end_time.format("%H:%M").to_string(),
@@ -1589,7 +1722,7 @@ pub async fn diff_rota_vs_latest_save_detailed(
     rota_id: i64,
 ) -> Result<Vec<ChangeDetail>, sqlx::Error> {
     let latest: Option<(i64, i64, String, String, String, Option<String>)> = sqlx::query_as(
-        "SELECT id, rota_id, saved_at, summary, snapshot_json, label
+        "SELECT id, rota_id, saved_at, summary, snapshot_json, restored_at
          FROM saves WHERE rota_id = ? ORDER BY saved_at DESC LIMIT 1",
     )
     .bind(rota_id)
@@ -1643,7 +1776,7 @@ pub async fn diff_save_vs_previous(
         .ok_or_else(|| sqlx::Error::RowNotFound)?;
 
     let prev: Option<(i64, i64, String, String, String, Option<String>)> = sqlx::query_as(
-        "SELECT id, rota_id, saved_at, summary, snapshot_json, label
+        "SELECT id, rota_id, saved_at, summary, snapshot_json, restored_at
          FROM saves WHERE rota_id = ? AND saved_at < ?
          ORDER BY saved_at DESC LIMIT 1",
     )
@@ -1675,20 +1808,6 @@ fn empty_snapshot(week_start: &str) -> SaveSnapshot {
         total_shifts: 0,
         unique_employees: 0,
     }
-}
-
-/// Set or clear the label on a save.
-pub async fn update_save_label(
-    pool: &SqlitePool,
-    save_id: i64,
-    label: Option<&str>,
-) -> Result<(), sqlx::Error> {
-    sqlx::query("UPDATE saves SET label = ? WHERE id = ?")
-        .bind(label)
-        .bind(save_id)
-        .execute(pool)
-        .await?;
-    Ok(())
 }
 
 /// Restore a rota to the state captured by a save.
@@ -1828,6 +1947,14 @@ pub async fn restore_from_save(
             assignments_restored += 1;
         }
     }
+
+    // Stamp the target save so the UI can promote it to the top of its
+    // week's list and badge it "Restored".
+    sqlx::query("UPDATE saves SET restored_at = ? WHERE id = ?")
+        .bind(&now)
+        .bind(save_id)
+        .execute(&mut *tx)
+        .await?;
 
     tx.commit().await?;
 

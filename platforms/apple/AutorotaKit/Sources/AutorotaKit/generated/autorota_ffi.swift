@@ -2362,24 +2362,40 @@ public struct FfiSave {
     public var rotaId: Int64
     public var savedAt: String
     public var summary: String
-    public var label: String?
+    /**
+     * User-assigned tags for this save, ordered by insertion.
+     */
+    public var tags: [String]
     /**
      * Denormalized from the rota for display convenience.
      */
     public var weekStart: String
+    /**
+     * RFC3339 timestamp set when the user restored to this save. Drives the
+     * red "Restored" badge and promotes the entry to the top of its week.
+     */
+    public var restoredAt: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(id: Int64, rotaId: Int64, savedAt: String, summary: String, label: String?, 
+    public init(id: Int64, rotaId: Int64, savedAt: String, summary: String, 
+        /**
+         * User-assigned tags for this save, ordered by insertion.
+         */tags: [String], 
         /**
          * Denormalized from the rota for display convenience.
-         */weekStart: String) {
+         */weekStart: String, 
+        /**
+         * RFC3339 timestamp set when the user restored to this save. Drives the
+         * red "Restored" badge and promotes the entry to the top of its week.
+         */restoredAt: String?) {
         self.id = id
         self.rotaId = rotaId
         self.savedAt = savedAt
         self.summary = summary
-        self.label = label
+        self.tags = tags
         self.weekStart = weekStart
+        self.restoredAt = restoredAt
     }
 }
 
@@ -2399,10 +2415,13 @@ extension FfiSave: Equatable, Hashable {
         if lhs.summary != rhs.summary {
             return false
         }
-        if lhs.label != rhs.label {
+        if lhs.tags != rhs.tags {
             return false
         }
         if lhs.weekStart != rhs.weekStart {
+            return false
+        }
+        if lhs.restoredAt != rhs.restoredAt {
             return false
         }
         return true
@@ -2413,8 +2432,9 @@ extension FfiSave: Equatable, Hashable {
         hasher.combine(rotaId)
         hasher.combine(savedAt)
         hasher.combine(summary)
-        hasher.combine(label)
+        hasher.combine(tags)
         hasher.combine(weekStart)
+        hasher.combine(restoredAt)
     }
 }
 
@@ -2430,8 +2450,9 @@ public struct FfiConverterTypeFfiSave: FfiConverterRustBuffer {
                 rotaId: FfiConverterInt64.read(from: &buf), 
                 savedAt: FfiConverterString.read(from: &buf), 
                 summary: FfiConverterString.read(from: &buf), 
-                label: FfiConverterOptionString.read(from: &buf), 
-                weekStart: FfiConverterString.read(from: &buf)
+                tags: FfiConverterSequenceString.read(from: &buf), 
+                weekStart: FfiConverterString.read(from: &buf), 
+                restoredAt: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -2440,8 +2461,9 @@ public struct FfiConverterTypeFfiSave: FfiConverterRustBuffer {
         FfiConverterInt64.write(value.rotaId, into: &buf)
         FfiConverterString.write(value.savedAt, into: &buf)
         FfiConverterString.write(value.summary, into: &buf)
-        FfiConverterOptionString.write(value.label, into: &buf)
+        FfiConverterSequenceString.write(value.tags, into: &buf)
         FfiConverterString.write(value.weekStart, into: &buf)
+        FfiConverterOptionString.write(value.restoredAt, into: &buf)
     }
 }
 
@@ -2469,20 +2491,22 @@ public struct FfiSaveDetail {
     public var rotaId: Int64
     public var savedAt: String
     public var summary: String
-    public var label: String?
+    public var tags: [String]
     public var weekStart: String
     public var snapshotJson: String
+    public var restoredAt: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(id: Int64, rotaId: Int64, savedAt: String, summary: String, label: String?, weekStart: String, snapshotJson: String) {
+    public init(id: Int64, rotaId: Int64, savedAt: String, summary: String, tags: [String], weekStart: String, snapshotJson: String, restoredAt: String?) {
         self.id = id
         self.rotaId = rotaId
         self.savedAt = savedAt
         self.summary = summary
-        self.label = label
+        self.tags = tags
         self.weekStart = weekStart
         self.snapshotJson = snapshotJson
+        self.restoredAt = restoredAt
     }
 }
 
@@ -2502,13 +2526,16 @@ extension FfiSaveDetail: Equatable, Hashable {
         if lhs.summary != rhs.summary {
             return false
         }
-        if lhs.label != rhs.label {
+        if lhs.tags != rhs.tags {
             return false
         }
         if lhs.weekStart != rhs.weekStart {
             return false
         }
         if lhs.snapshotJson != rhs.snapshotJson {
+            return false
+        }
+        if lhs.restoredAt != rhs.restoredAt {
             return false
         }
         return true
@@ -2519,9 +2546,10 @@ extension FfiSaveDetail: Equatable, Hashable {
         hasher.combine(rotaId)
         hasher.combine(savedAt)
         hasher.combine(summary)
-        hasher.combine(label)
+        hasher.combine(tags)
         hasher.combine(weekStart)
         hasher.combine(snapshotJson)
+        hasher.combine(restoredAt)
     }
 }
 
@@ -2537,9 +2565,10 @@ public struct FfiConverterTypeFfiSaveDetail: FfiConverterRustBuffer {
                 rotaId: FfiConverterInt64.read(from: &buf), 
                 savedAt: FfiConverterString.read(from: &buf), 
                 summary: FfiConverterString.read(from: &buf), 
-                label: FfiConverterOptionString.read(from: &buf), 
+                tags: FfiConverterSequenceString.read(from: &buf), 
                 weekStart: FfiConverterString.read(from: &buf), 
-                snapshotJson: FfiConverterString.read(from: &buf)
+                snapshotJson: FfiConverterString.read(from: &buf), 
+                restoredAt: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -2548,9 +2577,10 @@ public struct FfiConverterTypeFfiSaveDetail: FfiConverterRustBuffer {
         FfiConverterInt64.write(value.rotaId, into: &buf)
         FfiConverterString.write(value.savedAt, into: &buf)
         FfiConverterString.write(value.summary, into: &buf)
-        FfiConverterOptionString.write(value.label, into: &buf)
+        FfiConverterSequenceString.write(value.tags, into: &buf)
         FfiConverterString.write(value.weekStart, into: &buf)
         FfiConverterString.write(value.snapshotJson, into: &buf)
+        FfiConverterOptionString.write(value.restoredAt, into: &buf)
     }
 }
 
@@ -4597,6 +4627,19 @@ fileprivate struct FfiConverterSequenceTypeFfiTombstone: FfiConverterRustBuffer 
         return seq
     }
 }
+/**
+ * Add a tag to a save. Enforces max tags per save, rejects duplicates
+ * (case-insensitive), and validates the tag string (non-empty, ≤15 chars,
+ * no `;`). Errors surface as distinct `FfiError::Validation` codes so the
+ * UI can show a specific inline hint.
+ */
+public func addSaveTag(saveId: Int64, tag: String)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_add_save_tag(
+        FfiConverterInt64.lower(saveId),
+        FfiConverterString.lower(tag),$0
+    )
+}
+}
 public func applyRemoteRecord(record: FfiSyncRecord)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_apply_remote_record(
         FfiConverterTypeFfiSyncRecord.lower(record),$0
@@ -4991,6 +5034,16 @@ public func moveAssignment(id: Int64, newShiftId: Int64)throws  {try rustCallWit
 }
 }
 /**
+ * Remove a tag from a save by case-insensitive match. No-op if absent.
+ */
+public func removeSaveTag(saveId: Int64, tag: String)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_remove_save_tag(
+        FfiConverterInt64.lower(saveId),
+        FfiConverterString.lower(tag),$0
+    )
+}
+}
+/**
  * Restore the live state of a rota to the snapshot captured by a save.
  * Existing shifts and assignments for the rota are replaced. Assignments
  * for employees that no longer exist are skipped; the count is returned.
@@ -5062,13 +5115,6 @@ public func updateRole(id: Int64, name: String)throws  {try rustCallWithError(Ff
     )
 }
 }
-public func updateSaveLabel(saveId: Int64, label: String?)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
-    uniffi_autorota_ffi_fn_func_update_save_label(
-        FfiConverterInt64.lower(saveId),
-        FfiConverterOptionString.lower(label),$0
-    )
-}
-}
 public func updateShiftTemplate(template: FfiShiftTemplate)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_update_shift_template(
         FfiConverterTypeFfiShiftTemplate.lower(template),$0
@@ -5112,6 +5158,9 @@ private var initializationResult: InitializationResult = {
     let scaffolding_contract_version = ffi_autorota_ffi_uniffi_contract_version()
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_add_save_tag() != 65371) {
+        return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_apply_remote_record() != 2938) {
         return InitializationResult.apiChecksumMismatch
@@ -5269,6 +5318,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_autorota_ffi_checksum_func_move_assignment() != 47939) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_autorota_ffi_checksum_func_remove_save_tag() != 41547) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_autorota_ffi_checksum_func_restore_to_save() != 63243) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -5294,9 +5346,6 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_update_role() != 50775) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_autorota_ffi_checksum_func_update_save_label() != 25876) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_update_shift_template() != 52563) {

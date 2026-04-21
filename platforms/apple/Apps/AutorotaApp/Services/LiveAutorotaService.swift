@@ -161,8 +161,13 @@ struct LiveAutorotaService: AutorotaServiceProtocol {
         NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
         return result
     }
-    func updateSaveLabel(saveId: Int64, label: String?) async throws {
-        try await updateSaveLabelAsync(saveId: saveId, label: label)
+    func addSaveTag(saveId: Int64, tag: String) async throws {
+        try await addSaveTagAsync(saveId: saveId, tag: tag)
+        NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
+    }
+    func removeSaveTag(saveId: Int64, tag: String) async throws {
+        try await removeSaveTagAsync(saveId: saveId, tag: tag)
+        NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
     }
 
     func exportWeekSchedule(weekStart: String, config: FfiExportConfig) async throws -> FfiExportResult { try await exportWeekScheduleAsync(weekStart: weekStart, config: config) }

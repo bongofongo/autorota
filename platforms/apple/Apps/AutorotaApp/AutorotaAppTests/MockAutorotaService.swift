@@ -2,6 +2,16 @@ import Foundation
 import AutorotaKit
 @testable import AutorotaApp
 
+/// Mirrors the validation codes surfaced by the Rust FFI via `FfiError.InvalidArgument`.
+/// Raw values match the `as_code()` strings on the Rust `TagError` enum.
+enum MockTagError: String, Error {
+    case empty = "tag_empty"
+    case tooLong = "tag_too_long"
+    case containsSemicolon = "tag_has_semicolon"
+    case duplicate = "tag_duplicate"
+    case maxReached = "tag_max_reached"
+}
+
 /// Mock service that returns canned data and tracks method calls.
 /// Tests can override the return values and inject errors.
 final class MockAutorotaService: AutorotaServiceProtocol, @unchecked Sendable {
@@ -316,9 +326,44 @@ final class MockAutorotaService: AutorotaServiceProtocol, @unchecked Sendable {
         return stubbedRestoreResult
     }
 
-    func updateSaveLabel(saveId: Int64, label: String?) async throws {
-        callLog.append("updateSaveLabel:\(saveId):\(label ?? "nil")")
+    /// In-memory tag store keyed by save id. Mirrors live constraints so
+    /// tests can exercise validation and error branches.
+    var stubbedTags: [Int64: [String]] = [:]
+
+    /// Max tags per save — matches the Rust constant.
+    static let tagMaxPerSave = 3
+    /// Max characters per tag — matches the Rust constant.
+    static let tagMaxLen = 15
+
+    func addSaveTag(saveId: Int64, tag: String) async throws {
+        callLog.append("addSaveTag:\(saveId):\(tag)")
         if let e = errorToThrow { throw e }
+        let trimmed = tag.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            throw MockTagError.empty
+        }
+        if trimmed.count > Self.tagMaxLen {
+            throw MockTagError.tooLong
+        }
+        if trimmed.contains(";") {
+            throw MockTagError.containsSemicolon
+        }
+        var existing = stubbedTags[saveId] ?? []
+        if existing.count >= Self.tagMaxPerSave {
+            throw MockTagError.maxReached
+        }
+        if existing.contains(where: { $0.lowercased() == trimmed.lowercased() }) {
+            throw MockTagError.duplicate
+        }
+        existing.append(trimmed)
+        stubbedTags[saveId] = existing
+    }
+
+    func removeSaveTag(saveId: Int64, tag: String) async throws {
+        callLog.append("removeSaveTag:\(saveId):\(tag)")
+        if let e = errorToThrow { throw e }
+        let lower = tag.lowercased()
+        stubbedTags[saveId] = (stubbedTags[saveId] ?? []).filter { $0.lowercased() != lower }
     }
 
     // MARK: - Export

@@ -18,7 +18,7 @@ enum TabPage: String, CaseIterable, Codable, Identifiable {
         case .employees: "Employees"
         case .templates: "Shifts"
         case .overrides: "Exceptions"
-        case .history: "Activity"
+        case .history: "Edit Log"
         case .analytics: "Analytics"
         case .export: "Export"
         case .settings: "Menu"
@@ -45,7 +45,7 @@ enum TabPage: String, CaseIterable, Codable, Identifiable {
         case .employees: EmployeeListView()
         case .templates: ShiftTemplateListView()
         case .overrides: OverridesTabView()
-        case .history: ActivityLogView()
+        case .history: EditLogView()
         case .analytics: AnalyticsView()
         case .export: ExportTabView()
         case .settings: SettingsView()

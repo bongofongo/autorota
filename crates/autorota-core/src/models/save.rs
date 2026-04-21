@@ -8,7 +8,110 @@ pub struct Save {
     pub saved_at: String,
     pub summary: String,
     pub snapshot_json: String,
-    pub label: Option<String>,
+    /// User-assigned tags for this save, ordered by insertion.
+    pub tags: Vec<String>,
+    /// RFC3339 timestamp set when the user restored the rota to this save.
+    /// Non-NULL means the entry gets a red "Restored" badge and is sorted
+    /// above its week siblings by `COALESCE(restored_at, saved_at)`.
+    pub restored_at: Option<String>,
+}
+
+// ── Tag validation ──────────────────────────────────────────────────────────
+
+/// Max characters in a single tag.
+pub const TAG_MAX_LEN: usize = 15;
+
+/// Max tags that may exist on a single save.
+pub const TAG_MAX_PER_SAVE: usize = 3;
+
+/// Reasons a tag add may fail. Variants cross the FFI boundary as distinct
+/// error messages so the UI can show a specific inline hint.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TagError {
+    Empty,
+    TooLong,
+    ContainsSemicolon,
+    Duplicate,
+    MaxReached,
+}
+
+impl TagError {
+    pub fn as_code(&self) -> &'static str {
+        match self {
+            TagError::Empty => "tag_empty",
+            TagError::TooLong => "tag_too_long",
+            TagError::ContainsSemicolon => "tag_has_semicolon",
+            TagError::Duplicate => "tag_duplicate",
+            TagError::MaxReached => "tag_max_reached",
+        }
+    }
+}
+
+impl std::fmt::Display for TagError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_code())
+    }
+}
+
+/// Validate a raw tag string against the per-tag rules.
+///
+/// Trims whitespace, rejects empty, >15 chars, or containing `;`.
+/// Returns the trimmed value on success (preserving original case).
+pub fn validate_tag(raw: &str) -> Result<String, TagError> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err(TagError::Empty);
+    }
+    if trimmed.chars().count() > TAG_MAX_LEN {
+        return Err(TagError::TooLong);
+    }
+    if trimmed.contains(';') {
+        return Err(TagError::ContainsSemicolon);
+    }
+    Ok(trimmed.to_string())
+}
+
+#[cfg(test)]
+mod tag_validation_tests {
+    use super::*;
+
+    #[test]
+    fn accepts_normal_tag() {
+        assert_eq!(validate_tag("morning").unwrap(), "morning");
+    }
+
+    #[test]
+    fn trims_whitespace() {
+        assert_eq!(validate_tag("  busy  ").unwrap(), "busy");
+    }
+
+    #[test]
+    fn rejects_empty() {
+        assert_eq!(validate_tag("").unwrap_err(), TagError::Empty);
+        assert_eq!(validate_tag("   ").unwrap_err(), TagError::Empty);
+    }
+
+    #[test]
+    fn rejects_too_long() {
+        // 16 ASCII chars > max (15)
+        assert_eq!(
+            validate_tag("abcdefghijklmnop").unwrap_err(),
+            TagError::TooLong
+        );
+    }
+
+    #[test]
+    fn accepts_exactly_max() {
+        assert_eq!(validate_tag("abcdefghijklmno").unwrap(), "abcdefghijklmno");
+    }
+
+    #[test]
+    fn rejects_semicolon() {
+        assert_eq!(
+            validate_tag("a;b").unwrap_err(),
+            TagError::ContainsSemicolon
+        );
+    }
 }
 
 // ── Snapshot JSON structure ──────────────────────────────────────────────────
@@ -29,6 +132,12 @@ pub struct SaveSnapshot {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SaveShiftSnapshot {
     pub shift_id: i64,
+    /// Parent template if this was a template-driven shift. Template shifts
+    /// get new `shift_id`s each time the scheduler is regenerated, so the diff
+    /// logic uses `(date, template_id)` to match identity across regens. Ad-hoc
+    /// shifts leave this `None` and are matched by `shift_id` instead.
+    #[serde(default)]
+    pub template_id: Option<i64>,
     pub date: String,
     pub start_time: String,
     pub end_time: String,
@@ -156,19 +265,49 @@ pub struct RestoreResult {
 /// save, or a persisted save vs a synthesized live-state snapshot). The
 /// result lists additions, removals, per-shift modifications, and
 /// cross-shift employee moves.
+/// Stable identity used to match the "same" shift across two snapshots.
+///
+/// Template-driven shifts get new `shift_id`s every time the scheduler
+/// regenerates the week, so matching by `shift_id` alone reports every shift
+/// on every day as removed+added whenever a regen happens between saves.
+/// For those we key on `(date, template_id)` instead — that survives regens.
+/// Ad-hoc shifts (no template) keep a stable DB id, so we key on `shift_id`.
+#[derive(Hash, Eq, PartialEq, Clone, Debug)]
+enum ShiftIdentity {
+    Template { date: String, template_id: i64 },
+    AdHoc { shift_id: i64 },
+}
+
+fn shift_identity(s: &SaveShiftSnapshot) -> ShiftIdentity {
+    match s.template_id {
+        Some(tid) => ShiftIdentity::Template {
+            date: s.date.clone(),
+            template_id: tid,
+        },
+        None => ShiftIdentity::AdHoc {
+            shift_id: s.shift_id,
+        },
+    }
+}
+
 pub fn diff_snapshots(old: &SaveSnapshot, new: &SaveSnapshot) -> Vec<ChangeDetail> {
     use std::collections::HashMap;
 
+    let old_by_key: HashMap<ShiftIdentity, &SaveShiftSnapshot> =
+        old.shifts.iter().map(|s| (shift_identity(s), s)).collect();
+    let new_by_key: HashMap<ShiftIdentity, &SaveShiftSnapshot> =
+        new.shifts.iter().map(|s| (shift_identity(s), s)).collect();
+
+    // Also keep a shift_id→old-snapshot map for collapse_moves, which needs
+    // to resolve the "from" shift of a move by its database id.
     let old_by_id: HashMap<i64, &SaveShiftSnapshot> =
         old.shifts.iter().map(|s| (s.shift_id, s)).collect();
-    let new_by_id: HashMap<i64, &SaveShiftSnapshot> =
-        new.shifts.iter().map(|s| (s.shift_id, s)).collect();
 
     let mut changes: Vec<ChangeDetail> = Vec::new();
 
     // Shifts added (in new, not in old).
     for shift in &new.shifts {
-        if !old_by_id.contains_key(&shift.shift_id) {
+        if !old_by_key.contains_key(&shift_identity(shift)) {
             changes.push(ChangeDetail {
                 shift_id: shift.shift_id,
                 date: shift.date.clone(),
@@ -197,7 +336,7 @@ pub fn diff_snapshots(old: &SaveSnapshot, new: &SaveSnapshot) -> Vec<ChangeDetai
 
     // Shifts removed (in old, not in new).
     for shift in &old.shifts {
-        if !new_by_id.contains_key(&shift.shift_id) {
+        if !new_by_key.contains_key(&shift_identity(shift)) {
             changes.push(ChangeDetail {
                 shift_id: shift.shift_id,
                 date: shift.date.clone(),
@@ -220,16 +359,18 @@ pub fn diff_snapshots(old: &SaveSnapshot, new: &SaveSnapshot) -> Vec<ChangeDetai
         }
     }
 
-    // Shifts in both — compare fields and assignments.
-    for (shift_id, new_shift) in &new_by_id {
-        let Some(old_shift) = old_by_id.get(shift_id) else {
+    // Shifts in both — compare fields and assignments. Iterate new shifts so
+    // reported ids come from the current state (stable under template regen).
+    for new_shift in &new.shifts {
+        let Some(old_shift) = old_by_key.get(&shift_identity(new_shift)) else {
             continue;
         };
+        let shift_id = new_shift.shift_id;
 
         if old_shift.start_time != new_shift.start_time || old_shift.end_time != new_shift.end_time
         {
             changes.push(ChangeDetail {
-                shift_id: *shift_id,
+                shift_id,
                 date: new_shift.date.clone(),
                 kind: ChangeKind::ShiftTimeChanged {
                     old_start: old_shift.start_time.clone(),
@@ -244,7 +385,7 @@ pub fn diff_snapshots(old: &SaveSnapshot, new: &SaveSnapshot) -> Vec<ChangeDetai
             || old_shift.max_employees != new_shift.max_employees
         {
             changes.push(ChangeDetail {
-                shift_id: *shift_id,
+                shift_id,
                 date: new_shift.date.clone(),
                 kind: ChangeKind::ShiftCapacityChanged {
                     old_min: old_shift.min_employees,
@@ -257,7 +398,7 @@ pub fn diff_snapshots(old: &SaveSnapshot, new: &SaveSnapshot) -> Vec<ChangeDetai
 
         if old_shift.required_role != new_shift.required_role {
             changes.push(ChangeDetail {
-                shift_id: *shift_id,
+                shift_id,
                 date: new_shift.date.clone(),
                 kind: ChangeKind::ShiftRoleChanged {
                     old_role: old_shift.required_role.clone(),
@@ -281,7 +422,7 @@ pub fn diff_snapshots(old: &SaveSnapshot, new: &SaveSnapshot) -> Vec<ChangeDetai
         for (emp_id, new_a) in &new_emp {
             match old_emp.get(emp_id) {
                 None => changes.push(ChangeDetail {
-                    shift_id: *shift_id,
+                    shift_id,
                     date: new_shift.date.clone(),
                     kind: ChangeKind::AssignmentAdded {
                         employee_id: *emp_id,
@@ -290,7 +431,7 @@ pub fn diff_snapshots(old: &SaveSnapshot, new: &SaveSnapshot) -> Vec<ChangeDetai
                 }),
                 Some(old_a) if old_a.status != new_a.status => {
                     changes.push(ChangeDetail {
-                        shift_id: *shift_id,
+                        shift_id,
                         date: new_shift.date.clone(),
                         kind: ChangeKind::AssignmentStatusChanged {
                             employee_id: *emp_id,
@@ -306,7 +447,7 @@ pub fn diff_snapshots(old: &SaveSnapshot, new: &SaveSnapshot) -> Vec<ChangeDetai
         for (emp_id, old_a) in &old_emp {
             if !new_emp.contains_key(emp_id) {
                 changes.push(ChangeDetail {
-                    shift_id: *shift_id,
+                    shift_id: old_shift.shift_id,
                     date: old_shift.date.clone(),
                     kind: ChangeKind::AssignmentRemoved {
                         employee_id: *emp_id,
@@ -416,6 +557,7 @@ mod diff_tests {
     ) -> SaveShiftSnapshot {
         SaveShiftSnapshot {
             shift_id: id,
+            template_id: None,
             date: date.to_string(),
             start_time: start.to_string(),
             end_time: end.to_string(),
@@ -587,6 +729,85 @@ mod diff_tests {
                 ..
             }
         )));
+    }
+
+    fn tshift(
+        id: i64,
+        template_id: Option<i64>,
+        date: &str,
+        start: &str,
+        end: &str,
+        role: &str,
+        assignments: Vec<SaveAssignmentSnapshot>,
+    ) -> SaveShiftSnapshot {
+        SaveShiftSnapshot {
+            shift_id: id,
+            template_id,
+            date: date.to_string(),
+            start_time: start.to_string(),
+            end_time: end.to_string(),
+            required_role: role.to_string(),
+            min_employees: 1,
+            max_employees: 1,
+            assignments,
+        }
+    }
+
+    #[test]
+    fn regenerated_template_shifts_match_by_template_id() {
+        // Scheduler regen wipes and recreates template shifts with new DB
+        // ids. With matching by (date, template_id) the diff should only
+        // report the real change (one new assignment), not every shift as
+        // removed+added.
+        let old = snap(vec![
+            tshift(
+                100,
+                Some(7),
+                "2026-04-20",
+                "09:00",
+                "17:00",
+                "barista",
+                vec![],
+            ),
+            tshift(
+                101,
+                Some(8),
+                "2026-04-21",
+                "09:00",
+                "17:00",
+                "barista",
+                vec![],
+            ),
+        ]);
+        let new = snap(vec![
+            tshift(
+                200,
+                Some(7),
+                "2026-04-20",
+                "09:00",
+                "17:00",
+                "barista",
+                vec![assign(10, "Alice", "Proposed")],
+            ),
+            tshift(
+                201,
+                Some(8),
+                "2026-04-21",
+                "09:00",
+                "17:00",
+                "barista",
+                vec![],
+            ),
+        ]);
+        let d = diff_snapshots(&old, &new);
+        assert_eq!(d.len(), 1, "unexpected changes: {:?}", d);
+        assert!(matches!(
+            d[0].kind,
+            ChangeKind::AssignmentAdded {
+                employee_id: 10,
+                ..
+            }
+        ));
     }
 
     #[test]

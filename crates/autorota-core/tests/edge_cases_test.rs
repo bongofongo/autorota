@@ -568,28 +568,61 @@ async fn rota_has_saves_reflects_state() {
 }
 
 #[tokio::test]
-async fn update_save_label_sets_and_clears() {
+async fn save_tags_add_remove_and_validation() {
+    use autorota_core::db::queries::SaveTagError;
+    use autorota_core::models::save::TagError;
+
     let pool = test_pool().await;
     let (rota_id, _ids) = seed_rota_with_past_shifts(&pool).await;
     let save_id = queries::create_save(&pool, rota_id).await.unwrap();
 
-    // Initially no label.
+    // Initially no tags.
     let got = queries::get_save(&pool, save_id).await.unwrap().unwrap();
-    assert!(got.label.is_none());
+    assert!(got.tags.is_empty());
 
-    // Set a label.
-    queries::update_save_label(&pool, save_id, Some("Week 13"))
+    // Add tags preserves order.
+    queries::add_save_tag(&pool, save_id, "Morning")
+        .await
+        .unwrap();
+    queries::add_save_tag(&pool, save_id, "Busy").await.unwrap();
+    let got = queries::get_save(&pool, save_id).await.unwrap().unwrap();
+    assert_eq!(got.tags, vec!["Morning".to_string(), "Busy".to_string()]);
+
+    // Case-insensitive duplicate rejected.
+    match queries::add_save_tag(&pool, save_id, "morning").await {
+        Err(SaveTagError::Validation(TagError::Duplicate)) => {}
+        other => panic!("expected Duplicate, got {other:?}"),
+    }
+
+    // Third tag ok; fourth hits the cap.
+    queries::add_save_tag(&pool, save_id, "weekend")
+        .await
+        .unwrap();
+    match queries::add_save_tag(&pool, save_id, "extra").await {
+        Err(SaveTagError::Validation(TagError::MaxReached)) => {}
+        other => panic!("expected MaxReached, got {other:?}"),
+    }
+
+    // Remove by case-insensitive match.
+    queries::remove_save_tag(&pool, save_id, "MORNING")
         .await
         .unwrap();
     let got = queries::get_save(&pool, save_id).await.unwrap().unwrap();
-    assert_eq!(got.label.as_deref(), Some("Week 13"));
+    assert_eq!(got.tags, vec!["Busy".to_string(), "weekend".to_string()]);
 
-    // Clear the label.
-    queries::update_save_label(&pool, save_id, None)
-        .await
-        .unwrap();
-    let got = queries::get_save(&pool, save_id).await.unwrap().unwrap();
-    assert!(got.label.is_none());
+    // Validation failures.
+    match queries::add_save_tag(&pool, save_id, "   ").await {
+        Err(SaveTagError::Validation(TagError::Empty)) => {}
+        other => panic!("expected Empty, got {other:?}"),
+    }
+    match queries::add_save_tag(&pool, save_id, "abcdefghijklmnop").await {
+        Err(SaveTagError::Validation(TagError::TooLong)) => {}
+        other => panic!("expected TooLong, got {other:?}"),
+    }
+    match queries::add_save_tag(&pool, save_id, "has;semi").await {
+        Err(SaveTagError::Validation(TagError::ContainsSemicolon)) => {}
+        other => panic!("expected ContainsSemicolon, got {other:?}"),
+    }
 }
 
 #[tokio::test]

@@ -251,6 +251,11 @@ typedef void (*UniffiForeignFutureCompleteVoid)(uint64_t, UniffiForeignFutureStr
     );
 
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_ADD_SAVE_TAG
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_ADD_SAVE_TAG
+void uniffi_autorota_ffi_fn_func_add_save_tag(int64_t save_id, RustBuffer tag, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_APPLY_REMOTE_RECORD
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_APPLY_REMOTE_RECORD
 void uniffi_autorota_ffi_fn_func_apply_remote_record(RustBuffer record, RustCallStatus *_Nonnull out_status
@@ -518,6 +523,11 @@ int64_t uniffi_autorota_ffi_fn_func_materialise_week(RustBuffer week_start, Rust
 void uniffi_autorota_ffi_fn_func_move_assignment(int64_t id, int64_t new_shift_id, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_REMOVE_SAVE_TAG
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_REMOVE_SAVE_TAG
+void uniffi_autorota_ffi_fn_func_remove_save_tag(int64_t save_id, RustBuffer tag, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_RESTORE_TO_SAVE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_RESTORE_TO_SAVE
 RustBuffer uniffi_autorota_ffi_fn_func_restore_to_save(int64_t save_id, RustCallStatus *_Nonnull out_status
@@ -561,11 +571,6 @@ void uniffi_autorota_ffi_fn_func_update_employee(RustBuffer employee, RustCallSt
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_UPDATE_ROLE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_UPDATE_ROLE
 void uniffi_autorota_ffi_fn_func_update_role(int64_t id, RustBuffer name, RustCallStatus *_Nonnull out_status
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_UPDATE_SAVE_LABEL
-#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_UPDATE_SAVE_LABEL
-void uniffi_autorota_ffi_fn_func_update_save_label(int64_t save_id, RustBuffer label, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_UPDATE_SHIFT_TEMPLATE
@@ -866,6 +871,12 @@ void ffi_autorota_ffi_rust_future_free_void(uint64_t handle
 #ifndef UNIFFI_FFIDEF_FFI_AUTOROTA_FFI_RUST_FUTURE_COMPLETE_VOID
 #define UNIFFI_FFIDEF_FFI_AUTOROTA_FFI_RUST_FUTURE_COMPLETE_VOID
 void ffi_autorota_ffi_rust_future_complete_void(uint64_t handle, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_ADD_SAVE_TAG
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_ADD_SAVE_TAG
+uint16_t uniffi_autorota_ffi_checksum_func_add_save_tag(void
+    
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_APPLY_REMOTE_RECORD
@@ -1180,6 +1191,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_move_assignment(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_REMOVE_SAVE_TAG
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_REMOVE_SAVE_TAG
+uint16_t uniffi_autorota_ffi_checksum_func_remove_save_tag(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_RESTORE_TO_SAVE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_RESTORE_TO_SAVE
 uint16_t uniffi_autorota_ffi_checksum_func_restore_to_save(void
@@ -1231,12 +1248,6 @@ uint16_t uniffi_autorota_ffi_checksum_func_update_employee(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_UPDATE_ROLE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_UPDATE_ROLE
 uint16_t uniffi_autorota_ffi_checksum_func_update_role(void
-    
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_UPDATE_SAVE_LABEL
-#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_UPDATE_SAVE_LABEL
-uint16_t uniffi_autorota_ffi_checksum_func_update_save_label(void
     
 );
 #endif

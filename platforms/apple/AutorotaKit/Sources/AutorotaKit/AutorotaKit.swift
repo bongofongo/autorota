@@ -357,9 +357,15 @@ public func diffSaveVsPreviousAsync(saveId: Int64) async throws -> [FfiChangeDet
     }.value
 }
 
-public func updateSaveLabelAsync(saveId: Int64, label: String?) async throws {
+public func addSaveTagAsync(saveId: Int64, tag: String) async throws {
     try await Task.detached(priority: .userInitiated) {
-        try updateSaveLabel(saveId: saveId, label: label)
+        try addSaveTag(saveId: saveId, tag: tag)
+    }.value
+}
+
+public func removeSaveTagAsync(saveId: Int64, tag: String) async throws {
+    try await Task.detached(priority: .userInitiated) {
+        try removeSaveTag(saveId: saveId, tag: tag)
     }.value
 }
 

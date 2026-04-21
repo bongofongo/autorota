@@ -68,7 +68,8 @@ protocol AutorotaServiceProtocol: Sendable {
     func diffSavesDetailed(oldSaveId: Int64, newSaveId: Int64) async throws -> [FfiChangeDetail]
     func diffSaveVsPrevious(saveId: Int64) async throws -> [FfiChangeDetail]
     func restoreToSave(saveId: Int64) async throws -> FfiRestoreResult
-    func updateSaveLabel(saveId: Int64, label: String?) async throws
+    func addSaveTag(saveId: Int64, tag: String) async throws
+    func removeSaveTag(saveId: Int64, tag: String) async throws
 
     // Export
     func exportWeekSchedule(weekStart: String, config: FfiExportConfig) async throws -> FfiExportResult

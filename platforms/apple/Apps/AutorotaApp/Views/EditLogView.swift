@@ -1,8 +1,9 @@
 import SwiftUI
 import AutorotaKit
 
-struct ActivityLogView: View {
-    @State private var vm = ActivityLogViewModel()
+struct EditLogView: View {
+    @State private var vm = EditLogViewModel()
+    @State private var expandedWeeks: Set<String> = [currentWeekStart()]
 
     var body: some View {
         NavigationStack {
@@ -11,9 +12,15 @@ struct ActivityLogView: View {
                     if vm.isLoading && vm.saves.isEmpty {
                         ProgressView("Loading…")
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if let err = vm.error, vm.saves.isEmpty {
+                        ContentUnavailableView(
+                            "Couldn't load edits",
+                            systemImage: "exclamationmark.triangle",
+                            description: Text(err)
+                        )
                     } else if vm.saves.isEmpty {
                         ContentUnavailableView(
-                            "No activity yet",
+                            "No edits yet",
                             systemImage: "clock.arrow.circlepath",
                             description: Text("Saves will appear here as you edit schedules.")
                         )
@@ -33,18 +40,22 @@ struct ActivityLogView: View {
                         }
                 }
             }
-            .navigationTitle("Activity Log")
+            .navigationTitle("Edit Log")
             .task { await vm.loadSaves() }
+            .onTapGesture { dismissKeyboard() }
         }
     }
 
     private var savesList: some View {
         List {
             ForEach(vm.savesByWeek, id: \.weekStart) { weekGroup in
-                Section("Week of \(weekGroup.weekStart)") {
+                DisclosureGroup(isExpanded: weekBinding(weekGroup.weekStart)) {
                     ForEach(weekGroup.saves, id: \.id) { save in
                         SaveEntryView(save: save, vm: vm)
                     }
+                } label: {
+                    Text("Week of \(weekGroup.weekStart)")
+                        .font(.headline)
                 }
             }
         }
@@ -53,23 +64,52 @@ struct ActivityLogView: View {
         #else
         .listStyle(.inset)
         #endif
+        .scrollDismissesKeyboard(.immediately)
         .refreshable { await vm.loadSaves() }
     }
+
+    private func weekBinding(_ key: String) -> Binding<Bool> {
+        Binding(
+            get: { expandedWeeks.contains(key) },
+            set: { isOn in
+                if isOn { expandedWeeks.insert(key) } else { expandedWeeks.remove(key) }
+            }
+        )
+    }
+}
+
+private func dismissKeyboard() {
+    #if os(iOS)
+    UIApplication.shared.sendAction(
+        #selector(UIResponder.resignFirstResponder),
+        to: nil, from: nil, for: nil
+    )
+    #elseif os(macOS)
+    NSApp.keyWindow?.makeFirstResponder(nil)
+    #endif
 }
 
 // MARK: - Save Entry
 
 private struct SaveEntryView: View {
     let save: FfiSave
-    let vm: ActivityLogViewModel
-    @State private var labelText: String = ""
+    let vm: EditLogViewModel
+    @State private var tagInput: String = ""
+    @FocusState private var tagFieldFocused: Bool
     @State private var showRestoreConfirmation = false
+    @State private var showTagInput = false
 
     private var isExpanded: Bool { vm.expandedSaveId == save.id }
+
+    private var validation: EditLogViewModel.TagValidation {
+        EditLogViewModel.validate(tagInput, existing: save.tags)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Button {
+                tagFieldFocused = false
+                showTagInput = false
                 Task { await vm.toggleExpanded(saveId: save.id) }
             } label: {
                 HStack {
@@ -77,14 +117,14 @@ private struct SaveEntryView: View {
                         HStack(spacing: 6) {
                             Text(formattedDate(save.savedAt))
                                 .font(.subheadline.bold())
-                            if let label = save.label {
-                                Text(label)
-                                    .font(.caption.bold())
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color.accentColor.opacity(0.15))
-                                    .foregroundStyle(Color.accentColor)
-                                    .clipShape(Capsule())
+                            if save.restoredAt != nil {
+                                SystemBadge(text: "Restored", color: .green)
+                            }
+                            if !save.tags.isEmpty {
+                                TagChipRow(
+                                    tags: save.tags,
+                                    onDelete: nil
+                                )
                             }
                         }
                         Text(save.summary)
@@ -103,6 +143,19 @@ private struct SaveEntryView: View {
             if isExpanded {
                 Divider()
 
+                HStack(spacing: 8) {
+                    restoreButton
+                        .frame(maxWidth: .infinity)
+                    tagInputArea
+                        .frame(maxWidth: .infinity)
+                }
+
+                if !save.tags.isEmpty {
+                    TagChipRow(tags: save.tags) { tag in
+                        Task { await vm.removeTag(saveId: save.id, tag: tag) }
+                    }
+                }
+
                 if let changes = vm.changesBySaveId[save.id] {
                     if changes.isEmpty {
                         Text("No changes from previous save")
@@ -118,50 +171,86 @@ private struct SaveEntryView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
                 }
-
-                HStack {
-                    TextField("Add label…", text: $labelText)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.subheadline)
-                    if !labelText.isEmpty || save.label != nil {
-                        Button("Save") {
-                            Task { await vm.updateLabel(saveId: save.id, label: labelText) }
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                    }
-                }
-                .onAppear { labelText = save.label ?? "" }
-
-                Button(role: .destructive) {
-                    showRestoreConfirmation = true
-                } label: {
-                    Label("Restore to this point", systemImage: "arrow.counterclockwise")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .disabled(vm.isRestoring)
-                .confirmationDialog(
-                    "Restore schedule?",
-                    isPresented: $showRestoreConfirmation,
-                    titleVisibility: .visible
-                ) {
-                    Button("Restore", role: .destructive) {
-                        Task {
-                            await vm.restoreToSave(
-                                id: save.id,
-                                summary: save.summary,
-                                weekStart: save.weekStart
-                            )
-                            await vm.loadSaves()
-                        }
-                    }
-                } message: {
-                    Text("This will overwrite the current schedule for week of \(save.weekStart) with the state from this save. This cannot be undone.")
-                }
             }
         }
         .padding(.vertical, 4)
+    }
+
+    private var restoreButton: some View {
+        Button {
+            showRestoreConfirmation = true
+        } label: {
+            Label("Restore", systemImage: "arrow.counterclockwise")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .tint(.orange)
+        .disabled(vm.isRestoring)
+        .confirmationDialog(
+            "Restore schedule?",
+            isPresented: $showRestoreConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Restore", role: .destructive) {
+                Task {
+                    await vm.restoreToSave(
+                        id: save.id,
+                        summary: save.summary,
+                        weekStart: save.weekStart
+                    )
+                }
+            }
+        } message: {
+            Text("This will overwrite the current schedule for week of \(save.weekStart) with the state from this save. This cannot be undone.")
+        }
+    }
+
+    private var tagInputArea: some View {
+        let atMax = save.tags.count >= EditLogViewModel.tagMaxPerSave
+        return Button {
+            showTagInput = true
+        } label: {
+            Label("Tag", systemImage: "plus")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        .tint(atMax ? .red : .green)
+        .disabled(atMax)
+        .popover(isPresented: $showTagInput) {
+            tagPopoverContent
+        }
+    }
+
+    private var tagPopoverContent: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Add tag")
+                .font(.subheadline.bold())
+            TextField("Tag", text: $tagInput)
+                .textFieldStyle(.roundedBorder)
+                .focused($tagFieldFocused)
+                .onSubmit { submitTag() }
+                .onAppear { tagFieldFocused = true }
+            if let hint = validation.hint {
+                Text(hint)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    tagInput = ""
+                    showTagInput = false
+                }
+                Button("Save") { submitTag() }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!isSaveEnabled)
+            }
+        }
+        .padding()
+        .frame(minWidth: 240)
+        .presentationCompactAdaptation(.popover)
     }
 
     private func formattedDate(_ iso: String) -> String {
@@ -171,8 +260,84 @@ private struct SaveEntryView: View {
             return iso
         }
         let relative = RelativeDateTimeFormatter()
-        relative.unitsStyle = .short
+        relative.unitsStyle = .full
         return relative.localizedString(for: date, relativeTo: Date())
+    }
+
+    private var isSaveEnabled: Bool {
+        if case .valid = validation { return true }
+        return false
+    }
+
+    private func submitTag() {
+        guard case .valid(let value) = validation else { return }
+        Task {
+            if await vm.addTag(saveId: save.id, tag: value) {
+                tagInput = ""
+                showTagInput = false
+            }
+        }
+    }
+}
+
+// MARK: - System Badge
+
+/// Read-only capsule used for system-controlled labels ("Current", "Restored").
+/// Differs from `TagChip` in that it carries a color tint and never shows a
+/// delete button — the user can't remove these.
+private struct SystemBadge: View {
+    let text: String
+    let color: Color
+
+    var body: some View {
+        Text(text)
+            .font(.caption2.bold())
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(color.opacity(0.18))
+            .foregroundStyle(color)
+            .clipShape(Capsule())
+    }
+}
+
+// MARK: - Tag Chip
+
+private struct TagChipRow: View {
+    let tags: [String]
+    /// When non-nil, each chip shows an inline `×` delete button.
+    let onDelete: ((String) -> Void)?
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(tags, id: \.self) { tag in
+                TagChip(tag: tag, onDelete: onDelete.map { cb in { cb(tag) } })
+            }
+        }
+    }
+}
+
+private struct TagChip: View {
+    let tag: String
+    let onDelete: (() -> Void)?
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(tag)
+                .font(.caption.bold())
+            if let onDelete {
+                Button(action: onDelete) {
+                    Image(systemName: "xmark")
+                        .font(.caption2.bold())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Remove tag \(tag)")
+            }
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(Color.accentColor.opacity(0.15))
+        .foregroundStyle(Color.accentColor)
+        .clipShape(Capsule())
     }
 }
 
@@ -323,22 +488,23 @@ private struct RestoreToastBanner: View {
     let toast: RestoreToast
 
     var body: some View {
-        VStack(spacing: 4) {
-            Label("Restored to: \(toast.saveSummary)", systemImage: "checkmark.circle.fill")
-                .font(.subheadline.bold())
-            Text("Week of \(toast.weekStart) — \(toast.shiftsRestored) shifts, \(toast.assignmentsRestored) assignments")
-                .font(.caption)
-            if toast.assignmentsSkipped > 0 {
-                Text("\(toast.assignmentsSkipped) assignment(s) skipped (employees deleted)")
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+                .font(.body.bold())
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Schedule restored")
+                    .font(.subheadline.weight(.semibold))
+                Text("Week of \(toast.weekStart)")
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(.secondary)
             }
         }
-        .padding()
-        .frame(maxWidth: .infinity)
-        .background(.thinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.regularMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(.quaternary, lineWidth: 0.5))
+        .shadow(color: .black.opacity(0.12), radius: 8, y: 2)
         .padding(.top, 8)
     }
 }

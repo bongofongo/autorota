@@ -214,9 +214,13 @@ pub struct FfiSave {
     pub rota_id: i64,
     pub saved_at: String,
     pub summary: String,
-    pub label: Option<String>,
+    /// User-assigned tags for this save, ordered by insertion.
+    pub tags: Vec<String>,
     /// Denormalized from the rota for display convenience.
     pub week_start: String,
+    /// RFC3339 timestamp set when the user restored to this save. Drives the
+    /// red "Restored" badge and promotes the entry to the top of its week.
+    pub restored_at: Option<String>,
 }
 
 /// A save record with the full snapshot JSON (for detail views).
@@ -226,9 +230,10 @@ pub struct FfiSaveDetail {
     pub rota_id: i64,
     pub saved_at: String,
     pub summary: String,
-    pub label: Option<String>,
+    pub tags: Vec<String>,
     pub week_start: String,
     pub snapshot_json: String,
+    pub restored_at: Option<String>,
 }
 
 /// One detailed change attached to a shift on a specific date.

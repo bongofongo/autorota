@@ -1645,8 +1645,9 @@ pub fn list_saves(rota_id: Option<i64>) -> Result<Vec<FfiSave>, FfiError> {
                 rota_id: s.rota_id,
                 saved_at: s.saved_at,
                 summary: s.summary,
-                label: s.label,
+                tags: s.tags,
                 week_start,
+                restored_at: s.restored_at,
             });
         }
         Ok(ffi_saves)
@@ -1676,9 +1677,10 @@ pub fn get_save_detail(save_id: i64) -> Result<Option<FfiSaveDetail>, FfiError> 
             rota_id: save.rota_id,
             saved_at: save.saved_at,
             summary: save.summary,
-            label: save.label,
+            tags: save.tags,
             week_start,
             snapshot_json: save.snapshot_json,
+            restored_at: save.restored_at,
         }))
     });
     result.map_err(Into::into)
@@ -1706,10 +1708,29 @@ pub fn restore_to_save(save_id: i64) -> Result<FfiRestoreResult, FfiError> {
     })
 }
 
+/// Add a tag to a save. Enforces max tags per save, rejects duplicates
+/// (case-insensitive), and validates the tag string (non-empty, ≤15 chars,
+/// no `;`). Errors surface as distinct `FfiError::Validation` codes so the
+/// UI can show a specific inline hint.
 #[uniffi::export]
-pub fn update_save_label(save_id: i64, label: Option<String>) -> Result<(), FfiError> {
+pub fn add_save_tag(save_id: i64, tag: String) -> Result<(), FfiError> {
+    use autorota_core::db::queries::SaveTagError;
+
     let pool = pool()?;
-    rt().block_on(queries::update_save_label(pool, save_id, label.as_deref()))
+    match rt().block_on(queries::add_save_tag(pool, save_id, &tag)) {
+        Ok(()) => Ok(()),
+        Err(SaveTagError::Validation(e)) => Err(FfiError::InvalidArgument {
+            msg: e.as_code().to_string(),
+        }),
+        Err(SaveTagError::Db(e)) => Err(e.into()),
+    }
+}
+
+/// Remove a tag from a save by case-insensitive match. No-op if absent.
+#[uniffi::export]
+pub fn remove_save_tag(save_id: i64, tag: String) -> Result<(), FfiError> {
+    let pool = pool()?;
+    rt().block_on(queries::remove_save_tag(pool, save_id, &tag))
         .map_err(Into::into)
 }
 
