@@ -27,6 +27,7 @@ private struct RowMaxWidthKey: PreferenceKey {
 struct RotaOverflowPopover: View {
     let actions: [RotaOverflowAction]
     @Binding var isPresented: Bool
+    var anchor: Alignment = .bottomTrailing
     @State private var rowWidth: CGFloat = 0
     #if os(iOS)
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -43,8 +44,19 @@ struct RotaOverflowPopover: View {
         #endif
     }
 
+    private var isTopAnchored: Bool { anchor == .topTrailing || anchor == .topLeading }
+
+    private var transitionAnchor: UnitPoint {
+        switch anchor {
+        case .topTrailing: return .topTrailing
+        case .topLeading: return .topLeading
+        case .bottomLeading: return .bottomLeading
+        default: return .bottomTrailing
+        }
+    }
+
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
+        ZStack(alignment: anchor) {
             // Tap-outside dismiss backdrop.
             Color.black.opacity(0.001)
                 .contentShape(Rectangle())
@@ -90,9 +102,9 @@ struct RotaOverflowPopover: View {
                 if newValue > rowWidth { rowWidth = newValue }
             }
             .padding(.trailing, 20)
-            .padding(.bottom, bottomPadding)
+            .padding(isTopAnchored ? .top : .bottom, isTopAnchored ? 8 : bottomPadding)
             .transition(
-                .scale(scale: 0.85, anchor: .bottomTrailing)
+                .scale(scale: 0.85, anchor: transitionAnchor)
                 .combined(with: .opacity)
             )
         }

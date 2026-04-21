@@ -22,7 +22,7 @@ struct ContentView: View {
     private var showsDotsTab: Bool {
         #if os(iOS)
         guard verticalSizeClass == .regular else { return false }
-        return lastPage == .rota || lastPage == .employees
+        return lastPage == .rota
         #else
         return false
         #endif
@@ -68,19 +68,12 @@ struct ContentView: View {
         .onChange(of: selection) { _, new in
             switch new {
             case .dots:
-                // Route the overflow menu to whichever tab is active.
-                switch lastPage {
-                case .employees:
-                    selection = .page(.employees)
-                    employeeBridge.overflowOpen.toggle()
-                default:
-                    selection = .page(.rota)
-                    lastPage = .rota
-                    if bridge.isEditMode {
-                        bridge.isEditMode = false
-                    } else {
-                        bridge.overflowOpen.toggle()
-                    }
+                selection = .page(.rota)
+                lastPage = .rota
+                if bridge.isEditMode {
+                    bridge.isEditMode = false
+                } else {
+                    bridge.overflowOpen.toggle()
                 }
             case .page(let p):
                 lastPage = p
