@@ -198,32 +198,30 @@ struct AnalyticsViewModelTests {
         #expect(vm.weeklyTrends.isEmpty)
     }
 
-    @Test func datePresetComputesCorrectRange() {
+    @Test func defaultDateRangeIsCurrentISOWeek() {
         let vm = AnalyticsViewModel(service: MockAutorotaService())
 
-        vm.selectedPreset = .thisWeek
-        let (weekStart, weekEnd) = vm.effectiveDateRange()
-        // Should be a 7-day span (Monday to Sunday)
+        let (start, end) = vm.effectiveDateRange()
         let fmt = DateFormatter()
         fmt.dateFormat = "yyyy-MM-dd"
         fmt.locale = Locale(identifier: "en_US_POSIX")
-        let start = fmt.date(from: weekStart)!
-        let end = fmt.date(from: weekEnd)!
-        let days = Calendar(identifier: .iso8601).dateComponents([.day], from: start, to: end).day!
-        #expect(days == 6) // Monday to Sunday = 6 days difference
+        let startD = fmt.date(from: start)!
+        let endD = fmt.date(from: end)!
+        let days = Calendar(identifier: .iso8601).dateComponents([.day], from: startD, to: endD).day!
+        #expect(days == 6) // Monday to Sunday
+    }
 
-        vm.selectedPreset = .thisMonth
-        let (monthStart, monthEnd) = vm.effectiveDateRange()
-        // Month start should be day 01
-        #expect(monthStart.hasSuffix("-01"))
-        // Month end should be in the same month
-        #expect(monthStart.prefix(7) == monthEnd.prefix(7))
+    @Test func effectiveDateRangeReflectsSetDates() {
+        let vm = AnalyticsViewModel(service: MockAutorotaService())
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        vm.startDate = fmt.date(from: "2026-01-01")!
+        vm.endDate = fmt.date(from: "2026-03-31")!
 
-        vm.selectedPreset = .thisQuarter
-        let (qStart, _) = vm.effectiveDateRange()
-        // Quarter start month should be 01, 04, 07, or 10
-        let qMonth = Int(qStart.split(separator: "-")[1])!
-        #expect([1, 4, 7, 10].contains(qMonth))
+        let (start, end) = vm.effectiveDateRange()
+        #expect(start == "2026-01-01")
+        #expect(end == "2026-03-31")
     }
 
     @Test func targetWeeklyHoursPopulatedFromEmployeeList() async {

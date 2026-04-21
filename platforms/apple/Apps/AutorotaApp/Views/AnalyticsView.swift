@@ -37,9 +37,6 @@ struct AnalyticsView: View {
                 vm.displayCurrency = displayCurrency
                 Task { await vm.load() }
             }
-            .onChange(of: vm.selectedPreset) {
-                Task { await vm.load() }
-            }
             .alert("Error", isPresented: .constant(vm.error != nil)) {
                 Button("OK") { vm.error = nil }
             } message: {
@@ -69,26 +66,29 @@ struct AnalyticsView: View {
     // MARK: - Date Range Picker
 
     private var dateRangePicker: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Picker("Period", selection: $vm.selectedPreset) {
-                ForEach(AnalyticsViewModel.DatePreset.allCases) { preset in
-                    Text(preset.rawValue).tag(preset)
-                }
+        ZStack {
+            Image(systemName: "arrow.right")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            HStack {
+                DatePicker("", selection: $vm.startDate, displayedComponents: .date)
+                    .labelsHidden()
+                    .datePickerStyle(.compact)
+                Spacer()
+                DatePicker("", selection: $vm.endDate, in: vm.startDate..., displayedComponents: .date)
+                    .labelsHidden()
+                    .datePickerStyle(.compact)
             }
-            .pickerStyle(.segmented)
-
-            if vm.selectedPreset == .custom {
-                HStack {
-                    DatePicker("From", selection: $vm.customStartDate, displayedComponents: .date)
-                    DatePicker("To", selection: $vm.customEndDate, displayedComponents: .date)
-                }
-                .onChange(of: vm.customStartDate) {
-                    Task { await vm.load() }
-                }
-                .onChange(of: vm.customEndDate) {
-                    Task { await vm.load() }
-                }
-            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .onChange(of: vm.startDate) {
+            if vm.endDate < vm.startDate { vm.endDate = vm.startDate }
+            Task { await vm.load() }
+        }
+        .onChange(of: vm.endDate) {
+            Task { await vm.load() }
         }
     }
 

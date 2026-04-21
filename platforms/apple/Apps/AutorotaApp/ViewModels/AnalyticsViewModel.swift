@@ -7,18 +7,8 @@ final class AnalyticsViewModel {
 
     // MARK: - Date Range
 
-    enum DatePreset: String, CaseIterable, Identifiable {
-        case thisWeek = "Week"
-        case thisMonth = "Month"
-        case thisQuarter = "Quarter"
-        case custom = "Custom"
-
-        var id: String { rawValue }
-    }
-
-    var selectedPreset: DatePreset = .thisMonth
-    var customStartDate: Date = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date()
-    var customEndDate: Date = Date()
+    var startDate: Date
+    var endDate: Date
 
     // MARK: - Loading State
 
@@ -99,6 +89,12 @@ final class AnalyticsViewModel {
 
     init(service: AutorotaServiceProtocol = LiveAutorotaService()) {
         self.service = service
+        let cal = Calendar(identifier: .iso8601)
+        let now = Date()
+        let monday = cal.date(from: cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: now)) ?? now
+        let sunday = cal.date(byAdding: .day, value: 6, to: monday) ?? now
+        self.startDate = monday
+        self.endDate = sunday
     }
 
     // MARK: - Load
@@ -120,35 +116,10 @@ final class AnalyticsViewModel {
     // MARK: - Date Range Computation
 
     func effectiveDateRange() -> (start: String, end: String) {
-        let cal = Calendar(identifier: .iso8601)
         let fmt = DateFormatter()
         fmt.dateFormat = "yyyy-MM-dd"
         fmt.locale = Locale(identifier: "en_US_POSIX")
-        let now = Date()
-
-        switch selectedPreset {
-        case .thisWeek:
-            let monday = cal.date(from: cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: now))!
-            let sunday = cal.date(byAdding: .day, value: 6, to: monday)!
-            return (fmt.string(from: monday), fmt.string(from: sunday))
-
-        case .thisMonth:
-            let comps = cal.dateComponents([.year, .month], from: now)
-            let first = cal.date(from: comps)!
-            let last = cal.date(byAdding: DateComponents(month: 1, day: -1), to: first)!
-            return (fmt.string(from: first), fmt.string(from: last))
-
-        case .thisQuarter:
-            let comps = cal.dateComponents([.year, .month], from: now)
-            let currentMonth = comps.month!
-            let quarterStart = ((currentMonth - 1) / 3) * 3 + 1
-            let first = cal.date(from: DateComponents(year: comps.year, month: quarterStart, day: 1))!
-            let last = cal.date(byAdding: DateComponents(month: 3, day: -1), to: first)!
-            return (fmt.string(from: first), fmt.string(from: last))
-
-        case .custom:
-            return (fmt.string(from: customStartDate), fmt.string(from: customEndDate))
-        }
+        return (fmt.string(from: startDate), fmt.string(from: endDate))
     }
 
     // MARK: - Aggregation
