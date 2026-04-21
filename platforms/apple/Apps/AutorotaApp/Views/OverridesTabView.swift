@@ -514,6 +514,7 @@ struct EmployeeAvailabilityOverrideSheet: View {
     @State private var slotsByDate: [String: [AvailabilitySlot]] = [:]
     @State private var currentDateIndex = 0
     @State private var showLongRangeWarning = false
+    @State private var showDeleteConfirmation = false
 
     private static let softMaxDaysInRange = 84  // 12 weeks
 
@@ -636,6 +637,17 @@ struct EmployeeAvailabilityOverrideSheet: View {
                     TextField("Optional notes", text: $notes, axis: .vertical)
                         .lineLimit(2...4)
                 }
+
+                if isEditing {
+                    Section {
+                        Button(role: .destructive) {
+                            showDeleteConfirmation = true
+                        } label: {
+                            Label("Delete Exception", systemImage: "trash")
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
+                }
             }
             .scrollDisabled(selectionModeActive)
             #if os(macOS)
@@ -657,6 +669,12 @@ struct EmployeeAvailabilityOverrideSheet: View {
                 Button("Save anyway") { save() }
             } message: {
                 Text("This exception covers \(datesInRange.count) days (more than \(Self.softMaxDaysInRange / 7) weeks). Long ranges can be hard to manage — are you sure?")
+            }
+            .alert("Delete exception?", isPresented: $showDeleteConfirmation) {
+                Button("Cancel", role: .cancel) {}
+                Button("Delete", role: .destructive) { deleteExisting() }
+            } message: {
+                Text("This exception will be removed. The employee's default availability applies on that date.")
             }
         }
         #if os(macOS)
@@ -783,6 +801,14 @@ struct EmployeeAvailabilityOverrideSheet: View {
             showLongRangeWarning = true
         } else {
             save()
+        }
+    }
+
+    private func deleteExisting() {
+        guard let ovr = existing else { return }
+        Task {
+            await vm.deleteEmployeeOverride(id: ovr.id)
+            dismiss()
         }
     }
 
