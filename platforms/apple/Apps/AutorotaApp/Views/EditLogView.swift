@@ -127,9 +127,6 @@ private struct SaveEntryView: View {
                                 )
                             }
                         }
-                        Text(save.summary)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                     }
                     Spacer()
                     Image(systemName: "chevron.right")
