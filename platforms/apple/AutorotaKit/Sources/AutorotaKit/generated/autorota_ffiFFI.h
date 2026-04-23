@@ -261,6 +261,11 @@ void uniffi_autorota_ffi_fn_func_add_save_tag(int64_t save_id, RustBuffer tag, R
 void uniffi_autorota_ffi_fn_func_apply_remote_record(RustBuffer record, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_APPLY_ROSTER_IMPORT
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_APPLY_ROSTER_IMPORT
+RustBuffer uniffi_autorota_ffi_fn_func_apply_roster_import(RustBuffer rows, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_CLEAR_TOMBSTONES
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_CLEAR_TOMBSTONES
 void uniffi_autorota_ffi_fn_func_clear_tombstones(RustBuffer ids, RustCallStatus *_Nonnull out_status
@@ -370,6 +375,11 @@ RustBuffer uniffi_autorota_ffi_fn_func_diff_save_vs_previous(int64_t save_id, Ru
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_DIFF_SAVES_DETAILED
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_DIFF_SAVES_DETAILED
 RustBuffer uniffi_autorota_ffi_fn_func_diff_saves_detailed(int64_t old_save_id, int64_t new_save_id, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_EXPORT_EMPLOYEE_BUNDLE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_EXPORT_EMPLOYEE_BUNDLE
+RustBuffer uniffi_autorota_ffi_fn_func_export_employee_bundle(RustBuffer config, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_EXPORT_EMPLOYEE_SCHEDULE
@@ -521,6 +531,11 @@ int64_t uniffi_autorota_ffi_fn_func_materialise_week(RustBuffer week_start, Rust
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_MOVE_ASSIGNMENT
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_MOVE_ASSIGNMENT
 void uniffi_autorota_ffi_fn_func_move_assignment(int64_t id, int64_t new_shift_id, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_PARSE_ROSTER_FILE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_PARSE_ROSTER_FILE
+RustBuffer uniffi_autorota_ffi_fn_func_parse_roster_file(RustBuffer bytes, RustBuffer format_hint, RustBuffer strategy, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_REMOVE_SAVE_TAG
@@ -885,6 +900,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_apply_remote_record(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_APPLY_ROSTER_IMPORT
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_APPLY_ROSTER_IMPORT
+uint16_t uniffi_autorota_ffi_checksum_func_apply_roster_import(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_CLEAR_TOMBSTONES
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_CLEAR_TOMBSTONES
 uint16_t uniffi_autorota_ffi_checksum_func_clear_tombstones(void
@@ -1014,6 +1035,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_diff_save_vs_previous(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_DIFF_SAVES_DETAILED
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_DIFF_SAVES_DETAILED
 uint16_t uniffi_autorota_ffi_checksum_func_diff_saves_detailed(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_EXPORT_EMPLOYEE_BUNDLE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_EXPORT_EMPLOYEE_BUNDLE
+uint16_t uniffi_autorota_ffi_checksum_func_export_employee_bundle(void
     
 );
 #endif
@@ -1188,6 +1215,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_materialise_week(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_MOVE_ASSIGNMENT
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_MOVE_ASSIGNMENT
 uint16_t uniffi_autorota_ffi_checksum_func_move_assignment(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_PARSE_ROSTER_FILE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_PARSE_ROSTER_FILE
+uint16_t uniffi_autorota_ffi_checksum_func_parse_roster_file(void
     
 );
 #endif

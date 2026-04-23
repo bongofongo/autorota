@@ -323,5 +323,43 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         sqlx::raw_sql(m20).execute(pool).await?;
     }
 
+    // Migration 021: `phone` + `whatsapp` contact fields on employees.
+    let has_phone: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) > 0 FROM pragma_table_info('employees') WHERE name = 'phone'",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    if !has_phone {
+        let m21 = include_str!("../../migrations/021_employee_contact.sql");
+        sqlx::raw_sql(m21).execute(pool).await?;
+    }
+
+    // Migration 022: collapse `whatsapp` into `phone`, add `preferred_contact`
+    // ("imessage" | "whatsapp" | NULL). Guard on the column we're adding.
+    let has_preferred_contact: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) > 0 FROM pragma_table_info('employees') WHERE name = 'preferred_contact'",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    if !has_preferred_contact {
+        let m22 = include_str!("../../migrations/022_preferred_contact.sql");
+        sqlx::raw_sql(m22).execute(pool).await?;
+    }
+
+    // Migration 023: optional `email` column on employees. Guard on column
+    // presence so re-running on an existing DB is a no-op.
+    let has_email: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) > 0 FROM pragma_table_info('employees') WHERE name = 'email'",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    if !has_email {
+        let m23 = include_str!("../../migrations/023_employee_email.sql");
+        sqlx::raw_sql(m23).execute(pool).await?;
+    }
+
     Ok(())
 }

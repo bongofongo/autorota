@@ -43,6 +43,10 @@ pub struct FfiEmployee {
     pub max_daily_hours: f32,
     pub notes: Option<String>,
     pub bank_details: Option<String>,
+    pub phone: Option<String>,
+    pub email: Option<String>,
+    /// `"imessage"` | `"whatsapp"` | `"email"` | `None` (unspecified).
+    pub preferred_contact: Option<String>,
     pub hourly_wage: Option<f32>,
     /// Currency code for the wage (e.g. "usd", "gbp", "eur").
     pub wage_currency: Option<String>,
@@ -346,13 +350,16 @@ pub struct FfiEmployeeExportConfig {
     pub start_date: String,
     /// "YYYY-MM-DD"
     pub end_date: String,
-    /// "csv" | "json" | "pdf"
+    /// "csv" | "json" | "pdf" | "xlsx" | "markdown" | "ics"
     pub format: String,
     /// "staff_schedule" | "manager_report"
     pub profile: String,
     pub show_shift_name: bool,
     pub show_times: bool,
     pub show_role: bool,
+    /// IANA timezone identifier (e.g. "Europe/London"). Only consulted when
+    /// `format == "ics"`; `None` = floating local times.
+    pub timezone_id: Option<String>,
 }
 
 /// Result of an export operation.
@@ -416,4 +423,47 @@ pub struct FfiShiftTemplateOverride {
     pub min_employees: Option<u32>,
     pub max_employees: Option<u32>,
     pub notes: Option<String>,
+}
+
+// ── Roster Import ────────────────────────────────────────────────────────────
+
+/// One row from a parsed roster file, annotated with diff state.
+#[derive(Clone, uniffi::Record)]
+pub struct FfiParsedEmployeeRow {
+    pub first_name: String,
+    pub last_name: String,
+    pub nickname: Option<String>,
+    pub phone: Option<String>,
+    pub email: Option<String>,
+    /// `"imessage"` | `"whatsapp"` | `"email"` | `None` (unspecified).
+    pub preferred_contact: Option<String>,
+    pub roles: Vec<String>,
+    pub target_weekly_hours: Option<f32>,
+    pub weekly_hours_deviation: Option<f32>,
+    pub max_daily_hours: Option<f32>,
+    pub hourly_wage: Option<f32>,
+    pub wage_currency: Option<String>,
+    pub notes: Option<String>,
+    pub bank_details: Option<String>,
+    /// `Some(id)` → UPDATE, `None` → INSERT.
+    pub match_existing_id: Option<i64>,
+    /// Human-readable summary: "NEW", "UPDATE: phone 555→777", "NO CHANGE",
+    /// "AMBIGUOUS — requires manual review".
+    pub diff_summary: String,
+    /// Set by the Rust layer to a sensible default (true for NEW/UPDATE,
+    /// false for NO CHANGE / AMBIGUOUS). UI toggles per row before applying.
+    pub include: bool,
+}
+
+#[derive(Clone, uniffi::Record)]
+pub struct FfiParsedRoster {
+    pub rows: Vec<FfiParsedEmployeeRow>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Clone, uniffi::Record)]
+pub struct FfiImportSummary {
+    pub inserted: u32,
+    pub updated: u32,
+    pub skipped: u32,
 }

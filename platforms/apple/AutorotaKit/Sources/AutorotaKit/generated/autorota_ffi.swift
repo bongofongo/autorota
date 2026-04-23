@@ -525,6 +525,24 @@ fileprivate struct FfiConverterString: FfiConverter {
     }
 }
 
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterData: FfiConverterRustBuffer {
+    typealias SwiftType = Data
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> Data {
+        let len: Int32 = try readInt(&buf)
+        return Data(try readBytes(&buf, count: Int(len)))
+    }
+
+    public static func write(_ value: Data, into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        writeBytes(&buf, value)
+    }
+}
+
 
 public struct AvailabilitySlot {
     public var weekday: String
@@ -1182,6 +1200,12 @@ public struct FfiEmployee {
     public var maxDailyHours: Float
     public var notes: String?
     public var bankDetails: String?
+    public var phone: String?
+    public var email: String?
+    /**
+     * `"imessage"` | `"whatsapp"` | `"email"` | `None` (unspecified).
+     */
+    public var preferredContact: String?
     public var hourlyWage: Float?
     /**
      * Currency code for the wage (e.g. "usd", "gbp", "eur").
@@ -1197,7 +1221,10 @@ public struct FfiEmployee {
         /**
          * Computed display name: nickname if set, otherwise "first_name last_name".
          * This field is ignored when creating/updating employees; Rust recomputes it.
-         */displayName: String, roles: [String], startDate: String, targetWeeklyHours: Float, weeklyHoursDeviation: Float, maxDailyHours: Float, notes: String?, bankDetails: String?, hourlyWage: Float?, 
+         */displayName: String, roles: [String], startDate: String, targetWeeklyHours: Float, weeklyHoursDeviation: Float, maxDailyHours: Float, notes: String?, bankDetails: String?, phone: String?, email: String?, 
+        /**
+         * `"imessage"` | `"whatsapp"` | `"email"` | `None` (unspecified).
+         */preferredContact: String?, hourlyWage: Float?, 
         /**
          * Currency code for the wage (e.g. "usd", "gbp", "eur").
          */wageCurrency: String?, defaultAvailability: [AvailabilitySlot], availability: [AvailabilitySlot], deleted: Bool) {
@@ -1213,6 +1240,9 @@ public struct FfiEmployee {
         self.maxDailyHours = maxDailyHours
         self.notes = notes
         self.bankDetails = bankDetails
+        self.phone = phone
+        self.email = email
+        self.preferredContact = preferredContact
         self.hourlyWage = hourlyWage
         self.wageCurrency = wageCurrency
         self.defaultAvailability = defaultAvailability
@@ -1261,6 +1291,15 @@ extension FfiEmployee: Equatable, Hashable {
         if lhs.bankDetails != rhs.bankDetails {
             return false
         }
+        if lhs.phone != rhs.phone {
+            return false
+        }
+        if lhs.email != rhs.email {
+            return false
+        }
+        if lhs.preferredContact != rhs.preferredContact {
+            return false
+        }
         if lhs.hourlyWage != rhs.hourlyWage {
             return false
         }
@@ -1292,6 +1331,9 @@ extension FfiEmployee: Equatable, Hashable {
         hasher.combine(maxDailyHours)
         hasher.combine(notes)
         hasher.combine(bankDetails)
+        hasher.combine(phone)
+        hasher.combine(email)
+        hasher.combine(preferredContact)
         hasher.combine(hourlyWage)
         hasher.combine(wageCurrency)
         hasher.combine(defaultAvailability)
@@ -1320,6 +1362,9 @@ public struct FfiConverterTypeFfiEmployee: FfiConverterRustBuffer {
                 maxDailyHours: FfiConverterFloat.read(from: &buf), 
                 notes: FfiConverterOptionString.read(from: &buf), 
                 bankDetails: FfiConverterOptionString.read(from: &buf), 
+                phone: FfiConverterOptionString.read(from: &buf), 
+                email: FfiConverterOptionString.read(from: &buf), 
+                preferredContact: FfiConverterOptionString.read(from: &buf), 
                 hourlyWage: FfiConverterOptionFloat.read(from: &buf), 
                 wageCurrency: FfiConverterOptionString.read(from: &buf), 
                 defaultAvailability: FfiConverterSequenceTypeAvailabilitySlot.read(from: &buf), 
@@ -1341,6 +1386,9 @@ public struct FfiConverterTypeFfiEmployee: FfiConverterRustBuffer {
         FfiConverterFloat.write(value.maxDailyHours, into: &buf)
         FfiConverterOptionString.write(value.notes, into: &buf)
         FfiConverterOptionString.write(value.bankDetails, into: &buf)
+        FfiConverterOptionString.write(value.phone, into: &buf)
+        FfiConverterOptionString.write(value.email, into: &buf)
+        FfiConverterOptionString.write(value.preferredContact, into: &buf)
         FfiConverterOptionFloat.write(value.hourlyWage, into: &buf)
         FfiConverterOptionString.write(value.wageCurrency, into: &buf)
         FfiConverterSequenceTypeAvailabilitySlot.write(value.defaultAvailability, into: &buf)
@@ -1496,7 +1544,7 @@ public struct FfiEmployeeExportConfig {
      */
     public var endDate: String
     /**
-     * "csv" | "json" | "pdf"
+     * "csv" | "json" | "pdf" | "xlsx" | "markdown" | "ics"
      */
     public var format: String
     /**
@@ -1506,6 +1554,11 @@ public struct FfiEmployeeExportConfig {
     public var showShiftName: Bool
     public var showTimes: Bool
     public var showRole: Bool
+    /**
+     * IANA timezone identifier (e.g. "Europe/London"). Only consulted when
+     * `format == "ics"`; `None` = floating local times.
+     */
+    public var timezoneId: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -1517,11 +1570,15 @@ public struct FfiEmployeeExportConfig {
          * "YYYY-MM-DD"
          */endDate: String, 
         /**
-         * "csv" | "json" | "pdf"
+         * "csv" | "json" | "pdf" | "xlsx" | "markdown" | "ics"
          */format: String, 
         /**
          * "staff_schedule" | "manager_report"
-         */profile: String, showShiftName: Bool, showTimes: Bool, showRole: Bool) {
+         */profile: String, showShiftName: Bool, showTimes: Bool, showRole: Bool, 
+        /**
+         * IANA timezone identifier (e.g. "Europe/London"). Only consulted when
+         * `format == "ics"`; `None` = floating local times.
+         */timezoneId: String?) {
         self.employeeId = employeeId
         self.startDate = startDate
         self.endDate = endDate
@@ -1530,6 +1587,7 @@ public struct FfiEmployeeExportConfig {
         self.showShiftName = showShiftName
         self.showTimes = showTimes
         self.showRole = showRole
+        self.timezoneId = timezoneId
     }
 }
 
@@ -1561,6 +1619,9 @@ extension FfiEmployeeExportConfig: Equatable, Hashable {
         if lhs.showRole != rhs.showRole {
             return false
         }
+        if lhs.timezoneId != rhs.timezoneId {
+            return false
+        }
         return true
     }
 
@@ -1573,6 +1634,7 @@ extension FfiEmployeeExportConfig: Equatable, Hashable {
         hasher.combine(showShiftName)
         hasher.combine(showTimes)
         hasher.combine(showRole)
+        hasher.combine(timezoneId)
     }
 }
 
@@ -1591,7 +1653,8 @@ public struct FfiConverterTypeFfiEmployeeExportConfig: FfiConverterRustBuffer {
                 profile: FfiConverterString.read(from: &buf), 
                 showShiftName: FfiConverterBool.read(from: &buf), 
                 showTimes: FfiConverterBool.read(from: &buf), 
-                showRole: FfiConverterBool.read(from: &buf)
+                showRole: FfiConverterBool.read(from: &buf), 
+                timezoneId: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -1604,6 +1667,7 @@ public struct FfiConverterTypeFfiEmployeeExportConfig: FfiConverterRustBuffer {
         FfiConverterBool.write(value.showShiftName, into: &buf)
         FfiConverterBool.write(value.showTimes, into: &buf)
         FfiConverterBool.write(value.showRole, into: &buf)
+        FfiConverterOptionString.write(value.timezoneId, into: &buf)
     }
 }
 
@@ -2063,6 +2127,80 @@ public func FfiConverterTypeFfiExportResult_lower(_ value: FfiExportResult) -> R
 }
 
 
+public struct FfiImportSummary {
+    public var inserted: UInt32
+    public var updated: UInt32
+    public var skipped: UInt32
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(inserted: UInt32, updated: UInt32, skipped: UInt32) {
+        self.inserted = inserted
+        self.updated = updated
+        self.skipped = skipped
+    }
+}
+
+
+
+extension FfiImportSummary: Equatable, Hashable {
+    public static func ==(lhs: FfiImportSummary, rhs: FfiImportSummary) -> Bool {
+        if lhs.inserted != rhs.inserted {
+            return false
+        }
+        if lhs.updated != rhs.updated {
+            return false
+        }
+        if lhs.skipped != rhs.skipped {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(inserted)
+        hasher.combine(updated)
+        hasher.combine(skipped)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFfiImportSummary: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiImportSummary {
+        return
+            try FfiImportSummary(
+                inserted: FfiConverterUInt32.read(from: &buf), 
+                updated: FfiConverterUInt32.read(from: &buf), 
+                skipped: FfiConverterUInt32.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FfiImportSummary, into buf: inout [UInt8]) {
+        FfiConverterUInt32.write(value.inserted, into: &buf)
+        FfiConverterUInt32.write(value.updated, into: &buf)
+        FfiConverterUInt32.write(value.skipped, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiImportSummary_lift(_ buf: RustBuffer) throws -> FfiImportSummary {
+    return try FfiConverterTypeFfiImportSummary.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiImportSummary_lower(_ value: FfiImportSummary) -> RustBuffer {
+    return FfiConverterTypeFfiImportSummary.lower(value)
+}
+
+
 public struct FfiMergeConflict {
     public var recordId: Int64
     public var resolvedFields: String
@@ -2126,6 +2264,289 @@ public func FfiConverterTypeFfiMergeConflict_lift(_ buf: RustBuffer) throws -> F
 #endif
 public func FfiConverterTypeFfiMergeConflict_lower(_ value: FfiMergeConflict) -> RustBuffer {
     return FfiConverterTypeFfiMergeConflict.lower(value)
+}
+
+
+/**
+ * One row from a parsed roster file, annotated with diff state.
+ */
+public struct FfiParsedEmployeeRow {
+    public var firstName: String
+    public var lastName: String
+    public var nickname: String?
+    public var phone: String?
+    public var email: String?
+    /**
+     * `"imessage"` | `"whatsapp"` | `"email"` | `None` (unspecified).
+     */
+    public var preferredContact: String?
+    public var roles: [String]
+    public var targetWeeklyHours: Float?
+    public var weeklyHoursDeviation: Float?
+    public var maxDailyHours: Float?
+    public var hourlyWage: Float?
+    public var wageCurrency: String?
+    public var notes: String?
+    public var bankDetails: String?
+    /**
+     * `Some(id)` → UPDATE, `None` → INSERT.
+     */
+    public var matchExistingId: Int64?
+    /**
+     * Human-readable summary: "NEW", "UPDATE: phone 555→777", "NO CHANGE",
+     * "AMBIGUOUS — requires manual review".
+     */
+    public var diffSummary: String
+    /**
+     * Set by the Rust layer to a sensible default (true for NEW/UPDATE,
+     * false for NO CHANGE / AMBIGUOUS). UI toggles per row before applying.
+     */
+    public var include: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(firstName: String, lastName: String, nickname: String?, phone: String?, email: String?, 
+        /**
+         * `"imessage"` | `"whatsapp"` | `"email"` | `None` (unspecified).
+         */preferredContact: String?, roles: [String], targetWeeklyHours: Float?, weeklyHoursDeviation: Float?, maxDailyHours: Float?, hourlyWage: Float?, wageCurrency: String?, notes: String?, bankDetails: String?, 
+        /**
+         * `Some(id)` → UPDATE, `None` → INSERT.
+         */matchExistingId: Int64?, 
+        /**
+         * Human-readable summary: "NEW", "UPDATE: phone 555→777", "NO CHANGE",
+         * "AMBIGUOUS — requires manual review".
+         */diffSummary: String, 
+        /**
+         * Set by the Rust layer to a sensible default (true for NEW/UPDATE,
+         * false for NO CHANGE / AMBIGUOUS). UI toggles per row before applying.
+         */include: Bool) {
+        self.firstName = firstName
+        self.lastName = lastName
+        self.nickname = nickname
+        self.phone = phone
+        self.email = email
+        self.preferredContact = preferredContact
+        self.roles = roles
+        self.targetWeeklyHours = targetWeeklyHours
+        self.weeklyHoursDeviation = weeklyHoursDeviation
+        self.maxDailyHours = maxDailyHours
+        self.hourlyWage = hourlyWage
+        self.wageCurrency = wageCurrency
+        self.notes = notes
+        self.bankDetails = bankDetails
+        self.matchExistingId = matchExistingId
+        self.diffSummary = diffSummary
+        self.include = include
+    }
+}
+
+
+
+extension FfiParsedEmployeeRow: Equatable, Hashable {
+    public static func ==(lhs: FfiParsedEmployeeRow, rhs: FfiParsedEmployeeRow) -> Bool {
+        if lhs.firstName != rhs.firstName {
+            return false
+        }
+        if lhs.lastName != rhs.lastName {
+            return false
+        }
+        if lhs.nickname != rhs.nickname {
+            return false
+        }
+        if lhs.phone != rhs.phone {
+            return false
+        }
+        if lhs.email != rhs.email {
+            return false
+        }
+        if lhs.preferredContact != rhs.preferredContact {
+            return false
+        }
+        if lhs.roles != rhs.roles {
+            return false
+        }
+        if lhs.targetWeeklyHours != rhs.targetWeeklyHours {
+            return false
+        }
+        if lhs.weeklyHoursDeviation != rhs.weeklyHoursDeviation {
+            return false
+        }
+        if lhs.maxDailyHours != rhs.maxDailyHours {
+            return false
+        }
+        if lhs.hourlyWage != rhs.hourlyWage {
+            return false
+        }
+        if lhs.wageCurrency != rhs.wageCurrency {
+            return false
+        }
+        if lhs.notes != rhs.notes {
+            return false
+        }
+        if lhs.bankDetails != rhs.bankDetails {
+            return false
+        }
+        if lhs.matchExistingId != rhs.matchExistingId {
+            return false
+        }
+        if lhs.diffSummary != rhs.diffSummary {
+            return false
+        }
+        if lhs.include != rhs.include {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(firstName)
+        hasher.combine(lastName)
+        hasher.combine(nickname)
+        hasher.combine(phone)
+        hasher.combine(email)
+        hasher.combine(preferredContact)
+        hasher.combine(roles)
+        hasher.combine(targetWeeklyHours)
+        hasher.combine(weeklyHoursDeviation)
+        hasher.combine(maxDailyHours)
+        hasher.combine(hourlyWage)
+        hasher.combine(wageCurrency)
+        hasher.combine(notes)
+        hasher.combine(bankDetails)
+        hasher.combine(matchExistingId)
+        hasher.combine(diffSummary)
+        hasher.combine(include)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFfiParsedEmployeeRow: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiParsedEmployeeRow {
+        return
+            try FfiParsedEmployeeRow(
+                firstName: FfiConverterString.read(from: &buf), 
+                lastName: FfiConverterString.read(from: &buf), 
+                nickname: FfiConverterOptionString.read(from: &buf), 
+                phone: FfiConverterOptionString.read(from: &buf), 
+                email: FfiConverterOptionString.read(from: &buf), 
+                preferredContact: FfiConverterOptionString.read(from: &buf), 
+                roles: FfiConverterSequenceString.read(from: &buf), 
+                targetWeeklyHours: FfiConverterOptionFloat.read(from: &buf), 
+                weeklyHoursDeviation: FfiConverterOptionFloat.read(from: &buf), 
+                maxDailyHours: FfiConverterOptionFloat.read(from: &buf), 
+                hourlyWage: FfiConverterOptionFloat.read(from: &buf), 
+                wageCurrency: FfiConverterOptionString.read(from: &buf), 
+                notes: FfiConverterOptionString.read(from: &buf), 
+                bankDetails: FfiConverterOptionString.read(from: &buf), 
+                matchExistingId: FfiConverterOptionInt64.read(from: &buf), 
+                diffSummary: FfiConverterString.read(from: &buf), 
+                include: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FfiParsedEmployeeRow, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.firstName, into: &buf)
+        FfiConverterString.write(value.lastName, into: &buf)
+        FfiConverterOptionString.write(value.nickname, into: &buf)
+        FfiConverterOptionString.write(value.phone, into: &buf)
+        FfiConverterOptionString.write(value.email, into: &buf)
+        FfiConverterOptionString.write(value.preferredContact, into: &buf)
+        FfiConverterSequenceString.write(value.roles, into: &buf)
+        FfiConverterOptionFloat.write(value.targetWeeklyHours, into: &buf)
+        FfiConverterOptionFloat.write(value.weeklyHoursDeviation, into: &buf)
+        FfiConverterOptionFloat.write(value.maxDailyHours, into: &buf)
+        FfiConverterOptionFloat.write(value.hourlyWage, into: &buf)
+        FfiConverterOptionString.write(value.wageCurrency, into: &buf)
+        FfiConverterOptionString.write(value.notes, into: &buf)
+        FfiConverterOptionString.write(value.bankDetails, into: &buf)
+        FfiConverterOptionInt64.write(value.matchExistingId, into: &buf)
+        FfiConverterString.write(value.diffSummary, into: &buf)
+        FfiConverterBool.write(value.include, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiParsedEmployeeRow_lift(_ buf: RustBuffer) throws -> FfiParsedEmployeeRow {
+    return try FfiConverterTypeFfiParsedEmployeeRow.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiParsedEmployeeRow_lower(_ value: FfiParsedEmployeeRow) -> RustBuffer {
+    return FfiConverterTypeFfiParsedEmployeeRow.lower(value)
+}
+
+
+public struct FfiParsedRoster {
+    public var rows: [FfiParsedEmployeeRow]
+    public var warnings: [String]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(rows: [FfiParsedEmployeeRow], warnings: [String]) {
+        self.rows = rows
+        self.warnings = warnings
+    }
+}
+
+
+
+extension FfiParsedRoster: Equatable, Hashable {
+    public static func ==(lhs: FfiParsedRoster, rhs: FfiParsedRoster) -> Bool {
+        if lhs.rows != rhs.rows {
+            return false
+        }
+        if lhs.warnings != rhs.warnings {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(rows)
+        hasher.combine(warnings)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFfiParsedRoster: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiParsedRoster {
+        return
+            try FfiParsedRoster(
+                rows: FfiConverterSequenceTypeFfiParsedEmployeeRow.read(from: &buf), 
+                warnings: FfiConverterSequenceString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FfiParsedRoster, into buf: inout [UInt8]) {
+        FfiConverterSequenceTypeFfiParsedEmployeeRow.write(value.rows, into: &buf)
+        FfiConverterSequenceString.write(value.warnings, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiParsedRoster_lift(_ buf: RustBuffer) throws -> FfiParsedRoster {
+    return try FfiConverterTypeFfiParsedRoster.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiParsedRoster_lower(_ value: FfiParsedRoster) -> RustBuffer {
+    return FfiConverterTypeFfiParsedRoster.lower(value)
 }
 
 
@@ -4374,6 +4795,56 @@ fileprivate struct FfiConverterSequenceTypeFfiEmployeeShiftRecord: FfiConverterR
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeFfiExportResult: FfiConverterRustBuffer {
+    typealias SwiftType = [FfiExportResult]
+
+    public static func write(_ value: [FfiExportResult], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeFfiExportResult.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [FfiExportResult] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [FfiExportResult]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeFfiExportResult.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeFfiParsedEmployeeRow: FfiConverterRustBuffer {
+    typealias SwiftType = [FfiParsedEmployeeRow]
+
+    public static func write(_ value: [FfiParsedEmployeeRow], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeFfiParsedEmployeeRow.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [FfiParsedEmployeeRow] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [FfiParsedEmployeeRow]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeFfiParsedEmployeeRow.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeFfiRole: FfiConverterRustBuffer {
     typealias SwiftType = [FfiRole]
 
@@ -4664,6 +5135,13 @@ public func applyRemoteRecord(record: FfiSyncRecord)throws  {try rustCallWithErr
     )
 }
 }
+public func applyRosterImport(rows: [FfiParsedEmployeeRow])throws  -> FfiImportSummary {
+    return try  FfiConverterTypeFfiImportSummary.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_apply_roster_import(
+        FfiConverterSequenceTypeFfiParsedEmployeeRow.lower(rows),$0
+    )
+})
+}
 public func clearTombstones(ids: [Int64])throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_clear_tombstones(
         FfiConverterSequenceInt64.lower(ids),$0
@@ -4833,6 +5311,18 @@ public func diffSavesDetailed(oldSaveId: Int64, newSaveId: Int64)throws  -> [Ffi
     uniffi_autorota_ffi_fn_func_diff_saves_detailed(
         FfiConverterInt64.lower(oldSaveId),
         FfiConverterInt64.lower(newSaveId),$0
+    )
+})
+}
+/**
+ * Emit the four-format personal bundle (PDF, ICS, Markdown, XLSX) for one
+ * employee's schedule over a date range. The caller-supplied `format` field
+ * on `config` is ignored — each output uses its own format.
+ */
+public func exportEmployeeBundle(config: FfiEmployeeExportConfig)throws  -> [FfiExportResult] {
+    return try  FfiConverterSequenceTypeFfiExportResult.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_export_employee_bundle(
+        FfiConverterTypeFfiEmployeeExportConfig.lower(config),$0
     )
 })
 }
@@ -5051,6 +5541,15 @@ public func moveAssignment(id: Int64, newShiftId: Int64)throws  {try rustCallWit
     )
 }
 }
+public func parseRosterFile(bytes: Data, formatHint: String, strategy: String)throws  -> FfiParsedRoster {
+    return try  FfiConverterTypeFfiParsedRoster.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_parse_roster_file(
+        FfiConverterData.lower(bytes),
+        FfiConverterString.lower(formatHint),
+        FfiConverterString.lower(strategy),$0
+    )
+})
+}
 /**
  * Remove a tag from a save by case-insensitive match. No-op if absent.
  */
@@ -5183,6 +5682,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_autorota_ffi_checksum_func_apply_remote_record() != 2938) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_autorota_ffi_checksum_func_apply_roster_import() != 58062) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_autorota_ffi_checksum_func_clear_tombstones() != 33976) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -5247,6 +5749,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_diff_saves_detailed() != 34253) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_export_employee_bundle() != 49963) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_export_employee_schedule() != 200) {
@@ -5334,6 +5839,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_move_assignment() != 47939) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_parse_roster_file() != 40278) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_remove_save_tag() != 41547) {

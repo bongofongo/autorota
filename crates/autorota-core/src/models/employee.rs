@@ -21,6 +21,13 @@ pub struct Employee {
     pub notes: Option<String>,
     /// Bank details for payment.
     pub bank_details: Option<String>,
+    /// Contact phone number (free-form, no validation).
+    pub phone: Option<String>,
+    /// Contact email address (free-form, no validation).
+    pub email: Option<String>,
+    /// Messaging app linked to the phone number.
+    /// `"imessage"` | `"whatsapp"` | `None` (phone not linked / no phone).
+    pub preferred_contact: Option<String>,
     /// Hourly wage rate.
     pub hourly_wage: Option<f32>,
     /// Currency code for the wage (e.g. "usd", "gbp", "eur").

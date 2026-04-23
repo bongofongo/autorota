@@ -40,7 +40,7 @@ struct AnalyticsViewModelTests {
             id: id, firstName: first, lastName: "Smith", nickname: nil,
             displayName: "\(first) Smith", roles: ["Barista"], startDate: "2025-01-01",
             targetWeeklyHours: targetHours, weeklyHoursDeviation: 5, maxDailyHours: 8,
-            notes: nil, bankDetails: nil, hourlyWage: 15.0, wageCurrency: "usd", defaultAvailability: [], availability: [], deleted: false
+            notes: nil, bankDetails: nil, phone: nil, email: nil, preferredContact: nil, hourlyWage: 15.0, wageCurrency: "usd", defaultAvailability: [], availability: [], deleted: false
         )
     }
 

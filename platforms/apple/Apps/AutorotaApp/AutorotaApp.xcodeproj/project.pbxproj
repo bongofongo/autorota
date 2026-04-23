@@ -48,6 +48,10 @@
 		CC0016033020000000205001 /* CarouselAvailabilityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0016043020000000205001 /* CarouselAvailabilityView.swift */; };
 		CC0017013030000000205001 /* FfiError+UserMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0017023030000000205001 /* FfiError+UserMessage.swift */; };
 		CC0018013040000000205001 /* AllAvailabilitiesSetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0018023040000000205001 /* AllAvailabilitiesSetView.swift */; };
+		CC0019013050000000205001 /* SendSchedulePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0019023050000000205001 /* SendSchedulePicker.swift */; };
+		CC0019033050000000205001 /* RosterImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0019043050000000205001 /* RosterImportView.swift */; };
+		CC0020013060000000205001 /* PhoneNumberFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0020023060000000205001 /* PhoneNumberFormatter.swift */; };
+		CC0021013070000000205001 /* PhoneInputField.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0021023070000000205001 /* PhoneInputField.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -103,6 +107,10 @@
 		CC0016043020000000205001 /* CarouselAvailabilityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarouselAvailabilityView.swift; sourceTree = "<group>"; };
 		CC0017023030000000205001 /* FfiError+UserMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FfiError+UserMessage.swift"; sourceTree = "<group>"; };
 		CC0018023040000000205001 /* AllAvailabilitiesSetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllAvailabilitiesSetView.swift; sourceTree = "<group>"; };
+		CC0019023050000000205001 /* SendSchedulePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SendSchedulePicker.swift; sourceTree = "<group>"; };
+		CC0019043050000000205001 /* RosterImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RosterImportView.swift; sourceTree = "<group>"; };
+		CC0020023060000000205001 /* PhoneNumberFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneNumberFormatter.swift; sourceTree = "<group>"; };
+		CC0021023070000000205001 /* PhoneInputField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneInputField.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -201,6 +209,9 @@
 				CC00060B2F90000000205001 /* RotaOverflowPopover.swift */,
 				CC0015023010000000205001 /* EmployeeUIBridge.swift */,
 				CC0015043010000000205001 /* WeeklyAvailabilityView.swift */,
+				CC0019023050000000205001 /* SendSchedulePicker.swift */,
+				CC0019043050000000205001 /* RosterImportView.swift */,
+				CC0021023070000000205001 /* PhoneInputField.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -213,6 +224,7 @@
 				CC0007022FA0000000205001 /* ExchangeRateService.swift */,
 				CC0017023030000000205001 /* FfiError+UserMessage.swift */,
 				CC0001042F80000000205001 /* LiveAutorotaService.swift */,
+				CC0020023060000000205001 /* PhoneNumberFormatter.swift */,
 				CC0009062FC0000000205001 /* SyncConflictResolver.swift */,
 				CC0009042FC0000000205001 /* SyncRecordMapper.swift */,
 			);
@@ -370,6 +382,10 @@
 				CC0016013020000000205001 /* AvailabilityProgressViewModel.swift in Sources */,
 				CC0016033020000000205001 /* CarouselAvailabilityView.swift in Sources */,
 				CC0018013040000000205001 /* AllAvailabilitiesSetView.swift in Sources */,
+				CC0019013050000000205001 /* SendSchedulePicker.swift in Sources */,
+				CC0019033050000000205001 /* RosterImportView.swift in Sources */,
+				CC0020013060000000205001 /* PhoneNumberFormatter.swift in Sources */,
+				CC0021013070000000205001 /* PhoneInputField.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

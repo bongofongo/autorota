@@ -123,6 +123,9 @@ fn employee_to_ffi(e: Employee) -> FfiEmployee {
         max_daily_hours: e.max_daily_hours,
         notes: e.notes,
         bank_details: e.bank_details,
+        phone: e.phone,
+        email: e.email,
+        preferred_contact: e.preferred_contact,
         hourly_wage: e.hourly_wage,
         wage_currency: e.wage_currency,
         default_availability: availability_to_slots(&e.default_availability),
@@ -144,6 +147,9 @@ fn ffi_to_employee(e: FfiEmployee) -> Result<Employee, FfiError> {
         max_daily_hours: e.max_daily_hours,
         notes: e.notes,
         bank_details: e.bank_details,
+        phone: e.phone,
+        email: e.email,
+        preferred_contact: e.preferred_contact,
         hourly_wage: e.hourly_wage,
         wage_currency: e.wage_currency,
         default_availability: slots_to_availability(e.default_availability)?,
@@ -857,6 +863,7 @@ pub fn export_employee_schedule(
             show_times: config.show_times,
             show_role: config.show_role,
         },
+        timezone_id: config.timezone_id.clone(),
     };
 
     let result = rt()
@@ -882,6 +889,118 @@ pub fn export_employee_schedule(
         data: result.data,
         filename: result.filename,
         mime_type: result.mime_type,
+    })
+}
+
+/// Emit the four-format personal bundle (PDF, ICS, Markdown, XLSX) for one
+/// employee's schedule over a date range. The caller-supplied `format` field
+/// on `config` is ignored — each output uses its own format.
+#[uniffi::export]
+pub fn export_employee_bundle(
+    config: FfiEmployeeExportConfig,
+) -> Result<Vec<FfiExportResult>, FfiError> {
+    let formats = ["pdf", "ics", "markdown", "xlsx"];
+    let mut out = Vec::with_capacity(formats.len());
+    for fmt in formats {
+        let mut cfg = config.clone();
+        cfg.format = fmt.to_string();
+        out.push(export_employee_schedule(cfg)?);
+    }
+    Ok(out)
+}
+
+// ── Roster Import ────────────────────────────────────────────────────────────
+
+use autorota_core::import::{self, MergeStrategy, ParsedEmployeeRow, ParsedRoster};
+
+fn row_to_ffi(r: ParsedEmployeeRow) -> FfiParsedEmployeeRow {
+    FfiParsedEmployeeRow {
+        first_name: r.first_name,
+        last_name: r.last_name,
+        nickname: r.nickname,
+        phone: r.phone,
+        email: r.email,
+        preferred_contact: r.preferred_contact,
+        roles: r.roles,
+        target_weekly_hours: r.target_weekly_hours,
+        weekly_hours_deviation: r.weekly_hours_deviation,
+        max_daily_hours: r.max_daily_hours,
+        hourly_wage: r.hourly_wage,
+        wage_currency: r.wage_currency,
+        notes: r.notes,
+        bank_details: r.bank_details,
+        match_existing_id: r.match_existing_id,
+        diff_summary: r.diff_summary,
+        include: r.include,
+    }
+}
+
+fn ffi_to_row(r: FfiParsedEmployeeRow) -> ParsedEmployeeRow {
+    ParsedEmployeeRow {
+        first_name: r.first_name,
+        last_name: r.last_name,
+        nickname: r.nickname,
+        phone: r.phone,
+        email: r.email,
+        preferred_contact: r.preferred_contact,
+        roles: r.roles,
+        target_weekly_hours: r.target_weekly_hours,
+        weekly_hours_deviation: r.weekly_hours_deviation,
+        max_daily_hours: r.max_daily_hours,
+        hourly_wage: r.hourly_wage,
+        wage_currency: r.wage_currency,
+        notes: r.notes,
+        bank_details: r.bank_details,
+        match_existing_id: r.match_existing_id,
+        diff_summary: r.diff_summary,
+        include: r.include,
+    }
+}
+
+#[uniffi::export]
+pub fn parse_roster_file(
+    bytes: Vec<u8>,
+    format_hint: String,
+    strategy: String,
+) -> Result<FfiParsedRoster, FfiError> {
+    let pool = pool()?;
+    let strat: MergeStrategy = strategy
+        .parse()
+        .map_err(|e: String| FfiError::InvalidArgument { msg: e })?;
+
+    let parsed: ParsedRoster = rt()
+        .block_on(import::roster::parse_roster(pool, &bytes, &format_hint, strat))
+        .map_err(|e| match e {
+            import::roster::ImportError::Db(db) => FfiError::Db { msg: db.to_string() },
+            import::roster::ImportError::Parse(m) | import::roster::ImportError::UnsupportedFormat(m) => {
+                FfiError::InvalidArgument { msg: m }
+            }
+        })?;
+
+    Ok(FfiParsedRoster {
+        rows: parsed.rows.into_iter().map(row_to_ffi).collect(),
+        warnings: parsed.warnings,
+    })
+}
+
+#[uniffi::export]
+pub fn apply_roster_import(
+    rows: Vec<FfiParsedEmployeeRow>,
+) -> Result<FfiImportSummary, FfiError> {
+    let pool = pool()?;
+    let core_rows: Vec<ParsedEmployeeRow> = rows.into_iter().map(ffi_to_row).collect();
+    let summary = rt()
+        .block_on(import::roster::apply_import(pool, &core_rows))
+        .map_err(|e| match e {
+            import::roster::ImportError::Db(db) => FfiError::Db { msg: db.to_string() },
+            import::roster::ImportError::Parse(m) | import::roster::ImportError::UnsupportedFormat(m) => {
+                FfiError::InvalidArgument { msg: m }
+            }
+        })?;
+    Ok(FfiImportSummary {
+        inserted: summary.inserted,
+        updated: summary.updated,
+        skipped: summary.skipped,
     })
 }
 
@@ -1127,6 +1246,9 @@ mod tests {
             max_daily_hours: 8.0,
             notes: Some("Prefers mornings".into()),
             bank_details: None,
+            phone: None,
+            email: None,
+            preferred_contact: None,
             hourly_wage: None,
             wage_currency: None,
             default_availability: Availability::default(),
@@ -1260,6 +1382,9 @@ mod tests {
             max_daily_hours: 8.0,
             notes: None,
             bank_details: None,
+            phone: None,
+            email: None,
+            preferred_contact: None,
             hourly_wage: None,
             wage_currency: None,
             default_availability: avail_slots.clone(),

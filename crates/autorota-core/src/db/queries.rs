@@ -41,8 +41,8 @@ pub async fn insert_employee(pool: &SqlitePool, emp: &Employee) -> Result<i64, s
     let now = chrono::Utc::now().to_rfc3339();
 
     let id = sqlx::query_scalar(
-        "INSERT INTO employees (first_name, last_name, nickname, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, hourly_wage, wage_currency, default_availability, availability, last_modified, sync_status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0) RETURNING id",
+        "INSERT INTO employees (first_name, last_name, nickname, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, phone, email, preferred_contact, hourly_wage, wage_currency, default_availability, availability, last_modified, sync_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0) RETURNING id",
     )
     .bind(&emp.first_name)
     .bind(&emp.last_name)
@@ -54,6 +54,9 @@ pub async fn insert_employee(pool: &SqlitePool, emp: &Employee) -> Result<i64, s
     .bind(emp.max_daily_hours)
     .bind(&emp.notes)
     .bind(&emp.bank_details)
+    .bind(&emp.phone)
+    .bind(&emp.email)
+    .bind(&emp.preferred_contact)
     .bind(emp.hourly_wage)
     .bind(&emp.wage_currency)
     .bind(&default_avail)
@@ -66,8 +69,8 @@ pub async fn insert_employee(pool: &SqlitePool, emp: &Employee) -> Result<i64, s
 }
 
 pub async fn get_employee(pool: &SqlitePool, id: i64) -> Result<Option<Employee>, sqlx::Error> {
-    let row: Option<(i64, String, String, Option<String>, String, String, f64, f64, f64, Option<String>, Option<String>, Option<f64>, Option<String>, String, String, bool)> = sqlx::query_as(
-        "SELECT id, first_name, last_name, nickname, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, hourly_wage, wage_currency, default_availability, availability, deleted
+    let row: Option<EmployeeRow> = sqlx::query_as(
+        "SELECT id, first_name, last_name, nickname, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, phone, email, preferred_contact, hourly_wage, wage_currency, default_availability, availability, deleted
          FROM employees WHERE id = ?",
     )
     .bind(id)
@@ -78,8 +81,8 @@ pub async fn get_employee(pool: &SqlitePool, id: i64) -> Result<Option<Employee>
 }
 
 pub async fn list_employees(pool: &SqlitePool) -> Result<Vec<Employee>, sqlx::Error> {
-    let rows: Vec<(i64, String, String, Option<String>, String, String, f64, f64, f64, Option<String>, Option<String>, Option<f64>, Option<String>, String, String, bool)> = sqlx::query_as(
-        "SELECT id, first_name, last_name, nickname, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, hourly_wage, wage_currency, default_availability, availability, deleted
+    let rows: Vec<EmployeeRow> = sqlx::query_as(
+        "SELECT id, first_name, last_name, nickname, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, phone, email, preferred_contact, hourly_wage, wage_currency, default_availability, availability, deleted
          FROM employees WHERE deleted = 0 ORDER BY start_date",
     )
     .fetch_all(pool)
@@ -90,8 +93,8 @@ pub async fn list_employees(pool: &SqlitePool) -> Result<Vec<Employee>, sqlx::Er
 
 /// List all employees including soft-deleted ones (for historical schedule display).
 pub async fn list_all_employees(pool: &SqlitePool) -> Result<Vec<Employee>, sqlx::Error> {
-    let rows: Vec<(i64, String, String, Option<String>, String, String, f64, f64, f64, Option<String>, Option<String>, Option<f64>, Option<String>, String, String, bool)> = sqlx::query_as(
-        "SELECT id, first_name, last_name, nickname, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, hourly_wage, wage_currency, default_availability, availability, deleted
+    let rows: Vec<EmployeeRow> = sqlx::query_as(
+        "SELECT id, first_name, last_name, nickname, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, phone, email, preferred_contact, hourly_wage, wage_currency, default_availability, availability, deleted
          FROM employees ORDER BY start_date",
     )
     .fetch_all(pool)
@@ -108,7 +111,7 @@ pub async fn update_employee(pool: &SqlitePool, emp: &Employee) -> Result<(), sq
 
     sqlx::query(
         "UPDATE employees SET first_name = ?, last_name = ?, nickname = ?, roles = ?, start_date = ?, target_weekly_hours = ?, weekly_hours_deviation = ?, max_daily_hours = ?,
-         notes = ?, bank_details = ?, hourly_wage = ?, wage_currency = ?, default_availability = ?, availability = ?, last_modified = ?, sync_status = 0 WHERE id = ?",
+         notes = ?, bank_details = ?, phone = ?, email = ?, preferred_contact = ?, hourly_wage = ?, wage_currency = ?, default_availability = ?, availability = ?, last_modified = ?, sync_status = 0 WHERE id = ?",
     )
     .bind(&emp.first_name)
     .bind(&emp.last_name)
@@ -120,6 +123,9 @@ pub async fn update_employee(pool: &SqlitePool, emp: &Employee) -> Result<(), sq
     .bind(emp.max_daily_hours)
     .bind(&emp.notes)
     .bind(&emp.bank_details)
+    .bind(&emp.phone)
+    .bind(&emp.email)
+    .bind(&emp.preferred_contact)
     .bind(emp.hourly_wage)
     .bind(&emp.wage_currency)
     .bind(&default_avail)
@@ -144,44 +150,51 @@ pub async fn delete_employee(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Err
     Ok(())
 }
 
-fn employee_from_row(
-    row: (
-        i64,
-        String,
-        String,
-        Option<String>,
-        String,
-        String,
-        f64,
-        f64,
-        f64,
-        Option<String>,
-        Option<String>,
-        Option<f64>,
-        Option<String>,
-        String,
-        String,
-        bool,
-    ),
-) -> Employee {
-    let (
+#[derive(sqlx::FromRow)]
+struct EmployeeRow {
+    id: i64,
+    first_name: String,
+    last_name: String,
+    nickname: Option<String>,
+    roles: String,
+    start_date: String,
+    target_weekly_hours: f64,
+    weekly_hours_deviation: f64,
+    max_daily_hours: f64,
+    notes: Option<String>,
+    bank_details: Option<String>,
+    phone: Option<String>,
+    email: Option<String>,
+    preferred_contact: Option<String>,
+    hourly_wage: Option<f64>,
+    wage_currency: Option<String>,
+    default_availability: String,
+    availability: String,
+    deleted: bool,
+}
+
+fn employee_from_row(row: EmployeeRow) -> Employee {
+    let EmployeeRow {
         id,
         first_name,
         last_name,
         nickname,
-        roles_json,
-        start_date_str,
-        target_weekly,
-        deviation,
-        max_daily,
+        roles: roles_json,
+        start_date: start_date_str,
+        target_weekly_hours: target_weekly,
+        weekly_hours_deviation: deviation,
+        max_daily_hours: max_daily,
         notes,
         bank_details,
+        phone,
+        email,
+        preferred_contact,
         hourly_wage,
         wage_currency,
-        default_avail_json,
-        avail_json,
+        default_availability: default_avail_json,
+        availability: avail_json,
         deleted,
-    ) = row;
+    } = row;
     Employee {
         id,
         first_name,
@@ -195,6 +208,9 @@ fn employee_from_row(
         max_daily_hours: max_daily as f32,
         notes,
         bank_details,
+        phone,
+        email,
+        preferred_contact,
         hourly_wage: hourly_wage.map(|v| v as f32),
         wage_currency,
         default_availability: Availability::from_json(&default_avail_json).unwrap_or_default(),
@@ -2181,6 +2197,9 @@ pub fn syncable_columns(table_name: &str) -> Vec<&'static str> {
             "max_daily_hours",
             "notes",
             "bank_details",
+            "phone",
+            "email",
+            "preferred_contact",
             "hourly_wage",
             "wage_currency",
             "default_availability",

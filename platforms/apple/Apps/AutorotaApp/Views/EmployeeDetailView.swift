@@ -1,5 +1,40 @@
 import SwiftUI
 import AutorotaKit
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+
+/// Canonical preferred messaging channel tokens shared between the edit sheet
+/// and the read-only Details Phone row. Kept file-local since only this view
+/// consumes it today.
+enum ContactMethod: String {
+    case imessage
+    case whatsapp
+
+    var icon: String {
+        switch self {
+        case .imessage: "message.fill"
+        case .whatsapp: "bubble.left.and.bubble.right.fill"
+        }
+    }
+
+    /// Build a deep link for `phone`. `sms:` opens Messages (iMessage when
+    /// available, SMS otherwise). `wa.me/<E.164-less-plus>` opens WhatsApp
+    /// when installed, otherwise the web click-to-chat flow.
+    func url(for phone: String) -> URL? {
+        let digits = phone.filter { $0.isNumber || $0 == "+" }
+        guard !digits.isEmpty else { return nil }
+        switch self {
+        case .imessage:
+            return URL(string: "sms:\(digits)")
+        case .whatsapp:
+            let bare = digits.hasPrefix("+") ? String(digits.dropFirst()) : digits
+            return URL(string: "https://wa.me/\(bare)")
+        }
+    }
+}
 
 struct EmployeeDetailView: View {
 
@@ -232,6 +267,54 @@ struct EmployeeDetailView: View {
                     let converted = exchangeRates.convert(wage, from: from, to: displayCurrency)
                     let sym = exchangeRates.symbol(for: displayCurrency)
                     LabeledContent("Hourly wage", value: String(format: "%@%.2f", sym, converted))
+                }
+                if let phone = employee.phone, !phone.isEmpty {
+                    let method = ContactMethod(rawValue: employee.preferredContact ?? "")
+                    let detected = PhoneCountry.detect(from: phone)
+                    let effective: PhoneCountry = detected == .other
+                        ? PhoneCountry(regionCode: Locale.current.region?.identifier ?? "")
+                        : detected
+                    let displayFormatter = PhoneNumberFormatter(country: effective)
+                    // Promote domestic/partial input to E.164 so the display
+                    // shows the `+CC` prefix, then group.
+                    let e164 = displayFormatter.normalizeForStorage(phone)
+                    let prettyPhone = displayFormatter.format(e164)
+                    HStack {
+                        Text("Phone").foregroundStyle(.secondary)
+                        Spacer()
+                        Text(prettyPhone)
+                        if let method, let url = method.url(for: phone) {
+                            Button {
+                                #if canImport(UIKit)
+                                UIApplication.shared.open(url)
+                                #elseif canImport(AppKit)
+                                NSWorkspace.shared.open(url)
+                                #endif
+                            } label: {
+                                Image(systemName: method.icon)
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
+                }
+                if let email = employee.email, !email.isEmpty {
+                    HStack {
+                        Text("Email").foregroundStyle(.secondary)
+                        Spacer()
+                        Text(email)
+                        if let url = URL(string: "mailto:\(email)") {
+                            Button {
+                                #if canImport(UIKit)
+                                UIApplication.shared.open(url)
+                                #elseif canImport(AppKit)
+                                NSWorkspace.shared.open(url)
+                                #endif
+                            } label: {
+                                Image(systemName: "envelope.fill")
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
                 }
             }
 
@@ -506,6 +589,65 @@ struct EmployeeEditSheet: View {
     @State private var deviation = 4.0
     @State private var maxDaily = 8.0
     @State private var notes = ""
+    @State private var phone = ""
+    @State private var phoneCountry: PhoneCountry = PhoneCountry(
+        regionCode: Locale.current.region?.identifier ?? ""
+    )
+    @State private var email = ""
+    @State private var preferredContact: PreferredContact = .none
+
+    private var phoneFormatter: PhoneNumberFormatter {
+        PhoneNumberFormatter(country: phoneCountry)
+    }
+
+    /// Live formatter passed to `PhoneInputField`. Auto-detects country on
+    /// pasted `+CC…` input, then groups the NSN for the selected country.
+    private func formatPhoneInput(_ raw: String) -> String {
+        let normNew = phoneFormatter.normalize(raw)
+        if normNew.hasPrefix("+") {
+            let detected = PhoneCountry.detect(from: normNew)
+            if detected != .other, detected != phoneCountry {
+                phoneCountry = detected
+            }
+        }
+        return PhoneNumberFormatter(country: phoneCountry).formatForField(raw)
+    }
+
+    /// Inline hint shown when the current input fails validation.
+    private var invalidPhoneHint: String {
+        if phoneCountry == .other {
+            return "Enter 7–15 digits. Use + for international."
+        }
+        let range = phoneCountry.nsnLengthRange
+        if range.lowerBound == range.upperBound {
+            return "Enter a \(range.lowerBound)-digit \(phoneCountry.displayName) number."
+        }
+        return "Enter a \(range.lowerBound)–\(range.upperBound)-digit \(phoneCountry.displayName) number."
+    }
+
+    /// Swap the selected country while preserving the NSN the user has
+    /// already entered. Empty fields stay empty.
+    private func switchPhoneCountry(to new: PhoneCountry) {
+        let oldF = PhoneNumberFormatter(country: phoneCountry)
+        let nsn = oldF.extractNSN(phone)
+        phoneCountry = new
+        let newF = PhoneNumberFormatter(country: new)
+        phone = newF.formatForField(nsn)
+    }
+
+    enum PreferredContact: String, CaseIterable, Identifiable {
+        case none = ""
+        case imessage = "imessage"
+        case whatsapp = "whatsapp"
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .none: "Not linked"
+            case .imessage: "iMessage"
+            case .whatsapp: "WhatsApp"
+            }
+        }
+    }
     @State private var hourlyWageText = ""
     @State private var wageCurrency: String = AppCurrency.usd.rawValue
 
@@ -530,6 +672,15 @@ struct EmployeeEditSheet: View {
     @State private var selectionModeActive = false
 
     private var isEditing: Bool { existing != nil }
+
+    /// Minimal RFC5322-subset check: `local@domain.tld`, no spaces.
+    private static func isValidEmail(_ s: String) -> Bool {
+        let trimmed = s.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, !trimmed.contains(" ") else { return false }
+        let parts = trimmed.split(separator: "@")
+        guard parts.count == 2, !parts[0].isEmpty else { return false }
+        return parts[1].contains(".")
+    }
 
     private static let sheetDateFmt: DateFormatter = {
         let f = DateFormatter()
@@ -673,6 +824,90 @@ struct EmployeeEditSheet: View {
                 Section("Notes") {
                     TextField("Optional notes", text: $notes, axis: .vertical)
                         .lineLimit(3...6)
+                }
+
+                Section("Contact") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        TextField("Email (optional)", text: $email)
+                            #if canImport(UIKit)
+                            .keyboardType(.emailAddress)
+                            .textContentType(.emailAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled(true)
+                            #endif
+                        if !email.isEmpty, !Self.isValidEmail(email) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "exclamationmark.circle.fill")
+                                    .foregroundStyle(.orange)
+                                Text("Enter a valid email address.")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .font(.caption)
+                        }
+                    }
+                    Picker("Messaging app", selection: $preferredContact) {
+                        ForEach(PreferredContact.allCases) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.menu)
+                    if preferredContact != .none {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 8) {
+                                PhoneInputField(
+                                    text: $phone,
+                                    placeholder: phoneCountry.placeholder,
+                                    format: formatPhoneInput
+                                )
+                                Menu {
+                                    ForEach(PhoneCountry.allCases) { c in
+                                        Button {
+                                            switchPhoneCountry(to: c)
+                                        } label: {
+                                            HStack {
+                                                Text("\(c.flag)  \(c.displayName)")
+                                                if !c.callingCode.isEmpty {
+                                                    Spacer()
+                                                    Text("+\(c.callingCode)")
+                                                }
+                                                if c == phoneCountry {
+                                                    Image(systemName: "checkmark")
+                                                }
+                                            }
+                                        }
+                                    }
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Text(phoneCountry.flag)
+                                        Text(phoneCountry.chipLabel)
+                                            .font(.callout.monospacedDigit())
+                                        Image(systemName: "chevron.down")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(.quaternary, in: Capsule())
+                                }
+                                .menuStyle(.borderlessButton)
+                                .fixedSize()
+                            }
+                            if !phone.isEmpty {
+                                HStack(spacing: 4) {
+                                    if phoneFormatter.isValid(phone) {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundStyle(.green)
+                                        Text("Looks valid")
+                                            .foregroundStyle(.secondary)
+                                    } else {
+                                        Image(systemName: "exclamationmark.circle.fill")
+                                            .foregroundStyle(.orange)
+                                        Text(invalidPhoneHint)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .font(.caption)
+                            }
+                        }
+                    }
                 }
 
                 Section("Availability") {
@@ -836,6 +1071,14 @@ struct EmployeeEditSheet: View {
         deviation = Double(e.weeklyHoursDeviation)
         maxDaily = Double(e.maxDailyHours)
         notes = e.notes ?? ""
+        let stored = e.phone ?? ""
+        let detected = PhoneCountry.detect(from: stored)
+        phoneCountry = detected == .other
+            ? PhoneCountry(regionCode: Locale.current.region?.identifier ?? "")
+            : detected
+        phone = PhoneNumberFormatter(country: phoneCountry).formatForField(stored)
+        email = e.email ?? ""
+        preferredContact = PreferredContact(rawValue: e.preferredContact ?? "") ?? .none
         let storedCurrency = e.wageCurrency ?? displayCurrency
         wageCurrency = storedCurrency
         if let wage = e.hourlyWage {
@@ -878,6 +1121,16 @@ struct EmployeeEditSheet: View {
             maxDailyHours: Float(maxDaily),
             notes: notes.isEmpty ? nil : notes,
             bankDetails: existing?.bankDetails,
+            phone: {
+                guard preferredContact != .none else { return nil }
+                let normalized = phoneFormatter.normalizeForStorage(phone)
+                return normalized.isEmpty ? nil : normalized
+            }(),
+            email: {
+                let trimmed = email.trimmingCharacters(in: .whitespaces)
+                return trimmed.isEmpty ? nil : trimmed
+            }(),
+            preferredContact: preferredContact == .none ? nil : preferredContact.rawValue,
             hourlyWage: parsedWage,
             wageCurrency: parsedWage != nil ? wageCurrency : nil,
             defaultAvailability: finalDefault,
