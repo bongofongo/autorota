@@ -4,102 +4,143 @@ import AutorotaKit
 import UniformTypeIdentifiers
 #endif
 
+/// Share pull-up shown from the Rota tab. Layout / profile / cell content
+/// come from the Export (settings) tab; here the user picks:
+///   1. Scope — full rota vs. per-employee
+///   2. Per-employee sub-scope — all employees vs. one employee
+///   3. Format — pdf / xlsx / csv / markdown / json (and ics for per-employee)
 struct ExportSheetView: View {
     let weekStart: String
     let service: AutorotaServiceProtocol
     @Environment(\.dismiss) private var dismiss
 
-    // Export options — initialised from @AppStorage defaults.
-    @State private var layout: String
-    @State private var format: String
-    @State private var profile: String
-    @State private var showShiftName: Bool
-    @State private var showTimes: Bool
-    @State private var showRole: Bool
-    @State private var pdfTemplate: String
+    // MARK: - Settings (from Export tab)
 
+    @AppStorage("exportDefaultLayout") private var layout: String = "employee_by_weekday"
+    @AppStorage("exportDefaultProfile") private var profile: String = "staff_schedule"
+    @AppStorage("exportDefaultPdfTemplate") private var pdfTemplate: String = "weekly_grid"
+    @AppStorage("exportShowShiftName") private var showShiftName: Bool = true
+    @AppStorage("exportShowTimes") private var showTimes: Bool = true
+    @AppStorage("exportShowRole") private var showRole: Bool = true
+
+    // MARK: - Scope state
+
+    enum Scope: String, CaseIterable, Identifiable {
+        case fullRota, perEmployee
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .fullRota: "Full View"
+            case .perEmployee: "Employee View"
+            }
+        }
+    }
+
+    enum PerEmployeeScope: String, CaseIterable, Identifiable {
+        case all, individual
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .all: "All Employees"
+            case .individual: "One Employee"
+            }
+        }
+    }
+
+    @State private var scope: Scope = .fullRota
+    @State private var perEmpScope: PerEmployeeScope = .all
+    @State private var selectedEmployeeId: Int64?
+    @State private var format: String = "pdf"
+
+    // MARK: - Export state
+
+    @State private var employees: [FfiEmployee] = []
+    @State private var loadingEmployees = false
     @State private var isExporting = false
     @State private var error: String?
-    @State private var exportFileURL: URL?
+    @State private var exportURLs: [URL] = []
     @State private var showShareSheet = false
-
-    init(weekStart: String, service: AutorotaServiceProtocol) {
-        self.weekStart = weekStart
-        self.service = service
-        // Read defaults; fall back to sensible values.
-        let defaults = UserDefaults.standard
-        _layout = State(initialValue: defaults.string(forKey: "exportDefaultLayout") ?? "employee_by_weekday")
-        _format = State(initialValue: defaults.string(forKey: "exportDefaultFormat") ?? "csv")
-        _profile = State(initialValue: defaults.string(forKey: "exportDefaultProfile") ?? "staff_schedule")
-        _showShiftName = State(initialValue: defaults.object(forKey: "exportShowShiftName") as? Bool ?? true)
-        _showTimes = State(initialValue: defaults.object(forKey: "exportShowTimes") as? Bool ?? true)
-        _showRole = State(initialValue: defaults.object(forKey: "exportShowRole") as? Bool ?? true)
-        _pdfTemplate = State(initialValue: defaults.string(forKey: "exportDefaultPdfTemplate") ?? "weekly_grid")
-    }
+    @State private var tempDir: URL?
+    @State private var showRecipientsInfo = false
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Layout") {
-                    Picker("Layout", selection: $layout) {
-                        Text("By Employee").tag("employee_by_weekday")
-                        Text("By Shift").tag("shift_by_weekday")
+                Section {
+                    Picker("Scope", selection: $scope) {
+                        ForEach(Scope.allCases) { s in Text(s.label).tag(s) }
                     }
                     .pickerStyle(.segmented)
+                } header: {
+                    Text("What to export")
                 }
 
-                Section("Format") {
-                    Picker("Format", selection: $format) {
-                        Text("CSV").tag("csv")
-                        Text("JSON").tag("json")
-                        Text("PDF").tag("pdf")
-                    }
-                    .pickerStyle(.segmented)
-                }
-
-                if format == "pdf" {
-                    Section("PDF Template") {
-                        Picker("Template", selection: $pdfTemplate) {
-                            Text("Weekly Grid").tag("weekly_grid")
-                            Text("Per Employee").tag("per_employee")
-                            Text("By Role").tag("by_role")
+                if scope == .perEmployee {
+                    Section {
+                        Picker("Recipients", selection: $perEmpScope) {
+                            ForEach(PerEmployeeScope.allCases) { s in Text(s.label).tag(s) }
                         }
                         .pickerStyle(.segmented)
+
+                        if perEmpScope == .individual {
+                            employeeRow
+                        }
+                    } header: {
+                        HStack {
+                            Text("Recipients")
+                            Spacer()
+                            Button {
+                                showRecipientsInfo = true
+                            } label: {
+                                Image(systemName: "info.circle")
+                            }
+                            .buttonStyle(.borderless)
+                            .popover(isPresented: $showRecipientsInfo, arrowEdge: .top) {
+                                Text("**All Employees** generates a separate export file for every employee using this week's schedule, then shares or saves them together.")
+                                    .font(.footnote)
+                                    .multilineTextAlignment(.leading)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .padding()
+                                    .frame(width: 280)
+                                    .presentationCompactAdaptation(.popover)
+                            }
+                        }
                     }
                 }
 
-                Section("Profile") {
-                    Picker("Profile", selection: $profile) {
-                        Text("Staff Schedule").tag("staff_schedule")
-                        Text("Manager Report").tag("manager_report")
+                Section {
+                    Picker("Format", selection: $format) {
+                        ForEach(availableFormats) { f in
+                            Text(f.label).tag(f.id)
+                        }
                     }
-                    .pickerStyle(.segmented)
-                }
-
-                Section("Cell Content") {
-                    Toggle("Shift Name", isOn: $showShiftName)
-                    Toggle("Times", isOn: $showTimes)
-                    Toggle("Role", isOn: $showRole)
+                    .pickerStyle(.menu)
+                } header: {
+                    Text("Format")
+                } footer: {
+                    Text("Layout, profile, and cell content use your Export tab settings.")
                 }
             }
             #if os(macOS)
             .formStyle(.grouped)
             #endif
-            .navigationTitle("Export Schedule")
+            .navigationTitle("Share Schedule")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") { cleanup(); dismiss() }
+                        .disabled(isExporting)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if isExporting {
                         ProgressView()
                     } else {
                         Button("Export") {
-                            Task { await performExport() }
+                            Task { await run() }
                         }
+                        .disabled(!canExport)
                     }
                 }
             }
@@ -109,35 +150,141 @@ struct ExportSheetView: View {
                 Text(error ?? "")
             }
             #if os(iOS)
-            .sheet(isPresented: $showShareSheet) {
-                if let url = exportFileURL {
-                    ShareSheet(activityItems: [url])
+            .sheet(isPresented: $showShareSheet, onDismiss: { cleanup(); dismiss() }) {
+                if !exportURLs.isEmpty {
+                    ShareSheet(activityItems: exportURLs)
                 }
             }
             #endif
+        }
+        .task { await loadEmployeesIfNeeded() }
+        .onChange(of: scope) { _, new in
+            if new == .perEmployee { Task { await loadEmployeesIfNeeded() } }
+            clampFormat()
         }
         #if os(iOS)
         .presentationDetents([.medium, .large])
         #endif
         #if os(macOS)
-        .frame(minWidth: 380, idealWidth: 440, minHeight: 400, idealHeight: 500)
+        .frame(minWidth: 420, idealWidth: 460, minHeight: 360, idealHeight: 460)
         #endif
     }
 
-    private func performExport() async {
+    // MARK: - Employee picker row
+
+    @ViewBuilder
+    private var employeeRow: some View {
+        if loadingEmployees {
+            ProgressView("Loading employees…")
+        } else if employees.isEmpty {
+            Text("No employees found").foregroundStyle(.secondary)
+        } else {
+            Picker("Employee", selection: $selectedEmployeeId) {
+                ForEach(employees, id: \.id) { e in
+                    Text(e.displayName).tag(Optional(e.id))
+                }
+            }
+        }
+    }
+
+    // MARK: - Format catalogue
+
+    private struct FormatOpt: Identifiable {
+        let id: String
+        let label: String
+    }
+
+    private var availableFormats: [FormatOpt] {
+        var list: [FormatOpt] = [
+            .init(id: "pdf", label: "PDF"),
+            .init(id: "xlsx", label: "Spreadsheet (XLSX)"),
+            .init(id: "csv", label: "CSV"),
+            .init(id: "markdown", label: "Markdown"),
+            .init(id: "json", label: "JSON"),
+        ]
+        if scope == .perEmployee {
+            list.append(.init(id: "ics", label: "ICS Calendar"))
+        }
+        return list
+    }
+
+    private func clampFormat() {
+        if !availableFormats.contains(where: { $0.id == format }) {
+            format = availableFormats.first?.id ?? "pdf"
+        }
+    }
+
+    // MARK: - Ability gate
+
+    private var canExport: Bool {
+        if isExporting { return false }
+        switch scope {
+        case .fullRota:
+            return true
+        case .perEmployee:
+            switch perEmpScope {
+            case .all: return !employees.isEmpty
+            case .individual: return selectedEmployeeId != nil
+            }
+        }
+    }
+
+    // MARK: - Loading
+
+    private func loadEmployeesIfNeeded() async {
+        if !employees.isEmpty || loadingEmployees { return }
+        loadingEmployees = true
+        do {
+            employees = try await service.listEmployees()
+            if selectedEmployeeId == nil {
+                selectedEmployeeId = employees.first?.id
+            }
+        } catch {
+            self.error = userFacingMessage(error)
+        }
+        loadingEmployees = false
+    }
+
+    // MARK: - Export dispatch
+
+    private func run() async {
         isExporting = true
         error = nil
+        defer { isExporting = false }
 
-        // Persist current selections so they become the defaults next time.
-        let defaults = UserDefaults.standard
-        defaults.set(layout, forKey: "exportDefaultLayout")
-        defaults.set(format, forKey: "exportDefaultFormat")
-        defaults.set(profile, forKey: "exportDefaultProfile")
-        defaults.set(showShiftName, forKey: "exportShowShiftName")
-        defaults.set(showTimes, forKey: "exportShowTimes")
-        defaults.set(showRole, forKey: "exportShowRole")
-        defaults.set(pdfTemplate, forKey: "exportDefaultPdfTemplate")
+        do {
+            let dir = try makeTempDir()
+            tempDir = dir
 
+            let urls: [URL]
+            switch scope {
+            case .fullRota:
+                urls = [try await exportFullRota(into: dir)]
+            case .perEmployee:
+                switch perEmpScope {
+                case .all:
+                    urls = try await exportAllEmployees(into: dir)
+                case .individual:
+                    guard let id = selectedEmployeeId else { return }
+                    urls = [try await exportOneEmployee(id: id, into: dir)]
+                }
+            }
+
+            exportURLs = urls
+
+            #if os(iOS)
+            showShareSheet = true
+            #else
+            try saveOnMac(urls: urls)
+            cleanup()
+            dismiss()
+            #endif
+        } catch {
+            self.error = userFacingMessage(error)
+        }
+    }
+
+    private func exportFullRota(into dir: URL) async throws -> URL {
         let config = FfiExportConfig(
             layout: layout,
             format: format,
@@ -147,55 +294,133 @@ struct ExportSheetView: View {
             showRole: showRole,
             pdfTemplate: format == "pdf" ? pdfTemplate : nil
         )
+        let result = try await service.exportWeekSchedule(weekStart: weekStart, config: config)
+        return try writeResult(result, into: dir)
+    }
 
-        do {
-            let result = try await service.exportWeekSchedule(weekStart: weekStart, config: config)
+    private func exportOneEmployee(id: Int64, into dir: URL) async throws -> URL {
+        let (start, end) = weekRange()
+        let config = FfiEmployeeExportConfig(
+            employeeId: id,
+            startDate: start,
+            endDate: end,
+            format: format,
+            profile: profile,
+            showShiftName: showShiftName,
+            showTimes: showTimes,
+            showRole: showRole,
+            timezoneId: TimeZone.current.identifier
+        )
+        let result = try await service.exportEmployeeSchedule(config: config)
+        return try writeResult(result, into: dir)
+    }
 
-            let tempDir = FileManager.default.temporaryDirectory
-            let fileURL = tempDir.appendingPathComponent(result.filename)
-
-            // PDF exports arrive base64-encoded so they fit the String-typed
-            // FFI contract. CSV/JSON are UTF-8 text as before.
-            if format == "pdf" {
-                guard let pdfData = Data(base64Encoded: result.data) else {
-                    throw ExportSheetError.invalidPdfPayload
-                }
-                try pdfData.write(to: fileURL, options: .atomic)
-            } else {
-                try result.data.write(to: fileURL, atomically: true, encoding: .utf8)
-            }
-
-            exportFileURL = fileURL
-
-            #if os(iOS)
-            showShareSheet = true
-            #else
-            let panel = NSSavePanel()
-            panel.nameFieldStringValue = result.filename
-            panel.allowedContentTypes = allowedContentTypes(for: format)
-            if panel.runModal() == .OK, let dest = panel.url {
-                // The user may have picked a destination that already exists
-                // (the panel warns but lets them proceed); overwrite it.
-                if FileManager.default.fileExists(atPath: dest.path) {
-                    try FileManager.default.removeItem(at: dest)
-                }
-                try FileManager.default.copyItem(at: fileURL, to: dest)
-            }
-            dismiss()
-            #endif
-        } catch {
-            self.error = userFacingMessage(error)
+    private func exportAllEmployees(into dir: URL) async throws -> [URL] {
+        var urls: [URL] = []
+        let (start, end) = weekRange()
+        for e in employees {
+            let config = FfiEmployeeExportConfig(
+                employeeId: e.id,
+                startDate: start,
+                endDate: end,
+                format: format,
+                profile: profile,
+                showShiftName: showShiftName,
+                showTimes: showTimes,
+                showRole: showRole,
+                timezoneId: TimeZone.current.identifier
+            )
+            let result = try await service.exportEmployeeSchedule(config: config)
+            urls.append(try writeResult(result, into: dir))
         }
+        return urls
+    }
 
-        isExporting = false
+    // MARK: - File I/O
+
+    private func makeTempDir() throws -> URL {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("autorota-export-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    private func writeResult(_ result: FfiExportResult, into dir: URL) throws -> URL {
+        let url = dir.appendingPathComponent(result.filename)
+        if isBinary(format: format) {
+            guard let data = Data(base64Encoded: result.data) else {
+                throw ExportSheetError.invalidBinaryPayload
+            }
+            try data.write(to: url, options: .atomic)
+        } else {
+            try result.data.write(to: url, atomically: true, encoding: .utf8)
+        }
+        return url
+    }
+
+    private func isBinary(format: String) -> Bool {
+        format == "pdf" || format == "xlsx"
+    }
+
+    private func weekRange() -> (String, String) {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        guard let start = fmt.date(from: weekStart),
+              let end = Calendar.current.date(byAdding: .day, value: 6, to: start) else {
+            return (weekStart, weekStart)
+        }
+        return (weekStart, fmt.string(from: end))
+    }
+
+    private func cleanup() {
+        if let dir = tempDir {
+            try? FileManager.default.removeItem(at: dir)
+            tempDir = nil
+        }
+        exportURLs = []
     }
 
     #if os(macOS)
+    private func saveOnMac(urls: [URL]) throws {
+        if urls.count == 1, let only = urls.first {
+            let panel = NSSavePanel()
+            panel.nameFieldStringValue = only.lastPathComponent
+            panel.allowedContentTypes = allowedContentTypes(for: format)
+            if panel.runModal() == .OK, let dest = panel.url {
+                if FileManager.default.fileExists(atPath: dest.path) {
+                    try FileManager.default.removeItem(at: dest)
+                }
+                try FileManager.default.copyItem(at: only, to: dest)
+            }
+        } else {
+            let panel = NSOpenPanel()
+            panel.canChooseDirectories = true
+            panel.canChooseFiles = false
+            panel.canCreateDirectories = true
+            panel.prompt = "Save Here"
+            if panel.runModal() == .OK, let dest = panel.url {
+                for url in urls {
+                    let target = dest.appendingPathComponent(url.lastPathComponent)
+                    if FileManager.default.fileExists(atPath: target.path) {
+                        try FileManager.default.removeItem(at: target)
+                    }
+                    try FileManager.default.copyItem(at: url, to: target)
+                }
+            }
+        }
+    }
+
     private func allowedContentTypes(for format: String) -> [UTType] {
         switch format {
         case "csv": return [.commaSeparatedText]
         case "json": return [.json]
         case "pdf": return [.pdf]
+        case "xlsx":
+            return [UTType(filenameExtension: "xlsx") ?? .spreadsheet]
+        case "markdown":
+            return [UTType(filenameExtension: "md") ?? .plainText]
+        case "ics":
+            return [UTType(filenameExtension: "ics") ?? .calendarEvent]
         default: return []
         }
     }
@@ -203,12 +428,12 @@ struct ExportSheetView: View {
 }
 
 private enum ExportSheetError: LocalizedError {
-    case invalidPdfPayload
+    case invalidBinaryPayload
 
     var errorDescription: String? {
         switch self {
-        case .invalidPdfPayload:
-            return "The exported PDF payload could not be decoded."
+        case .invalidBinaryPayload:
+            return "The exported binary payload could not be decoded."
         }
     }
 }
