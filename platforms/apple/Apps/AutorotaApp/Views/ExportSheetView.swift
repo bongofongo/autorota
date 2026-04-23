@@ -16,12 +16,19 @@ struct ExportSheetView: View {
 
     // MARK: - Settings (from Export tab)
 
-    @AppStorage("exportDefaultLayout") private var layout: String = "employee_by_weekday"
-    @AppStorage("exportDefaultProfile") private var profile: String = "staff_schedule"
-    @AppStorage("exportDefaultPdfTemplate") private var pdfTemplate: String = "weekly_grid"
-    @AppStorage("exportShowShiftName") private var showShiftName: Bool = true
-    @AppStorage("exportShowTimes") private var showTimes: Bool = true
-    @AppStorage("exportShowRole") private var showRole: Bool = true
+    // Full View defaults
+    @AppStorage("exportDefaultLayout") private var fullLayout: String = "employee_by_weekday"
+    @AppStorage("exportDefaultProfile") private var fullProfile: String = "staff_schedule"
+    @AppStorage("exportDefaultPdfTemplate") private var fullPdfTemplate: String = "weekly_grid"
+    @AppStorage("exportShowShiftName") private var fullShowShiftName: Bool = true
+    @AppStorage("exportShowTimes") private var fullShowTimes: Bool = true
+    @AppStorage("exportShowRole") private var fullShowRole: Bool = true
+
+    // Employee View defaults
+    @AppStorage("empExportDefaultProfile") private var empProfile: String = "staff_schedule"
+    @AppStorage("empExportShowShiftName") private var empShowShiftName: Bool = true
+    @AppStorage("empExportShowTimes") private var empShowTimes: Bool = true
+    @AppStorage("empExportShowRole") private var empShowRole: Bool = true
 
     // MARK: - Scope state
 
@@ -286,13 +293,13 @@ struct ExportSheetView: View {
 
     private func exportFullRota(into dir: URL) async throws -> URL {
         let config = FfiExportConfig(
-            layout: layout,
+            layout: fullLayout,
             format: format,
-            profile: profile,
-            showShiftName: showShiftName,
-            showTimes: showTimes,
-            showRole: showRole,
-            pdfTemplate: format == "pdf" ? pdfTemplate : nil
+            profile: fullProfile,
+            showShiftName: fullShowShiftName,
+            showTimes: fullShowTimes,
+            showRole: fullShowRole,
+            pdfTemplate: format == "pdf" ? fullPdfTemplate : nil
         )
         let result = try await service.exportWeekSchedule(weekStart: weekStart, config: config)
         return try writeResult(result, into: dir)
@@ -305,10 +312,10 @@ struct ExportSheetView: View {
             startDate: start,
             endDate: end,
             format: format,
-            profile: profile,
-            showShiftName: showShiftName,
-            showTimes: showTimes,
-            showRole: showRole,
+            profile: empProfile,
+            showShiftName: empShowShiftName,
+            showTimes: empShowTimes,
+            showRole: empShowRole,
             timezoneId: TimeZone.current.identifier
         )
         let result = try await service.exportEmployeeSchedule(config: config)
@@ -324,10 +331,10 @@ struct ExportSheetView: View {
                 startDate: start,
                 endDate: end,
                 format: format,
-                profile: profile,
-                showShiftName: showShiftName,
-                showTimes: showTimes,
-                showRole: showRole,
+                profile: empProfile,
+                showShiftName: empShowShiftName,
+                showTimes: empShowTimes,
+                showRole: empShowRole,
                 timezoneId: TimeZone.current.identifier
             )
             let result = try await service.exportEmployeeSchedule(config: config)
