@@ -24,8 +24,9 @@ struct ExportSheetView: View {
     @AppStorage("exportShowTimes") private var fullShowTimes: Bool = true
     @AppStorage("exportShowRole") private var fullShowRole: Bool = true
 
-    // Employee View defaults
-    @AppStorage("empExportDefaultProfile") private var empProfile: String = "staff_schedule"
+    // Employee View defaults. Profile is locked to staff_schedule — employee
+    // exports never include wage/cost data.
+    private let empProfile = "staff_schedule"
     @AppStorage("empExportShowShiftName") private var empShowShiftName: Bool = true
     @AppStorage("empExportShowTimes") private var empShowTimes: Bool = true
     @AppStorage("empExportShowRole") private var empShowRole: Bool = true
@@ -296,7 +297,7 @@ struct ExportSheetView: View {
             layout: fullLayout,
             format: format,
             profile: fullProfile,
-            showShiftName: fullShowShiftName,
+            showShiftName: fullLayout == "shift_by_weekday" ? false : fullShowShiftName,
             showTimes: fullShowTimes,
             showRole: fullShowRole,
             pdfTemplate: format == "pdf" ? fullPdfTemplate : nil

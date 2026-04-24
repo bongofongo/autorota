@@ -224,10 +224,7 @@ fn build_employee_grid(
                                 r.shift.end_time.format("%H:%M"),
                             ));
                         }
-                        if flags.show_role {
-                            parts.push(r.shift.required_role.clone());
-                        }
-                        let mut text = parts.join(" ");
+                        let mut text = parts.join("\n");
                         if is_manager {
                             if let Some(wage) = r.hourly_wage {
                                 let cost = wage * r.shift.duration_hours();
@@ -318,18 +315,21 @@ fn build_shift_grid(
         let key = slot_key_for(shift);
         shift_exists.insert((shift.date, key.clone()));
         if seen.insert(key.clone()) {
-            let label = shift
+            let time_line = format!(
+                "{}-{}",
+                key.start.format("%H:%M"),
+                key.end.format("%H:%M"),
+            );
+            let name_line = shift
                 .template_id
                 .and_then(|tid| tmpl_map.get(&tid))
                 .map(|t| t.name.clone())
-                .unwrap_or_else(|| {
-                    format!(
-                        "{} {}-{}",
-                        key.role,
-                        key.start.format("%H:%M"),
-                        key.end.format("%H:%M"),
-                    )
-                });
+                .unwrap_or_else(|| key.role.clone());
+            let mut label = format!("{name_line}\n{time_line}");
+            if flags.show_role && !key.role.is_empty() && name_line != key.role {
+                label.push('\n');
+                label.push_str(&key.role);
+            }
             slot_labels.insert(key.clone(), label);
             slot_order.push(key);
         }
@@ -371,22 +371,10 @@ fn build_shift_grid(
                     .unwrap()
                     .iter()
                     .map(|r| {
+                        // Role and times live in the row label column in this
+                        // layout, so the data cell is just the employee name
+                        // (plus cost in manager mode).
                         let mut text = r.employee_name.clone();
-                        // In shift layout, cell content flags control additional info.
-                        let mut extras = Vec::new();
-                        if flags.show_times {
-                            extras.push(format!(
-                                "{}-{}",
-                                r.shift.start_time.format("%H:%M"),
-                                r.shift.end_time.format("%H:%M"),
-                            ));
-                        }
-                        if flags.show_role {
-                            extras.push(r.shift.required_role.clone());
-                        }
-                        if !extras.is_empty() {
-                            text.push_str(&format!(" ({})", extras.join(", ")));
-                        }
                         if is_manager {
                             if let Some(wage) = r.hourly_wage {
                                 let cost = wage * r.shift.duration_hours();
@@ -520,10 +508,7 @@ pub fn build_single_employee_grid(
                             shift.end_time.format("%H:%M"),
                         ));
                     }
-                    if flags.show_role {
-                        line_parts.push(shift.required_role.clone());
-                    }
-                    let mut text = line_parts.join(" ");
+                    let mut text = line_parts.join("\n");
                     if is_manager {
                         if let Some(wage) = a.hourly_wage {
                             let cost = wage * shift.duration_hours();
@@ -692,7 +677,7 @@ mod tests {
         let config = staff_config(ExportLayout::ShiftByWeekday);
         let grid = build_grid(&config, ws, &assignments, &shifts, &employees, &templates);
 
-        assert_eq!(grid.row_headers, vec!["Morning"]);
+        assert_eq!(grid.row_headers, vec!["Morning\n07:00-12:00"]);
         // Monday cell should have Alice.
         assert!(grid.cells[0][0].contains("Alice Smith"));
         // Tuesday onwards should be empty (no shift exists for those days).
@@ -775,11 +760,29 @@ mod tests {
         let grid = build_grid(&config, ws, &assignments, &shifts, &employees, &templates);
         assert_eq!(grid.cells[0][0], "Morning");
 
-        // Show everything.
+        // Shift name + times in employee layout: newline-separated, shift first.
+        // Role is not rendered inside employee-layout cells.
         let config = ExportConfigBuilder::staff().show_role().build();
         let grid = build_grid(&config, ws, &assignments, &shifts, &employees, &templates);
-        assert!(grid.cells[0][0].contains("Morning"));
-        assert!(grid.cells[0][0].contains("07:00-12:00"));
-        assert!(grid.cells[0][0].contains("Barista"));
+        assert_eq!(grid.cells[0][0], "Morning\n07:00-12:00");
+    }
+
+    #[test]
+    fn shift_grid_role_in_row_label() {
+        let ws = week_start();
+        let mon = ws;
+        let templates = vec![make_template(1, "Morning", (7, 0), (12, 0), "Barista")];
+        let shifts = vec![make_shift(1, Some(1), mon, (7, 0), (12, 0), "Barista")];
+        let employees = vec![make_employee(1, "Alice", "Smith")];
+        let assignments = vec![make_assignment(1, 1, 1, None)];
+
+        let config = ExportConfigBuilder::staff()
+            .layout(ExportLayout::ShiftByWeekday)
+            .show_role()
+            .build();
+        let grid = build_grid(&config, ws, &assignments, &shifts, &employees, &templates);
+        assert_eq!(grid.row_headers, vec!["Morning\n07:00-12:00\nBarista"]);
+        // Role should not appear inside the data cell itself.
+        assert!(!grid.cells[0][0].contains("Barista"));
     }
 }

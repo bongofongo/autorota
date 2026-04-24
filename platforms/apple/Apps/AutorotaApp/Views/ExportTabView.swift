@@ -16,11 +16,20 @@ struct ExportTabView: View {
     @AppStorage("exportShowRole") private var fullShowRole: Bool = true
 
     // MARK: - Employee View defaults
+    //
+    // Employee exports are always "staff_schedule" — employees shouldn't see
+    // wage/cost data — so there is no profile picker in this section.
 
-    @AppStorage("empExportDefaultProfile") private var empProfile: String = "staff_schedule"
     @AppStorage("empExportShowShiftName") private var empShowShiftName: Bool = true
     @AppStorage("empExportShowTimes") private var empShowTimes: Bool = true
-    @AppStorage("empExportShowRole") private var empShowRole: Bool = true
+
+    private let service: AutorotaServiceProtocol
+
+    @State private var previewScope: ExportPreviewSheet.Scope?
+
+    init(service: AutorotaServiceProtocol = LiveAutorotaService()) {
+        self.service = service
+    }
 
     var body: some View {
         NavigationStack {
@@ -35,6 +44,9 @@ struct ExportTabView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
+            .sheet(item: $previewScope) { scope in
+                ExportPreviewSheet(scope: scope, service: service)
+            }
         }
     }
 
@@ -47,6 +59,9 @@ struct ExportTabView: View {
                 Text("By Shift").tag("shift_by_weekday")
             }
             .pickerStyle(.segmented)
+            .onChange(of: fullLayout) { _, new in
+                if new == "shift_by_weekday" { fullShowShiftName = false }
+            }
 
             Picker("Profile", selection: $fullProfile) {
                 Text("Staff Schedule").tag("staff_schedule")
@@ -55,13 +70,21 @@ struct ExportTabView: View {
             .pickerStyle(.segmented)
 
             Toggle("Shift Name", isOn: $fullShowShiftName)
+                .disabled(fullLayout == "shift_by_weekday")
             Toggle("Times", isOn: $fullShowTimes)
             Toggle("Role", isOn: $fullShowRole)
+                .disabled(fullLayout == "employee_by_weekday")
 
             Picker("PDF Template", selection: $fullPdfTemplate) {
                 Text("Weekly Grid").tag("weekly_grid")
                 Text("Per Employee").tag("per_employee")
                 Text("By Role").tag("by_role")
+            }
+
+            Button {
+                previewScope = .full
+            } label: {
+                Label("Preview PDF", systemImage: "doc.text.magnifyingglass")
             }
         } header: {
             Text("Full View")
@@ -74,19 +97,22 @@ struct ExportTabView: View {
 
     private var employeeViewSection: some View {
         Section {
-            Picker("Profile", selection: $empProfile) {
-                Text("Staff Schedule").tag("staff_schedule")
-                Text("Manager Report").tag("manager_report")
-            }
-            .pickerStyle(.segmented)
-
             Toggle("Shift Name", isOn: $empShowShiftName)
             Toggle("Times", isOn: $empShowTimes)
-            Toggle("Role", isOn: $empShowRole)
+
+            Button {
+                previewScope = .employee
+            } label: {
+                Label("Preview PDF", systemImage: "doc.text.magnifyingglass")
+            }
         } header: {
             Text("Employee View")
         } footer: {
-            Text("Applied when exporting per-employee schedules, whether for all employees or a single one.")
+            Text("Applied when exporting per-employee schedules, whether for all employees or a single one. Wage and cost data are never included.")
         }
     }
+}
+
+extension ExportPreviewSheet.Scope: Identifiable {
+    public var id: String { rawValue }
 }
