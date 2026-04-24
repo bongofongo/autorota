@@ -52,6 +52,7 @@
 		CC0019033050000000205001 /* RosterImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0019043050000000205001 /* RosterImportView.swift */; };
 		CC0020013060000000205001 /* PhoneNumberFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0020023060000000205001 /* PhoneNumberFormatter.swift */; };
 		CC0021013070000000205001 /* PhoneInputField.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0021023070000000205001 /* PhoneInputField.swift */; };
+		CC0022013080000000205001 /* ExportPreviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0022023080000000205001 /* ExportPreviewSheet.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -111,6 +112,7 @@
 		CC0019043050000000205001 /* RosterImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RosterImportView.swift; sourceTree = "<group>"; };
 		CC0020023060000000205001 /* PhoneNumberFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneNumberFormatter.swift; sourceTree = "<group>"; };
 		CC0021023070000000205001 /* PhoneInputField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneInputField.swift; sourceTree = "<group>"; };
+		CC0022023080000000205001 /* ExportPreviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPreviewSheet.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -212,6 +214,7 @@
 				CC0019023050000000205001 /* SendSchedulePicker.swift */,
 				CC0019043050000000205001 /* RosterImportView.swift */,
 				CC0021023070000000205001 /* PhoneInputField.swift */,
+				CC0022023080000000205001 /* ExportPreviewSheet.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -386,6 +389,7 @@
 				CC0019033050000000205001 /* RosterImportView.swift in Sources */,
 				CC0020013060000000205001 /* PhoneNumberFormatter.swift in Sources */,
 				CC0021013070000000205001 /* PhoneInputField.swift in Sources */,
+				CC0022013080000000205001 /* ExportPreviewSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

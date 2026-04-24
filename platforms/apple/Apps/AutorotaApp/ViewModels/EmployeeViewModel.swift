@@ -9,7 +9,7 @@ final class EmployeeViewModel {
     var isLoading = false
     var error: String?
 
-    private let service: AutorotaServiceProtocol
+    let service: AutorotaServiceProtocol
 
     init(service: AutorotaServiceProtocol = LiveAutorotaService()) {
         self.service = service

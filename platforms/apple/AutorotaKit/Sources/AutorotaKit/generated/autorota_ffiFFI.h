@@ -387,6 +387,16 @@ RustBuffer uniffi_autorota_ffi_fn_func_export_employee_bundle(RustBuffer config,
 RustBuffer uniffi_autorota_ffi_fn_func_export_employee_schedule(RustBuffer config, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_EXPORT_PREVIEW_EMPLOYEE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_EXPORT_PREVIEW_EMPLOYEE
+RustBuffer uniffi_autorota_ffi_fn_func_export_preview_employee(RustBuffer config, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_EXPORT_PREVIEW_FULL
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_EXPORT_PREVIEW_FULL
+RustBuffer uniffi_autorota_ffi_fn_func_export_preview_full(RustBuffer config, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_EXPORT_WEEK_SCHEDULE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_EXPORT_WEEK_SCHEDULE
 RustBuffer uniffi_autorota_ffi_fn_func_export_week_schedule(RustBuffer week_start, RustBuffer config, RustCallStatus *_Nonnull out_status
@@ -1047,6 +1057,18 @@ uint16_t uniffi_autorota_ffi_checksum_func_export_employee_bundle(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_EXPORT_EMPLOYEE_SCHEDULE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_EXPORT_EMPLOYEE_SCHEDULE
 uint16_t uniffi_autorota_ffi_checksum_func_export_employee_schedule(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_EXPORT_PREVIEW_EMPLOYEE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_EXPORT_PREVIEW_EMPLOYEE
+uint16_t uniffi_autorota_ffi_checksum_func_export_preview_employee(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_EXPORT_PREVIEW_FULL
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_EXPORT_PREVIEW_FULL
+uint16_t uniffi_autorota_ffi_checksum_func_export_preview_full(void
     
 );
 #endif

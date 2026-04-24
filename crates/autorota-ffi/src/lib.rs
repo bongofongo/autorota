@@ -892,6 +892,68 @@ pub fn export_employee_schedule(
     })
 }
 
+/// Generate a full-rota preview PDF/CSV/etc. using synthetic fixture data.
+/// Bypasses the database; `week_start` is ignored by the renderer.
+#[uniffi::export]
+pub fn export_preview_full(config: FfiExportConfig) -> Result<FfiExportResult, FfiError> {
+    let core_config = parse_export_config(config)?;
+    let result = autorota_core::export::preview::generate_preview_full(core_config).map_err(
+        |e| match e {
+            autorota_core::export::ExportError::Pdf(msg) => FfiError::InvalidArgument { msg },
+            other => FfiError::InvalidArgument {
+                msg: other.to_string(),
+            },
+        },
+    )?;
+    Ok(FfiExportResult {
+        data: result.data,
+        filename: result.filename,
+        mime_type: result.mime_type,
+    })
+}
+
+/// Generate a single-employee preview using synthetic fixture data. The
+/// `employee_id`, `start_date`, and `end_date` fields on `config` are ignored.
+#[uniffi::export]
+pub fn export_preview_employee(
+    config: FfiEmployeeExportConfig,
+) -> Result<FfiExportResult, FfiError> {
+    let format: ExportFormat = config
+        .format
+        .parse()
+        .map_err(|e: String| FfiError::InvalidArgument { msg: e })?;
+    let profile: ExportProfile = config
+        .profile
+        .parse()
+        .map_err(|e: String| FfiError::InvalidArgument { msg: e })?;
+
+    let core_config = EmployeeExportConfig {
+        employee_id: config.employee_id,
+        format,
+        profile,
+        cell_content: CellContentFlags {
+            show_shift_name: config.show_shift_name,
+            show_times: config.show_times,
+            show_role: config.show_role,
+        },
+        timezone_id: config.timezone_id.clone(),
+    };
+
+    let result = autorota_core::export::preview::generate_preview_employee(core_config).map_err(
+        |e| match e {
+            autorota_core::export::ExportError::Pdf(msg) => FfiError::InvalidArgument { msg },
+            other => FfiError::InvalidArgument {
+                msg: other.to_string(),
+            },
+        },
+    )?;
+    Ok(FfiExportResult {
+        data: result.data,
+        filename: result.filename,
+        mime_type: result.mime_type,
+    })
+}
+
 /// Emit the four-format personal bundle (PDF, ICS, Markdown, XLSX) for one
 /// employee's schedule over a date range. The caller-supplied `format` field
 /// on `config` is ignored — each output uses its own format.

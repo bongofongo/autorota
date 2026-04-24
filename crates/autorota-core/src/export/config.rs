@@ -36,6 +36,9 @@ pub enum ExportFormat {
     Csv,
     Json,
     Pdf,
+    Xlsx,
+    Markdown,
+    Ics,
 }
 
 impl FromStr for ExportFormat {
@@ -45,6 +48,9 @@ impl FromStr for ExportFormat {
             "csv" => Ok(Self::Csv),
             "json" => Ok(Self::Json),
             "pdf" => Ok(Self::Pdf),
+            "xlsx" => Ok(Self::Xlsx),
+            "markdown" => Ok(Self::Markdown),
+            "ics" => Ok(Self::Ics),
             other => Err(format!("invalid export format: {other}")),
         }
     }
@@ -56,6 +62,9 @@ impl fmt::Display for ExportFormat {
             Self::Csv => write!(f, "csv"),
             Self::Json => write!(f, "json"),
             Self::Pdf => write!(f, "pdf"),
+            Self::Xlsx => write!(f, "xlsx"),
+            Self::Markdown => write!(f, "markdown"),
+            Self::Ics => write!(f, "ics"),
         }
     }
 }
@@ -148,6 +157,9 @@ pub struct EmployeeExportConfig {
     pub format: ExportFormat,
     pub profile: ExportProfile,
     pub cell_content: CellContentFlags,
+    /// IANA timezone (e.g. `"Europe/London"`). Only consulted when
+    /// `format == Ics`; when `None` the ICS output uses floating local times.
+    pub timezone_id: Option<String>,
 }
 
 /// Result of an export operation.
@@ -176,7 +188,14 @@ mod tests {
 
     #[test]
     fn format_roundtrip() {
-        for fmt in [ExportFormat::Csv, ExportFormat::Json] {
+        for fmt in [
+            ExportFormat::Csv,
+            ExportFormat::Json,
+            ExportFormat::Pdf,
+            ExportFormat::Xlsx,
+            ExportFormat::Markdown,
+            ExportFormat::Ics,
+        ] {
             let s = fmt.to_string();
             let parsed: ExportFormat = s.parse().unwrap();
             assert_eq!(parsed, fmt);

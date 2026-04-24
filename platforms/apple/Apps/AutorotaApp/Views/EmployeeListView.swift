@@ -7,6 +7,8 @@ struct EmployeeListView: View {
     @State private var showingAddSheet = false
     @State private var showingAvailability = false
     @State private var selectedEmployee: FfiEmployee?
+    @State private var sendScheduleTarget: FfiEmployee?
+    @State private var showingImport = false
     var body: some View {
         NavigationStack {
             Group {
@@ -29,6 +31,23 @@ struct EmployeeListView: View {
                                     }
                                 }
                             }
+                            .contextMenu {
+                                Button {
+                                    sendScheduleTarget = employee
+                                } label: {
+                                    Label("Send schedule…", systemImage: "paperplane")
+                                }
+                            }
+                            #if os(iOS)
+                            .swipeActions(edge: .leading) {
+                                Button {
+                                    sendScheduleTarget = employee
+                                } label: {
+                                    Label("Send", systemImage: "paperplane")
+                                }
+                                .tint(.blue)
+                            }
+                            #endif
                         }
                     }
                 }
@@ -47,6 +66,11 @@ struct EmployeeListView: View {
                         } label: {
                             Label("Weekly availability", systemImage: "calendar.badge.clock")
                         }
+                        Button {
+                            showingImport = true
+                        } label: {
+                            Label("Import employees…", systemImage: "square.and.arrow.down")
+                        }
                     } label: {
                         Image(systemName: "ellipsis")
                     }
@@ -54,6 +78,19 @@ struct EmployeeListView: View {
             }
             .sheet(isPresented: $showingAddSheet) {
                 EmployeeEditSheet(viewModel: vm)
+            }
+            .sheet(isPresented: Binding(
+                get: { sendScheduleTarget != nil },
+                set: { if !$0 { sendScheduleTarget = nil } }
+            )) {
+                if let employee = sendScheduleTarget {
+                    SendSchedulePicker(employee: employee, service: vm.service)
+                }
+            }
+            .sheet(isPresented: $showingImport) {
+                RosterImportView(service: vm.service) {
+                    Task { await vm.load() }
+                }
             }
             #if os(iOS)
             .fullScreenCover(isPresented: $showingAvailability) {

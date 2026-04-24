@@ -109,7 +109,8 @@ final class EmployeeExportViewModel {
             profile: profile,
             showShiftName: showShiftName,
             showTimes: showTimes,
-            showRole: showRole
+            showRole: showRole,
+            timezoneId: TimeZone.current.identifier
         )
 
         do {

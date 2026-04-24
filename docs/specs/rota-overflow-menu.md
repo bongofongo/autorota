@@ -1,7 +1,8 @@
 # Rota overflow menu — current spec
 
 Captures the as-built behaviour of the Rota page's dots/options button and
-the popover menu it presents, plus follow-up work.
+the popover menu it presents, plus follow-up work. Reflects the post-auto-save
+workflow (no staging mode, no manual commit).
 
 ## Triggers (the dots button)
 
@@ -87,25 +88,24 @@ in portrait and landscape.
 Computed per current `RotaViewModel` mode. Each entry is a
 `RotaOverflowAction { title, systemImage, role?, action }`.
 
-### Normal mode
-- **Stage** — `tray.and.arrow.down` — only when `vm.weekHasPastDays` and a
-  schedule exists. Calls `vm.enterStagingMode()`.
-- **Edit** — `pencil` — only when a schedule exists. Calls
-  `Task { await vm.enterEditMode() }`.
-- **Share** — `square.and.arrow.up` — only when a schedule exists. Sets
-  `showExportSheet = true`.
+### Normal mode (when a schedule exists)
+- **Delete schedule** — `trash`, role `.destructive` — sets
+  `vm.showDeleteScheduleConfirmation = true`.
+- **Edit** — `pencil` — calls `Task { await vm.enterEditMode() }`.
+- **Share** — `square.and.arrow.up` — sets `showExportSheet = true`.
 - **Generate** — `wand.and.stars` — always. Calls
   `Task { await vm.runSchedule() }`.
 
-### Edit mode
-- **Lock past days** / **Unlock past days** — `lock.fill` / `lock.open.fill`
-  — only when `vm.weekHasPastDays`. Toggles `vm.pastUnlocked`.
-- **Delete schedule** — `trash`, role `.destructive` — only when
-  `vm.weekCategory != .future`. Sets `vm.showDeleteScheduleConfirmation = true`.
-- **Done editing** — `checkmark`. Calls `vm.exitEditMode()`.
+### Normal mode (no schedule yet)
+- **Generate** only.
 
-### Staging mode
-- **Done staging** — `checkmark`. Calls `vm.exitStagingMode()`.
+### Edit mode
+- No overflow actions. Exiting edit mode is handled by a dedicated
+  checkmark button; auto-save fires on exit (`RotaViewModel.exitEditMode`).
+
+> Staging mode and the manual **Stage** action were removed when the
+> commit workflow was replaced by auto-save. Past-day locking is now a
+> property of the week view, not an overflow action.
 
 ## Files
 - `platforms/apple/Apps/AutorotaApp/Views/ContentView.swift` — TabView, dots
@@ -121,9 +121,8 @@ Computed per current `RotaViewModel` mode. Each entry is a
 
 - [ ] **Mode-aware base button.** The dots glyph stays as `ellipsis` in all
       modes today. Consider switching the base button glyph (and/or its
-      tint) when in editing or staging mode so the user can see at a glance
-      that the menu's contents have changed (e.g. `checkmark.circle` while
-      staging, `pencil.circle` while editing).
+      tint) when in edit mode so the user can see at a glance that a
+      dedicated exit control exists (e.g. `pencil.circle`).
 - [ ] **Landscape button placement + menu placement.** The current
       `GeometryReader { .position(x: width * 0.8, y: height - 28) }` is a
       best-guess; revisit so the button truly sits adjacent to the system

@@ -1,5 +1,11 @@
 # iCloud Sync Implementation Plan
 
+> **Status: IMPLEMENTED (archived).** The plan below was executed; live code
+> is in `crates/autorota-core/migrations/011_sync_support.sql`,
+> `crates/autorota-core/src/models/sync.rs`, the `sync_*` FFI exports, and
+> the Apple-side `AutorotaSyncEngine` / `SyncConflictResolver` /
+> `SyncRecordMapper`. Kept for historical design context.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Sync all domain data across a user's Apple devices via CKSyncEngine and CloudKit private database.

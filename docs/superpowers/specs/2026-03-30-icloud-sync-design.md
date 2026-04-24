@@ -1,5 +1,6 @@
 # iCloud Sync Design
 
+**Status:** Implemented (archived design reference).
 **Date:** 2026-03-30
 **Approach:** CKSyncEngine (iOS 17+ / macOS 14+)
 **Scope:** Single-user, multi-device sync via CloudKit private database

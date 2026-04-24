@@ -172,6 +172,18 @@ struct LiveAutorotaService: AutorotaServiceProtocol {
 
     func exportWeekSchedule(weekStart: String, config: FfiExportConfig) async throws -> FfiExportResult { try await exportWeekScheduleAsync(weekStart: weekStart, config: config) }
     func exportEmployeeSchedule(config: FfiEmployeeExportConfig) async throws -> FfiExportResult { try await exportEmployeeScheduleAsync(config: config) }
+    func exportEmployeeBundle(config: FfiEmployeeExportConfig) async throws -> [FfiExportResult] { try await exportEmployeeBundleAsync(config: config) }
+    func exportPreviewFull(config: FfiExportConfig) async throws -> FfiExportResult { try await exportPreviewFullAsync(config: config) }
+    func exportPreviewEmployee(config: FfiEmployeeExportConfig) async throws -> FfiExportResult { try await exportPreviewEmployeeAsync(config: config) }
+
+    func parseRosterFile(bytes: Data, formatHint: String, strategy: String) async throws -> FfiParsedRoster {
+        try await parseRosterFileAsync(bytes: bytes, formatHint: formatHint, strategy: strategy)
+    }
+    func applyRosterImport(rows: [FfiParsedEmployeeRow]) async throws -> FfiImportSummary {
+        let result = try await applyRosterImportAsync(rows: rows)
+        NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
+        return result
+    }
 
     // Availability Progress
     func listAvailabilityProgress(weekStart: String) async throws -> [FfiAvailabilityProgress] { try await listAvailabilityProgressAsync(weekStart: weekStart) }

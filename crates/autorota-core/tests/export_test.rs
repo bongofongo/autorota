@@ -637,6 +637,7 @@ async fn export_employee_csv() {
             show_times: true,
             show_role: false,
         },
+        timezone_id: None,
     };
 
     let result = export_employee_schedule(&pool, 1, ws, end, config)
@@ -678,6 +679,7 @@ async fn export_employee_not_found_error() {
             show_times: true,
             show_role: false,
         },
+        timezone_id: None,
     };
 
     let err = export_employee_schedule(&pool, 99999, ws, end, config)
@@ -707,6 +709,7 @@ async fn export_employee_json() {
             show_times: true,
             show_role: false,
         },
+        timezone_id: None,
     };
 
     let result = export_employee_schedule(&pool, 1, ws, end, config)
@@ -742,6 +745,7 @@ async fn export_employee_pdf() {
             show_times: true,
             show_role: false,
         },
+        timezone_id: None,
     };
 
     let result = export_employee_schedule(&pool, 1, ws, end, config)

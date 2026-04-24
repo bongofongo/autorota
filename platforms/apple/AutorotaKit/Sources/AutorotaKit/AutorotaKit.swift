@@ -383,6 +383,38 @@ public func exportEmployeeScheduleAsync(config: FfiEmployeeExportConfig) async t
     }.value
 }
 
+public func exportEmployeeBundleAsync(config: FfiEmployeeExportConfig) async throws -> [FfiExportResult] {
+    try await Task.detached(priority: .userInitiated) {
+        try exportEmployeeBundle(config: config)
+    }.value
+}
+
+public func exportPreviewFullAsync(config: FfiExportConfig) async throws -> FfiExportResult {
+    try await Task.detached(priority: .userInitiated) {
+        try exportPreviewFull(config: config)
+    }.value
+}
+
+public func exportPreviewEmployeeAsync(config: FfiEmployeeExportConfig) async throws -> FfiExportResult {
+    try await Task.detached(priority: .userInitiated) {
+        try exportPreviewEmployee(config: config)
+    }.value
+}
+
+// MARK: - Roster Import
+
+public func parseRosterFileAsync(bytes: Data, formatHint: String, strategy: String) async throws -> FfiParsedRoster {
+    try await Task.detached(priority: .userInitiated) {
+        try parseRosterFile(bytes: bytes, formatHint: formatHint, strategy: strategy)
+    }.value
+}
+
+public func applyRosterImportAsync(rows: [FfiParsedEmployeeRow]) async throws -> FfiImportSummary {
+    try await Task.detached(priority: .userInitiated) {
+        try applyRosterImport(rows: rows)
+    }.value
+}
+
 // MARK: - Sync
 
 public func getPendingSyncRecordsAsync(tableName: String) async throws -> [FfiSyncRecord] {

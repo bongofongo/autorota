@@ -1,5 +1,11 @@
 # Auto-Save & Activity Log Implementation Plan
 
+> **Status: IMPLEMENTED (archived).** The plan below was executed. Live
+> code is in migrations 016–019, `crates/autorota-core/src/models/save.rs`,
+> the `save_*` / `restore_to_save` / `diff_save_*` FFI exports, and the
+> Apple-side `EditLogView` / `EditLogViewModel`. Kept for historical design
+> context.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the manual commit workflow with session-based auto-save and an activity log view, with full rename of "commit" → "save" across all layers.

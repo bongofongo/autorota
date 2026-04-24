@@ -1,5 +1,6 @@
 ---
 title: "Brainstorming Key Problems of the App (Revised)"
+status: "Historical — design exploration. Theme 1 (auto-save + restore) and Theme 4 (separate Edit Log) are implemented. Themes 2 (variable-range availability), 3 (day/week templates), 5 (overrides UX polish), and 6 (contacts/export-import) remain open. See `docs/overview.md` for current architecture."
 ---
 
 # Theme 1: Immutable History + Flexible Editing

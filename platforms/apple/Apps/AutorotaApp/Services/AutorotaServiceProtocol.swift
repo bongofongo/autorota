@@ -1,3 +1,4 @@
+import Foundation
 import AutorotaKit
 
 /// Abstraction over AutorotaKit async functions, enabling dependency injection
@@ -74,6 +75,13 @@ protocol AutorotaServiceProtocol: Sendable {
     // Export
     func exportWeekSchedule(weekStart: String, config: FfiExportConfig) async throws -> FfiExportResult
     func exportEmployeeSchedule(config: FfiEmployeeExportConfig) async throws -> FfiExportResult
+    func exportEmployeeBundle(config: FfiEmployeeExportConfig) async throws -> [FfiExportResult]
+    func exportPreviewFull(config: FfiExportConfig) async throws -> FfiExportResult
+    func exportPreviewEmployee(config: FfiEmployeeExportConfig) async throws -> FfiExportResult
+
+    // Roster Import
+    func parseRosterFile(bytes: Data, formatHint: String, strategy: String) async throws -> FfiParsedRoster
+    func applyRosterImport(rows: [FfiParsedEmployeeRow]) async throws -> FfiImportSummary
 
     // Availability Progress
     func listAvailabilityProgress(weekStart: String) async throws -> [FfiAvailabilityProgress]

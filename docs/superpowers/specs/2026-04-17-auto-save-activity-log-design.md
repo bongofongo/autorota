@@ -1,5 +1,6 @@
 # Auto-Save & Activity Log Design
 
+**Status:** Implemented (archived design reference).
 **Date:** 2026-04-17
 **Replaces:** Manual commit system (explicit shift selection + commit button)
 

@@ -5333,6 +5333,28 @@ public func exportEmployeeSchedule(config: FfiEmployeeExportConfig)throws  -> Ff
     )
 })
 }
+/**
+ * Generate a single-employee preview using synthetic fixture data. The
+ * `employee_id`, `start_date`, and `end_date` fields on `config` are ignored.
+ */
+public func exportPreviewEmployee(config: FfiEmployeeExportConfig)throws  -> FfiExportResult {
+    return try  FfiConverterTypeFfiExportResult.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_export_preview_employee(
+        FfiConverterTypeFfiEmployeeExportConfig.lower(config),$0
+    )
+})
+}
+/**
+ * Generate a full-rota preview PDF/CSV/etc. using synthetic fixture data.
+ * Bypasses the database; `week_start` is ignored by the renderer.
+ */
+public func exportPreviewFull(config: FfiExportConfig)throws  -> FfiExportResult {
+    return try  FfiConverterTypeFfiExportResult.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_export_preview_full(
+        FfiConverterTypeFfiExportConfig.lower(config),$0
+    )
+})
+}
 public func exportWeekSchedule(weekStart: String, config: FfiExportConfig)throws  -> FfiExportResult {
     return try  FfiConverterTypeFfiExportResult.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_export_week_schedule(
@@ -5755,6 +5777,12 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_export_employee_schedule() != 200) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_export_preview_employee() != 61671) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_export_preview_full() != 47484) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_export_week_schedule() != 7973) {

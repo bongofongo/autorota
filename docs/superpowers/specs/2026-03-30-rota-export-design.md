@@ -1,5 +1,10 @@
 # Rota Export Feature — Design Spec
 
+> **Status: IMPLEMENTED (archived).** CSV, JSON, and PDF export are live;
+> PDF rendering is in `crates/autorota-core/src/export/pdf/` (weekly,
+> by-role, per-employee, employee_schedule). The Swift share-sheet UI is
+> `ExportSheetView` / `ExportTabView`.
+
 ## Context
 
 Cafe managers need to share weekly schedules with staff and use them in external tools (spreadsheets, print). Currently there is no export functionality. This feature adds CSV and JSON export of weekly rotas, with the architecture designed so PDF rendering can be added later (Swift-side, using the same structured data from Rust).

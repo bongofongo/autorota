@@ -1,7 +1,11 @@
 # History Tab — Flat Assignment Rows
 
 **Date:** 2026-04-09
-**Status:** Draft
+**Status:** Implemented (archived). The History tab was later renamed to
+the **Edit Log** and the `CommitHistoryView` / `CommitHistoryViewModel`
+files referenced below have been replaced by `EditLogView` /
+`EditLogViewModel`. The flat-assignment layout described here survived
+the rename.
 
 ## Context
 

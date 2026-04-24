@@ -1,5 +1,6 @@
 ---
 title: "Brainstorming Key Problems of the App"
+status: "Historical — unfiltered early notes. See `revised_brainstorming.md` for the cleaned-up version and `docs/overview.md` for current architecture."
 ---
 
 # Problem 1 - Dealing with Past Shifts

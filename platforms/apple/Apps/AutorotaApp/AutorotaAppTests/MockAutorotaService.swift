@@ -382,6 +382,45 @@ final class MockAutorotaService: AutorotaServiceProtocol, @unchecked Sendable {
         return stubbedExportResult
     }
 
+    var stubbedBundleResults: [FfiExportResult] = [
+        FfiExportResult(data: "%PDF-mock", filename: "schedule.pdf", mimeType: "application/pdf"),
+        FfiExportResult(data: "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n", filename: "schedule.ics", mimeType: "text/calendar"),
+        FfiExportResult(data: "# mock", filename: "schedule.md", mimeType: "text/markdown"),
+        FfiExportResult(data: "UEsDBBQAAAAA", filename: "schedule.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+    ]
+
+    func exportEmployeeBundle(config: FfiEmployeeExportConfig) async throws -> [FfiExportResult] {
+        callLog.append("exportEmployeeBundle:\(config.employeeId)")
+        if let e = errorToThrow { throw e }
+        return stubbedBundleResults
+    }
+
+    func exportPreviewFull(config: FfiExportConfig) async throws -> FfiExportResult {
+        callLog.append("exportPreviewFull:\(config.format)")
+        if let e = errorToThrow { throw e }
+        return stubbedExportResult
+    }
+
+    func exportPreviewEmployee(config: FfiEmployeeExportConfig) async throws -> FfiExportResult {
+        callLog.append("exportPreviewEmployee:\(config.format)")
+        if let e = errorToThrow { throw e }
+        return stubbedExportResult
+    }
+
+    var stubbedParsedRoster = FfiParsedRoster(rows: [], warnings: [])
+    var stubbedImportSummary = FfiImportSummary(inserted: 0, updated: 0, skipped: 0)
+
+    func parseRosterFile(bytes: Data, formatHint: String, strategy: String) async throws -> FfiParsedRoster {
+        callLog.append("parseRosterFile:\(formatHint):\(strategy)")
+        if let e = errorToThrow { throw e }
+        return stubbedParsedRoster
+    }
+    func applyRosterImport(rows: [FfiParsedEmployeeRow]) async throws -> FfiImportSummary {
+        callLog.append("applyRosterImport:\(rows.count)")
+        if let e = errorToThrow { throw e }
+        return stubbedImportSummary
+    }
+
     // MARK: - Availability Progress
 
     var stubbedAvailabilityProgress: [FfiAvailabilityProgress] = []

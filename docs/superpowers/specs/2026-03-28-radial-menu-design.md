@@ -1,5 +1,13 @@
 # Radial Fan Menu — iOS Navigation Enhancement
 
+> **Status: SUPERSEDED (archived).** This radial-fan approach shipped
+> briefly and was later replaced by a configurable tab bar with a pinned
+> **Menu** tab hosting hidden pages. See `docs/quick-bar-report.md` and
+> `platforms/apple/Apps/AutorotaApp/Views/TabPage.swift` for the current
+> design. The files named below (`RadialFanMenuView.swift`,
+> `FloatingMoreButton.swift`, `CustomTabBar.swift`,
+> `NavigationLayoutManager`) no longer exist in the codebase.
+
 ## Context
 
 The app currently uses a standard 5-tab `TabView` on iOS (Rota, Employees, Templates, Overrides, Settings). As the app grows, the tab bar becomes crowded. This feature adds a configurable "More" button — a visually distinct floating button with its own border, overlaid above the bottom-right corner of the tab bar — that presents additional pages in a radial fan pattern. The button is deliberately separate from the tab bar to make it visually distinguishable. Users can customise which pages appear in the tab bar vs the fan via Settings. macOS is unaffected — it continues using sidebar navigation.

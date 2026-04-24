@@ -1,31 +1,54 @@
-# Quick Bar Component — Development Report
+# Tab Bar + Menu Overflow — Development Report
 
-## Overview
+> **Historical note.** This document originally described a radial fan
+> "Quick Bar" iteration (`FloatingMoreButton` + `RadialFanMenuView` +
+> `NavigationLayoutManager`). That approach was superseded. The current
+> model is a configurable tab bar with a pinned **Menu** tab that hosts
+> hidden pages. The historical radial-fan design is archived under
+> `docs/superpowers/specs/2026-03-28-radial-menu-design.md` — the files
+> it references (`RadialFanMenuView.swift`, `FloatingMoreButton.swift`,
+> `CustomTabBar.swift`) no longer exist.
 
-The Quick Bar is a radial fan menu for the iOS build of Autorota, designed to give users fast access to pages that aren't pinned to the bottom tab bar. A floating circular button in the bottom-right corner of the screen opens a fan of page shortcuts that arc upward and to the left. Users can configure which pages appear in the tab bar versus the Quick Bar through a collapsible "Layout" section in Settings.
+## Current Design
 
-## Design
+All navigable pages live in `TabPage` (`platforms/apple/Apps/AutorotaApp/Views/TabPage.swift`):
 
-The component consists of four pieces:
+| Page | Title | Icon |
+|------|-------|------|
+| `rota` | Rota | `calendar` |
+| `employees` | Employees | `person.2` |
+| `templates` | Shifts | `clock` |
+| `overrides` | Exceptions | `exclamationmark.circle` |
+| `history` | Edit Log | `clock.arrow.circlepath` |
+| `analytics` | Analytics | `chart.bar` |
+| `export` | Export | `square.and.arrow.up` |
+| `settings` | Menu | `line.3.horizontal` |
 
-- **TabPage model** (`TabPage.swift`): An enum of all navigable pages (Rota, Employees, Templates, Overrides, Settings) with a `NavigationLayoutManager` observable class that tracks which pages are in the tab bar vs. the Quick Bar, persisted to `UserDefaults` as JSON. The manager enforces constraints: max 3 pages in the tab bar, max 5 in the Quick Bar.
+`settings` is always pinned to the trailing end of the tab bar and hosts
+all pages that did not fit. `TabPage.configurablePages` is the user-sortable
+set; `TabPage.defaultTabBar` is `[.rota, .employees, .templates]` on iOS
+(max 3 configurable slots) and `[.rota, .employees, .templates, .overrides]`
+on macOS (max 4).
 
-- **FloatingMoreButton** (`FloatingMoreButton.swift`): A 48pt circular button with a red fill, white border stroke, and drop shadow to visually separate it from the native tab bar. The icon toggles between a hamburger menu and an X with a rotation animation.
+## State Management
 
-- **RadialFanMenuView** (`RadialFanMenuView.swift`): When the fan opens, items fade in at positions calculated along a 90-degree arc (from straight up to straight left relative to the button). A `GeometryReader` determines the button's screen position, and standard trigonometry places each item at the correct angle and radius. Tapping a fan item presents that page as a full-screen cover with a "Done" button to dismiss. Tapping outside the fan dismisses it.
+`TabLayoutManager` (`@Observable`) in the same file owns
+`configurableTabBarPages` and persists the full ordered list under the
+`tabBarLayout` key in `UserDefaults` as a JSON array of `TabPage` raw
+values. `hiddenPages` is derived — everything in
+`TabPage.configurablePages` that is not currently in the tab bar. The
+Menu tab (`SettingsView`) renders the hidden pages as navigation rows.
 
-- **ContentView integration**: On iOS, the native `TabView` displays only the tab-bar-assigned pages. The fan overlay and floating button are layered on top via a `ZStack`. A semi-transparent rectangle overlays the tab bar when the fan is open to dim it. On macOS, nothing changes — the existing sidebar `TabView` renders all five pages as before.
+## Rota-Specific Overflow
 
-- **Settings UI**: A `DisclosureGroup("Layout")` section in `SettingsView` shows two lists — "Tab Bar" and "Quick Bar" — with move buttons on each row. Constraints are enforced by disabling buttons when either section is at capacity.
-
-## Current State and Known Issues
-
-The fan's position math was iterated on several times. SwiftUI's coordinate system (y-axis increases downward) required negating the sine component to get upward movement. The final version uses `GeometryReader` with absolute positioning rather than offset-from-corner, which proved more reliable across device sizes.
-
-Fan pages open as `.fullScreenCover` presentations rather than switching within the `TabView`, since pages not in the tab bar can't be selected via `TabView(selection:)`. This works but means fan-accessed pages don't show the tab bar — the user must tap "Done" to return.
-
-The tab bar dimming uses a plain rectangle overlay rather than modifying the native `UITabBar` appearance, which is a pragmatic workaround for SwiftUI's limited tab bar customization API.
+A separate "dots" overflow menu lives on the Rota page only — unrelated
+to the tab bar Menu tab. It is described in
+`docs/specs/rota-overflow-menu.md`.
 
 ## Recommendations for Future Work
 
-If this component is revisited, consider: (1) allowing drag-to-reorder within the Layout settings, (2) haptic feedback on fan open/close, (3) adapting the fan radius and arc for iPad screen sizes, and (4) exploring whether a custom tab bar (replacing the native `TabView` entirely) would give better control over dimming and slide animations without the compromises encountered during this iteration.
+- Drag-to-reorder within the Menu tab's layout settings.
+- iPad-specific default layout (more room than phone, less than desktop
+  sidebar).
+- Consider surfacing Edit Log / Analytics as pinned defaults on larger
+  devices once they stabilise.
