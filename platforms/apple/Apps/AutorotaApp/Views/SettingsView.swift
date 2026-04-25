@@ -1,4 +1,6 @@
 import SwiftUI
+import TipKit
+import AutorotaKit
 
 enum AppCurrency: String, CaseIterable {
     case usd, gbp, eur
@@ -50,9 +52,13 @@ struct SettingsView: View {
     @AppStorage("exportShowShiftName") private var exportShowShiftName: Bool = true
     @AppStorage("exportShowTimes") private var exportShowTimes: Bool = true
     @AppStorage("exportShowRole") private var exportShowRole: Bool = true
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
     @Environment(TabLayoutManager.self) private var layoutManager
     @Environment(AutorotaSyncEngine.self) private var syncEngine
     @Environment(LocaleManager.self) private var localeManager
+    @State private var showReplayConfirm = false
+    @State private var replayErrorMessage: String?
+    private let exportProfileTip = ExportProfileTip()
 
     private var selectedAppearance: AppAppearance {
         AppAppearance(rawValue: appearance) ?? .system
@@ -141,6 +147,7 @@ struct SettingsView: View {
                             Text("Staff Schedule").tag("staff_schedule")
                             Text("Manager Report").tag("manager_report")
                         }
+                        .popoverTip(exportProfileTip)
                         
                         Toggle("Show Shift Name", isOn: $exportShowShiftName)
                         Toggle("Show Times", isOn: $exportShowTimes)
@@ -195,6 +202,12 @@ struct SettingsView: View {
                     } label: {
                         Label("Help & Guide", systemImage: "questionmark.circle")
                     }
+                    Button {
+                        showReplayConfirm = true
+                    } label: {
+                        Label("settings.replay_onboarding", systemImage: "arrow.counterclockwise.circle")
+                    }
+                    .tint(.primary)
                 }
 
 
@@ -223,7 +236,58 @@ struct SettingsView: View {
 
             }
             .navigationTitle("Menu")
+            .confirmationDialog(
+                "settings.replay_onboarding.confirm.title",
+                isPresented: $showReplayConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("settings.replay_onboarding.keep_data") {
+                    replayOnboarding(reseed: false)
+                }
+                Button("settings.replay_onboarding.reset_sample", role: .destructive) {
+                    replayOnboarding(reseed: true)
+                }
+                Button("onboarding.alert.cancel", role: .cancel) {}
+            } message: {
+                Text("settings.replay_onboarding.confirm.body")
+            }
+            .alert(
+                "settings.replay_onboarding.error.title",
+                isPresented: Binding(
+                    get: { replayErrorMessage != nil },
+                    set: { if !$0 { replayErrorMessage = nil } }
+                )
+            ) {
+                Button("onboarding.alert.ok") { replayErrorMessage = nil }
+            } message: {
+                Text(replayErrorMessage ?? "")
+            }
         }
+    }
+
+    private func replayOnboarding(reseed: Bool) {
+        if reseed {
+            do {
+                _ = try seedSampleData(overwrite: true)
+            } catch let error as FfiError {
+                replayErrorMessage = localizeReplayError(error)
+                return
+            } catch {
+                replayErrorMessage = error.localizedDescription
+                return
+            }
+        }
+        try? Tips.resetDatastore()
+        hasCompletedOnboarding = false
+    }
+
+    private func localizeReplayError(_ error: FfiError) -> String {
+        let code: ErrorCode
+        switch error {
+        case .Db(let c, _), .NotFound(let c, _), .InvalidArgument(let c, _):
+            code = c
+        }
+        return localizeError(code: code, localeId: Locale.current.identifier)
     }
 }
 

@@ -9,3 +9,4 @@ err-invalid-save-tag = The label is invalid.
 err-invalid-pdf = There was a problem creating the PDF.
 err-invalid-import = The import file is invalid.
 err-invalid-generic = The provided value is invalid.
+err-seed-already-exists = Sample data could not be loaded because the database already contains employees, roles, or shifts.

@@ -467,3 +467,15 @@ pub struct FfiImportSummary {
     pub updated: u32,
     pub skipped: u32,
 }
+
+// ── Sample-data seeder ───────────────────────────────────────────────────────
+
+/// Counts of rows inserted by `seed_sample_data`.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct FfiSeedReport {
+    pub employees: u32,
+    pub roles: u32,
+    pub templates: u32,
+    /// Total availability hour-slots seeded across all employees.
+    pub availabilities: u32,
+}

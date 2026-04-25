@@ -27,6 +27,11 @@ struct HelpView: View {
                     "help.section.employees.item.4",
                     "help.section.employees.item.5",
                     "help.section.employees.item.6",
+                ],
+                examples: [
+                    "help.section.employees.example.1",
+                    "help.section.employees.example.2",
+                    "help.section.employees.example.3",
                 ]
             )
 
@@ -38,6 +43,10 @@ struct HelpView: View {
                     "help.section.shifts.item.2",
                     "help.section.shifts.item.3",
                     "help.section.shifts.item.4",
+                ],
+                examples: [
+                    "help.section.shifts.example.1",
+                    "help.section.shifts.example.2",
                 ]
             )
 
@@ -50,6 +59,25 @@ struct HelpView: View {
                     "help.section.rota.item.3",
                     "help.section.rota.item.4",
                     "help.section.rota.item.5",
+                ],
+                examples: [
+                    "help.section.rota.example.1",
+                    "help.section.rota.example.2",
+                ]
+            )
+
+            helpSection(
+                title: "help.section.scheduler",
+                icon: "wand.and.stars",
+                items: [
+                    "help.section.scheduler.item.1",
+                    "help.section.scheduler.item.2",
+                    "help.section.scheduler.item.3",
+                    "help.section.scheduler.item.4",
+                ],
+                examples: [
+                    "help.section.scheduler.example.1",
+                    "help.section.scheduler.example.2",
                 ]
             )
 
@@ -61,6 +89,10 @@ struct HelpView: View {
                     "help.section.exceptions.item.2",
                     "help.section.exceptions.item.3",
                     "help.section.exceptions.item.4",
+                ],
+                examples: [
+                    "help.section.exceptions.example.1",
+                    "help.section.exceptions.example.2",
                 ]
             )
 
@@ -71,6 +103,10 @@ struct HelpView: View {
                     "help.section.history.item.1",
                     "help.section.history.item.2",
                     "help.section.history.item.3",
+                ],
+                examples: [
+                    "help.section.history.example.1",
+                    "help.section.history.example.2",
                 ]
             )
 
@@ -81,6 +117,10 @@ struct HelpView: View {
                     "help.section.exporting.item.1",
                     "help.section.exporting.item.2",
                     "help.section.exporting.item.3",
+                ],
+                examples: [
+                    "help.section.exporting.example.1",
+                    "help.section.exporting.example.2",
                 ]
             )
 
@@ -92,6 +132,10 @@ struct HelpView: View {
                     "help.section.settings.item.2",
                     "help.section.settings.item.3",
                     "help.section.settings.item.4",
+                ],
+                examples: [
+                    "help.section.settings.example.1",
+                    "help.section.settings.example.2",
                 ]
             )
         }
@@ -102,7 +146,8 @@ struct HelpView: View {
     private func helpSection(
         title: LocalizedStringKey,
         icon: String,
-        items: [LocalizedStringKey]
+        items: [LocalizedStringKey],
+        examples: [LocalizedStringKey]? = nil
     ) -> some View {
         DisclosureGroup {
             ForEach(items.indices, id: \.self) { idx in
@@ -112,10 +157,33 @@ struct HelpView: View {
                 }
                 .font(.title3)
             }
+            if let examples, !examples.isEmpty {
+                helpExamples(examples)
+            }
         } label: {
             Label(title, systemImage: icon)
                 .font(.headline)
         }
+    }
+
+    @ViewBuilder
+    private func helpExamples(_ items: [LocalizedStringKey]) -> some View {
+        DisclosureGroup {
+            ForEach(items.indices, id: \.self) { idx in
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "lightbulb")
+                        .foregroundStyle(.yellow)
+                    Text(items[idx])
+                }
+                .font(.body)
+                .padding(.vertical, 2)
+            }
+        } label: {
+            Label("help.examples.label", systemImage: "text.book.closed")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.top, 4)
     }
 
     private func helpStep(number: Int, text: LocalizedStringKey) -> some View {

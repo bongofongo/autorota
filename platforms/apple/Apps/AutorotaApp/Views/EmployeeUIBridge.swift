@@ -7,4 +7,8 @@ import SwiftUI
 @Observable
 final class EmployeeUIBridge {
     var overflowOpen: Bool = false
+    /// Toggled by onboarding's "Add my first employee" CTA. `EmployeeListView`
+    /// observes it to switch to the Employees tab and present the add-employee
+    /// sheet, then resets the flag.
+    var requestNewEmployeeSheet: Bool = false
 }

@@ -1,38 +1,48 @@
 import SwiftUI
+import AutorotaKit
 
 private struct OnboardingPage: Identifiable {
     let id = UUID()
     let systemImage: String
-    let title: String
-    let description: String
+    let title: LocalizedStringKey
+    let description: LocalizedStringKey
 }
 
 private let pages: [OnboardingPage] = [
     OnboardingPage(
         systemImage: "cup.and.saucer.fill",
-        title: "Welcome to Autorota",
-        description: "The simple way to schedule shifts for your cafe. Set up your team, define your shifts, and generate weekly rotas in minutes."
+        title: "onboarding.page.welcome.title",
+        description: "onboarding.page.welcome.body"
     ),
     OnboardingPage(
         systemImage: "person.2.fill",
-        title: "Your Team",
-        description: "Add your employees in the Employees tab. Give them roles, set their hourly rates, and mark which days they can work."
+        title: "onboarding.page.team.title",
+        description: "onboarding.page.team.body"
     ),
     OnboardingPage(
         systemImage: "clock.fill",
-        title: "Shifts",
-        description: "Define the shifts you run each week with start times, end times, and required roles. Shifts are reused every time you build a rota."
+        title: "onboarding.page.shifts.title",
+        description: "onboarding.page.shifts.body"
     ),
     OnboardingPage(
         systemImage: "calendar",
-        title: "Your Rota",
-        description: "View and manage your weekly schedule in the Rota tab. Generate rotas automatically, then adjust as needed."
+        title: "onboarding.page.rota.title",
+        description: "onboarding.page.rota.body"
     ),
 ]
 
 struct OnboardingView: View {
     @Binding var isPresented: Bool
+    @Environment(EmployeeUIBridge.self) private var employeeBridge
     @State private var currentPage = 0
+    @State private var sampleLoadState: SampleLoadState = .idle
+    @State private var sampleErrorMessage: String?
+
+    private enum SampleLoadState: Equatable {
+        case idle
+        case loading
+        case loaded
+    }
 
     private var isLastPage: Bool {
         currentPage == pages.count
@@ -43,7 +53,7 @@ struct OnboardingView: View {
             HStack {
                 Spacer()
                 if !isLastPage {
-                    Button("Skip") { isPresented = false }
+                    Button("onboarding.button.skip") { isPresented = false }
                         .font(.title3)
                         .padding()
                 }
@@ -52,8 +62,13 @@ struct OnboardingView: View {
             #if os(iOS)
             TabView(selection: $currentPage) {
                 ForEach(Array(pages.enumerated()), id: \.element.id) { index, page in
-                    pageContent(systemImage: page.systemImage, title: page.title, description: page.description)
-                        .tag(index)
+                    pageContent(
+                        systemImage: page.systemImage,
+                        title: page.title,
+                        description: page.description,
+                        showsSampleData: index == 0
+                    )
+                    .tag(index)
                 }
                 finalPage.tag(pages.count)
             }
@@ -62,7 +77,12 @@ struct OnboardingView: View {
             Group {
                 if currentPage < pages.count {
                     let page = pages[currentPage]
-                    pageContent(systemImage: page.systemImage, title: page.title, description: page.description)
+                    pageContent(
+                        systemImage: page.systemImage,
+                        title: page.title,
+                        description: page.description,
+                        showsSampleData: currentPage == 0
+                    )
                 } else {
                     finalPage
                 }
@@ -72,19 +92,19 @@ struct OnboardingView: View {
 
             HStack(spacing: 16) {
                 if currentPage > 0 {
-                    Button("Previous") { withAnimation { currentPage -= 1 } }
+                    Button("onboarding.button.previous") { withAnimation { currentPage -= 1 } }
                         .font(.title3)
                 }
                 Spacer()
                 pageIndicator
                 Spacer()
                 if isLastPage {
-                    Button("Get Started") { isPresented = false }
+                    Button("onboarding.button.get_started") { isPresented = false }
                         .font(.title3.bold())
                         .buttonStyle(.borderedProminent)
                         .controlSize(.large)
                 } else {
-                    Button("Next") { withAnimation { currentPage += 1 } }
+                    Button("onboarding.button.next") { withAnimation { currentPage += 1 } }
                         .font(.title3)
                 }
             }
@@ -93,11 +113,27 @@ struct OnboardingView: View {
             #endif
         }
         #if os(macOS)
-        .frame(width: 600, height: 450)
+        .frame(width: 600, height: 480)
         #endif
+        .alert(
+            "onboarding.sample.error.title",
+            isPresented: Binding(
+                get: { sampleErrorMessage != nil },
+                set: { if !$0 { sampleErrorMessage = nil } }
+            )
+        ) {
+            Button("onboarding.alert.ok") { sampleErrorMessage = nil }
+        } message: {
+            Text(sampleErrorMessage ?? "")
+        }
     }
 
-    private func pageContent(systemImage: String, title: String, description: String) -> some View {
+    private func pageContent(
+        systemImage: String,
+        title: LocalizedStringKey,
+        description: LocalizedStringKey,
+        showsSampleData: Bool
+    ) -> some View {
         VStack(spacing: 24) {
             Spacer()
             Image(systemName: systemImage)
@@ -111,7 +147,34 @@ struct OnboardingView: View {
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 32)
+            if showsSampleData {
+                sampleDataControl
+            }
             Spacer()
+        }
+    }
+
+    @ViewBuilder
+    private var sampleDataControl: some View {
+        switch sampleLoadState {
+        case .idle:
+            Button {
+                Task { await loadSampleData() }
+            } label: {
+                Label("onboarding.sample.load", systemImage: "tray.and.arrow.down")
+                    .font(.body.weight(.medium))
+            }
+            .buttonStyle(.bordered)
+        case .loading:
+            HStack(spacing: 8) {
+                ProgressView()
+                Text("onboarding.sample.loading")
+                    .foregroundStyle(.secondary)
+            }
+        case .loaded:
+            Label("onboarding.sample.loaded", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+                .font(.body.weight(.medium))
         }
     }
 
@@ -121,21 +184,29 @@ struct OnboardingView: View {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 72))
                 .foregroundStyle(.green)
-            Text("You're All Set")
+            Text("onboarding.page.ready.title")
                 .font(.largeTitle.bold())
-            Text("Head to the Employees tab to add your first team member, then create shifts and generate your rota.")
+            Text("onboarding.page.ready.body")
                 .font(.title3)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 32)
-            #if os(iOS)
-            Button(action: { isPresented = false }) {
-                Text("Get Started")
+
+            Button {
+                employeeBridge.requestNewEmployeeSheet = true
+                isPresented = false
+            } label: {
+                Text("onboarding.cta.add_first_employee")
                     .font(.title3.bold())
-                    .frame(maxWidth: 280)
+                    .frame(maxWidth: 320)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
+
+            #if os(iOS)
+            Button("onboarding.button.get_started") { isPresented = false }
+                .font(.body)
+                .padding(.top, 4)
             #endif
             Spacer()
         }
@@ -152,4 +223,30 @@ struct OnboardingView: View {
         }
     }
     #endif
+
+    @MainActor
+    private func loadSampleData() async {
+        sampleLoadState = .loading
+        do {
+            _ = try await Task.detached(priority: .userInitiated) {
+                try seedSampleData(overwrite: false)
+            }.value
+            sampleLoadState = .loaded
+        } catch let error as FfiError {
+            sampleLoadState = .idle
+            sampleErrorMessage = localizeFfiError(error)
+        } catch {
+            sampleLoadState = .idle
+            sampleErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func localizeFfiError(_ error: FfiError) -> String {
+        let code: ErrorCode
+        switch error {
+        case .Db(let c, _), .NotFound(let c, _), .InvalidArgument(let c, _):
+            code = c
+        }
+        return localizeError(code: code, localeId: Locale.current.identifier)
+    }
 }

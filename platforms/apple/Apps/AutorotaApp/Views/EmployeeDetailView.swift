@@ -1,5 +1,6 @@
 import SwiftUI
 import AutorotaKit
+import TipKit
 #if canImport(UIKit)
 import UIKit
 #elseif canImport(AppKit)
@@ -582,6 +583,8 @@ struct EmployeeEditSheet: View {
 
     @State private var roleVM = RoleViewModel()
     @State private var overrideVM = OverrideViewModel()
+    private let employeeRolesTip = EmployeeRolesTip()
+    private let availabilityModeTip = AvailabilityModeTip()
     @State private var firstName = ""
     @State private var lastName = ""
     @State private var nickname = ""
@@ -788,6 +791,7 @@ struct EmployeeEditSheet: View {
                         ))
                     }
                 }
+                .popoverTip(employeeRolesTip)
                 Section("Hours") {
                     StepperField(label: "Target", suffix: "h/week",
                                  value: $targetHours, range: 0...80, step: 1)
@@ -919,6 +923,7 @@ struct EmployeeEditSheet: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                    .popoverTip(availabilityModeTip)
 
                     switch availabilityMode {
                     case .default:

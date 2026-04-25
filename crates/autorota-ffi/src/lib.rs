@@ -1,4 +1,5 @@
 mod error;
+mod seed;
 mod types;
 
 use std::sync::OnceLock;
@@ -282,6 +283,21 @@ pub fn init_db(db_path: String) -> Result<(), FfiError> {
         code: ErrorCode::DbConnectionFailed,
         msg: "database already initialized".into(),
     })
+}
+
+// ── Sample data ───────────────────────────────────────────────────────────────
+
+/// Seed the database with a cafe-themed sample dataset (3 roles, 4 employees,
+/// 5 shift templates). Used by onboarding's "Load sample data" flow.
+///
+/// If the database already contains any employees, roles, or shift templates,
+/// this returns `SeedAlreadyExists` unless `overwrite` is `true`. When
+/// `overwrite` is `true`, all existing user data (employees, roles, templates,
+/// rotas, shifts, assignments, and dependent rows) is dropped before seeding.
+#[uniffi::export]
+pub fn seed_sample_data(overwrite: bool) -> Result<FfiSeedReport, FfiError> {
+    let pool = pool()?;
+    rt().block_on(seed::seed_sample_data(pool, overwrite))
 }
 
 // ── Employees ─────────────────────────────────────────────────────────────────

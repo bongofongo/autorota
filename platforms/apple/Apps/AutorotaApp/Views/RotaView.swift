@@ -1,10 +1,12 @@
 import SwiftUI
 import AutorotaKit
+import TipKit
 
 struct RotaView: View {
 
     @State private var vm = RotaViewModel()
     @State private var showExportSheet = false
+    private let twoPassTip = RotaTwoPassTip()
     @Environment(RotaUIBridge.self) private var bridge
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     #if os(iOS)
@@ -50,6 +52,7 @@ struct RotaView: View {
                         systemImage: "calendar.badge.plus",
                         description: Text("Tap Generate to create a schedule for this week.")
                     )
+                    .popoverTip(twoPassTip)
                     Spacer()
                 }
             }

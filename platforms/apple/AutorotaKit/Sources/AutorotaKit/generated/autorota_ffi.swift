@@ -3243,6 +3243,97 @@ public func FfiConverterTypeFfiScheduleResult_lower(_ value: FfiScheduleResult) 
 }
 
 
+/**
+ * Counts of rows inserted by `seed_sample_data`.
+ */
+public struct FfiSeedReport {
+    public var employees: UInt32
+    public var roles: UInt32
+    public var templates: UInt32
+    /**
+     * Total availability hour-slots seeded across all employees.
+     */
+    public var availabilities: UInt32
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(employees: UInt32, roles: UInt32, templates: UInt32, 
+        /**
+         * Total availability hour-slots seeded across all employees.
+         */availabilities: UInt32) {
+        self.employees = employees
+        self.roles = roles
+        self.templates = templates
+        self.availabilities = availabilities
+    }
+}
+
+
+
+extension FfiSeedReport: Equatable, Hashable {
+    public static func ==(lhs: FfiSeedReport, rhs: FfiSeedReport) -> Bool {
+        if lhs.employees != rhs.employees {
+            return false
+        }
+        if lhs.roles != rhs.roles {
+            return false
+        }
+        if lhs.templates != rhs.templates {
+            return false
+        }
+        if lhs.availabilities != rhs.availabilities {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(employees)
+        hasher.combine(roles)
+        hasher.combine(templates)
+        hasher.combine(availabilities)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFfiSeedReport: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiSeedReport {
+        return
+            try FfiSeedReport(
+                employees: FfiConverterUInt32.read(from: &buf), 
+                roles: FfiConverterUInt32.read(from: &buf), 
+                templates: FfiConverterUInt32.read(from: &buf), 
+                availabilities: FfiConverterUInt32.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FfiSeedReport, into buf: inout [UInt8]) {
+        FfiConverterUInt32.write(value.employees, into: &buf)
+        FfiConverterUInt32.write(value.roles, into: &buf)
+        FfiConverterUInt32.write(value.templates, into: &buf)
+        FfiConverterUInt32.write(value.availabilities, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiSeedReport_lift(_ buf: RustBuffer) throws -> FfiSeedReport {
+    return try FfiConverterTypeFfiSeedReport.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiSeedReport_lower(_ value: FfiSeedReport) -> RustBuffer {
+    return FfiConverterTypeFfiSeedReport.lower(value)
+}
+
+
 public struct FfiShift {
     public var id: Int64
     public var templateId: Int64?
@@ -4219,6 +4310,7 @@ public enum ErrorCode {
     case invalidPdf
     case invalidImport
     case invalidGeneric
+    case seedAlreadyExists
 }
 
 
@@ -4253,6 +4345,8 @@ public struct FfiConverterTypeErrorCode: FfiConverterRustBuffer {
         case 10: return .invalidImport
         
         case 11: return .invalidGeneric
+        
+        case 12: return .seedAlreadyExists
         
         default: throw UniffiInternalError.unexpectedEnumCase
         }
@@ -4304,6 +4398,10 @@ public struct FfiConverterTypeErrorCode: FfiConverterRustBuffer {
         
         case .invalidGeneric:
             writeInt(&buf, Int32(11))
+        
+        
+        case .seedAlreadyExists:
+            writeInt(&buf, Int32(12))
         
         }
     }
@@ -5766,6 +5864,22 @@ public func runSchedule(weekStart: String)throws  -> FfiScheduleResult {
     )
 })
 }
+/**
+ * Seed the database with a cafe-themed sample dataset (3 roles, 4 employees,
+ * 5 shift templates). Used by onboarding's "Load sample data" flow.
+ *
+ * If the database already contains any employees, roles, or shift templates,
+ * this returns `SeedAlreadyExists` unless `overwrite` is `true`. When
+ * `overwrite` is `true`, all existing user data (employees, roles, templates,
+ * rotas, shifts, assignments, and dependent rows) is dropped before seeding.
+ */
+public func seedSampleData(overwrite: Bool)throws  -> FfiSeedReport {
+    return try  FfiConverterTypeFfiSeedReport.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_seed_sample_data(
+        FfiConverterBool.lower(overwrite),$0
+    )
+})
+}
 public func setAvailabilityProgress(employeeId: Int64, weekStart: String, done: Bool)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_set_availability_progress(
         FfiConverterInt64.lower(employeeId),
@@ -6039,6 +6153,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_run_schedule() != 48877) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_seed_sample_data() != 58222) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_set_availability_progress() != 31340) {

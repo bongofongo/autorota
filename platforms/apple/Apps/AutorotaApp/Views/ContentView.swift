@@ -84,11 +84,22 @@ struct ContentView: View {
                 showOnboarding = true
             }
         }
+        .onChange(of: hasCompletedOnboarding) { _, completed in
+            if !completed {
+                showOnboarding = true
+            }
+        }
+        .onChange(of: employeeBridge.requestNewEmployeeSheet) { _, requested in
+            if requested {
+                selection = .page(.employees)
+            }
+        }
         #if os(iOS)
         .fullScreenCover(isPresented: $showOnboarding) {
             hasCompletedOnboarding = true
         } content: {
             OnboardingView(isPresented: $showOnboarding)
+                .environment(employeeBridge)
                 .interactiveDismissDisabled()
         }
         #else
@@ -96,6 +107,7 @@ struct ContentView: View {
             hasCompletedOnboarding = true
         } content: {
             OnboardingView(isPresented: $showOnboarding)
+                .environment(employeeBridge)
                 .interactiveDismissDisabled()
         }
         #endif

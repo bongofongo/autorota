@@ -1,6 +1,7 @@
 import AutorotaKit
 import CloudKit
 import SwiftUI
+import TipKit
 
 @main
 struct AutorotaAppApp: App {
@@ -11,6 +12,10 @@ struct AutorotaAppApp: App {
         } catch {
             fatalError("Failed to initialise database: \(error)")
         }
+        try? Tips.configure([
+            .displayFrequency(.immediate),
+            .datastoreLocation(.applicationDefault),
+        ])
     }
 
     @AppStorage("appAppearance") private var appearance: String = AppAppearance.system.rawValue

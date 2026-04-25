@@ -1,5 +1,6 @@
 import SwiftUI
 import AutorotaKit
+import TipKit
 
 /// A 7-column × 24-row grid showing availability state per weekday/hour.
 /// When `isEditable` is true, tapping a cell cycles through No → Maybe → Yes.
@@ -49,6 +50,9 @@ struct AvailabilityGridView: View {
     private static let rowHeight: CGFloat = 18
     private static let headerHeight: CGFloat = 16
 
+    private let cycleTip = AvailabilityCycleTip()
+    private let dragTip = AvailabilityDragTip()
+
     // Selection state
     @State private var _isSelectionModeActive = false
     private var isSelectionModeActive: Bool {
@@ -81,13 +85,19 @@ struct AvailabilityGridView: View {
         VStack(spacing: 8) {
             if isEditable {
                 toolbarRow
+                    .popoverTip(dragTip)
             }
 
             GeometryReader { geometry in
                 let cellWidth = cellWidth(for: geometry.size.width)
                 ZStack(alignment: .topLeading) {
                     // The grid itself
-                    gridContent(cellWidth: cellWidth)
+                    if isEditable {
+                        gridContent(cellWidth: cellWidth)
+                            .popoverTip(cycleTip)
+                    } else {
+                        gridContent(cellWidth: cellWidth)
+                    }
 
                     // Selection highlight overlay
                     if isSelectionModeActive, let rect = selectionRect {
@@ -450,7 +460,11 @@ private struct CellView: View {
                     .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
             )
             .opacity(isDimmed ? 0.3 : 1.0)
-            .onTapGesture { if isEditable { onTap() } }
+            .onTapGesture {
+                guard isEditable else { return }
+                onTap()
+                Task { await AvailabilityDragTip.cycleDismissed.donate() }
+            }
             .accessibilityElement()
             .accessibilityLabel("\(weekday) \(String(format: "%02d", hour)):00")
             .accessibilityValue(state)

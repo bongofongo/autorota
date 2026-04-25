@@ -16,6 +16,7 @@ pub enum ErrorCode {
     InvalidPdf,
     InvalidImport,
     InvalidGeneric,
+    SeedAlreadyExists,
 }
 
 impl ErrorCode {
@@ -32,6 +33,7 @@ impl ErrorCode {
             ErrorCode::InvalidPdf => "err-invalid-pdf",
             ErrorCode::InvalidImport => "err-invalid-import",
             ErrorCode::InvalidGeneric => "err-invalid-generic",
+            ErrorCode::SeedAlreadyExists => "err-seed-already-exists",
         }
     }
 }

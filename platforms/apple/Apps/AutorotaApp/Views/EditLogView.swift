@@ -1,5 +1,6 @@
 import SwiftUI
 import AutorotaKit
+import TipKit
 
 struct EditLogView: View {
     @State private var vm = EditLogViewModel()
@@ -104,6 +105,7 @@ private struct SaveEntryView: View {
     @State private var showRestoreConfirmation = false
     @State private var showTagInput = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private let restoreTip = EditLogRestoreTip()
 
     private var isExpanded: Bool { vm.expandedSaveId == save.id }
 
@@ -191,6 +193,7 @@ private struct SaveEntryView: View {
         .controlSize(.small)
         .tint(.orange)
         .disabled(vm.isRestoring)
+        .popoverTip(restoreTip)
         .confirmationDialog(
             "Restore schedule?",
             isPresented: $showRestoreConfirmation,

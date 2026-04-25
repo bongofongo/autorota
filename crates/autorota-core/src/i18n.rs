@@ -155,7 +155,10 @@ mod tests {
 
     #[test]
     fn hindi_lookup_works() {
-        assert_eq!(localize("err-not-found-employee", "hi"), "कर्मचारी नहीं मिला।");
+        assert_eq!(
+            localize("err-not-found-employee", "hi"),
+            "कर्मचारी नहीं मिला।"
+        );
     }
 
     #[test]

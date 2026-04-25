@@ -3,6 +3,7 @@ import AutorotaKit
 
 struct EmployeeListView: View {
 
+    @Environment(EmployeeUIBridge.self) private var employeeBridge
     @State private var vm = EmployeeViewModel()
     @State private var showingAddSheet = false
     @State private var showingAvailability = false
@@ -107,7 +108,19 @@ struct EmployeeListView: View {
             }, message: {
                 Text(vm.error ?? "")
             })
-            .task { await vm.load() }
+            .task {
+                await vm.load()
+                consumePendingNewEmployeeRequest()
+            }
+            .onChange(of: employeeBridge.requestNewEmployeeSheet) { _, _ in
+                consumePendingNewEmployeeRequest()
+            }
         }
+    }
+
+    private func consumePendingNewEmployeeRequest() {
+        guard employeeBridge.requestNewEmployeeSheet else { return }
+        showingAddSheet = true
+        employeeBridge.requestNewEmployeeSheet = false
     }
 }
