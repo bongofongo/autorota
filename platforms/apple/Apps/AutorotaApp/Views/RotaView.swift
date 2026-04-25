@@ -6,6 +6,7 @@ struct RotaView: View {
     @State private var vm = RotaViewModel()
     @State private var showExportSheet = false
     @Environment(RotaUIBridge.self) private var bridge
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     #if os(iOS)
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     #endif
@@ -58,8 +59,12 @@ struct RotaView: View {
                     if vm.isEditMode {
                         vm.exitEditMode()
                     } else {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
+                        if reduceMotion {
                             bridge.overflowOpen.toggle()
+                        } else {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
+                                bridge.overflowOpen.toggle()
+                            }
                         }
                     }
                 } label: {
@@ -70,6 +75,7 @@ struct RotaView: View {
                         .padding(14)
                         .glassEffect(.regular.interactive(), in: Circle())
                 }
+                .accessibilityLabel(vm.isEditMode ? "Done editing" : "More actions")
                 .padding(.trailing, 20)
                 .padding(.bottom, 12)
             }
@@ -95,7 +101,7 @@ struct RotaView: View {
                     vm.exitEditMode()
                 }
             }
-            .animation(.spring(response: 0.3, dampingFraction: 0.78), value: bridge.overflowOpen)
+            .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.78), value: bridge.overflowOpen)
             .alert(
                 "No schedule for \(vm.weekDateRangeLabel)",
                 isPresented: $vm.showGenerateConfirmation
@@ -303,7 +309,7 @@ private struct ScheduleGridView: View {
             )
         ) {
             Button("Cancel", role: .cancel) { shiftToDelete = nil }
-            Button("Delete", role: .destructive) {2
+            Button("Delete", role: .destructive) {
                 if let id = shiftToDelete {
                     Task { await vm.deleteShift(id: id) }
                 }
@@ -534,6 +540,7 @@ private struct ShiftCard: View {
                             .foregroundStyle(.red)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Delete shift")
                 }
 
                 Text("\(assignments.count)/\(shift.maxEmployees)")
@@ -578,6 +585,14 @@ private struct ShiftCard: View {
         )
         .opacity(isLocked && isEditMode ? 0.5 : 1.0)
         .padding(.horizontal, isCompact ? 6 : 16)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(shiftA11yLabel)
+    }
+
+    private var shiftA11yLabel: String {
+        let role = shift.requiredRole.isEmpty ? "any role" : shift.requiredRole
+        let staffing = "\(assignments.count) of \(shift.maxEmployees) staffed"
+        return "Shift \(shift.startTime) to \(shift.endTime), \(role), \(staffing)"
     }
 }
 
@@ -612,7 +627,7 @@ private struct AssignmentRow: View {
                 Image(systemName: "arrow.left.arrow.right.circle.fill")
                     .foregroundStyle(.white)
                     .frame(width: 16)
-                Text(entry.employeeName ?? "Unknown")
+                Text(entry.employeeName)
                     .font(.subheadline.bold())
                     .foregroundStyle(.white)
                 Spacer()
@@ -637,7 +652,8 @@ private struct AssignmentRow: View {
 
     // Normal row for all other states
     private var baseRow: some View {
-        HStack {
+        let employeeName = entry.employeeName
+        return HStack {
             if canEdit {
                 // Tappable name tag — initiates or cancels swap
                 Button {
@@ -647,7 +663,7 @@ private struct AssignmentRow: View {
                         vm.selectSwapSource(assignmentId: entry.assignmentId, shiftId: entry.shiftId)
                     }
                 } label: {
-                    Text(entry.employeeName ?? "Unknown")
+                    Text(employeeName)
                         .font(.subheadline)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
@@ -668,9 +684,11 @@ private struct AssignmentRow: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(vm.hasSwapSource && !isSwapSource)
+                .accessibilityLabel(isSwapSource ? "Cancel swap for \(employeeName)" : "Start swap for \(employeeName)")
             } else {
-                Text(entry.employeeName ?? "Unknown")
+                Text(employeeName)
                     .font(.subheadline)
+                    .accessibilityLabel("Assigned: \(employeeName)")
             }
 
             Spacer()
@@ -683,6 +701,7 @@ private struct AssignmentRow: View {
                         .foregroundStyle(.red)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Remove assignment")
             }
         }
         .padding(.vertical, 2)

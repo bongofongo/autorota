@@ -197,6 +197,7 @@ private struct AvailabilityCard: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(selectionMode ? "Exit selection mode" : "Enter selection mode")
                 // Done checkmark
                 Button {
                     Task {

@@ -79,6 +79,7 @@ struct CarouselAvailabilityView: View {
                                         .font(.title3)
                                         .foregroundStyle(progressVM.isDone(employee.id) ? .green : .secondary)
                                 }
+                                .accessibilityLabel(progressVM.isDone(employee.id) ? "Mark \(employee.displayName) not done" : "Mark \(employee.displayName) done")
                             }
                         }
                         .padding(.horizontal, 16)

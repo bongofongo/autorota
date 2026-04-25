@@ -4,6 +4,7 @@ import AutorotaKit
 struct EditLogView: View {
     @State private var vm = EditLogViewModel()
     @State private var expandedWeeks: Set<String> = [currentWeekStart()]
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         NavigationStack {
@@ -31,11 +32,15 @@ struct EditLogView: View {
 
                 if let toast = vm.restoreToast {
                     RestoreToastBanner(toast: toast)
-                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
                         .onAppear {
                             Task {
                                 try? await Task.sleep(for: .seconds(4))
-                                withAnimation { vm.restoreToast = nil }
+                                if reduceMotion {
+                                    vm.restoreToast = nil
+                                } else {
+                                    withAnimation { vm.restoreToast = nil }
+                                }
                             }
                         }
                 }
@@ -98,6 +103,7 @@ private struct SaveEntryView: View {
     @FocusState private var tagFieldFocused: Bool
     @State private var showRestoreConfirmation = false
     @State private var showTagInput = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var isExpanded: Bool { vm.expandedSaveId == save.id }
 
@@ -132,7 +138,8 @@ private struct SaveEntryView: View {
                     Image(systemName: "chevron.right")
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
                         .foregroundStyle(.secondary)
-                        .animation(.easeInOut(duration: 0.2), value: isExpanded)
+                        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: isExpanded)
+                        .accessibilityHidden(true)
                 }
             }
             .buttonStyle(.plain)

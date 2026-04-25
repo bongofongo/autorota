@@ -140,6 +140,7 @@ struct SettingsView: View {
                                         Image(systemName: "arrow.down.circle.fill")
                                             .foregroundStyle(.red)
                                     }
+                                    .accessibilityLabel("Hide \(page.title) from tab bar")
                                 }
                             }
                         } header: {
@@ -159,6 +160,7 @@ struct SettingsView: View {
                                                 .foregroundStyle(layoutManager.configurableTabBarPages.count >= TabPage.maxConfigurable ? .gray : .blue)
                                         }
                                         .disabled(layoutManager.configurableTabBarPages.count >= TabPage.maxConfigurable)
+                                        .accessibilityLabel("Add \(page.title) to tab bar")
                                     }
                                 }
                             } header: {

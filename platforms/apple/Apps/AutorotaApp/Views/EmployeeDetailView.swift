@@ -442,6 +442,7 @@ struct EmployeeDetailView: View {
                         Image(systemName: "chevron.left")
                     }
                     .buttonStyle(.borderless)
+                    .accessibilityLabel("Previous week")
                     Spacer()
                     VStack(spacing: 1) {
                         Text(actualWeekLabel(days: days))
@@ -459,6 +460,7 @@ struct EmployeeDetailView: View {
                         Image(systemName: "chevron.right")
                     }
                     .buttonStyle(.borderless)
+                    .accessibilityLabel("Next week")
                 }
 
                 AvailabilityGridView(
@@ -956,6 +958,7 @@ struct EmployeeEditSheet: View {
                                 Image(systemName: "chevron.left")
                             }
                             .buttonStyle(.borderless)
+                            .accessibilityLabel("Previous week")
                             Spacer()
                             VStack(spacing: 1) {
                                 if let first = days.first?.date, let last = days.last?.date {
@@ -975,6 +978,7 @@ struct EmployeeEditSheet: View {
                                 Image(systemName: "chevron.right")
                             }
                             .buttonStyle(.borderless)
+                            .accessibilityLabel("Next week")
                         }
 
                         AvailabilityGridView(
@@ -1246,6 +1250,7 @@ private struct StepperField: View {
 
     @State private var textValue: String = ""
     @FocusState private var isFocused: Bool
+    @ScaledMetric private var fieldWidth: CGFloat = 48
 
     var body: some View {
         HStack {
@@ -1259,12 +1264,13 @@ private struct StepperField: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.borderless)
+            .accessibilityLabel("Decrease \(label)")
 
             TextField("", text: $textValue)
                 #if os(iOS)
                 .keyboardType(.decimalPad)
                 #endif
-                .frame(width: 48)
+                .frame(width: fieldWidth)
                 .multilineTextAlignment(.center)
                 .textFieldStyle(.roundedBorder)
                 .focused($isFocused)
@@ -1290,6 +1296,7 @@ private struct StepperField: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.borderless)
+            .accessibilityLabel("Increase \(label)")
         }
         .onChange(of: value) { _, newVal in
             if !isFocused {

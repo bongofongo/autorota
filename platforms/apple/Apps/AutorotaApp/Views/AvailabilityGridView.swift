@@ -163,7 +163,9 @@ struct AvailabilityGridView: View {
                                 state: state,
                                 isEditable: isEditable && inRange && !isSelectionModeActive && !dayReadOnly,
                                 isDimmed: !inRange || dayReadOnly,
-                                cellWidth: cellWidth
+                                cellWidth: cellWidth,
+                                weekday: day,
+                                hour: hour
                             ) {
                                 if isEditable && inRange && !isSelectionModeActive && !dayReadOnly {
                                     toggle(weekday: day, hour: hour)
@@ -225,6 +227,7 @@ struct AvailabilityGridView: View {
                         .background(isSelectionModeActive ? Color.blue : Color.clear, in: RoundedRectangle(cornerRadius: 6))
                 }
                 .buttonStyle(.borderless)
+                .accessibilityLabel(isSelectionModeActive ? "Exit selection mode" : "Enter selection mode")
             }
         }
     }
@@ -433,6 +436,8 @@ private struct CellView: View {
     let isEditable: Bool
     let isDimmed: Bool
     let cellWidth: CGFloat
+    let weekday: String
+    let hour: Int
     let onTap: () -> Void
     @Environment(\.accessibilityPalette) private var palette
 
@@ -446,6 +451,11 @@ private struct CellView: View {
             )
             .opacity(isDimmed ? 0.3 : 1.0)
             .onTapGesture { if isEditable { onTap() } }
+            .accessibilityElement()
+            .accessibilityLabel("\(weekday) \(String(format: "%02d", hour)):00")
+            .accessibilityValue(state)
+            .accessibilityHint(isEditable ? "Double-tap to cycle availability" : "")
+            .accessibilityAddTraits(isEditable ? .isButton : [])
     }
 
     private func color(for state: String) -> Color {

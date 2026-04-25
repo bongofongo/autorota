@@ -145,6 +145,7 @@ struct ExportSheetView: View {
                                 Image(systemName: "info.circle")
                             }
                             .buttonStyle(.borderless)
+                            .accessibilityLabel("About recipients")
                             .popover(isPresented: $showRecipientsInfo, arrowEdge: .top) {
                                 Text("**All Employees** generates a separate export file for every employee using this week's schedule, then shares or saves them together.")
                                     .font(.footnote)

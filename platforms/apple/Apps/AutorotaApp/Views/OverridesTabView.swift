@@ -218,6 +218,7 @@ struct OverridesTabView: View {
                         Spacer()
                         Button { showingEmpSheet = true } label: { Image(systemName: "plus") }
                             .buttonStyle(.borderless)
+                            .accessibilityLabel("Add employee exception")
                     }
                 }
 
@@ -308,6 +309,7 @@ struct OverridesTabView: View {
                         Spacer()
                         Button { showingTmplSheet = true } label: { Image(systemName: "plus") }
                             .buttonStyle(.borderless)
+                            .accessibilityLabel("Add shift change")
                     }
                 }
             }
@@ -497,6 +499,7 @@ struct EmployeeAvailabilityOverrideSheet: View {
     var preselectedEndDate: Date? = nil
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedEmployeeId: Int64?
     @State private var date = Date()
     @State private var slots: [AvailabilitySlot] = []
@@ -589,7 +592,7 @@ struct EmployeeAvailabilityOverrideSheet: View {
 
                 Section("Date") {
                     if !isEditing {
-                        Toggle("Date Range", isOn: $isDateRange.animation())
+                        Toggle("Date Range", isOn: reduceMotion ? $isDateRange : $isDateRange.animation())
                             .onChange(of: isDateRange) { _, newVal in
                                 currentDateIndex = 0
                                 if newVal {
@@ -715,6 +718,7 @@ struct EmployeeAvailabilityOverrideSheet: View {
                 }
                 .buttonStyle(.borderless)
                 .disabled(currentDateIndex == 0)
+                .accessibilityLabel("Previous day")
 
                 Spacer()
 
@@ -735,6 +739,7 @@ struct EmployeeAvailabilityOverrideSheet: View {
                 }
                 .buttonStyle(.borderless)
                 .disabled(currentDateIndex == dates.count - 1)
+                .accessibilityLabel("Next day")
             }
 
             // Not available presets
