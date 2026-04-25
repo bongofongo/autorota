@@ -6,6 +6,7 @@ struct AnalyticsView: View {
 
     @State private var vm = AnalyticsViewModel()
     @Environment(ExchangeRateService.self) private var exchangeRates
+    @Environment(\.accessibilityPalette) private var palette
     @AppStorage("appCurrency") private var displayCurrency = "usd"
 
     var body: some View {
@@ -133,7 +134,7 @@ struct AnalyticsView: View {
                     x: .value("Hours", emp.totalHours),
                     y: .value("Employee", emp.name)
                 )
-                .foregroundStyle(.blue.gradient)
+                .foregroundStyle(palette.chartPrimary.gradient)
             }
             .chartYAxis {
                 AxisMarks { _ in
@@ -204,7 +205,7 @@ struct AnalyticsView: View {
                     x: .value("Hours", role.totalHours),
                     y: .value("Role", role.role)
                 )
-                .foregroundStyle(.orange.gradient)
+                .foregroundStyle(palette.chartSecondary.gradient)
                 .annotation(position: .trailing) {
                     Text(fmtHours(role.totalHours))
                         .font(.caption2)
@@ -227,7 +228,7 @@ struct AnalyticsView: View {
                     x: .value("Day", day.dayName),
                     y: .value("Hours", day.totalHours)
                 )
-                .foregroundStyle(.green.gradient)
+                .foregroundStyle(palette.chartTertiary.gradient)
             }
             .frame(height: 200)
         }
@@ -246,12 +247,12 @@ struct AnalyticsView: View {
                         x: .value("Week", week.weekStart),
                         y: .value("Hours", week.totalHours)
                     )
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(palette.chartPrimary)
                     PointMark(
                         x: .value("Week", week.weekStart),
                         y: .value("Hours", week.totalHours)
                     )
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(palette.chartPrimary)
                 }
                 .frame(height: 200)
             } else {
@@ -273,12 +274,12 @@ struct AnalyticsView: View {
                         x: .value("Week", week.weekStart),
                         y: .value("Cost", week.totalCost)
                     )
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(palette.chartSecondary)
                     AreaMark(
                         x: .value("Week", week.weekStart),
                         y: .value("Cost", week.totalCost)
                     )
-                    .foregroundStyle(.orange.opacity(0.1))
+                    .foregroundStyle(palette.chartSecondary.opacity(0.1))
                 }
                 .frame(height: 200)
             } else {

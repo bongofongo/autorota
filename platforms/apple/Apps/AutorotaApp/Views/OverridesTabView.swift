@@ -20,6 +20,7 @@ struct OverridesTabView: View {
     @State private var empViewMode: EmpViewMode = .allByDate
     @State private var expandedEmployees: Set<Int64> = []
     @State private var expandedGroups: Set<String> = []
+    @Environment(\.accessibilityPalette) private var palette
 
     enum EmpViewMode: String, CaseIterable, Identifiable {
         case allByDate = "All · Soonest Date"
@@ -122,13 +123,7 @@ struct OverridesTabView: View {
     }
 
     private func availabilityColor(for slots: [DayAvailabilitySlot]) -> Color {
-        guard !slots.isEmpty else { return .gray }
-        let hasNo = slots.contains { $0.state == "No" }
-        let hasMaybe = slots.contains { $0.state == "Maybe" }
-        let hasYes = slots.contains { $0.state == "Yes" }
-        if hasNo && !hasYes && !hasMaybe { return .red }
-        if hasMaybe || (hasYes && hasNo) { return .yellow }
-        return .green
+        palette.availabilityColor(forSlots: slots)
     }
 
     @ViewBuilder

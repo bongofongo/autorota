@@ -42,6 +42,7 @@ enum AppAppearance: String, CaseIterable {
 
 struct SettingsView: View {
     @AppStorage("appAppearance") private var appearance: String = AppAppearance.system.rawValue
+    @AppStorage("colorBlindnessMode") private var colorBlindnessMode: String = ColorBlindnessMode.none.rawValue
     @AppStorage("appCurrency") private var currency: String = AppCurrency.usd.rawValue
     @AppStorage("exportDefaultLayout") private var exportDefaultLayout: String = "employee_by_weekday"
     @AppStorage("exportDefaultFormat") private var exportDefaultFormat: String = "csv"
@@ -81,7 +82,24 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.segmented)
                 }
-                
+
+                Section {
+                    Picker("Color Vision", selection: $colorBlindnessMode) {
+                        ForEach(ColorBlindnessMode.allCases, id: \.rawValue) { option in
+                            Text(option.label).tag(option.rawValue)
+                        }
+                    }
+                    AccessibilityPaletteSwatches(
+                        palette: AccessibilityPalette.palette(
+                            for: ColorBlindnessMode(rawValue: colorBlindnessMode) ?? .none
+                        )
+                    )
+                } header: {
+                    Text("Accessibility")
+                } footer: {
+                    Text("Adjusts availability, status, and chart colors so they remain distinguishable for the selected type of color vision.")
+                }
+
                 Section("Experience") {
                     Picker("Currency", selection: $currency) {
                         ForEach(AppCurrency.allCases, id: \.rawValue) { option in
@@ -185,5 +203,34 @@ struct SettingsView: View {
             }
             .navigationTitle("Menu")
         }
+    }
+}
+
+private struct AccessibilityPaletteSwatches: View {
+    let palette: AccessibilityPalette
+
+    var body: some View {
+        HStack(spacing: 8) {
+            swatch(palette.yes, label: "Yes")
+            swatch(palette.maybe, label: "Maybe")
+            swatch(palette.no, label: "No")
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func swatch(_ color: Color, label: String) -> some View {
+        VStack(spacing: 4) {
+            RoundedRectangle(cornerRadius: 4)
+                .fill(color)
+                .frame(height: 20)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4)
+                        .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5)
+                )
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
     }
 }

@@ -14,6 +14,7 @@ struct AutorotaAppApp: App {
     }
 
     @AppStorage("appAppearance") private var appearance: String = AppAppearance.system.rawValue
+    @AppStorage("colorBlindnessMode") private var colorBlindnessMode: String = ColorBlindnessMode.none.rawValue
     @State private var exchangeRateService = ExchangeRateService()
     @State private var syncEngine = AutorotaSyncEngine()
     @State private var showSyncPrompt = false
@@ -21,6 +22,10 @@ struct AutorotaAppApp: App {
 
     private var selectedAppearance: AppAppearance {
         AppAppearance(rawValue: appearance) ?? .system
+    }
+
+    private var selectedPalette: AccessibilityPalette {
+        AccessibilityPalette.palette(for: ColorBlindnessMode(rawValue: colorBlindnessMode) ?? .none)
     }
 
     var body: some Scene {
@@ -52,6 +57,7 @@ struct AutorotaAppApp: App {
             }
             .environment(exchangeRateService)
             .environment(syncEngine)
+            .environment(\.accessibilityPalette, selectedPalette)
             .task {
                 await exchangeRateService.fetchRates()
                 await checkFirstLaunchSync()

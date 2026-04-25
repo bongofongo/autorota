@@ -207,6 +207,7 @@ struct ShiftRecordRow: View {
     let record: FfiEmployeeShiftRecord
     let currencySymbol: String
     var convertedCost: Float?
+    @Environment(\.accessibilityPalette) private var palette
 
     var body: some View {
         HStack(spacing: 8) {
@@ -255,9 +256,9 @@ struct ShiftRecordRow: View {
 
     private var statusInfo: (Color, String) {
         switch record.status {
-        case "Proposed": (.orange, "Proposed")
-        case "Confirmed": (.green, "Confirmed")
-        case "Overridden": (.blue, "Overridden")
+        case "Proposed": (palette.proposed, "Proposed")
+        case "Confirmed": (palette.confirmed, "Confirmed")
+        case "Overridden": (palette.overridden, "Overridden")
         default: (.gray, record.status)
         }
     }

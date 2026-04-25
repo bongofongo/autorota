@@ -434,6 +434,7 @@ private struct CellView: View {
     let isDimmed: Bool
     let cellWidth: CGFloat
     let onTap: () -> Void
+    @Environment(\.accessibilityPalette) private var palette
 
     var body: some View {
         RoundedRectangle(cornerRadius: 3)
@@ -449,9 +450,9 @@ private struct CellView: View {
 
     private func color(for state: String) -> Color {
         switch state {
-        case "Yes":   return .green.opacity(0.75)
-        case "No":    return .red.opacity(0.55)
-        default:      return .yellow.opacity(0.45)
+        case "Yes":   return palette.yes.opacity(0.75)
+        case "No":    return palette.no.opacity(0.55)
+        default:      return palette.maybe.opacity(0.45)
         }
     }
 }

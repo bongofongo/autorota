@@ -19,6 +19,7 @@
 		5B96752A2F72075A00205001 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B96751B2F72075A00205001 /* ContentView.swift */; };
 		5B9675302F72075A00205001 /* RoleViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B9675312F72075A00205001 /* RoleViewModel.swift */; };
 		CC0001012F80000000205001 /* AutorotaServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0001032F80000000205001 /* AutorotaServiceProtocol.swift */; };
+		CC0001013200000000205001 /* AccessibilityPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0001023200000000205001 /* AccessibilityPalette.swift */; };
 		CC0001022F80000000205001 /* LiveAutorotaService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0001042F80000000205001 /* LiveAutorotaService.swift */; };
 		CC0003012F80000000205001 /* OverrideViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0003022F80000000205001 /* OverrideViewModel.swift */; };
 		CC0003032F80000000205001 /* OverridesTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0003042F80000000205001 /* OverridesTabView.swift */; };
@@ -85,6 +86,7 @@
 		5B96751E2F72075A00205001 /* RotaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RotaView.swift; sourceTree = "<group>"; };
 		5B96751F2F72075A00205001 /* ShiftTemplateListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiftTemplateListView.swift; sourceTree = "<group>"; };
 		5B9675312F72075A00205001 /* RoleViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoleViewModel.swift; sourceTree = "<group>"; };
+		CC0001023200000000205001 /* AccessibilityPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityPalette.swift; sourceTree = "<group>"; };
 		CC0001032F80000000205001 /* AutorotaServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutorotaServiceProtocol.swift; sourceTree = "<group>"; };
 		CC0001042F80000000205001 /* LiveAutorotaService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveAutorotaService.swift; sourceTree = "<group>"; };
 		CC0002052F80000000205001 /* AutorotaAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AutorotaAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -243,6 +245,7 @@
 		CC0001052F80000000205001 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				CC0001023200000000205001 /* AccessibilityPalette.swift */,
 				CC0001032F80000000205001 /* AutorotaServiceProtocol.swift */,
 				CC0009022FC0000000205001 /* AutorotaSyncEngine.swift */,
 				CC0026023100000000205001 /* BulkSendDispatcher.swift */,
@@ -380,6 +383,7 @@
 				5B9675292F72075A00205001 /* AvailabilityGridView.swift in Sources */,
 				5B96752A2F72075A00205001 /* ContentView.swift in Sources */,
 				CC0001012F80000000205001 /* AutorotaServiceProtocol.swift in Sources */,
+				CC0001013200000000205001 /* AccessibilityPalette.swift in Sources */,
 				CC0001022F80000000205001 /* LiveAutorotaService.swift in Sources */,
 				CC0003012F80000000205001 /* OverrideViewModel.swift in Sources */,
 				CC0003032F80000000205001 /* OverridesTabView.swift in Sources */,
