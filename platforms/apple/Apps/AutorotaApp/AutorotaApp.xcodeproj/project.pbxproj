@@ -53,6 +53,14 @@
 		CC0020013060000000205001 /* PhoneNumberFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0020023060000000205001 /* PhoneNumberFormatter.swift */; };
 		CC0021013070000000205001 /* PhoneInputField.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0021023070000000205001 /* PhoneInputField.swift */; };
 		CC0022013080000000205001 /* ExportPreviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0022023080000000205001 /* ExportPreviewSheet.swift */; };
+		CC0023013090000000205001 /* RotaExportPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0023023090000000205001 /* RotaExportPreview.swift */; };
+		CC0024013100000000205001 /* BulkSendSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0024023100000000205001 /* BulkSendSettings.swift */; };
+		CC0025013100000000205001 /* MessageBodyBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0025023100000000205001 /* MessageBodyBuilder.swift */; };
+		CC0026013100000000205001 /* BulkSendDispatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0026023100000000205001 /* BulkSendDispatcher.swift */; };
+		CC0027013100000000205001 /* MessageComposeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0027023100000000205001 /* MessageComposeView.swift */; };
+		CC0028013100000000205001 /* MailComposeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0028023100000000205001 /* MailComposeView.swift */; };
+		CC0029013100000000205001 /* BulkSendChecklistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0029023100000000205001 /* BulkSendChecklistView.swift */; };
+		CC0030013100000000205001 /* BulkSendSkipListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0030023100000000205001 /* BulkSendSkipListView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -113,6 +121,14 @@
 		CC0020023060000000205001 /* PhoneNumberFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneNumberFormatter.swift; sourceTree = "<group>"; };
 		CC0021023070000000205001 /* PhoneInputField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneInputField.swift; sourceTree = "<group>"; };
 		CC0022023080000000205001 /* ExportPreviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPreviewSheet.swift; sourceTree = "<group>"; };
+		CC0023023090000000205001 /* RotaExportPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RotaExportPreview.swift; sourceTree = "<group>"; };
+		CC0024023100000000205001 /* BulkSendSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BulkSendSettings.swift; sourceTree = "<group>"; };
+		CC0025023100000000205001 /* MessageBodyBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageBodyBuilder.swift; sourceTree = "<group>"; };
+		CC0026023100000000205001 /* BulkSendDispatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BulkSendDispatcher.swift; sourceTree = "<group>"; };
+		CC0027023100000000205001 /* MessageComposeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageComposeView.swift; sourceTree = "<group>"; };
+		CC0028023100000000205001 /* MailComposeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MailComposeView.swift; sourceTree = "<group>"; };
+		CC0029023100000000205001 /* BulkSendChecklistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BulkSendChecklistView.swift; sourceTree = "<group>"; };
+		CC0030023100000000205001 /* BulkSendSkipListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BulkSendSkipListView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -191,6 +207,8 @@
 				CC0018023040000000205001 /* AllAvailabilitiesSetView.swift */,
 				CC0012042FF0000000205001 /* AnalyticsView.swift */,
 				5B96751A2F72075A00205001 /* AvailabilityGridView.swift */,
+				CC0029023100000000205001 /* BulkSendChecklistView.swift */,
+				CC0030023100000000205001 /* BulkSendSkipListView.swift */,
 				CC0016043020000000205001 /* CarouselAvailabilityView.swift */,
 				CC0010042FD0000000205001 /* EditLogView.swift */,
 				5B96751B2F72075A00205001 /* ContentView.swift */,
@@ -200,6 +218,8 @@
 				CC0008022FB0000000205001 /* ExportSheetView.swift */,
 				CC0013023000000000205001 /* ExportTabView.swift */,
 				CC0011042FE0000000205001 /* HelpView.swift */,
+				CC0028023100000000205001 /* MailComposeView.swift */,
+				CC0027023100000000205001 /* MessageComposeView.swift */,
 				CC0011022FE0000000205001 /* OnboardingView.swift */,
 				CC0003042F80000000205001 /* OverridesTabView.swift */,
 				5B96751E2F72075A00205001 /* RotaView.swift */,
@@ -215,6 +235,7 @@
 				CC0019043050000000205001 /* RosterImportView.swift */,
 				CC0021023070000000205001 /* PhoneInputField.swift */,
 				CC0022023080000000205001 /* ExportPreviewSheet.swift */,
+				CC0023023090000000205001 /* RotaExportPreview.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -224,9 +245,12 @@
 			children = (
 				CC0001032F80000000205001 /* AutorotaServiceProtocol.swift */,
 				CC0009022FC0000000205001 /* AutorotaSyncEngine.swift */,
+				CC0026023100000000205001 /* BulkSendDispatcher.swift */,
+				CC0024023100000000205001 /* BulkSendSettings.swift */,
 				CC0007022FA0000000205001 /* ExchangeRateService.swift */,
 				CC0017023030000000205001 /* FfiError+UserMessage.swift */,
 				CC0001042F80000000205001 /* LiveAutorotaService.swift */,
+				CC0025023100000000205001 /* MessageBodyBuilder.swift */,
 				CC0020023060000000205001 /* PhoneNumberFormatter.swift */,
 				CC0009062FC0000000205001 /* SyncConflictResolver.swift */,
 				CC0009042FC0000000205001 /* SyncRecordMapper.swift */,
@@ -390,6 +414,14 @@
 				CC0020013060000000205001 /* PhoneNumberFormatter.swift in Sources */,
 				CC0021013070000000205001 /* PhoneInputField.swift in Sources */,
 				CC0022013080000000205001 /* ExportPreviewSheet.swift in Sources */,
+				CC0023013090000000205001 /* RotaExportPreview.swift in Sources */,
+				CC0024013100000000205001 /* BulkSendSettings.swift in Sources */,
+				CC0025013100000000205001 /* MessageBodyBuilder.swift in Sources */,
+				CC0026013100000000205001 /* BulkSendDispatcher.swift in Sources */,
+				CC0027013100000000205001 /* MessageComposeView.swift in Sources */,
+				CC0028013100000000205001 /* MailComposeView.swift in Sources */,
+				CC0029013100000000205001 /* BulkSendChecklistView.swift in Sources */,
+				CC0030013100000000205001 /* BulkSendSkipListView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

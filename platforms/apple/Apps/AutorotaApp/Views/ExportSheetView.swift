@@ -12,6 +12,12 @@ import UniformTypeIdentifiers
 struct ExportSheetView: View {
     let weekStart: String
     let service: AutorotaServiceProtocol
+    /// Set by `RotaView` when the rota has dirty edits. Used to gate Bulk
+    /// Send so the audit trail captures the version that was distributed.
+    var hasUnsavedEdits: Bool = false
+    /// Persists the in-memory rota as a Save snapshot. Bulk Send invokes
+    /// this when the user taps "Save & continue" on the unsaved-edits alert.
+    var onSaveBeforeBulkSend: (() async -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
 
     // MARK: - Settings (from Export tab)
@@ -30,6 +36,13 @@ struct ExportSheetView: View {
     @AppStorage("empExportShowShiftName") private var empShowShiftName: Bool = true
     @AppStorage("empExportShowTimes") private var empShowTimes: Bool = true
     @AppStorage("empExportShowRole") private var empShowRole: Bool = true
+
+    // Bulk Send message-body template
+    @AppStorage(BulkSendSettings.weekHeaderKey)   private var bulkWeekHeader: Bool = true
+    @AppStorage(BulkSendSettings.shiftLineKey)    private var bulkShiftLine: Bool = true
+    @AppStorage(BulkSendSettings.customPrefixKey) private var bulkCustomPrefix: String = ""
+    @AppStorage(BulkSendSettings.customSuffixKey) private var bulkCustomSuffix: String = ""
+    @State private var showBulkTemplate: Bool = false
 
     // MARK: - Scope state
 
@@ -71,6 +84,23 @@ struct ExportSheetView: View {
     @State private var tempDir: URL?
     @State private var showRecipientsInfo = false
 
+    // Bulk Send state
+    @State private var showBulkSend = false
+    @State private var showUnsavedEditsAlert = false
+    @State private var savingBeforeBulkSend = false
+
+    // Preview state
+    @State private var isPreviewing = false
+    @State private var previewPayload: PreviewPayload?
+
+    private struct PreviewPayload: Identifiable {
+        let id = UUID()
+        let title: String
+        let format: String
+        let result: FfiExportResult
+        let footnote: String?
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -81,6 +111,18 @@ struct ExportSheetView: View {
                     .pickerStyle(.segmented)
                 } header: {
                     Text("What to export")
+                }
+
+                if scope == .fullRota {
+                    Section {
+                        Picker("Layout", selection: $fullLayout) {
+                            Text("By Employee").tag("employee_by_weekday")
+                            Text("By Shift").tag("shift_by_weekday")
+                        }
+                        .pickerStyle(.segmented)
+                    } header: {
+                        Text("Layout")
+                    }
                 }
 
                 if scope == .perEmployee {
@@ -128,6 +170,71 @@ struct ExportSheetView: View {
                 } footer: {
                     Text("Layout, profile, and cell content use your Export tab settings.")
                 }
+
+                Section {
+                    Button {
+                        Task { await runPreview() }
+                    } label: {
+                        HStack {
+                            if isPreviewing {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Image(systemName: "eye")
+                            }
+                            Text("Preview")
+                        }
+                    }
+                    .disabled(isPreviewing || isExporting || !canExport)
+                } footer: {
+                    if scope == .perEmployee && perEmpScope == .all {
+                        Text("Previews the first employee's file. The export still produces one file per employee.")
+                    }
+                }
+
+                if scope == .perEmployee && perEmpScope == .all {
+                    Section {
+                        Button {
+                            startBulkSend()
+                        } label: {
+                            HStack {
+                                Image(systemName: "paperplane.fill")
+                                Text("Bulk Send")
+                            }
+                        }
+                        .disabled(isExporting || isPreviewing || employees.isEmpty)
+                    } footer: {
+                        Text("Send each employee a markdown rota via their preferred channel (iMessage, WhatsApp, or Email). Skipped recipients are listed after.")
+                    }
+                }
+
+                if scope == .perEmployee {
+                    Section {
+                        DisclosureGroup(isExpanded: $showBulkTemplate) {
+                            Toggle("Week header", isOn: $bulkWeekHeader)
+                            Toggle("Per-shift lines", isOn: $bulkShiftLine)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Prefix").font(.caption).foregroundStyle(.secondary)
+                                TextField("e.g. Hi {first_name},", text: $bulkCustomPrefix, axis: .vertical)
+                                    .lineLimit(1...3)
+                                    #if canImport(UIKit)
+                                    .textInputAutocapitalization(.sentences)
+                                    #endif
+                            }
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Suffix").font(.caption).foregroundStyle(.secondary)
+                                TextField("e.g. Let me know if any clashes.", text: $bulkCustomSuffix, axis: .vertical)
+                                    .lineLimit(1...3)
+                                    #if canImport(UIKit)
+                                    .textInputAutocapitalization(.sentences)
+                                    #endif
+                            }
+                        } label: {
+                            Label("Message Template", systemImage: "text.alignleft")
+                        }
+                    } footer: {
+                        Text("Used by Bulk Send. `{first_name}`, `{last_name}`, `{name}` are substituted per recipient.")
+                    }
+                }
             }
             #if os(macOS)
             .formStyle(.grouped)
@@ -164,6 +271,28 @@ struct ExportSheetView: View {
                 }
             }
             #endif
+            .sheet(item: $previewPayload) { payload in
+                RotaExportPreview(
+                    title: payload.title,
+                    format: payload.format,
+                    result: payload.result,
+                    footnote: payload.footnote
+                )
+            }
+            .sheet(isPresented: $showBulkSend) {
+                BulkSendChecklistView(weekStart: weekStart, service: service)
+            }
+            .alert(
+                "Save the rota first",
+                isPresented: $showUnsavedEditsAlert
+            ) {
+                Button("Save & continue") {
+                    Task { await saveThenBulkSend() }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This rota has unsaved changes. The version that gets sent should match the saved snapshot.")
+            }
         }
         .task { await loadEmployeesIfNeeded() }
         .onChange(of: scope) { _, new in
@@ -292,8 +421,60 @@ struct ExportSheetView: View {
         }
     }
 
-    private func exportFullRota(into dir: URL) async throws -> URL {
-        let config = FfiExportConfig(
+    // MARK: - Preview dispatch
+
+    private func runPreview() async {
+        isPreviewing = true
+        error = nil
+        defer { isPreviewing = false }
+
+        do {
+            switch scope {
+            case .fullRota:
+                let result = try await service.exportWeekSchedule(
+                    weekStart: weekStart,
+                    config: fullRotaConfig()
+                )
+                previewPayload = PreviewPayload(
+                    title: "Preview · \(formatLabel(format))",
+                    format: format,
+                    result: result,
+                    footnote: nil
+                )
+            case .perEmployee:
+                let id: Int64?
+                let footnote: String?
+                switch perEmpScope {
+                case .all:
+                    id = employees.first?.id
+                    footnote = id == nil ? nil : "Showing first employee. Export produces one file per employee."
+                case .individual:
+                    id = selectedEmployeeId
+                    footnote = nil
+                }
+                guard let employeeId = id else { return }
+                let result = try await service.exportEmployeeSchedule(
+                    config: employeeConfig(id: employeeId)
+                )
+                let name = employees.first(where: { $0.id == employeeId })?.displayName ?? "Employee"
+                previewPayload = PreviewPayload(
+                    title: "Preview · \(name)",
+                    format: format,
+                    result: result,
+                    footnote: footnote
+                )
+            }
+        } catch {
+            self.error = userFacingMessage(error)
+        }
+    }
+
+    private func formatLabel(_ id: String) -> String {
+        availableFormats.first(where: { $0.id == id })?.label ?? id.uppercased()
+    }
+
+    private func fullRotaConfig() -> FfiExportConfig {
+        FfiExportConfig(
             layout: fullLayout,
             format: format,
             profile: fullProfile,
@@ -302,13 +483,11 @@ struct ExportSheetView: View {
             showRole: fullShowRole,
             pdfTemplate: format == "pdf" ? fullPdfTemplate : nil
         )
-        let result = try await service.exportWeekSchedule(weekStart: weekStart, config: config)
-        return try writeResult(result, into: dir)
     }
 
-    private func exportOneEmployee(id: Int64, into dir: URL) async throws -> URL {
+    private func employeeConfig(id: Int64) -> FfiEmployeeExportConfig {
         let (start, end) = weekRange()
-        let config = FfiEmployeeExportConfig(
+        return FfiEmployeeExportConfig(
             employeeId: id,
             startDate: start,
             endDate: end,
@@ -319,26 +498,25 @@ struct ExportSheetView: View {
             showRole: empShowRole,
             timezoneId: TimeZone.current.identifier
         )
-        let result = try await service.exportEmployeeSchedule(config: config)
+    }
+
+    private func exportFullRota(into dir: URL) async throws -> URL {
+        let result = try await service.exportWeekSchedule(
+            weekStart: weekStart,
+            config: fullRotaConfig()
+        )
+        return try writeResult(result, into: dir)
+    }
+
+    private func exportOneEmployee(id: Int64, into dir: URL) async throws -> URL {
+        let result = try await service.exportEmployeeSchedule(config: employeeConfig(id: id))
         return try writeResult(result, into: dir)
     }
 
     private func exportAllEmployees(into dir: URL) async throws -> [URL] {
         var urls: [URL] = []
-        let (start, end) = weekRange()
         for e in employees {
-            let config = FfiEmployeeExportConfig(
-                employeeId: e.id,
-                startDate: start,
-                endDate: end,
-                format: format,
-                profile: empProfile,
-                showShiftName: empShowShiftName,
-                showTimes: empShowTimes,
-                showRole: empShowRole,
-                timezoneId: TimeZone.current.identifier
-            )
-            let result = try await service.exportEmployeeSchedule(config: config)
+            let result = try await service.exportEmployeeSchedule(config: employeeConfig(id: e.id))
             urls.append(try writeResult(result, into: dir))
         }
         return urls
@@ -386,6 +564,25 @@ struct ExportSheetView: View {
             tempDir = nil
         }
         exportURLs = []
+    }
+
+    // MARK: - Bulk Send
+
+    private func startBulkSend() {
+        if hasUnsavedEdits {
+            showUnsavedEditsAlert = true
+        } else {
+            showBulkSend = true
+        }
+    }
+
+    private func saveThenBulkSend() async {
+        savingBeforeBulkSend = true
+        defer { savingBeforeBulkSend = false }
+        if let save = onSaveBeforeBulkSend {
+            await save()
+        }
+        showBulkSend = true
     }
 
     #if os(macOS)

@@ -135,7 +135,12 @@ struct RotaView: View {
                 Text(vm.error ?? "")
             }
             .sheet(isPresented: $showExportSheet) {
-                ExportSheetView(weekStart: vm.selectedWeekStart, service: vm.service)
+                ExportSheetView(
+                    weekStart: vm.selectedWeekStart,
+                    service: vm.service,
+                    hasUnsavedEdits: vm.isDirty,
+                    onSaveBeforeBulkSend: { await vm.autoSave() }
+                )
             }
             .task { await vm.loadSchedule() }
         }
