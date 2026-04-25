@@ -16,6 +16,9 @@ struct AutorotaAppApp: App {
             .displayFrequency(.immediate),
             .datastoreLocation(.applicationDefault),
         ])
+        // Seam for swapping Mock ↔ Live without rebuilding env wiring.
+        let backend: LicenseBackend = LiveLicenseBackend()
+        _licenseService = State(initialValue: LicenseService(backend: backend))
     }
 
     @AppStorage("appAppearance") private var appearance: String = AppAppearance.system.rawValue
@@ -23,6 +26,7 @@ struct AutorotaAppApp: App {
     @State private var exchangeRateService = ExchangeRateService()
     @State private var syncEngine = AutorotaSyncEngine()
     @State private var localeManager = LocaleManager()
+    @State private var licenseService: LicenseService
     @State private var showSyncPrompt = false
     @State private var syncCheckComplete = false
 
@@ -64,9 +68,13 @@ struct AutorotaAppApp: App {
             .environment(exchangeRateService)
             .environment(syncEngine)
             .environment(localeManager)
+            .environment(licenseService)
             .environment(\.locale, localeManager.effectiveLocale)
             .environment(\.accessibilityPalette, selectedPalette)
             .task {
+                if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil {
+                    await licenseService.refresh()
+                }
                 await exchangeRateService.fetchRates()
                 await checkFirstLaunchSync()
             }

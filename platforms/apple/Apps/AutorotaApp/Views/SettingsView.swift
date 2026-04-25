@@ -56,6 +56,7 @@ struct SettingsView: View {
     @Environment(TabLayoutManager.self) private var layoutManager
     @Environment(AutorotaSyncEngine.self) private var syncEngine
     @Environment(LocaleManager.self) private var localeManager
+    @Environment(LicenseService.self) private var license
     @State private var showReplayConfirm = false
     @State private var replayErrorMessage: String?
     private let exportProfileTip = ExportProfileTip()
@@ -210,6 +211,8 @@ struct SettingsView: View {
                     .tint(.primary)
                 }
 
+
+                SubscriptionSettingsSection()
 
                 Section("iCloud Sync") {
                     HStack {

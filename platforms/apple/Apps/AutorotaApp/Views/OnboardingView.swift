@@ -33,7 +33,6 @@ private let pages: [OnboardingPage] = [
 
 struct OnboardingView: View {
     @Binding var isPresented: Bool
-    @Environment(EmployeeUIBridge.self) private var employeeBridge
     @State private var currentPage = 0
     @State private var sampleLoadState: SampleLoadState = .idle
     @State private var sampleErrorMessage: String?
@@ -70,7 +69,7 @@ struct OnboardingView: View {
                     )
                     .tag(index)
                 }
-                finalPage.tag(pages.count)
+                TierPickView(isPresented: $isPresented).tag(pages.count)
             }
             .tabViewStyle(.page(indexDisplayMode: .always))
             #else
@@ -84,7 +83,7 @@ struct OnboardingView: View {
                         showsSampleData: currentPage == 0
                     )
                 } else {
-                    finalPage
+                    TierPickView(isPresented: $isPresented)
                 }
             }
 
@@ -98,12 +97,7 @@ struct OnboardingView: View {
                 Spacer()
                 pageIndicator
                 Spacer()
-                if isLastPage {
-                    Button("onboarding.button.get_started") { isPresented = false }
-                        .font(.title3.bold())
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
-                } else {
+                if !isLastPage {
                     Button("onboarding.button.next") { withAnimation { currentPage += 1 } }
                         .font(.title3)
                 }
@@ -175,40 +169,6 @@ struct OnboardingView: View {
             Label("onboarding.sample.loaded", systemImage: "checkmark.circle.fill")
                 .foregroundStyle(.green)
                 .font(.body.weight(.medium))
-        }
-    }
-
-    private var finalPage: some View {
-        VStack(spacing: 24) {
-            Spacer()
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 72))
-                .foregroundStyle(.green)
-            Text("onboarding.page.ready.title")
-                .font(.largeTitle.bold())
-            Text("onboarding.page.ready.body")
-                .font(.title3)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 32)
-
-            Button {
-                employeeBridge.requestNewEmployeeSheet = true
-                isPresented = false
-            } label: {
-                Text("onboarding.cta.add_first_employee")
-                    .font(.title3.bold())
-                    .frame(maxWidth: 320)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-
-            #if os(iOS)
-            Button("onboarding.button.get_started") { isPresented = false }
-                .font(.body)
-                .padding(.top, 4)
-            #endif
-            Spacer()
         }
     }
 

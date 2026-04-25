@@ -33,7 +33,7 @@ final class EditLogViewModel {
 
     let service: AutorotaServiceProtocol
 
-    init(service: AutorotaServiceProtocol = LiveAutorotaService()) {
+    init(service: AutorotaServiceProtocol = GatedAutorotaService()) {
         self.service = service
     }
 

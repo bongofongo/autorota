@@ -33,7 +33,7 @@ final class EmployeeExportViewModel {
 
     let service: AutorotaServiceProtocol
 
-    init(service: AutorotaServiceProtocol = LiveAutorotaService()) {
+    init(service: AutorotaServiceProtocol = GatedAutorotaService()) {
         self.service = service
 
         // Read persisted defaults.

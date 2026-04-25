@@ -42,7 +42,7 @@ final class RotaViewModel {
 
     let service: AutorotaServiceProtocol
 
-    init(service: AutorotaServiceProtocol = LiveAutorotaService()) {
+    init(service: AutorotaServiceProtocol = GatedAutorotaService()) {
         self.service = service
     }
 

@@ -63,6 +63,19 @@
 		CC0028013100000000205001 /* MailComposeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0028023100000000205001 /* MailComposeView.swift */; };
 		CC0029013100000000205001 /* BulkSendChecklistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0029023100000000205001 /* BulkSendChecklistView.swift */; };
 		CC0030013100000000205001 /* BulkSendSkipListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0030023100000000205001 /* BulkSendSkipListView.swift */; };
+		CC0040013110000000205001 /* Tier.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0040023110000000205001 /* Tier.swift */; };
+		CC0041013110000000205001 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0041023110000000205001 /* KeychainStore.swift */; };
+		CC0042013110000000205001 /* LicenseGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0042023110000000205001 /* LicenseGate.swift */; };
+		CC0043013110000000205001 /* LicenseBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0043023110000000205001 /* LicenseBackend.swift */; };
+		CC0044013110000000205001 /* MockLicenseBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0044023110000000205001 /* MockLicenseBackend.swift */; };
+		CC0045013110000000205001 /* LiveLicenseBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0045023110000000205001 /* LiveLicenseBackend.swift */; };
+		CC0046013110000000205001 /* LicenseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0046023110000000205001 /* LicenseService.swift */; };
+		CC0047013110000000205001 /* PricingCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0047023110000000205001 /* PricingCatalog.swift */; };
+		CC0048013110000000205001 /* GatedAutorotaService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0048023110000000205001 /* GatedAutorotaService.swift */; };
+		CC0049013110000000205001 /* TierPickView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0049023110000000205001 /* TierPickView.swift */; };
+		CC0050013110000000205001 /* TierInfoModal.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0050023110000000205001 /* TierInfoModal.swift */; };
+		CC0051013110000000205001 /* ReadOnlyBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0051023110000000205001 /* ReadOnlyBanner.swift */; };
+		CC0052013110000000205001 /* SubscriptionSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0052023110000000205001 /* SubscriptionSettingsSection.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -133,6 +146,19 @@
 		CC0028023100000000205001 /* MailComposeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MailComposeView.swift; sourceTree = "<group>"; };
 		CC0029023100000000205001 /* BulkSendChecklistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BulkSendChecklistView.swift; sourceTree = "<group>"; };
 		CC0030023100000000205001 /* BulkSendSkipListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BulkSendSkipListView.swift; sourceTree = "<group>"; };
+		CC0040023110000000205001 /* Tier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tier.swift; sourceTree = "<group>"; };
+		CC0041023110000000205001 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
+		CC0042023110000000205001 /* LicenseGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LicenseGate.swift; sourceTree = "<group>"; };
+		CC0043023110000000205001 /* LicenseBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LicenseBackend.swift; sourceTree = "<group>"; };
+		CC0044023110000000205001 /* MockLicenseBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockLicenseBackend.swift; sourceTree = "<group>"; };
+		CC0045023110000000205001 /* LiveLicenseBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveLicenseBackend.swift; sourceTree = "<group>"; };
+		CC0046023110000000205001 /* LicenseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LicenseService.swift; sourceTree = "<group>"; };
+		CC0047023110000000205001 /* PricingCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PricingCatalog.swift; sourceTree = "<group>"; };
+		CC0048023110000000205001 /* GatedAutorotaService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatedAutorotaService.swift; sourceTree = "<group>"; };
+		CC0049023110000000205001 /* TierPickView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TierPickView.swift; sourceTree = "<group>"; };
+		CC0050023110000000205001 /* TierInfoModal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TierInfoModal.swift; sourceTree = "<group>"; };
+		CC0051023110000000205001 /* ReadOnlyBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadOnlyBanner.swift; sourceTree = "<group>"; };
+		CC0052023110000000205001 /* SubscriptionSettingsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionSettingsSection.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -240,6 +266,10 @@
 				CC0021023070000000205001 /* PhoneInputField.swift */,
 				CC0022023080000000205001 /* ExportPreviewSheet.swift */,
 				CC0023023090000000205001 /* RotaExportPreview.swift */,
+				CC0051023110000000205001 /* ReadOnlyBanner.swift */,
+				CC0052023110000000205001 /* SubscriptionSettingsSection.swift */,
+				CC0050023110000000205001 /* TierInfoModal.swift */,
+				CC0049023110000000205001 /* TierPickView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -254,12 +284,21 @@
 				CC0024023100000000205001 /* BulkSendSettings.swift */,
 				CC0007022FA0000000205001 /* ExchangeRateService.swift */,
 				CC0017023030000000205001 /* FfiError+UserMessage.swift */,
+				CC0048023110000000205001 /* GatedAutorotaService.swift */,
+				CC0041023110000000205001 /* KeychainStore.swift */,
+				CC0043023110000000205001 /* LicenseBackend.swift */,
+				CC0042023110000000205001 /* LicenseGate.swift */,
+				CC0046023110000000205001 /* LicenseService.swift */,
 				CC0001042F80000000205001 /* LiveAutorotaService.swift */,
+				CC0045023110000000205001 /* LiveLicenseBackend.swift */,
 				CC0027023040000000205001 /* LocaleManager.swift */,
 				CC0025023100000000205001 /* MessageBodyBuilder.swift */,
+				CC0044023110000000205001 /* MockLicenseBackend.swift */,
 				CC0020023060000000205001 /* PhoneNumberFormatter.swift */,
+				CC0047023110000000205001 /* PricingCatalog.swift */,
 				CC0009062FC0000000205001 /* SyncConflictResolver.swift */,
 				CC0009042FC0000000205001 /* SyncRecordMapper.swift */,
+				CC0040023110000000205001 /* Tier.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -436,6 +475,19 @@
 				CC0028013100000000205001 /* MailComposeView.swift in Sources */,
 				CC0029013100000000205001 /* BulkSendChecklistView.swift in Sources */,
 				CC0030013100000000205001 /* BulkSendSkipListView.swift in Sources */,
+				CC0040013110000000205001 /* Tier.swift in Sources */,
+				CC0041013110000000205001 /* KeychainStore.swift in Sources */,
+				CC0042013110000000205001 /* LicenseGate.swift in Sources */,
+				CC0043013110000000205001 /* LicenseBackend.swift in Sources */,
+				CC0044013110000000205001 /* MockLicenseBackend.swift in Sources */,
+				CC0045013110000000205001 /* LiveLicenseBackend.swift in Sources */,
+				CC0046013110000000205001 /* LicenseService.swift in Sources */,
+				CC0047013110000000205001 /* PricingCatalog.swift in Sources */,
+				CC0048013110000000205001 /* GatedAutorotaService.swift in Sources */,
+				CC0049013110000000205001 /* TierPickView.swift in Sources */,
+				CC0050013110000000205001 /* TierInfoModal.swift in Sources */,
+				CC0051013110000000205001 /* ReadOnlyBanner.swift in Sources */,
+				CC0052013110000000205001 /* SubscriptionSettingsSection.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

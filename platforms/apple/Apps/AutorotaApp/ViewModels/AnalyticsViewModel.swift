@@ -87,7 +87,7 @@ final class AnalyticsViewModel {
     var exchangeRates: ExchangeRateService?
     var displayCurrency: String = "usd"
 
-    init(service: AutorotaServiceProtocol = LiveAutorotaService()) {
+    init(service: AutorotaServiceProtocol = GatedAutorotaService()) {
         self.service = service
         let cal = Calendar(identifier: .iso8601)
         let now = Date()

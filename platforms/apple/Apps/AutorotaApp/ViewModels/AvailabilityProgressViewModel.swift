@@ -11,7 +11,7 @@ final class AvailabilityProgressViewModel {
 
     private let service: AutorotaServiceProtocol
 
-    init(service: AutorotaServiceProtocol = LiveAutorotaService()) {
+    init(service: AutorotaServiceProtocol = GatedAutorotaService()) {
         self.service = service
     }
 

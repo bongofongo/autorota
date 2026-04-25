@@ -27,7 +27,7 @@ struct ExportTabView: View {
 
     @State private var previewScope: ExportPreviewSheet.Scope?
 
-    init(service: AutorotaServiceProtocol = LiveAutorotaService()) {
+    init(service: AutorotaServiceProtocol = GatedAutorotaService()) {
         self.service = service
     }
 

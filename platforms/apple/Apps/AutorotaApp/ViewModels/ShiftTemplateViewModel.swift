@@ -11,7 +11,7 @@ final class ShiftTemplateViewModel {
 
     private let service: AutorotaServiceProtocol
 
-    init(service: AutorotaServiceProtocol = LiveAutorotaService()) {
+    init(service: AutorotaServiceProtocol = GatedAutorotaService()) {
         self.service = service
     }
 

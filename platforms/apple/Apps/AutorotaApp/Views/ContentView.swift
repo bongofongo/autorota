@@ -8,6 +8,7 @@ struct ContentView: View {
     @State private var lastPage: TabPage = .rota
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var showOnboarding = false
+    @Environment(LicenseService.self) private var license
     #if os(iOS)
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     #endif
@@ -29,6 +30,52 @@ struct ContentView: View {
     }
 
     var body: some View {
+        VStack(spacing: 0) {
+            if license.state.isReadOnly {
+                ReadOnlyBanner()
+            }
+            tabView
+        }
+        .onAppear {
+            if !hasCompletedOnboarding || license.state == .unset {
+                showOnboarding = true
+            }
+        }
+        .onChange(of: hasCompletedOnboarding) { _, completed in
+            if !completed {
+                showOnboarding = true
+            }
+        }
+        .onChange(of: employeeBridge.requestNewEmployeeSheet) { _, requested in
+            if requested {
+                selection = .page(.employees)
+            }
+        }
+        #if os(iOS)
+        .fullScreenCover(isPresented: $showOnboarding) {
+            if license.state != .unset {
+                hasCompletedOnboarding = true
+            }
+        } content: {
+            OnboardingView(isPresented: $showOnboarding)
+                .environment(employeeBridge)
+                .interactiveDismissDisabled()
+        }
+        #else
+        .sheet(isPresented: $showOnboarding) {
+            if license.state != .unset {
+                hasCompletedOnboarding = true
+            }
+        } content: {
+            OnboardingView(isPresented: $showOnboarding)
+                .environment(employeeBridge)
+                .interactiveDismissDisabled()
+        }
+        #endif
+    }
+
+    @ViewBuilder
+    private var tabView: some View {
         TabView(selection: $selection) {
             ForEach(layoutManager.tabBarPages) { page in
                 Tab(
@@ -79,38 +126,6 @@ struct ContentView: View {
                 lastPage = p
             }
         }
-        .onAppear {
-            if !hasCompletedOnboarding {
-                showOnboarding = true
-            }
-        }
-        .onChange(of: hasCompletedOnboarding) { _, completed in
-            if !completed {
-                showOnboarding = true
-            }
-        }
-        .onChange(of: employeeBridge.requestNewEmployeeSheet) { _, requested in
-            if requested {
-                selection = .page(.employees)
-            }
-        }
-        #if os(iOS)
-        .fullScreenCover(isPresented: $showOnboarding) {
-            hasCompletedOnboarding = true
-        } content: {
-            OnboardingView(isPresented: $showOnboarding)
-                .environment(employeeBridge)
-                .interactiveDismissDisabled()
-        }
-        #else
-        .sheet(isPresented: $showOnboarding) {
-            hasCompletedOnboarding = true
-        } content: {
-            OnboardingView(isPresented: $showOnboarding)
-                .environment(employeeBridge)
-                .interactiveDismissDisabled()
-        }
-        #endif
     }
 }
 

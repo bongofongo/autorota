@@ -4,6 +4,11 @@ import AutorotaKit
 /// Abstraction over AutorotaKit async functions, enabling dependency injection
 /// for ViewModels. The live implementation wraps real FFI calls; tests can
 /// provide a mock that returns canned data without the XCFramework.
+///
+/// **When adding a new method**: classify it as a read or a mutation, then
+/// update `GatedAutorotaService` accordingly. Mutations must call `try check()`
+/// before delegating; reads pass through. Skipping that step lets writes
+/// bypass the read-only license gate.
 protocol AutorotaServiceProtocol: Sendable {
     // Roles
     func listRoles() async throws -> [FfiRole]
