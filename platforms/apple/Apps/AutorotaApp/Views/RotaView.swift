@@ -307,15 +307,22 @@ private struct ScheduleGridView: View {
             Text("This shift and all its assignments will be permanently deleted.")
         }
         .alert(
-            "Unlock past days?",
+            "Edit past rota?",
             isPresented: $showUnlockPastConfirmation
         ) {
-            Button("Unlock", role: .destructive) {
+            Button("Edit", role: .destructive) {
                 vm.pastUnlocked = true
             }
-            Button("Cancel", role: .cancel) {}
+            Button("Cancel", role: .cancel) {
+                vm.isEditMode = false
+            }
         } message: {
-            Text("Past days are locked to prevent accidental edits. Unlock them to make changes.")
+            Text("This rota is from a past week. Are you sure you want to make changes?")
+        }
+        .onChange(of: vm.isEditMode) { _, new in
+            if new && vm.weekCategory == .past && !vm.pastUnlocked {
+                showUnlockPastConfirmation = true
+            }
         }
     }
 
@@ -357,25 +364,10 @@ private struct ScheduleGridView: View {
                             .padding(.horizontal)
                         }
                     } header: {
-                        HStack {
+                        HStack(spacing: 6) {
                             Text(day)
                                 .font(.headline)
-                            if vm.isDayPast(day) {
-                                if vm.isEditMode && !vm.pastUnlocked {
-                                    Button {
-                                        showUnlockPastConfirmation = true
-                                    } label: {
-                                        Image(systemName: "lock")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .buttonStyle(.plain)
-                                } else {
-                                    Image(systemName: vm.pastUnlocked ? "lock.open" : "lock")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
+                            DayFlourish(isToday: vm.isDayToday(day), isPast: vm.isDayPast(day))
                             Spacer()
                         }
                         .padding(.horizontal)
@@ -416,25 +408,10 @@ private struct ScheduleGridView: View {
     private func dayColumn(day: String, width: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             // Column header
-            HStack(spacing: 4) {
+            HStack(spacing: 6) {
                 Text(day)
                     .font(.headline)
-                if vm.isDayPast(day) {
-                    if vm.isEditMode && !vm.pastUnlocked {
-                        Button {
-                            showUnlockPastConfirmation = true
-                        } label: {
-                            Image(systemName: "lock")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                    } else {
-                        Image(systemName: vm.pastUnlocked ? "lock.open" : "lock")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
+                DayFlourish(isToday: vm.isDayToday(day), isPast: vm.isDayPast(day))
                 Spacer()
             }
             .padding(.horizontal, 8)
@@ -481,6 +458,28 @@ private struct ScheduleGridView: View {
             Spacer(minLength: 0)
         }
         .frame(width: width, alignment: .top)
+    }
+}
+
+// MARK: - Day flourish
+
+/// Small colored dot in day headers indicating past/today. No dot for future days.
+private struct DayFlourish: View {
+    let isToday: Bool
+    let isPast: Bool
+
+    var body: some View {
+        if let color = dotColor {
+            Circle()
+                .fill(color)
+                .frame(width: 6, height: 6)
+        }
+    }
+
+    private var dotColor: Color? {
+        if isToday { return .blue }
+        if isPast { return .secondary }
+        return nil
     }
 }
 

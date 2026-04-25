@@ -32,7 +32,9 @@ final class RotaViewModel {
     var swapSourceAssignmentId: Int64?
     var swapSourceShiftId: Int64?
 
-    // Past lock
+    // Past-week edit confirmation. Set true once the user confirms editing a
+    // past rota; gates edits only for `weekCategory == .past`. Resets on
+    // edit-mode exit and week changes.
     var pastUnlocked = false
 
     /// Tracks whether any mutations have occurred since the last save.
@@ -293,7 +295,7 @@ final class RotaViewModel {
     }
 
     func isShiftLocked(_ shift: FfiShiftInfo) -> Bool {
-        isShiftPast(shift) && !pastUnlocked
+        weekCategory == .past && !pastUnlocked
     }
 
     /// Date string for a weekday offset in the selected week (Mon=0, Tue=1, ..., Sun=6).
@@ -316,7 +318,11 @@ final class RotaViewModel {
     }
 
     func isDayLocked(_ weekday: String) -> Bool {
-        isDayPast(weekday) && !pastUnlocked
+        weekCategory == .past && !pastUnlocked
+    }
+
+    func isDayToday(_ weekday: String) -> Bool {
+        dateForWeekday(weekday) == isoDateString(from: Date())
     }
 
     // MARK: - Derived helpers
