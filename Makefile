@@ -140,3 +140,24 @@ swift-test-all: swift-test-app-macos swift-test-app-ios swift-test-app-ipad swif
 # Full suite: Rust, then all Swift platforms.
 # On a clean machine, run `make swift-build-xcframework` first.
 test-all: rust-test swift-test-all
+
+# ─── Devex ───────────────────────────────────────────────────────────────────
+
+.PHONY: install-hooks release-dry-run
+
+# Wire up local git hooks (cargo fmt/clippy on commit, swift compile on push).
+install-hooks:
+	@command -v lefthook >/dev/null 2>&1 || { \
+	  echo "lefthook not found. Install with: brew install lefthook"; \
+	  exit 1; \
+	}
+	lefthook install
+	@echo "Hooks installed. Skip a commit with: LEFTHOOK=0 git commit ..."
+
+# Preview what release-plz would propose without opening a PR.
+release-dry-run:
+	@command -v release-plz >/dev/null 2>&1 || { \
+	  echo "release-plz not found. Install with: cargo install release-plz"; \
+	  exit 1; \
+	}
+	release-plz update --dry-run

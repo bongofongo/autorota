@@ -1,0 +1,57 @@
+# release-plz config — opens a "Release PR" on every push to main.
+# Merging the PR creates tag `v<version>`, which triggers .github/workflows/release.yml
+# (the existing pipeline that builds + signs + ships to TestFlight + GitHub Release).
+#
+# Note: GITHUB_TOKEN cannot trigger downstream workflows from a tag push.
+# release-plz.yml must use a PAT or GitHub App token (RELEASE_PLZ_TOKEN secret)
+# for the tag push to fire release.yml. See docs/releasing.md.
+
+[workspace]
+# Internal app, not a library — never publish to crates.io.
+publish = false
+
+# Tag format must match release.yml's trigger: v[0-9]+.[0-9]+.[0-9]+
+git_tag_enable = true
+git_tag_name = "v{{ version }}"
+
+# release.yml owns GitHub Release creation (with attached .dmg).
+# release-plz only needs to push the tag.
+git_release_enable = false
+
+# Maintain CHANGELOG.md from conventional commits.
+changelog_update = true
+changelog_path = "CHANGELOG.md"
+
+# PR styling.
+pr_branch_prefix = "release-plz/"
+pr_name = "chore: release v{{ version }}"
+pr_labels = ["release"]
+
+# Don't create per-crate PRs — one PR per release across the workspace.
+# All crates share workspace.package.version, so they bump together.
+single_pull_request = true
+
+[changelog]
+header = """# Changelog
+
+All notable changes to autorota.
+Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+"""
+
+# Conventional Commits → changelog sections.
+commit_parsers = [
+    { message = "^feat", group = "Added" },
+    { message = "^fix", group = "Fixed" },
+    { message = "^perf", group = "Performance" },
+    { message = "^refactor", group = "Changed" },
+    { message = "^docs", group = "Documentation" },
+    { message = "^style", skip = true },
+    { message = "^test", skip = true },
+    { message = "^chore\\(release\\)", skip = true },
+    { message = "^chore", group = "Internal" },
+    { message = "^ci", skip = true },
+    { message = "^build", group = "Build" },
+    { message = "^revert", group = "Reverted" },
+]

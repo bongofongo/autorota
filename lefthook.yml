@@ -1,0 +1,25 @@
+# lefthook — opt-in local git hooks.
+# Install: `make install-hooks` (requires `brew install lefthook` first).
+# Uninstall: `lefthook uninstall`.
+# Skip a single commit: `LEFTHOOK=0 git commit ...`.
+
+pre-commit:
+  parallel: true
+  commands:
+    rust-fmt:
+      glob: "*.rs"
+      run: cargo fmt --check -- {staged_files}
+      stage_fixed: false
+    rust-clippy:
+      glob: "crates/**/*.rs"
+      # Workspace-wide; staged-file scoping is unreliable for clippy
+      # because lints depend on the whole crate graph.
+      run: cargo clippy --workspace --all-targets -- -D warnings
+
+pre-push:
+  commands:
+    swift-compile:
+      # Only run if Swift files changed in the push.
+      glob: "platforms/apple/**/*.swift"
+      # macOS-only; runs the Make target that does compile-check on all 3 platforms.
+      run: make swift-build-check

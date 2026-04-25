@@ -132,6 +132,49 @@ jobs:
       - name: Test AutorotaKit package
         run: cd platforms/apple/AutorotaKit && swift test
 
+  # ─── Swift: compile-check matrix (catches breaks in non-test files) ────────
+  # Faster than swift-app-tests; covers files no XCTest imports.
+  # Inputs are author-controlled matrix values, no PR-injected strings used.
+  swift-compile-check:
+    name: Swift Compile — ${{ matrix.platform }}
+    runs-on: macos-15
+    needs: xcframework
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macOS
+            target: macos
+          - platform: iOS
+            target: ios
+          - platform: iPadOS
+            target: ipad
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download XCFramework
+        uses: actions/download-artifact@v4
+        with:
+          name: xcframework
+          path: platforms/apple/AutorotaKit/XCFrameworks/
+
+      - name: Download generated bindings
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-bindings
+          path: platforms/apple/AutorotaKit/Sources/AutorotaKit/generated/
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26.0'
+
+      - name: Compile-check
+        env:
+          TARGET: ${{ matrix.target }}
+        run: make swift-build-check-"$TARGET"
+
   # ─── Tauri desktop: compile verification on macOS ──────────────────────────
   tauri-desktop:
     name: Tauri Desktop (macOS)
