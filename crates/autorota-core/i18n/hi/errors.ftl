@@ -1,0 +1,11 @@
+err-db-connection-failed = डेटाबेस से कनेक्ट नहीं हो सका।
+err-db-row-not-found = यह रिकॉर्ड अब मौजूद नहीं है। इसे हटा दिया गया होगा।
+err-db-generic = एक अप्रत्याशित डेटाबेस त्रुटि हुई।
+err-not-found-employee = कर्मचारी नहीं मिला।
+err-not-found-schedule = इस सप्ताह के लिए कोई शेड्यूल उपलब्ध नहीं है।
+err-not-found-generic = अनुरोधित आइटम नहीं मिल सका।
+err-invalid-date = दिनांक प्रारूप अमान्य है।
+err-invalid-save-tag = लेबल अमान्य है।
+err-invalid-pdf = PDF बनाने में समस्या हुई।
+err-invalid-import = इम्पोर्ट फ़ाइल अमान्य है।
+err-invalid-generic = प्रदान किया गया मान अमान्य है।

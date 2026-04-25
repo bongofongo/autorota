@@ -1,0 +1,11 @@
+err-db-connection-failed = تعذّر الاتصال بقاعدة البيانات.
+err-db-row-not-found = لم يعد هذا السجل موجوداً، ربما تم حذفه.
+err-db-generic = حدث خطأ غير متوقع في قاعدة البيانات.
+err-not-found-employee = لم يتم العثور على الموظف.
+err-not-found-schedule = لا يوجد جدول متاح لهذا الأسبوع.
+err-not-found-generic = تعذّر العثور على العنصر المطلوب.
+err-invalid-date = صيغة التاريخ غير صالحة.
+err-invalid-save-tag = التسمية غير صالحة.
+err-invalid-pdf = حدثت مشكلة أثناء إنشاء ملف PDF.
+err-invalid-import = ملف الاستيراد غير صالح.
+err-invalid-generic = القيمة المُقدَّمة غير صالحة.

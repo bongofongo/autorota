@@ -528,6 +528,11 @@ RustBuffer uniffi_autorota_ffi_fn_func_list_shift_templates(RustCallStatus *_Non
 RustBuffer uniffi_autorota_ffi_fn_func_list_shifts_for_rota(int64_t rota_id, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LOCALIZE_ERROR
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LOCALIZE_ERROR
+RustBuffer uniffi_autorota_ffi_fn_func_localize_error(RustBuffer code, RustBuffer locale_id, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_MARK_RECORDS_SYNCED
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_MARK_RECORDS_SYNCED
 void uniffi_autorota_ffi_fn_func_mark_records_synced(RustBuffer table_name, RustBuffer record_ids, RustBuffer base_snapshots, RustCallStatus *_Nonnull out_status
@@ -1219,6 +1224,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_list_shift_templates(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_SHIFTS_FOR_ROTA
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LIST_SHIFTS_FOR_ROTA
 uint16_t uniffi_autorota_ffi_checksum_func_list_shifts_for_rota(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LOCALIZE_ERROR
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_LOCALIZE_ERROR
+uint16_t uniffi_autorota_ffi_checksum_func_localize_error(void
     
 );
 #endif

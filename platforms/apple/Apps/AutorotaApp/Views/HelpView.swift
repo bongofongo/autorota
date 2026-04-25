@@ -4,107 +4,111 @@ struct HelpView: View {
     var body: some View {
         List {
             Section {
-                Text("Autorota helps you create weekly shift schedules for your cafe. Follow these steps to get started:")
+                Text("help.intro")
                     .font(.title3)
                 VStack(alignment: .leading, spacing: 8) {
-                    helpStep(number: 1, text: "Add your employees and their roles")
-                    helpStep(number: 2, text: "Create shifts for each day")
-                    helpStep(number: 3, text: "Generate a rota for any week")
+                    helpStep(number: 1, text: "help.step.1")
+                    helpStep(number: 2, text: "help.step.2")
+                    helpStep(number: 3, text: "help.step.3")
                 }
                 .font(.title3)
                 .padding(.vertical, 4)
             } header: {
-                Text("Getting Started")
+                Text("help.section.getting_started")
             }
 
             helpSection(
-                title: "Employees",
+                title: "help.section.employees",
                 icon: "person.2",
                 items: [
-                    "Tap the + button to add a new employee.",
-                    "Set their first name, last name, and optional nickname.",
-                    "Assign one or more roles (e.g. Barista, Kitchen).",
-                    "Set an hourly rate and weekly hour limits.",
-                    "Mark which hours of each day they are available to work.",
-                    "Tap an employee to see their details or shift history.",
+                    "help.section.employees.item.1",
+                    "help.section.employees.item.2",
+                    "help.section.employees.item.3",
+                    "help.section.employees.item.4",
+                    "help.section.employees.item.5",
+                    "help.section.employees.item.6",
                 ]
             )
 
             helpSection(
-                title: "Shifts",
+                title: "help.section.shifts",
                 icon: "clock",
                 items: [
-                    "Shifts define the slots you schedule each week.",
-                    "Set a name, start time, end time, and day of the week.",
-                    "Choose which roles are needed and how many staff.",
-                    "Shifts are reused every time you generate a rota.",
+                    "help.section.shifts.item.1",
+                    "help.section.shifts.item.2",
+                    "help.section.shifts.item.3",
+                    "help.section.shifts.item.4",
                 ]
             )
 
             helpSection(
-                title: "Rota",
+                title: "help.section.rota",
                 icon: "calendar",
                 items: [
-                    "The main schedule view shows one week at a time.",
-                    "Use the arrow buttons to move between weeks.",
-                    "Tap Generate to automatically assign employees to shifts.",
-                    "Tap any assignment to change it manually.",
-                    "Confirm shifts when you are happy with the schedule.",
+                    "help.section.rota.item.1",
+                    "help.section.rota.item.2",
+                    "help.section.rota.item.3",
+                    "help.section.rota.item.4",
+                    "help.section.rota.item.5",
                 ]
             )
 
             helpSection(
-                title: "Exceptions",
+                title: "help.section.exceptions",
                 icon: "exclamationmark.circle",
                 items: [
-                    "Use exceptions for one-off changes to a specific date.",
-                    "Pin an employee to a shift or exclude them from one.",
-                    "Change an employee's availability for a single day.",
-                    "Exceptions take priority over the generated schedule.",
+                    "help.section.exceptions.item.1",
+                    "help.section.exceptions.item.2",
+                    "help.section.exceptions.item.3",
+                    "help.section.exceptions.item.4",
                 ]
             )
 
             helpSection(
-                title: "History",
+                title: "help.section.history",
                 icon: "clock.arrow.circlepath",
                 items: [
-                    "View a log of all saved schedule changes.",
-                    "See what was changed and when.",
-                    "Useful for tracking edits over time.",
+                    "help.section.history.item.1",
+                    "help.section.history.item.2",
+                    "help.section.history.item.3",
                 ]
             )
 
             helpSection(
-                title: "Exporting",
+                title: "help.section.exporting",
                 icon: "square.and.arrow.up",
                 items: [
-                    "Export your rota as CSV or JSON from the Rota tab.",
-                    "Choose a layout: by employee or by shift.",
-                    "Set your default export preferences in Menu settings.",
+                    "help.section.exporting.item.1",
+                    "help.section.exporting.item.2",
+                    "help.section.exporting.item.3",
                 ]
             )
 
             helpSection(
-                title: "Settings",
+                title: "help.section.settings",
                 icon: "gearshape",
                 items: [
-                    "Change the app theme to Light, Dark, or System.",
-                    "Set your preferred currency for hourly rates.",
-                    "Customise which tabs appear in your tab bar.",
-                    "iCloud Sync keeps your data up to date across devices.",
+                    "help.section.settings.item.1",
+                    "help.section.settings.item.2",
+                    "help.section.settings.item.3",
+                    "help.section.settings.item.4",
                 ]
             )
         }
-        .navigationTitle("Help & Guide")
+        .navigationTitle("help.nav_title")
     }
 
     @ViewBuilder
-    private func helpSection(title: String, icon: String, items: [String]) -> some View {
+    private func helpSection(
+        title: LocalizedStringKey,
+        icon: String,
+        items: [LocalizedStringKey]
+    ) -> some View {
         DisclosureGroup {
-            ForEach(items, id: \.self) { item in
+            ForEach(items.indices, id: \.self) { idx in
                 HStack(alignment: .top, spacing: 8) {
-                    Text("\u{2022}")
-                    Text(item)
+                    Text(verbatim: "\u{2022}")
+                    Text(items[idx])
                 }
                 .font(.title3)
             }
@@ -114,9 +118,9 @@ struct HelpView: View {
         }
     }
 
-    private func helpStep(number: Int, text: String) -> some View {
+    private func helpStep(number: Int, text: LocalizedStringKey) -> some View {
         HStack(alignment: .top, spacing: 8) {
-            Text("\(number).")
+            Text(verbatim: "\(number).")
                 .bold()
             Text(text)
         }

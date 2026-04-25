@@ -1,0 +1,11 @@
+err-db-connection-failed = 无法连接到数据库。
+err-db-row-not-found = 此记录已不存在,可能已被删除。
+err-db-generic = 发生未预期的数据库错误。
+err-not-found-employee = 找不到员工。
+err-not-found-schedule = 此周没有可用的排班表。
+err-not-found-generic = 找不到所请求的项目。
+err-invalid-date = 日期格式无效。
+err-invalid-save-tag = 标签无效。
+err-invalid-pdf = 创建 PDF 时出现问题。
+err-invalid-import = 导入文件无效。
+err-invalid-generic = 提供的值无效。

@@ -33,12 +33,12 @@ struct EditLogViewModelTests {
     @Test("loadSaves surfaces clean error message from FfiError")
     func loadSavesSurfacesCleanFfiError() async {
         let mock = makeMock()
-        mock.errorToThrow = FfiError.Db(msg: "A referenced record no longer exists.")
+        mock.errorToThrow = FfiError.Db(code: .dbRowNotFound, msg: "row gone")
         let vm = EditLogViewModel(service: mock)
 
         await vm.loadSaves()
 
-        #expect(vm.error == "A referenced record no longer exists.")
+        #expect(vm.error == "This record no longer exists. It may have been deleted.")
     }
 
     @Test("loadSaves with empty result shows no error")
@@ -204,12 +204,12 @@ struct EditLogViewModelTests {
     @Test("restoreToSave surfaces error")
     func restoreToSaveSurfacesError() async {
         let mock = makeMock()
-        mock.errorToThrow = FfiError.NotFound(msg: "Save not found")
+        mock.errorToThrow = FfiError.NotFound(code: .notFoundGeneric, msg: "save missing")
         let vm = EditLogViewModel(service: mock)
 
         await vm.restoreToSave(id: 999, summary: "x", weekStart: "2026-03-30")
 
-        #expect(vm.error == "Save not found")
+        #expect(vm.error == "The requested item could not be found.")
         #expect(vm.restoreToast == nil)
     }
 }

@@ -4198,20 +4198,156 @@ public func FfiConverterTypeFfiWeekSchedule_lower(_ value: FfiWeekSchedule) -> R
     return FfiConverterTypeFfiWeekSchedule.lower(value)
 }
 
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+/**
+ * Stable error code surfaced to callers. The variant carries no data so it
+ * can be transported across the FFI boundary cheaply and used as a key into
+ * the Fluent translation bundle.
+ */
+
+public enum ErrorCode {
+    
+    case dbConnectionFailed
+    case dbRowNotFound
+    case dbGeneric
+    case notFoundEmployee
+    case notFoundSchedule
+    case notFoundGeneric
+    case invalidDate
+    case invalidSaveTag
+    case invalidPdf
+    case invalidImport
+    case invalidGeneric
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeErrorCode: FfiConverterRustBuffer {
+    typealias SwiftType = ErrorCode
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ErrorCode {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .dbConnectionFailed
+        
+        case 2: return .dbRowNotFound
+        
+        case 3: return .dbGeneric
+        
+        case 4: return .notFoundEmployee
+        
+        case 5: return .notFoundSchedule
+        
+        case 6: return .notFoundGeneric
+        
+        case 7: return .invalidDate
+        
+        case 8: return .invalidSaveTag
+        
+        case 9: return .invalidPdf
+        
+        case 10: return .invalidImport
+        
+        case 11: return .invalidGeneric
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: ErrorCode, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .dbConnectionFailed:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .dbRowNotFound:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .dbGeneric:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .notFoundEmployee:
+            writeInt(&buf, Int32(4))
+        
+        
+        case .notFoundSchedule:
+            writeInt(&buf, Int32(5))
+        
+        
+        case .notFoundGeneric:
+            writeInt(&buf, Int32(6))
+        
+        
+        case .invalidDate:
+            writeInt(&buf, Int32(7))
+        
+        
+        case .invalidSaveTag:
+            writeInt(&buf, Int32(8))
+        
+        
+        case .invalidPdf:
+            writeInt(&buf, Int32(9))
+        
+        
+        case .invalidImport:
+            writeInt(&buf, Int32(10))
+        
+        
+        case .invalidGeneric:
+            writeInt(&buf, Int32(11))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeErrorCode_lift(_ buf: RustBuffer) throws -> ErrorCode {
+    return try FfiConverterTypeErrorCode.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeErrorCode_lower(_ value: ErrorCode) -> RustBuffer {
+    return FfiConverterTypeErrorCode.lower(value)
+}
+
+
+
+extension ErrorCode: Equatable, Hashable {}
+
+
+
 
 /**
  * Typed error returned across the FFI boundary.
  * Swift receives a `FfiError` enum that can be pattern-matched in do/catch.
+ *
+ * `code` is the stable, locale-agnostic key for translation lookup.
+ * `msg` is an English developer-oriented detail used for logs / debugging,
+ * not for direct user display — call `localizeError` to produce user copy.
  */
 public enum FfiError {
 
     
     
-    case Db(msg: String
+    case Db(code: ErrorCode, msg: String
     )
-    case NotFound(msg: String
+    case NotFound(code: ErrorCode, msg: String
     )
-    case InvalidArgument(msg: String
+    case InvalidArgument(code: ErrorCode, msg: String
     )
 }
 
@@ -4230,12 +4366,15 @@ public struct FfiConverterTypeFfiError: FfiConverterRustBuffer {
 
         
         case 1: return .Db(
+            code: try FfiConverterTypeErrorCode.read(from: &buf), 
             msg: try FfiConverterString.read(from: &buf)
             )
         case 2: return .NotFound(
+            code: try FfiConverterTypeErrorCode.read(from: &buf), 
             msg: try FfiConverterString.read(from: &buf)
             )
         case 3: return .InvalidArgument(
+            code: try FfiConverterTypeErrorCode.read(from: &buf), 
             msg: try FfiConverterString.read(from: &buf)
             )
 
@@ -4250,18 +4389,21 @@ public struct FfiConverterTypeFfiError: FfiConverterRustBuffer {
 
         
         
-        case let .Db(msg):
+        case let .Db(code,msg):
             writeInt(&buf, Int32(1))
+            FfiConverterTypeErrorCode.write(code, into: &buf)
             FfiConverterString.write(msg, into: &buf)
             
         
-        case let .NotFound(msg):
+        case let .NotFound(code,msg):
             writeInt(&buf, Int32(2))
+            FfiConverterTypeErrorCode.write(code, into: &buf)
             FfiConverterString.write(msg, into: &buf)
             
         
-        case let .InvalidArgument(msg):
+        case let .InvalidArgument(code,msg):
             writeInt(&buf, Int32(3))
+            FfiConverterTypeErrorCode.write(code, into: &buf)
             FfiConverterString.write(msg, into: &buf)
             
         }
@@ -5119,8 +5261,8 @@ fileprivate struct FfiConverterSequenceTypeFfiTombstone: FfiConverterRustBuffer 
 /**
  * Add a tag to a save. Enforces max tags per save, rejects duplicates
  * (case-insensitive), and validates the tag string (non-empty, ≤15 chars,
- * no `;`). Errors surface as distinct `FfiError::Validation` codes so the
- * UI can show a specific inline hint.
+ * no `;`). Errors surface as `FfiError::InvalidArgument` with the
+ * `ErrorCode::InvalidSaveTag` code so the UI can show a specific inline hint.
  */
 public func addSaveTag(saveId: Int64, tag: String)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_add_save_tag(
@@ -5537,6 +5679,18 @@ public func listShiftsForRota(rotaId: Int64)throws  -> [FfiShift] {
     )
 })
 }
+/**
+ * Look up the localized user-facing message for a given error code.
+ * Exposed via UniFFI so Swift / Kotlin callers can render translated alerts.
+ */
+public func localizeError(code: ErrorCode, localeId: String) -> String {
+    return try!  FfiConverterString.lift(try! rustCall() {
+    uniffi_autorota_ffi_fn_func_localize_error(
+        FfiConverterTypeErrorCode.lower(code),
+        FfiConverterString.lower(localeId),$0
+    )
+})
+}
 public func markRecordsSynced(tableName: String, recordIds: [Int64], baseSnapshots: [String])throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_mark_records_synced(
         FfiConverterString.lower(tableName),
@@ -5698,7 +5852,7 @@ private var initializationResult: InitializationResult = {
     if bindings_contract_version != scaffolding_contract_version {
         return InitializationResult.contractVersionMismatch
     }
-    if (uniffi_autorota_ffi_checksum_func_add_save_tag() != 65371) {
+    if (uniffi_autorota_ffi_checksum_func_add_save_tag() != 15356) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_apply_remote_record() != 2938) {
@@ -5858,6 +6012,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_list_shifts_for_rota() != 18619) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_localize_error() != 55196) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_mark_records_synced() != 61452) {

@@ -17,6 +17,7 @@ struct AutorotaAppApp: App {
     @AppStorage("colorBlindnessMode") private var colorBlindnessMode: String = ColorBlindnessMode.none.rawValue
     @State private var exchangeRateService = ExchangeRateService()
     @State private var syncEngine = AutorotaSyncEngine()
+    @State private var localeManager = LocaleManager()
     @State private var showSyncPrompt = false
     @State private var syncCheckComplete = false
 
@@ -57,6 +58,8 @@ struct AutorotaAppApp: App {
             }
             .environment(exchangeRateService)
             .environment(syncEngine)
+            .environment(localeManager)
+            .environment(\.locale, localeManager.effectiveLocale)
             .environment(\.accessibilityPalette, selectedPalette)
             .task {
                 await exchangeRateService.fetchRates()

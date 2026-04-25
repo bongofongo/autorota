@@ -1,0 +1,11 @@
+err-db-connection-failed = No se pudo conectar a la base de datos.
+err-db-row-not-found = Este registro ya no existe. Es posible que se haya eliminado.
+err-db-generic = Se produjo un error inesperado en la base de datos.
+err-not-found-employee = No se encontró el empleado.
+err-not-found-schedule = No hay horario disponible para esta semana.
+err-not-found-generic = No se pudo encontrar el elemento solicitado.
+err-invalid-date = El formato de fecha no es válido.
+err-invalid-save-tag = La etiqueta no es válida.
+err-invalid-pdf = Hubo un problema al crear el PDF.
+err-invalid-import = El archivo de importación no es válido.
+err-invalid-generic = El valor proporcionado no es válido.

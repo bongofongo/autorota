@@ -1,0 +1,11 @@
+err-db-connection-failed = ডাটাবেসের সাথে সংযোগ করা যায়নি।
+err-db-row-not-found = এই রেকর্ডটি আর বিদ্যমান নেই। এটি মুছে ফেলা হয়ে থাকতে পারে।
+err-db-generic = একটি অপ্রত্যাশিত ডাটাবেস ত্রুটি ঘটেছে।
+err-not-found-employee = কর্মচারী খুঁজে পাওয়া যায়নি।
+err-not-found-schedule = এই সপ্তাহের জন্য কোনো সময়সূচি উপলব্ধ নেই।
+err-not-found-generic = অনুরোধকৃত আইটেমটি পাওয়া যায়নি।
+err-invalid-date = তারিখের ফরম্যাট অবৈধ।
+err-invalid-save-tag = লেবেলটি অবৈধ।
+err-invalid-pdf = PDF তৈরি করতে সমস্যা হয়েছে।
+err-invalid-import = ইমপোর্ট ফাইলটি অবৈধ।
+err-invalid-generic = প্রদত্ত মানটি অবৈধ।

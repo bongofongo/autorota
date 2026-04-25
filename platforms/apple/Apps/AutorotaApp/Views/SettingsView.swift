@@ -52,13 +52,15 @@ struct SettingsView: View {
     @AppStorage("exportShowRole") private var exportShowRole: Bool = true
     @Environment(TabLayoutManager.self) private var layoutManager
     @Environment(AutorotaSyncEngine.self) private var syncEngine
+    @Environment(LocaleManager.self) private var localeManager
 
     private var selectedAppearance: AppAppearance {
         AppAppearance(rawValue: appearance) ?? .system
     }
 
     var body: some View {
-        NavigationStack {
+        @Bindable var localeManager = localeManager
+        return NavigationStack {
             Form {
                 // Navigation links for pages not in the tab bar
                 if !layoutManager.hiddenPages.isEmpty {
@@ -81,6 +83,23 @@ struct SettingsView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                }
+
+                Section {
+                    Picker("settings.language.title", selection: $localeManager.selectedIdentifier) {
+                        Text("settings.language.match_system").tag(String?.none)
+                        Text(verbatim: "English").tag(String?("en"))
+                        Text(verbatim: "中文（简体）").tag(String?("zh-Hans"))
+                        Text(verbatim: "中文（繁體）").tag(String?("zh-Hant"))
+                        Text(verbatim: "العربية").tag(String?("ar"))
+                        Text(verbatim: "বাংলা").tag(String?("bn"))
+                        Text(verbatim: "हिन्दी").tag(String?("hi"))
+                        Text(verbatim: "Español").tag(String?("es"))
+                    }
+                } header: {
+                    Text("settings.language.section_header")
+                } footer: {
+                    Text("settings.language.restart_note")
                 }
 
                 Section {
@@ -140,7 +159,7 @@ struct SettingsView: View {
                                         Image(systemName: "arrow.down.circle.fill")
                                             .foregroundStyle(.red)
                                     }
-                                    .accessibilityLabel("Hide \(page.title) from tab bar")
+                                    .accessibilityLabel("Hide \(page.titleString) from tab bar")
                                 }
                             }
                         } header: {
@@ -160,7 +179,7 @@ struct SettingsView: View {
                                                 .foregroundStyle(layoutManager.configurableTabBarPages.count >= TabPage.maxConfigurable ? .gray : .blue)
                                         }
                                         .disabled(layoutManager.configurableTabBarPages.count >= TabPage.maxConfigurable)
-                                        .accessibilityLabel("Add \(page.title) to tab bar")
+                                        .accessibilityLabel("Add \(page.titleString) to tab bar")
                                     }
                                 }
                             } header: {

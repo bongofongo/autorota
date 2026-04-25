@@ -17,7 +17,7 @@ use chrono::{Datelike, Local, NaiveDate, NaiveTime, Weekday};
 use sqlx::SqlitePool;
 use tokio::runtime::Runtime;
 
-pub use error::FfiError;
+pub use error::{ErrorCode, FfiError, localize_error};
 pub use types::*;
 
 uniffi::setup_scaffolding!();
@@ -33,6 +33,7 @@ fn rt() -> &'static Runtime {
 
 fn pool() -> Result<&'static SqlitePool, FfiError> {
     POOL.get().ok_or_else(|| FfiError::Db {
+        code: ErrorCode::DbConnectionFailed,
         msg: "database not initialized — call initDb first".into(),
     })
 }
@@ -41,6 +42,7 @@ fn pool() -> Result<&'static SqlitePool, FfiError> {
 
 fn parse_date(s: &str) -> Result<NaiveDate, FfiError> {
     NaiveDate::parse_from_str(s, "%Y-%m-%d").map_err(|e| FfiError::InvalidArgument {
+        code: ErrorCode::InvalidDate,
         msg: format!("invalid date '{s}': {e}"),
     })
 }
@@ -49,6 +51,7 @@ fn parse_time(s: &str) -> Result<NaiveTime, FfiError> {
     NaiveTime::parse_from_str(s, "%H:%M")
         .or_else(|_| NaiveTime::parse_from_str(s, "%H:%M:%S"))
         .map_err(|e| FfiError::InvalidArgument {
+            code: ErrorCode::InvalidDate,
             msg: format!("invalid time '{s}': {e}"),
         })
 }
@@ -75,6 +78,7 @@ fn weekday_from_str(s: &str) -> Result<Weekday, FfiError> {
         "Sat" => Ok(Weekday::Sat),
         "Sun" => Ok(Weekday::Sun),
         other => Err(FfiError::InvalidArgument {
+            code: ErrorCode::InvalidGeneric,
             msg: format!("invalid weekday: {other}"),
         }),
     }
@@ -98,10 +102,13 @@ fn slots_to_availability(slots: Vec<AvailabilitySlot>) -> Result<Availability, F
     let mut avail = Availability::default();
     for slot in slots {
         let wd = weekday_from_str(&slot.weekday)?;
-        let state = slot
-            .state
-            .parse::<AvailabilityState>()
-            .map_err(|e| FfiError::InvalidArgument { msg: e })?;
+        let state =
+            slot.state
+                .parse::<AvailabilityState>()
+                .map_err(|e| FfiError::InvalidArgument {
+                    code: ErrorCode::InvalidGeneric,
+                    msg: e,
+                })?;
         avail.set(wd, slot.hour, state);
     }
     Ok(avail)
@@ -236,7 +243,10 @@ fn ffi_to_assignment(a: FfiAssignment) -> Result<Assignment, FfiError> {
         status: a
             .status
             .parse::<AssignmentStatus>()
-            .map_err(|e| FfiError::InvalidArgument { msg: e })?,
+            .map_err(|e| FfiError::InvalidArgument {
+                code: ErrorCode::InvalidGeneric,
+                msg: e,
+            })?,
         employee_name: a.employee_name,
         hourly_wage: a.hourly_wage,
     })
@@ -264,10 +274,12 @@ fn rota_to_ffi(r: Rota) -> FfiRota {
 #[uniffi::export]
 pub fn init_db(db_path: String) -> Result<(), FfiError> {
     let url = format!("sqlite:{db_path}");
-    let pool = rt()
-        .block_on(db::connect(&url))
-        .map_err(|e| FfiError::Db { msg: e.to_string() })?;
+    let pool = rt().block_on(db::connect(&url)).map_err(|e| FfiError::Db {
+        code: ErrorCode::DbConnectionFailed,
+        msg: e.to_string(),
+    })?;
     POOL.set(pool).map_err(|_| FfiError::Db {
+        code: ErrorCode::DbConnectionFailed,
         msg: "database already initialized".into(),
     })
 }
@@ -445,7 +457,10 @@ pub fn update_assignment_status(id: i64, status: String) -> Result<(), FfiError>
     let pool = pool()?;
     let s = status
         .parse::<AssignmentStatus>()
-        .map_err(|e| FfiError::InvalidArgument { msg: e })?;
+        .map_err(|e| FfiError::InvalidArgument {
+            code: ErrorCode::InvalidGeneric,
+            msg: e,
+        })?;
     rt().block_on(queries::update_assignment_status(pool, id, s))
         .map_err(FfiError::from)
 }
@@ -586,7 +601,10 @@ pub fn materialise_week(week_start: String) -> Result<i64, FfiError> {
             }
         }
     });
-    result.map_err(|e| FfiError::Db { msg: e.to_string() })
+    result.map_err(|e| FfiError::Db {
+        code: ErrorCode::DbGeneric,
+        msg: e.to_string(),
+    })
 }
 
 /// Create an empty rota record for the given week with no shifts and no assignments.
@@ -601,7 +619,10 @@ pub fn create_empty_week(week_start: String) -> Result<i64, FfiError> {
             None => queries::insert_rota(pool, date).await,
         }
     });
-    result.map_err(|e| FfiError::Db { msg: e.to_string() })
+    result.map_err(|e| FfiError::Db {
+        code: ErrorCode::DbGeneric,
+        msg: e.to_string(),
+    })
 }
 
 /// Delete the rota for the given week along with all its shifts and assignments.
@@ -616,7 +637,10 @@ pub fn delete_week(week_start: String) -> Result<(), FfiError> {
         }
         Ok(())
     });
-    result.map_err(|e| FfiError::Db { msg: e.to_string() })
+    result.map_err(|e| FfiError::Db {
+        code: ErrorCode::DbGeneric,
+        msg: e.to_string(),
+    })
 }
 
 /// Create/update a rota for the given week, re-materialise shifts, run the
@@ -632,6 +656,7 @@ pub fn run_schedule(week_start: String) -> Result<FfiScheduleResult, FfiError> {
         today - chrono::Duration::days(today.weekday().num_days_from_monday() as i64);
     if date <= current_monday {
         return Err(FfiError::InvalidArgument {
+            code: ErrorCode::InvalidGeneric,
             msg: "cannot generate schedule for current or past weeks".into(),
         });
     }
@@ -652,12 +677,18 @@ pub fn run_schedule(week_start: String) -> Result<FfiScheduleResult, FfiError> {
             }
         }
     });
-    let rota_id = rota_id.map_err(|e| FfiError::Db { msg: e.to_string() })?;
+    let rota_id = rota_id.map_err(|e| FfiError::Db {
+        code: ErrorCode::DbGeneric,
+        msg: e.to_string(),
+    })?;
 
     // Step 2: run scheduler
     let result = rt()
         .block_on(autorota_core::scheduler::schedule(pool, rota_id))
-        .map_err(|e| FfiError::Db { msg: e.to_string() })?;
+        .map_err(|e| FfiError::Db {
+            code: ErrorCode::DbGeneric,
+            msg: e.to_string(),
+        })?;
 
     Ok(FfiScheduleResult {
         assignments: result
@@ -750,7 +781,10 @@ pub fn get_week_schedule(week_start: String) -> Result<Option<FfiWeekSchedule>, 
             shifts: shift_infos,
         }))
     });
-    result.map_err(|e| FfiError::Db { msg: e.to_string() })
+    result.map_err(|e| FfiError::Db {
+        code: ErrorCode::DbGeneric,
+        msg: e.to_string(),
+    })
 }
 
 // ── Shift listing (useful for ad-hoc shift management) ────────────────────────
@@ -772,24 +806,36 @@ use autorota_core::export::config::{
 };
 
 fn parse_export_config(config: FfiExportConfig) -> Result<ExportConfig, FfiError> {
-    let layout: ExportLayout = config
-        .layout
-        .parse()
-        .map_err(|e: String| FfiError::InvalidArgument { msg: e })?;
-    let format: ExportFormat = config
-        .format
-        .parse()
-        .map_err(|e: String| FfiError::InvalidArgument { msg: e })?;
-    let profile: ExportProfile = config
-        .profile
-        .parse()
-        .map_err(|e: String| FfiError::InvalidArgument { msg: e })?;
+    let layout: ExportLayout =
+        config
+            .layout
+            .parse()
+            .map_err(|e: String| FfiError::InvalidArgument {
+                code: ErrorCode::InvalidGeneric,
+                msg: e,
+            })?;
+    let format: ExportFormat =
+        config
+            .format
+            .parse()
+            .map_err(|e: String| FfiError::InvalidArgument {
+                code: ErrorCode::InvalidGeneric,
+                msg: e,
+            })?;
+    let profile: ExportProfile =
+        config
+            .profile
+            .parse()
+            .map_err(|e: String| FfiError::InvalidArgument {
+                code: ErrorCode::InvalidGeneric,
+                msg: e,
+            })?;
     let pdf_template: Option<PdfTemplate> = match config.pdf_template.as_deref() {
         None | Some("") => None,
-        Some(s) => Some(
-            s.parse()
-                .map_err(|e: String| FfiError::InvalidArgument { msg: e })?,
-        ),
+        Some(s) => Some(s.parse().map_err(|e: String| FfiError::InvalidArgument {
+            code: ErrorCode::InvalidGeneric,
+            msg: e,
+        })?),
     };
 
     Ok(ExportConfig {
@@ -822,13 +868,21 @@ pub fn export_week_schedule(
         ))
         .map_err(|e| match e {
             autorota_core::export::ExportError::Db(db_err) => FfiError::Db {
+                code: ErrorCode::DbGeneric,
                 msg: db_err.to_string(),
             },
-            autorota_core::export::ExportError::NoSchedule(msg) => FfiError::NotFound { msg },
+            autorota_core::export::ExportError::NoSchedule(msg) => FfiError::NotFound {
+                code: ErrorCode::NotFoundSchedule,
+                msg,
+            },
             autorota_core::export::ExportError::EmployeeNotFound(id) => FfiError::NotFound {
+                code: ErrorCode::NotFoundEmployee,
                 msg: format!("employee {id} not found"),
             },
-            autorota_core::export::ExportError::Pdf(msg) => FfiError::InvalidArgument { msg },
+            autorota_core::export::ExportError::Pdf(msg) => FfiError::InvalidArgument {
+                code: ErrorCode::InvalidPdf,
+                msg,
+            },
         })?;
 
     Ok(FfiExportResult {
@@ -845,14 +899,22 @@ pub fn export_employee_schedule(
     let pool = pool()?;
     let start_date = parse_date(&config.start_date)?;
     let end_date = parse_date(&config.end_date)?;
-    let format: ExportFormat = config
-        .format
-        .parse()
-        .map_err(|e: String| FfiError::InvalidArgument { msg: e })?;
-    let profile: ExportProfile = config
-        .profile
-        .parse()
-        .map_err(|e: String| FfiError::InvalidArgument { msg: e })?;
+    let format: ExportFormat =
+        config
+            .format
+            .parse()
+            .map_err(|e: String| FfiError::InvalidArgument {
+                code: ErrorCode::InvalidGeneric,
+                msg: e,
+            })?;
+    let profile: ExportProfile =
+        config
+            .profile
+            .parse()
+            .map_err(|e: String| FfiError::InvalidArgument {
+                code: ErrorCode::InvalidGeneric,
+                msg: e,
+            })?;
 
     let core_config = EmployeeExportConfig {
         employee_id: config.employee_id,
@@ -876,13 +938,21 @@ pub fn export_employee_schedule(
         ))
         .map_err(|e| match e {
             autorota_core::export::ExportError::Db(db_err) => FfiError::Db {
+                code: ErrorCode::DbGeneric,
                 msg: db_err.to_string(),
             },
-            autorota_core::export::ExportError::NoSchedule(msg) => FfiError::NotFound { msg },
+            autorota_core::export::ExportError::NoSchedule(msg) => FfiError::NotFound {
+                code: ErrorCode::NotFoundSchedule,
+                msg,
+            },
             autorota_core::export::ExportError::EmployeeNotFound(id) => FfiError::NotFound {
+                code: ErrorCode::NotFoundEmployee,
                 msg: format!("employee {id} not found"),
             },
-            autorota_core::export::ExportError::Pdf(msg) => FfiError::InvalidArgument { msg },
+            autorota_core::export::ExportError::Pdf(msg) => FfiError::InvalidArgument {
+                code: ErrorCode::InvalidPdf,
+                msg,
+            },
         })?;
 
     Ok(FfiExportResult {
@@ -899,8 +969,12 @@ pub fn export_preview_full(config: FfiExportConfig) -> Result<FfiExportResult, F
     let core_config = parse_export_config(config)?;
     let result = autorota_core::export::preview::generate_preview_full(core_config).map_err(
         |e| match e {
-            autorota_core::export::ExportError::Pdf(msg) => FfiError::InvalidArgument { msg },
+            autorota_core::export::ExportError::Pdf(msg) => FfiError::InvalidArgument {
+                code: ErrorCode::InvalidPdf,
+                msg,
+            },
             other => FfiError::InvalidArgument {
+                code: ErrorCode::InvalidGeneric,
                 msg: other.to_string(),
             },
         },
@@ -918,14 +992,22 @@ pub fn export_preview_full(config: FfiExportConfig) -> Result<FfiExportResult, F
 pub fn export_preview_employee(
     config: FfiEmployeeExportConfig,
 ) -> Result<FfiExportResult, FfiError> {
-    let format: ExportFormat = config
-        .format
-        .parse()
-        .map_err(|e: String| FfiError::InvalidArgument { msg: e })?;
-    let profile: ExportProfile = config
-        .profile
-        .parse()
-        .map_err(|e: String| FfiError::InvalidArgument { msg: e })?;
+    let format: ExportFormat =
+        config
+            .format
+            .parse()
+            .map_err(|e: String| FfiError::InvalidArgument {
+                code: ErrorCode::InvalidGeneric,
+                msg: e,
+            })?;
+    let profile: ExportProfile =
+        config
+            .profile
+            .parse()
+            .map_err(|e: String| FfiError::InvalidArgument {
+                code: ErrorCode::InvalidGeneric,
+                msg: e,
+            })?;
 
     let core_config = EmployeeExportConfig {
         employee_id: config.employee_id,
@@ -941,8 +1023,12 @@ pub fn export_preview_employee(
 
     let result = autorota_core::export::preview::generate_preview_employee(core_config).map_err(
         |e| match e {
-            autorota_core::export::ExportError::Pdf(msg) => FfiError::InvalidArgument { msg },
+            autorota_core::export::ExportError::Pdf(msg) => FfiError::InvalidArgument {
+                code: ErrorCode::InvalidPdf,
+                msg,
+            },
             other => FfiError::InvalidArgument {
+                code: ErrorCode::InvalidGeneric,
                 msg: other.to_string(),
             },
         },
@@ -1028,15 +1114,28 @@ pub fn parse_roster_file(
     let pool = pool()?;
     let strat: MergeStrategy = strategy
         .parse()
-        .map_err(|e: String| FfiError::InvalidArgument { msg: e })?;
+        .map_err(|e: String| FfiError::InvalidArgument {
+            code: ErrorCode::InvalidGeneric,
+            msg: e,
+        })?;
 
     let parsed: ParsedRoster = rt()
-        .block_on(import::roster::parse_roster(pool, &bytes, &format_hint, strat))
+        .block_on(import::roster::parse_roster(
+            pool,
+            &bytes,
+            &format_hint,
+            strat,
+        ))
         .map_err(|e| match e {
-            import::roster::ImportError::Db(db) => FfiError::Db { msg: db.to_string() },
-            import::roster::ImportError::Parse(m) | import::roster::ImportError::UnsupportedFormat(m) => {
-                FfiError::InvalidArgument { msg: m }
-            }
+            import::roster::ImportError::Db(db) => FfiError::Db {
+                code: ErrorCode::DbGeneric,
+                msg: db.to_string(),
+            },
+            import::roster::ImportError::Parse(m)
+            | import::roster::ImportError::UnsupportedFormat(m) => FfiError::InvalidArgument {
+                code: ErrorCode::InvalidImport,
+                msg: m,
+            },
         })?;
 
     Ok(FfiParsedRoster {
@@ -1046,18 +1145,21 @@ pub fn parse_roster_file(
 }
 
 #[uniffi::export]
-pub fn apply_roster_import(
-    rows: Vec<FfiParsedEmployeeRow>,
-) -> Result<FfiImportSummary, FfiError> {
+pub fn apply_roster_import(rows: Vec<FfiParsedEmployeeRow>) -> Result<FfiImportSummary, FfiError> {
     let pool = pool()?;
     let core_rows: Vec<ParsedEmployeeRow> = rows.into_iter().map(ffi_to_row).collect();
     let summary = rt()
         .block_on(import::roster::apply_import(pool, &core_rows))
         .map_err(|e| match e {
-            import::roster::ImportError::Db(db) => FfiError::Db { msg: db.to_string() },
-            import::roster::ImportError::Parse(m) | import::roster::ImportError::UnsupportedFormat(m) => {
-                FfiError::InvalidArgument { msg: m }
-            }
+            import::roster::ImportError::Db(db) => FfiError::Db {
+                code: ErrorCode::DbGeneric,
+                msg: db.to_string(),
+            },
+            import::roster::ImportError::Parse(m)
+            | import::roster::ImportError::UnsupportedFormat(m) => FfiError::InvalidArgument {
+                code: ErrorCode::InvalidImport,
+                msg: m,
+            },
         })?;
     Ok(FfiImportSummary {
         inserted: summary.inserted,
@@ -1566,10 +1668,13 @@ fn day_availability_to_slots(avail: &DayAvailability) -> Vec<DayAvailabilitySlot
 fn slots_to_day_availability(slots: Vec<DayAvailabilitySlot>) -> Result<DayAvailability, FfiError> {
     let mut avail = DayAvailability::default();
     for s in slots {
-        let state = s
-            .state
-            .parse::<AvailabilityState>()
-            .map_err(|e| FfiError::InvalidArgument { msg: e })?;
+        let state =
+            s.state
+                .parse::<AvailabilityState>()
+                .map_err(|e| FfiError::InvalidArgument {
+                    code: ErrorCode::InvalidGeneric,
+                    msg: e,
+                })?;
         avail.set(s.hour, state);
     }
     Ok(avail)
@@ -1899,8 +2004,8 @@ pub fn restore_to_save(save_id: i64) -> Result<FfiRestoreResult, FfiError> {
 
 /// Add a tag to a save. Enforces max tags per save, rejects duplicates
 /// (case-insensitive), and validates the tag string (non-empty, ≤15 chars,
-/// no `;`). Errors surface as distinct `FfiError::Validation` codes so the
-/// UI can show a specific inline hint.
+/// no `;`). Errors surface as `FfiError::InvalidArgument` with the
+/// `ErrorCode::InvalidSaveTag` code so the UI can show a specific inline hint.
 #[uniffi::export]
 pub fn add_save_tag(save_id: i64, tag: String) -> Result<(), FfiError> {
     use autorota_core::db::queries::SaveTagError;
@@ -1909,6 +2014,7 @@ pub fn add_save_tag(save_id: i64, tag: String) -> Result<(), FfiError> {
     match rt().block_on(queries::add_save_tag(pool, save_id, &tag)) {
         Ok(()) => Ok(()),
         Err(SaveTagError::Validation(e)) => Err(FfiError::InvalidArgument {
+            code: ErrorCode::InvalidSaveTag,
             msg: e.as_code().to_string(),
         }),
         Err(SaveTagError::Db(e)) => Err(e.into()),

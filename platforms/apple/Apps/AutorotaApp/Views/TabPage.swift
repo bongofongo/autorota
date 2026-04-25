@@ -12,7 +12,9 @@ enum TabPage: String, CaseIterable, Codable, Identifiable {
 
     var id: String { rawValue }
 
-    var title: String {
+    /// Localized title for `Tab` / `Label` initializers (which accept
+    /// `LocalizedStringKey` and auto-resolve via the active bundle).
+    var title: LocalizedStringKey {
         switch self {
         case .rota: "Rota"
         case .employees: "Employees"
@@ -22,6 +24,21 @@ enum TabPage: String, CaseIterable, Codable, Identifiable {
         case .analytics: "Analytics"
         case .export: "Export"
         case .settings: "Menu"
+        }
+    }
+
+    /// Resolved title `String` for runtime contexts that need an actual string
+    /// (e.g. parameterized accessibility labels).
+    var titleString: String {
+        switch self {
+        case .rota: String(localized: "Rota")
+        case .employees: String(localized: "Employees")
+        case .templates: String(localized: "Shifts")
+        case .overrides: String(localized: "Exceptions")
+        case .history: String(localized: "Edit Log")
+        case .analytics: String(localized: "Analytics")
+        case .export: String(localized: "Export")
+        case .settings: String(localized: "Menu")
         }
     }
 

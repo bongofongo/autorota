@@ -1,0 +1,11 @@
+err-db-connection-failed = Could not connect to the database.
+err-db-row-not-found = This record no longer exists. It may have been deleted.
+err-db-generic = An unexpected database error occurred.
+err-not-found-employee = Employee not found.
+err-not-found-schedule = No schedule available for this week.
+err-not-found-generic = The requested item could not be found.
+err-invalid-date = The date format is invalid.
+err-invalid-save-tag = The label is invalid.
+err-invalid-pdf = There was a problem creating the PDF.
+err-invalid-import = The import file is invalid.
+err-invalid-generic = The provided value is invalid.
