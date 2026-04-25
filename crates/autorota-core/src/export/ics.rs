@@ -127,20 +127,28 @@ pub fn render_calendar(events: &[IcsEvent], tzid: Option<&str>) -> String {
 
         let (dtstart_prop, dtend_prop) = match tzid {
             Some(tz) => (
-                format!("DTSTART;TZID={tz}:{}T{}",
+                format!(
+                    "DTSTART;TZID={tz}:{}T{}",
                     ev.date.format("%Y%m%d"),
-                    format_time_basic(ev.start)),
-                format!("DTEND;TZID={tz}:{}T{}",
+                    format_time_basic(ev.start)
+                ),
+                format!(
+                    "DTEND;TZID={tz}:{}T{}",
                     end_date(ev.date, ev.start, ev.end).format("%Y%m%d"),
-                    format_time_basic(ev.end)),
+                    format_time_basic(ev.end)
+                ),
             ),
             None => (
-                format!("DTSTART:{}T{}",
+                format!(
+                    "DTSTART:{}T{}",
                     ev.date.format("%Y%m%d"),
-                    format_time_basic(ev.start)),
-                format!("DTEND:{}T{}",
+                    format_time_basic(ev.start)
+                ),
+                format!(
+                    "DTEND:{}T{}",
                     end_date(ev.date, ev.start, ev.end).format("%Y%m%d"),
-                    format_time_basic(ev.end)),
+                    format_time_basic(ev.end)
+                ),
             ),
         };
         out.push_str(&fold_line(&dtstart_prop));
@@ -214,12 +222,8 @@ mod tests {
     #[test]
     fn single_shift_has_valid_vevent() {
         let s = mk_shift(42, (2026, 4, 20), (7, 0), (12, 0), "Barista");
-        let ics = render_employee_calendar(
-            7,
-            "Alice",
-            &[(s, "Morning".into())],
-            Some("Europe/London"),
-        );
+        let ics =
+            render_employee_calendar(7, "Alice", &[(s, "Morning".into())], Some("Europe/London"));
         assert!(ics.contains("BEGIN:VCALENDAR"));
         assert!(ics.contains("END:VCALENDAR"));
         assert!(ics.contains("BEGIN:VEVENT"));
@@ -258,12 +262,7 @@ mod tests {
     fn balanced_begin_end_tokens() {
         let s1 = mk_shift(1, (2026, 4, 20), (7, 0), (12, 0), "");
         let s2 = mk_shift(2, (2026, 4, 21), (13, 0), (17, 0), "");
-        let ics = render_employee_calendar(
-            1,
-            "A",
-            &[(s1, "".into()), (s2, "".into())],
-            None,
-        );
+        let ics = render_employee_calendar(1, "A", &[(s1, "".into()), (s2, "".into())], None);
         assert_eq!(ics.matches("BEGIN:VEVENT").count(), 2);
         assert_eq!(ics.matches("END:VEVENT").count(), 2);
     }

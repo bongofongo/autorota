@@ -137,8 +137,14 @@ mod tests {
     fn totals_row_renders_when_present() {
         let mut g = grid();
         g.daily_totals = Some(vec![
-            DaySummary { total_hours: 5.0, total_cost: 75.0 },
-            DaySummary { total_hours: 0.0, total_cost: 0.0 },
+            DaySummary {
+                total_hours: 5.0,
+                total_cost: 75.0,
+            },
+            DaySummary {
+                total_hours: 0.0,
+                total_cost: 0.0,
+            },
         ]);
         g.weekly_total_cost = Some(75.0);
         let md = render_markdown(&g);

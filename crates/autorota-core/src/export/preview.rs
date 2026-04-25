@@ -12,7 +12,7 @@ use crate::models::{
 };
 
 use super::config::{EmployeeExportConfig, ExportConfig, ExportResult};
-use super::{render_employee_export, render_week_export, ExportError};
+use super::{ExportError, render_employee_export, render_week_export};
 
 /// Fixed Monday used as the preview week. Year picked to be distinct so the
 /// sample can't be mistaken for a real week in the user's data.
@@ -69,13 +69,22 @@ struct Fixture {
 
 impl Fixture {
     fn build() -> Self {
-        let week_start: NaiveDate =
-            PREVIEW_WEEK.parse().expect("hard-coded preview date parses");
+        let week_start: NaiveDate = PREVIEW_WEEK
+            .parse()
+            .expect("hard-coded preview date parses");
 
         let employees = vec![
             emp(1, "Alice", "Chen", None, &["Barista"], 12.0, "gbp"),
             emp(2, "Bob", "Sato", None, &["Barista"], 11.0, "gbp"),
-            emp(3, "Cara", "Liu", Some("C"), &["Lead Barista", "Barista"], 15.0, "gbp"),
+            emp(
+                3,
+                "Cara",
+                "Liu",
+                Some("C"),
+                &["Lead Barista", "Barista"],
+                15.0,
+                "gbp",
+            ),
             emp(4, "Dan", "Park", None, &["Kitchen"], 13.0, "gbp"),
             emp(5, "Eve", "Mori", None, &["Kitchen", "Barista"], 14.0, "gbp"),
         ];
@@ -260,43 +269,31 @@ mod tests {
 
     #[test]
     fn full_pdf_preview_renders_nonempty() {
-        let r = generate_preview_full(full_cfg(
-            ExportFormat::Pdf,
-            ExportProfile::StaffSchedule,
-        ))
-        .unwrap();
+        let r = generate_preview_full(full_cfg(ExportFormat::Pdf, ExportProfile::StaffSchedule))
+            .unwrap();
         assert!(!r.data.is_empty());
         assert_eq!(r.mime_type, "application/pdf");
     }
 
     #[test]
     fn full_pdf_manager_report_renders() {
-        let r = generate_preview_full(full_cfg(
-            ExportFormat::Pdf,
-            ExportProfile::ManagerReport,
-        ))
-        .unwrap();
+        let r = generate_preview_full(full_cfg(ExportFormat::Pdf, ExportProfile::ManagerReport))
+            .unwrap();
         assert!(!r.data.is_empty());
     }
 
     #[test]
     fn employee_pdf_preview_renders() {
-        let r = generate_preview_employee(emp_cfg(
-            ExportFormat::Pdf,
-            ExportProfile::StaffSchedule,
-        ))
-        .unwrap();
+        let r = generate_preview_employee(emp_cfg(ExportFormat::Pdf, ExportProfile::StaffSchedule))
+            .unwrap();
         assert!(!r.data.is_empty());
         assert_eq!(r.mime_type, "application/pdf");
     }
 
     #[test]
     fn full_csv_preview_has_rows() {
-        let r = generate_preview_full(full_cfg(
-            ExportFormat::Csv,
-            ExportProfile::StaffSchedule,
-        ))
-        .unwrap();
+        let r = generate_preview_full(full_cfg(ExportFormat::Csv, ExportProfile::StaffSchedule))
+            .unwrap();
         assert!(r.data.lines().count() > 2);
     }
 }

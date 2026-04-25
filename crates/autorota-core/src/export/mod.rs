@@ -147,9 +147,8 @@ pub(crate) fn render_week_export(
             Ok(ExportResult {
                 data: base64::engine::general_purpose::STANDARD.encode(&bytes),
                 filename,
-                mime_type:
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                        .to_string(),
+                mime_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    .to_string(),
             })
         }
         ExportFormat::Pdf => {
@@ -322,9 +321,8 @@ pub(crate) fn render_employee_export(
             })
         }
         ExportFormat::Xlsx => {
-            let bytes =
-                xlsx::render_workbook(&[("Schedule".to_string(), &export_grid)])
-                    .map_err(ExportError::Pdf)?;
+            let bytes = xlsx::render_workbook(&[("Schedule".to_string(), &export_grid)])
+                .map_err(ExportError::Pdf)?;
             let filename = format!(
                 "schedule-{}-{}-to-{}.xlsx",
                 slug,
@@ -334,16 +332,13 @@ pub(crate) fn render_employee_export(
             Ok(ExportResult {
                 data: base64::engine::general_purpose::STANDARD.encode(&bytes),
                 filename,
-                mime_type:
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                        .to_string(),
+                mime_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    .to_string(),
             })
         }
         ExportFormat::Ics => {
-            let template_by_id: std::collections::HashMap<i64, &str> = templates
-                .iter()
-                .map(|t| (t.id, t.name.as_str()))
-                .collect();
+            let template_by_id: std::collections::HashMap<i64, &str> =
+                templates.iter().map(|t| (t.id, t.name.as_str())).collect();
 
             let mut entries: Vec<(crate::models::shift::Shift, String)> = Vec::new();
             for s in &scoped_shifts {

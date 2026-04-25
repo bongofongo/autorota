@@ -145,10 +145,8 @@ impl PdfBuilder {
         for (row_idx, row) in grid.cells.iter().enumerate() {
             let label = grid.row_headers.get(row_idx).cloned().unwrap_or_default();
             let label_lines = wrap_cell(&label, LABEL_COL_WIDTH_MM);
-            let cell_lines: Vec<Vec<String>> = row
-                .iter()
-                .map(|c| wrap_cell(c, data_col_width))
-                .collect();
+            let cell_lines: Vec<Vec<String>> =
+                row.iter().map(|c| wrap_cell(c, data_col_width)).collect();
             let row_height = row_height_for(&label_lines, &cell_lines);
             // Page break if this row doesn't fit.
             if self.remaining_height() < row_height {
@@ -218,22 +216,20 @@ impl PdfBuilder {
         // Text content. Use bold for headers.
         let font = if is_header { &self.bold } else { &self.font };
         let mut x = MARGIN_MM;
-        let draw_cell = |layer: &PdfLayerReference,
-                         font: &IndirectFontRef,
-                         lines: &[String],
-                         cell_x: f64| {
-            let mut line_y = top_y - CELL_PADDING_Y - BODY_SIZE * 0.35;
-            for l in lines {
-                layer.use_text(
-                    l.clone(),
-                    BODY_SIZE,
-                    Mm(cell_x + CELL_PADDING_X),
-                    Mm(line_y),
-                    font,
-                );
-                line_y -= BODY_SIZE * 0.35 + CELL_LINE_LEADING;
-            }
-        };
+        let draw_cell =
+            |layer: &PdfLayerReference, font: &IndirectFontRef, lines: &[String], cell_x: f64| {
+                let mut line_y = top_y - CELL_PADDING_Y - BODY_SIZE * 0.35;
+                for l in lines {
+                    layer.use_text(
+                        l.clone(),
+                        BODY_SIZE,
+                        Mm(cell_x + CELL_PADDING_X),
+                        Mm(line_y),
+                        font,
+                    );
+                    line_y -= BODY_SIZE * 0.35 + CELL_LINE_LEADING;
+                }
+            };
         draw_cell(&layer, font, label_lines, x);
         x += LABEL_COL_WIDTH_MM;
         for cell in cells {

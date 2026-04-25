@@ -58,10 +58,7 @@ pub fn render_workbook_with_cost_summary(
     render_workbook(&all)
 }
 
-fn write_grid(
-    ws: &mut rust_xlsxwriter::Worksheet,
-    grid: &ExportGrid,
-) -> Result<(), XlsxError> {
+fn write_grid(ws: &mut rust_xlsxwriter::Worksheet, grid: &ExportGrid) -> Result<(), XlsxError> {
     let hfmt = header_fmt();
     let cfmt = cell_fmt();
     let tfmt = totals_fmt();
@@ -167,13 +164,9 @@ mod tests {
     #[test]
     fn multi_sheet_workbook_has_all_sheets() {
         let g = grid();
-        let bytes = render_workbook(&[
-            ("Schedule".into(), &g),
-            ("By Role: Barista".into(), &g),
-        ])
-        .unwrap();
-        let wb: calamine::Xlsx<_> =
-            calamine::open_workbook_from_rs(Cursor::new(bytes)).unwrap();
+        let bytes =
+            render_workbook(&[("Schedule".into(), &g), ("By Role: Barista".into(), &g)]).unwrap();
+        let wb: calamine::Xlsx<_> = calamine::open_workbook_from_rs(Cursor::new(bytes)).unwrap();
         assert_eq!(wb.sheet_names(), vec!["Schedule", "By Role_ Barista"]);
     }
 

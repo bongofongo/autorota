@@ -315,11 +315,7 @@ fn build_shift_grid(
         let key = slot_key_for(shift);
         shift_exists.insert((shift.date, key.clone()));
         if seen.insert(key.clone()) {
-            let time_line = format!(
-                "{}-{}",
-                key.start.format("%H:%M"),
-                key.end.format("%H:%M"),
-            );
+            let time_line = format!("{}-{}", key.start.format("%H:%M"), key.end.format("%H:%M"),);
             let name_line = shift
                 .template_id
                 .and_then(|tid| tmpl_map.get(&tid))

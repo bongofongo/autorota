@@ -90,7 +90,11 @@ pub async fn apply_import(
     }
     tx.commit().await?;
 
-    Ok(ImportSummary { inserted, updated, skipped })
+    Ok(ImportSummary {
+        inserted,
+        updated,
+        skipped,
+    })
 }
 
 // ── Format-specific parsing ─────────────────────────────────────────────────
@@ -108,7 +112,10 @@ fn parse_csv(bytes: &[u8]) -> Result<ParsedRoster, ImportError> {
         .flexible(true)
         .from_reader(trimmed);
 
-    let headers = rdr.headers().map_err(|e| ImportError::Parse(e.to_string()))?.clone();
+    let headers = rdr
+        .headers()
+        .map_err(|e| ImportError::Parse(e.to_string()))?
+        .clone();
     let header_strs: Vec<&str> = headers.iter().collect();
     let header_map = HeaderMap::new(&header_strs);
 
@@ -202,7 +209,10 @@ fn parse_json(bytes: &[u8]) -> Result<ParsedRoster, ImportError> {
         })
         .collect();
 
-    Ok(ParsedRoster { rows, warnings: Vec::new() })
+    Ok(ParsedRoster {
+        rows,
+        warnings: Vec::new(),
+    })
 }
 
 fn parse_xlsx(bytes: &[u8]) -> Result<ParsedRoster, ImportError> {
@@ -219,7 +229,10 @@ fn parse_xlsx(bytes: &[u8]) -> Result<ParsedRoster, ImportError> {
 
     let mut iter = range.rows();
     let Some(header_row) = iter.next() else {
-        return Ok(ParsedRoster { rows: Vec::new(), warnings: vec!["empty sheet".into()] });
+        return Ok(ParsedRoster {
+            rows: Vec::new(),
+            warnings: vec!["empty sheet".into()],
+        });
     };
     let headers: Vec<String> = header_row.iter().map(cell_to_string).collect();
     let header_map = HeaderMap::new(&headers);
@@ -284,10 +297,15 @@ impl HeaderMap {
     fn new<S: AsRef<str>>(headers: &[S]) -> Self {
         let find = |aliases: &[&str]| -> Option<usize> {
             for (i, h) in headers.iter().enumerate() {
-                let norm = h.as_ref().trim().to_lowercase().replace(['_', '-', ' '], "");
-                if aliases.iter().any(|a| {
-                    a.to_lowercase().replace(['_', '-', ' '], "") == norm
-                }) {
+                let norm = h
+                    .as_ref()
+                    .trim()
+                    .to_lowercase()
+                    .replace(['_', '-', ' '], "");
+                if aliases
+                    .iter()
+                    .any(|a| a.to_lowercase().replace(['_', '-', ' '], "") == norm)
+                {
                     return Some(i);
                 }
             }
@@ -308,7 +326,11 @@ impl HeaderMap {
             ]),
             roles: find(&["roles", "role", "skills"]),
             target_weekly_hours: find(&["target_weekly_hours", "weekly_hours", "hours_per_week"]),
-            weekly_hours_deviation: find(&["weekly_hours_deviation", "hours_deviation", "deviation"]),
+            weekly_hours_deviation: find(&[
+                "weekly_hours_deviation",
+                "hours_deviation",
+                "deviation",
+            ]),
             max_daily_hours: find(&["max_daily_hours", "daily_max"]),
             hourly_wage: find(&["hourly_wage", "wage", "rate", "pay_rate"]),
             wage_currency: find(&["wage_currency", "currency"]),
@@ -323,7 +345,10 @@ impl HeaderMap {
             idx.and_then(|i| cells.get(i)).cloned().unwrap_or_default()
         };
         let (first_name, last_name) = match (self.first_name, self.last_name, self.name) {
-            (Some(_), _, _) | (_, Some(_), _) => (g(self.first_name).trim().to_string(), g(self.last_name).trim().to_string()),
+            (Some(_), _, _) | (_, Some(_), _) => (
+                g(self.first_name).trim().to_string(),
+                g(self.last_name).trim().to_string(),
+            ),
             (None, None, Some(_)) => split_full_name(&g(self.name)),
             _ => return Err("no name columns found".into()),
         };
@@ -418,7 +443,8 @@ fn resolve_diffs(
         MergeStrategy::Name => {
             let mut by_name: HashMap<String, Vec<&Employee>> = HashMap::new();
             for e in existing {
-                by_name.entry(name_key(&e.first_name, &e.last_name, e.nickname.as_deref()))
+                by_name
+                    .entry(name_key(&e.first_name, &e.last_name, e.nickname.as_deref()))
                     .or_default()
                     .push(e);
             }
@@ -444,7 +470,9 @@ fn resolve_diffs(
                         r.include = false;
                         warnings.push(format!(
                             "{} {} matches {} existing employees",
-                            r.first_name, r.last_name, matches.len()
+                            r.first_name,
+                            r.last_name,
+                            matches.len()
                         ));
                     }
                 }
@@ -464,9 +492,18 @@ fn name_key(first: &str, last: &str, nick: Option<&str>) -> String {
 
 fn build_diff(emp: &Employee, row: &ParsedEmployeeRow) -> String {
     let mut changes = Vec::new();
-    fn diff_opt_str(label: &str, old: &Option<String>, new: &Option<String>, out: &mut Vec<String>) {
+    fn diff_opt_str(
+        label: &str,
+        old: &Option<String>,
+        new: &Option<String>,
+        out: &mut Vec<String>,
+    ) {
         if new.is_some() && new != old {
-            out.push(format!("{label} {}→{}", old.as_deref().unwrap_or("∅"), new.as_deref().unwrap_or("∅")));
+            out.push(format!(
+                "{label} {}→{}",
+                old.as_deref().unwrap_or("∅"),
+                new.as_deref().unwrap_or("∅")
+            ));
         }
     }
     fn diff_opt_f32(label: &str, old: Option<f32>, new: Option<f32>, out: &mut Vec<String>) {
@@ -489,8 +526,18 @@ fn build_diff(emp: &Employee, row: &ParsedEmployeeRow) -> String {
     diff_opt_str("notes", &emp.notes, &row.notes, &mut changes);
     diff_opt_str("bank", &emp.bank_details, &row.bank_details, &mut changes);
     diff_opt_f32("wage", emp.hourly_wage, row.hourly_wage, &mut changes);
-    diff_opt_f32("target_hrs", Some(emp.target_weekly_hours), row.target_weekly_hours, &mut changes);
-    diff_opt_f32("daily_max", Some(emp.max_daily_hours), row.max_daily_hours, &mut changes);
+    diff_opt_f32(
+        "target_hrs",
+        Some(emp.target_weekly_hours),
+        row.target_weekly_hours,
+        &mut changes,
+    );
+    diff_opt_f32(
+        "daily_max",
+        Some(emp.max_daily_hours),
+        row.max_daily_hours,
+        &mut changes,
+    );
 
     if !row.roles.is_empty() && row.roles != emp.roles {
         changes.push(format!("roles {:?}→{:?}", emp.roles, row.roles));
@@ -618,25 +665,52 @@ mod tests {
     #[test]
     fn merge_strategy_insert_only_never_matches() {
         let mut rows = vec![ParsedEmployeeRow {
-            first_name: "Alice".into(), last_name: "Smith".into(),
-            nickname: None, phone: None, email: None, preferred_contact: None, roles: vec![],
-            target_weekly_hours: None, weekly_hours_deviation: None, max_daily_hours: None,
-            hourly_wage: None, wage_currency: None, notes: None, bank_details: None,
-            match_existing_id: None, diff_summary: String::new(), include: true,
+            first_name: "Alice".into(),
+            last_name: "Smith".into(),
+            nickname: None,
+            phone: None,
+            email: None,
+            preferred_contact: None,
+            roles: vec![],
+            target_weekly_hours: None,
+            weekly_hours_deviation: None,
+            max_daily_hours: None,
+            hourly_wage: None,
+            wage_currency: None,
+            notes: None,
+            bank_details: None,
+            match_existing_id: None,
+            diff_summary: String::new(),
+            include: true,
         }];
         let existing = vec![Employee {
             id: 1,
-            first_name: "Alice".into(), last_name: "Smith".into(), nickname: None,
-            roles: vec![], start_date: chrono::Utc::now().date_naive(),
-            target_weekly_hours: 0.0, weekly_hours_deviation: 0.0, max_daily_hours: 0.0,
-            notes: None, bank_details: None, phone: None, email: None, preferred_contact: None,
-            hourly_wage: None, wage_currency: None,
+            first_name: "Alice".into(),
+            last_name: "Smith".into(),
+            nickname: None,
+            roles: vec![],
+            start_date: chrono::Utc::now().date_naive(),
+            target_weekly_hours: 0.0,
+            weekly_hours_deviation: 0.0,
+            max_daily_hours: 0.0,
+            notes: None,
+            bank_details: None,
+            phone: None,
+            email: None,
+            preferred_contact: None,
+            hourly_wage: None,
+            wage_currency: None,
             default_availability: Availability::default(),
             availability: Availability::default(),
             deleted: false,
         }];
         let mut warnings = vec![];
-        resolve_diffs(&mut rows, &existing, MergeStrategy::InsertOnly, &mut warnings);
+        resolve_diffs(
+            &mut rows,
+            &existing,
+            MergeStrategy::InsertOnly,
+            &mut warnings,
+        );
         assert_eq!(rows[0].match_existing_id, None);
         assert_eq!(rows[0].diff_summary, "NEW");
     }
@@ -644,19 +718,41 @@ mod tests {
     #[test]
     fn merge_by_name_matches_single_and_builds_diff() {
         let mut rows = vec![ParsedEmployeeRow {
-            first_name: "Alice".into(), last_name: "Smith".into(),
-            nickname: None, phone: Some("555".into()), email: None, preferred_contact: None, roles: vec![],
-            target_weekly_hours: None, weekly_hours_deviation: None, max_daily_hours: None,
-            hourly_wage: None, wage_currency: None, notes: None, bank_details: None,
-            match_existing_id: None, diff_summary: String::new(), include: true,
+            first_name: "Alice".into(),
+            last_name: "Smith".into(),
+            nickname: None,
+            phone: Some("555".into()),
+            email: None,
+            preferred_contact: None,
+            roles: vec![],
+            target_weekly_hours: None,
+            weekly_hours_deviation: None,
+            max_daily_hours: None,
+            hourly_wage: None,
+            wage_currency: None,
+            notes: None,
+            bank_details: None,
+            match_existing_id: None,
+            diff_summary: String::new(),
+            include: true,
         }];
         let existing = vec![Employee {
             id: 42,
-            first_name: "alice".into(), last_name: "smith".into(), nickname: None,
-            roles: vec![], start_date: chrono::Utc::now().date_naive(),
-            target_weekly_hours: 0.0, weekly_hours_deviation: 0.0, max_daily_hours: 0.0,
-            notes: None, bank_details: None, phone: None, email: None, preferred_contact: None,
-            hourly_wage: None, wage_currency: None,
+            first_name: "alice".into(),
+            last_name: "smith".into(),
+            nickname: None,
+            roles: vec![],
+            start_date: chrono::Utc::now().date_naive(),
+            target_weekly_hours: 0.0,
+            weekly_hours_deviation: 0.0,
+            max_daily_hours: 0.0,
+            notes: None,
+            bank_details: None,
+            phone: None,
+            email: None,
+            preferred_contact: None,
+            hourly_wage: None,
+            wage_currency: None,
             default_availability: Availability::default(),
             availability: Availability::default(),
             deleted: false,
@@ -671,18 +767,41 @@ mod tests {
     #[test]
     fn merge_by_name_flags_ambiguous() {
         let mut rows = vec![ParsedEmployeeRow {
-            first_name: "Alice".into(), last_name: "Smith".into(),
-            nickname: None, phone: None, email: None, preferred_contact: None, roles: vec![],
-            target_weekly_hours: None, weekly_hours_deviation: None, max_daily_hours: None,
-            hourly_wage: None, wage_currency: None, notes: None, bank_details: None,
-            match_existing_id: None, diff_summary: String::new(), include: true,
+            first_name: "Alice".into(),
+            last_name: "Smith".into(),
+            nickname: None,
+            phone: None,
+            email: None,
+            preferred_contact: None,
+            roles: vec![],
+            target_weekly_hours: None,
+            weekly_hours_deviation: None,
+            max_daily_hours: None,
+            hourly_wage: None,
+            wage_currency: None,
+            notes: None,
+            bank_details: None,
+            match_existing_id: None,
+            diff_summary: String::new(),
+            include: true,
         }];
         let mk = |id: i64| Employee {
-            id, first_name: "Alice".into(), last_name: "Smith".into(), nickname: None,
-            roles: vec![], start_date: chrono::Utc::now().date_naive(),
-            target_weekly_hours: 0.0, weekly_hours_deviation: 0.0, max_daily_hours: 0.0,
-            notes: None, bank_details: None, phone: None, email: None, preferred_contact: None,
-            hourly_wage: None, wage_currency: None,
+            id,
+            first_name: "Alice".into(),
+            last_name: "Smith".into(),
+            nickname: None,
+            roles: vec![],
+            start_date: chrono::Utc::now().date_naive(),
+            target_weekly_hours: 0.0,
+            weekly_hours_deviation: 0.0,
+            max_daily_hours: 0.0,
+            notes: None,
+            bank_details: None,
+            phone: None,
+            email: None,
+            preferred_contact: None,
+            hourly_wage: None,
+            wage_currency: None,
             default_availability: Availability::default(),
             availability: Availability::default(),
             deleted: false,
