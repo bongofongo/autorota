@@ -7,9 +7,9 @@ enum AppCurrency: String, CaseIterable {
 
     var label: String {
         switch self {
-        case .usd: "USD ($)"
-        case .gbp: "GBP (£)"
-        case .eur: "EUR (€)"
+        case .usd: String(localized: "USD ($)")
+        case .gbp: String(localized: "GBP (£)")
+        case .eur: String(localized: "EUR (€)")
         }
     }
 
@@ -27,9 +27,9 @@ enum AppAppearance: String, CaseIterable {
 
     var label: String {
         switch self {
-        case .system: "System"
-        case .light: "Light"
-        case .dark: "Dark"
+        case .system: String(localized: "System")
+        case .light: String(localized: "Light")
+        case .dark: String(localized: "Dark")
         }
     }
 

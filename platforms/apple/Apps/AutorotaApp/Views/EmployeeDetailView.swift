@@ -647,7 +647,7 @@ struct EmployeeEditSheet: View {
         var id: String { rawValue }
         var label: String {
             switch self {
-            case .none: "Not linked"
+            case .none: String(localized: "Not linked")
             case .imessage: "iMessage"
             case .whatsapp: "WhatsApp"
             }

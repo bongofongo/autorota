@@ -51,8 +51,8 @@ struct ExportSheetView: View {
         var id: String { rawValue }
         var label: String {
             switch self {
-            case .fullRota: "Full View"
-            case .perEmployee: "Employee View"
+            case .fullRota: String(localized: "Full View")
+            case .perEmployee: String(localized: "Employee View")
             }
         }
     }
@@ -62,8 +62,8 @@ struct ExportSheetView: View {
         var id: String { rawValue }
         var label: String {
             switch self {
-            case .all: "All Employees"
-            case .individual: "One Employee"
+            case .all: String(localized: "All Employees")
+            case .individual: String(localized: "One Employee")
             }
         }
     }
@@ -335,13 +335,13 @@ struct ExportSheetView: View {
     private var availableFormats: [FormatOpt] {
         var list: [FormatOpt] = [
             .init(id: "pdf", label: "PDF"),
-            .init(id: "xlsx", label: "Spreadsheet (XLSX)"),
+            .init(id: "xlsx", label: String(localized: "Spreadsheet (XLSX)")),
             .init(id: "csv", label: "CSV"),
             .init(id: "markdown", label: "Markdown"),
             .init(id: "json", label: "JSON"),
         ]
         if scope == .perEmployee {
-            list.append(.init(id: "ics", label: "ICS Calendar"))
+            list.append(.init(id: "ics", label: String(localized: "ICS Calendar")))
         }
         return list
     }

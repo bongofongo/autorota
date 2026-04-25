@@ -10,21 +10,21 @@ enum ColorBlindnessMode: String, CaseIterable {
 
     var label: String {
         switch self {
-        case .none: "None"
-        case .deuteranopia: "Deuteranopia (red-green)"
-        case .protanopia: "Protanopia (red-green)"
-        case .tritanopia: "Tritanopia (blue-yellow)"
-        case .achromatopsia: "Achromatopsia (monochrome)"
+        case .none: String(localized: "None")
+        case .deuteranopia: String(localized: "Deuteranopia (red-green)")
+        case .protanopia: String(localized: "Protanopia (red-green)")
+        case .tritanopia: String(localized: "Tritanopia (blue-yellow)")
+        case .achromatopsia: String(localized: "Achromatopsia (monochrome)")
         }
     }
 
     var shortLabel: String {
         switch self {
-        case .none: "None"
-        case .deuteranopia: "Deuteranopia"
-        case .protanopia: "Protanopia"
-        case .tritanopia: "Tritanopia"
-        case .achromatopsia: "Monochrome"
+        case .none: String(localized: "None")
+        case .deuteranopia: String(localized: "Deuteranopia")
+        case .protanopia: String(localized: "Protanopia")
+        case .tritanopia: String(localized: "Tritanopia")
+        case .achromatopsia: String(localized: "Monochrome")
         }
     }
 }
