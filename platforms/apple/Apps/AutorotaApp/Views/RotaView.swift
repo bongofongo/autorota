@@ -6,6 +6,7 @@ struct RotaView: View {
 
     @State private var vm = RotaViewModel()
     @State private var showExportSheet = false
+    @State private var deviceSafeAreaInsets: EdgeInsets = EdgeInsets()
     private let twoPassTip = RotaTwoPassTip()
     @Environment(RotaUIBridge.self) private var bridge
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -22,10 +23,13 @@ struct RotaView: View {
     /// In landscape iPhone we render a floating overlay button instead of
     /// the tab-bar dots tab (see `ContentView.showsDotsTab`). iPad surfaces
     /// the same actions through a navigation-bar toolbar item instead.
+    /// In portrait iPhone we also surface this button while in edit mode,
+    /// since the tab bar (which normally hosts the Done dots tab) is hidden.
     private var showsFloatingDotsButton: Bool {
         #if os(iOS)
         if isPad { return false }
-        return verticalSizeClass == .compact
+        if verticalSizeClass == .compact { return true }
+        return vm.isEditMode
         #else
         return false
         #endif
@@ -87,16 +91,27 @@ struct RotaView: View {
                         .glassEffect(.regular.interactive(), in: Circle())
                 }
                 .accessibilityLabel(vm.isEditMode ? "Done editing" : "More actions")
-                .padding(.trailing, 20)
-                .padding(.bottom, 12)
+                .padding(.trailing, 20 + deviceSafeAreaInsets.trailing)
+                .padding(.bottom, 12 + deviceSafeAreaInsets.bottom)
             }
 
                 if bridge.overflowOpen {
                     RotaOverflowPopover(
                         actions: overflowActions,
-                        isPresented: $bridge.overflowOpen
+                        isPresented: $bridge.overflowOpen,
+                        deviceSafeAreaInsets: deviceSafeAreaInsets
                     )
                 }
+            }
+            .background {
+                GeometryReader { proxy in
+                    Color.clear
+                        .preference(key: DeviceSafeAreaInsetsKey.self, value: proxy.safeAreaInsets)
+                }
+                .ignoresSafeArea()
+            }
+            .onPreferenceChange(DeviceSafeAreaInsetsKey.self) { newInsets in
+                deviceSafeAreaInsets = newInsets
             }
             #if os(iOS)
             .toolbar(isPad ? .visible : .hidden, for: .navigationBar)
@@ -113,7 +128,13 @@ struct RotaView: View {
                 bridge.overflowOpen = false
             }
             .onChange(of: vm.isEditMode) { _, new in
-                bridge.isEditMode = new
+                if reduceMotion {
+                    bridge.isEditMode = new
+                } else {
+                    withAnimation(.smooth(duration: 0.35)) {
+                        bridge.isEditMode = new
+                    }
+                }
             }
             .onChange(of: bridge.isEditMode) { _, new in
                 if !new && vm.isEditMode {
@@ -311,6 +332,21 @@ private struct CategoryBadge: View {
         case .current: .blue
         case .future: .orange
         }
+    }
+}
+
+// MARK: - Safe-area inset propagation
+
+/// Captures the device's actual safe-area insets (notch, home indicator) from
+/// a `GeometryReader` placed in a `.background` that ignores safe area, so
+/// floating overlay views can offset themselves clear of the notch in
+/// landscape iPhone — where `.toolbar(.hidden, for: .navigationBar)` plus the
+/// popover's full-screen tap-dismiss backdrop otherwise let trailing content
+/// drift under the dynamic island.
+struct DeviceSafeAreaInsetsKey: PreferenceKey {
+    static let defaultValue: EdgeInsets = EdgeInsets()
+    static func reduce(value: inout EdgeInsets, nextValue: () -> EdgeInsets) {
+        value = nextValue()
     }
 }
 

@@ -28,6 +28,11 @@ struct RotaOverflowPopover: View {
     let actions: [RotaOverflowAction]
     @Binding var isPresented: Bool
     var anchor: Alignment = .bottomTrailing
+    /// Device safe-area insets passed in from the host so popover rows can
+    /// clear the dynamic island in landscape iPhone. The popover's own
+    /// `.ignoresSafeArea()` backdrop expands its parent ZStack to physical
+    /// screen bounds, otherwise letting trailing rows sit under the notch.
+    var deviceSafeAreaInsets: EdgeInsets = EdgeInsets()
     @State private var rowWidth: CGFloat = 0
     #if os(iOS)
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -101,8 +106,11 @@ struct RotaOverflowPopover: View {
             .onPreferenceChange(RowMaxWidthKey.self) { newValue in
                 if newValue > rowWidth { rowWidth = newValue }
             }
-            .padding(.trailing, 20)
-            .padding(isTopAnchored ? .top : .bottom, isTopAnchored ? 8 : bottomPadding)
+            .padding(.trailing, 20 + deviceSafeAreaInsets.trailing)
+            .padding(
+                isTopAnchored ? .top : .bottom,
+                (isTopAnchored ? 8 : bottomPadding) + (isTopAnchored ? deviceSafeAreaInsets.top : deviceSafeAreaInsets.bottom)
+            )
             .transition(
                 .scale(scale: 0.85, anchor: transitionAnchor)
                 .combined(with: .opacity)

@@ -38,6 +38,7 @@ struct ContentView: View {
     private var showsDotsTab: Bool {
         #if os(iOS)
         if isPad { return false }
+        if bridge.isEditMode { return false }
         guard verticalSizeClass == .regular else { return false }
         return lastPage == .rota
         #else
@@ -134,6 +135,7 @@ struct ContentView: View {
         }
         #if os(iOS)
         .tabBarMinimizeBehavior(.onScrollDown)
+        .toolbar(bridge.isEditMode ? .hidden : .visible, for: .tabBar)
         #endif
         #if os(macOS)
         .tabViewStyle(.sidebarAdaptable)
@@ -147,7 +149,9 @@ struct ContentView: View {
                 selection = .page(.rota)
                 lastPage = .rota
                 if bridge.isEditMode {
-                    bridge.isEditMode = false
+                    withAnimation(.smooth(duration: 0.35)) {
+                        bridge.isEditMode = false
+                    }
                 } else {
                     bridge.overflowOpen.toggle()
                 }
@@ -171,17 +175,22 @@ struct ContentView: View {
             GeometryReader { geo in
                 let isLandscape = geo.size.width > geo.size.height
                 let alignment: Alignment = isLandscape ? tabBarEdge.alignment : .bottom
+                let hideEdge: Edge = isLandscape ? (tabBarEdge == .leading ? .leading : .trailing) : .bottom
                 ZStack(alignment: alignment) {
                     iPadPagesContainer
-                    FloatingTabBar(
-                        pages: layoutManager.tabBarPages,
-                        selection: $selection,
-                        axis: isLandscape ? .vertical : .horizontal
-                    )
-                    .padding(16)
+                    if !bridge.isEditMode {
+                        FloatingTabBar(
+                            pages: layoutManager.tabBarPages,
+                            selection: $selection,
+                            axis: isLandscape ? .vertical : .horizontal
+                        )
+                        .padding(16)
+                        .transition(.move(edge: hideEdge).combined(with: .opacity))
+                    }
                 }
                 .frame(width: geo.size.width, height: geo.size.height)
                 .animation(.snappy(duration: 0.25), value: isLandscape)
+                .animation(.smooth(duration: 0.35), value: bridge.isEditMode)
             }
         }
     }
