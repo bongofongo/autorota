@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 enum TabPage: String, CaseIterable, Codable, Identifiable {
     case rota
@@ -73,8 +76,15 @@ enum TabPage: String, CaseIterable, Codable, Identifiable {
     static let configurablePages: [TabPage] = [.rota, .employees, .templates, .overrides, .history, .analytics, .export]
 
     #if os(iOS)
-    static let defaultTabBar: [TabPage] = [.rota, .employees, .templates]
-    static let maxConfigurable = 3
+    /// iPad has more room than iPhone — give it 4 slots and a richer default.
+    static var defaultTabBar: [TabPage] {
+        UIDevice.current.userInterfaceIdiom == .pad
+            ? [.rota, .employees, .templates, .overrides]
+            : [.rota, .employees, .templates]
+    }
+    static var maxConfigurable: Int {
+        UIDevice.current.userInterfaceIdiom == .pad ? 4 : 3
+    }
     #else
     static let defaultTabBar: [TabPage] = [.rota, .employees, .templates, .overrides]
     static let maxConfigurable = 4

@@ -76,9 +76,17 @@
 		CC0050013110000000205001 /* TierInfoModal.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0050023110000000205001 /* TierInfoModal.swift */; };
 		CC0051013110000000205001 /* ReadOnlyBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0051023110000000205001 /* ReadOnlyBanner.swift */; };
 		CC0052013110000000205001 /* SubscriptionSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0052023110000000205001 /* SubscriptionSettingsSection.swift */; };
+		CC0053013110000000205001 /* FloatingTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0053023110000000205001 /* FloatingTabBar.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		5B874E1C2F9D8A3E0009F1AA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5B9674FC2F7205E900205001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5B9675032F7205E900205001;
+			remoteInfo = AutorotaApp;
+		};
 		CC0002012F80000000205001 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 5B9674FC2F7205E900205001 /* Project object */;
@@ -89,6 +97,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		5B874E162F9D8A3E0009F1AA /* AutorotaAppPerfTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AutorotaAppPerfTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5B9675042F7205E900205001 /* AutorotaApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AutorotaApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5B9675162F72075A00205001 /* EmployeeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmployeeViewModel.swift; sourceTree = "<group>"; };
 		5B9675172F72075A00205001 /* RotaViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RotaViewModel.swift; sourceTree = "<group>"; };
@@ -159,9 +168,15 @@
 		CC0050023110000000205001 /* TierInfoModal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TierInfoModal.swift; sourceTree = "<group>"; };
 		CC0051023110000000205001 /* ReadOnlyBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadOnlyBanner.swift; sourceTree = "<group>"; };
 		CC0052023110000000205001 /* SubscriptionSettingsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionSettingsSection.swift; sourceTree = "<group>"; };
+		CC0053023110000000205001 /* FloatingTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingTabBar.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		5B874E172F9D8A3E0009F1AA /* AutorotaAppPerfTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = AutorotaAppPerfTests;
+			sourceTree = "<group>";
+		};
 		5B9675062F7205E900205001 /* AutorotaApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = AutorotaApp;
@@ -175,6 +190,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		5B874E132F9D8A3E0009F1AA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5B9675012F7205E900205001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -198,6 +220,7 @@
 			children = (
 				5B9675062F7205E900205001 /* AutorotaApp */,
 				CC0002062F80000000205001 /* AutorotaAppTests */,
+				5B874E172F9D8A3E0009F1AA /* AutorotaAppPerfTests */,
 				5B9675052F7205E900205001 /* Products */,
 				CC0001052F80000000205001 /* Services */,
 				5B9675192F72075A00205001 /* ViewModels */,
@@ -210,6 +233,7 @@
 			children = (
 				5B9675042F7205E900205001 /* AutorotaApp.app */,
 				CC0002052F80000000205001 /* AutorotaAppTests.xctest */,
+				5B874E162F9D8A3E0009F1AA /* AutorotaAppPerfTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -270,6 +294,7 @@
 				CC0052023110000000205001 /* SubscriptionSettingsSection.swift */,
 				CC0050023110000000205001 /* TierInfoModal.swift */,
 				CC0049023110000000205001 /* TierPickView.swift */,
+				CC0053023110000000205001 /* FloatingTabBar.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -306,6 +331,29 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		5B874E152F9D8A3E0009F1AA /* AutorotaAppPerfTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5B874E1E2F9D8A3E0009F1AA /* Build configuration list for PBXNativeTarget "AutorotaAppPerfTests" */;
+			buildPhases = (
+				5B874E122F9D8A3E0009F1AA /* Sources */,
+				5B874E132F9D8A3E0009F1AA /* Frameworks */,
+				5B874E142F9D8A3E0009F1AA /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5B874E1D2F9D8A3E0009F1AA /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				5B874E172F9D8A3E0009F1AA /* AutorotaAppPerfTests */,
+			);
+			name = AutorotaAppPerfTests;
+			packageProductDependencies = (
+			);
+			productName = AutorotaAppPerfTests;
+			productReference = 5B874E162F9D8A3E0009F1AA /* AutorotaAppPerfTests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		5B9675032F7205E900205001 /* AutorotaApp */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 5B96750F2F7205EA00205001 /* Build configuration list for PBXNativeTarget "AutorotaApp" */;
@@ -357,9 +405,13 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2620;
+				LastSwiftUpdateCheck = 2630;
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
+					5B874E152F9D8A3E0009F1AA = {
+						CreatedOnToolsVersion = 26.3;
+						TestTargetID = 5B9675032F7205E900205001;
+					};
 					5B9675032F7205E900205001 = {
 						CreatedOnToolsVersion = 26.2;
 					};
@@ -394,11 +446,19 @@
 			targets = (
 				5B9675032F7205E900205001 /* AutorotaApp */,
 				CC0002082F80000000205001 /* AutorotaAppTests */,
+				5B874E152F9D8A3E0009F1AA /* AutorotaAppPerfTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		5B874E142F9D8A3E0009F1AA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5B9675022F7205E900205001 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -416,6 +476,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		5B874E122F9D8A3E0009F1AA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		5B9675002F7205E900205001 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -488,6 +555,7 @@
 				CC0050013110000000205001 /* TierInfoModal.swift in Sources */,
 				CC0051013110000000205001 /* ReadOnlyBanner.swift in Sources */,
 				CC0052013110000000205001 /* SubscriptionSettingsSection.swift in Sources */,
+				CC0053013110000000205001 /* FloatingTabBar.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -501,6 +569,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		5B874E1D2F9D8A3E0009F1AA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5B9675032F7205E900205001 /* AutorotaApp */;
+			targetProxy = 5B874E1C2F9D8A3E0009F1AA /* PBXContainerItemProxy */;
+		};
 		CC0002022F80000000205001 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 5B9675032F7205E900205001 /* AutorotaApp */;
@@ -509,6 +582,54 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		5B874E1F2F9D8A3E0009F1AA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = Fongo.AutorotaAppPerfTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG PERF_HELPERS $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = AutorotaApp;
+			};
+			name = Debug;
+		};
+		5B874E202F9D8A3E0009F1AA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = Fongo.AutorotaAppPerfTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = AutorotaApp;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		5B96750D2F7205EA00205001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -657,6 +778,7 @@
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited) PERF_HELPERS";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -766,6 +888,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		5B874E1E2F9D8A3E0009F1AA /* Build configuration list for PBXNativeTarget "AutorotaAppPerfTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5B874E1F2F9D8A3E0009F1AA /* Debug */,
+				5B874E202F9D8A3E0009F1AA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		5B9674FF2F7205E900205001 /* Build configuration list for PBXProject "AutorotaApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

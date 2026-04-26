@@ -13,10 +13,18 @@ struct RotaView: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     #endif
 
+    #if os(iOS)
+    private var isPad: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
+    #endif
+
     /// In landscape iPhone we render a floating overlay button instead of
-    /// the tab-bar dots tab (see `ContentView.showsDotsTab`).
+    /// the tab-bar dots tab (see `ContentView.showsDotsTab`). iPad surfaces
+    /// the same actions through a navigation-bar toolbar item instead.
     private var showsFloatingDotsButton: Bool {
         #if os(iOS)
+        if isPad { return false }
         return verticalSizeClass == .compact
         #else
         return false
@@ -91,7 +99,15 @@ struct RotaView: View {
                 }
             }
             #if os(iOS)
-            .toolbar(.hidden, for: .navigationBar)
+            .toolbar(isPad ? .visible : .hidden, for: .navigationBar)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if isPad {
+                    ToolbarItem(placement: .primaryAction) {
+                        iPadOverflowMenu
+                    }
+                }
+            }
             #endif
             .onDisappear {
                 bridge.overflowOpen = false
@@ -155,6 +171,40 @@ struct RotaView: View {
         }
     }
 
+    // MARK: - iPad toolbar menu
+
+    #if os(iOS)
+    /// Mirrors `EmployeeListView`'s primary-action component: an `ellipsis`
+    /// `Menu` (or a plain checkmark `Button` while editing) anchored in the
+    /// navigation toolbar. Reuses `overflowActions` so the iPhone landscape
+    /// floating glass popover and the iPad nav-bar menu surface the same
+    /// items from a single source.
+    @ViewBuilder
+    private var iPadOverflowMenu: some View {
+        if vm.isEditMode {
+            Button {
+                vm.exitEditMode()
+            } label: {
+                Image(systemName: "checkmark")
+            }
+            .accessibilityLabel("Done editing")
+        } else {
+            Menu {
+                ForEach(overflowActions) { action in
+                    Button(role: action.role) {
+                        action.action()
+                    } label: {
+                        Label(action.title, systemImage: action.systemImage)
+                    }
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+            }
+            .accessibilityLabel("More actions")
+        }
+    }
+    #endif
+
     // MARK: - Overflow menu actions
 
     private var overflowActions: [RotaOverflowAction] {
@@ -207,16 +257,19 @@ private struct WeekPickerView: View {
             Button(action: { selectedWeek = shifted(by: -1) }) {
                 Image(systemName: "chevron.left")
             }
+            .accessibilityIdentifier("rota.prevWeek")
             Spacer()
             HStack(spacing: 8) {
                 Text("Week of \(selectedWeek)")
                     .font(.subheadline.bold())
+                    .accessibilityIdentifier("rota.weekTitle")
                 CategoryBadge(category: category)
             }
             Spacer()
             Button(action: { selectedWeek = shifted(by: 1) }) {
                 Image(systemName: "chevron.right")
             }
+            .accessibilityIdentifier("rota.nextWeek")
         }
     }
 

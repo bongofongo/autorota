@@ -53,6 +53,9 @@ struct SettingsView: View {
     @AppStorage("exportShowTimes") private var exportShowTimes: Bool = true
     @AppStorage("exportShowRole") private var exportShowRole: Bool = true
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
+    #if os(iOS)
+    @AppStorage("tabBarEdge") private var tabBarEdgeRaw: String = TabBarEdge.trailing.rawValue
+    #endif
     @Environment(TabLayoutManager.self) private var layoutManager
     @Environment(AutorotaSyncEngine.self) private var syncEngine
     @Environment(LocaleManager.self) private var localeManager
@@ -156,6 +159,22 @@ struct SettingsView: View {
                     }
                     
                     DisclosureGroup("Layout") {
+                        #if os(iOS)
+                        if UIDevice.current.userInterfaceIdiom == .pad {
+                            Section {
+                                Picker("Bar Edge", selection: $tabBarEdgeRaw) {
+                                    ForEach(TabBarEdge.allCases) { edge in
+                                        Text(edge.label).tag(edge.rawValue)
+                                    }
+                                }
+                                .pickerStyle(.segmented)
+                            } header: {
+                                Text("Floating Rail")
+                            } footer: {
+                                Text("In landscape the navigation rail anchors to this edge of the screen. Portrait shows a floating bar at the bottom regardless.")
+                            }
+                        }
+                        #endif
                         Section {
                             ForEach(layoutManager.configurableTabBarPages) { page in
                                 HStack {
