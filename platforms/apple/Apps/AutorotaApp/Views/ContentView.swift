@@ -27,25 +27,6 @@ struct ContentView: View {
     }
     #endif
 
-    /// The dots tab is only shown in portrait iPhone while the Rota tab is
-    /// active. Landscape iPhone uses a floating overlay inside `RotaView`
-    /// instead, because the iOS 26 floating tab bar leading-aligns in
-    /// landscape when a `.search` role tab is present.
-    /// Use `lastPage` (not `selection`) so the dots tab stays visible while
-    /// the `.dots` selection is in flight — otherwise SwiftUI removes the tab
-    /// mid-transition and auto-selects the first tab, causing a visible glitch.
-    /// iPad uses the floating rail/bar instead and never renders the dots tab.
-    private var showsDotsTab: Bool {
-        #if os(iOS)
-        if isPad { return false }
-        if bridge.isEditMode { return false }
-        guard verticalSizeClass == .regular else { return false }
-        return lastPage == .rota
-        #else
-        return false
-        #endif
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             if license.state.isReadOnly {
@@ -116,22 +97,6 @@ struct ContentView: View {
                     page.destinationView
                 }
             }
-
-            #if os(iOS)
-            if showsDotsTab {
-                Tab(
-                    bridge.isEditMode ? "Done" : "More",
-                    systemImage: bridge.isEditMode ? "checkmark" : "ellipsis",
-                    value: TabSelection.dots,
-                    role: .search
-                ) {
-                    // Empty destination — this tab is hijacked: tapping it
-                    // just surfaces the Rota overflow menu via `bridge` and
-                    // reverts selection to the previously-active page.
-                    Color.clear
-                }
-            }
-            #endif
         }
         #if os(iOS)
         .tabBarMinimizeBehavior(.onScrollDown)
@@ -144,20 +109,7 @@ struct ContentView: View {
         .environment(bridge)
         .environment(employeeBridge)
         .onChange(of: selection) { _, new in
-            switch new {
-            case .dots:
-                selection = .page(.rota)
-                lastPage = .rota
-                if bridge.isEditMode {
-                    withAnimation(.smooth(duration: 0.35)) {
-                        bridge.isEditMode = false
-                    }
-                } else {
-                    bridge.overflowOpen.toggle()
-                }
-            case .page(let p):
-                lastPage = p
-            }
+            if case .page(let p) = new { lastPage = p }
         }
     }
 

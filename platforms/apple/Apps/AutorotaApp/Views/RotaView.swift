@@ -6,39 +6,12 @@ struct RotaView: View {
 
     @State private var vm = RotaViewModel()
     @State private var showExportSheet = false
-    @State private var deviceSafeAreaInsets: EdgeInsets = EdgeInsets()
     private let twoPassTip = RotaTwoPassTip()
     @Environment(RotaUIBridge.self) private var bridge
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    #if os(iOS)
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
-    #endif
-
-    #if os(iOS)
-    private var isPad: Bool {
-        UIDevice.current.userInterfaceIdiom == .pad
-    }
-    #endif
-
-    /// In landscape iPhone we render a floating overlay button instead of
-    /// the tab-bar dots tab (see `ContentView.showsDotsTab`). iPad surfaces
-    /// the same actions through a navigation-bar toolbar item instead.
-    /// In portrait iPhone we also surface this button while in edit mode,
-    /// since the tab bar (which normally hosts the Done dots tab) is hidden.
-    private var showsFloatingDotsButton: Bool {
-        #if os(iOS)
-        if isPad { return false }
-        if verticalSizeClass == .compact { return true }
-        return vm.isEditMode
-        #else
-        return false
-        #endif
-    }
 
     var body: some View {
-        @Bindable var bridge = bridge
         NavigationStack {
-            ZStack(alignment: .bottomTrailing) {
             VStack(spacing: 0) {
                 WeekPickerView(selectedWeek: $vm.selectedWeekStart, category: vm.weekCategory)
                     .padding(.horizontal)
@@ -68,65 +41,15 @@ struct RotaView: View {
                     Spacer()
                 }
             }
-
-            if showsFloatingDotsButton {
-                Button {
-                    if vm.isEditMode {
-                        vm.exitEditMode()
-                    } else {
-                        if reduceMotion {
-                            bridge.overflowOpen.toggle()
-                        } else {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
-                                bridge.overflowOpen.toggle()
-                            }
-                        }
-                    }
-                } label: {
-                    Image(systemName: vm.isEditMode ? "checkmark" : "ellipsis")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .frame(width: 24, height: 24)
-                        .padding(14)
-                        .glassEffect(.regular.interactive(), in: Circle())
-                }
-                .accessibilityLabel(vm.isEditMode ? "Done editing" : "More actions")
-                .padding(.trailing, 20 + deviceSafeAreaInsets.trailing)
-                .padding(.bottom, 12 + deviceSafeAreaInsets.bottom)
-            }
-
-                if bridge.overflowOpen {
-                    RotaOverflowPopover(
-                        actions: overflowActions,
-                        isPresented: $bridge.overflowOpen,
-                        deviceSafeAreaInsets: deviceSafeAreaInsets
-                    )
-                }
-            }
-            .background {
-                GeometryReader { proxy in
-                    Color.clear
-                        .preference(key: DeviceSafeAreaInsetsKey.self, value: proxy.safeAreaInsets)
-                }
-                .ignoresSafeArea()
-            }
-            .onPreferenceChange(DeviceSafeAreaInsetsKey.self) { newInsets in
-                deviceSafeAreaInsets = newInsets
-            }
+            .navigationTitle("Rota")
             #if os(iOS)
-            .toolbar(isPad ? .visible : .hidden, for: .navigationBar)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if isPad {
-                    ToolbarItem(placement: .primaryAction) {
-                        iPadOverflowMenu
-                    }
+                ToolbarItem(placement: .primaryAction) {
+                    overflowMenu
                 }
             }
             #endif
-            .onDisappear {
-                bridge.overflowOpen = false
-            }
             .onChange(of: vm.isEditMode) { _, new in
                 if reduceMotion {
                     bridge.isEditMode = new
@@ -141,7 +64,6 @@ struct RotaView: View {
                     vm.exitEditMode()
                 }
             }
-            .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.78), value: bridge.overflowOpen)
             .alert(
                 "No schedule for \(vm.weekDateRangeLabel)",
                 isPresented: $vm.showGenerateConfirmation
@@ -192,16 +114,16 @@ struct RotaView: View {
         }
     }
 
-    // MARK: - iPad toolbar menu
+    // MARK: - Toolbar menu
 
     #if os(iOS)
     /// Mirrors `EmployeeListView`'s primary-action component: an `ellipsis`
     /// `Menu` (or a plain checkmark `Button` while editing) anchored in the
-    /// navigation toolbar. Reuses `overflowActions` so the iPhone landscape
-    /// floating glass popover and the iPad nav-bar menu surface the same
-    /// items from a single source.
+    /// navigation toolbar. Used by both iPhone and iPad on iOS so the Rota
+    /// page surfaces its actions through the same top-right control as the
+    /// rest of the app.
     @ViewBuilder
-    private var iPadOverflowMenu: some View {
+    private var overflowMenu: some View {
         if vm.isEditMode {
             Button {
                 vm.exitEditMode()
@@ -332,21 +254,6 @@ private struct CategoryBadge: View {
         case .current: .blue
         case .future: .orange
         }
-    }
-}
-
-// MARK: - Safe-area inset propagation
-
-/// Captures the device's actual safe-area insets (notch, home indicator) from
-/// a `GeometryReader` placed in a `.background` that ignores safe area, so
-/// floating overlay views can offset themselves clear of the notch in
-/// landscape iPhone — where `.toolbar(.hidden, for: .navigationBar)` plus the
-/// popover's full-screen tap-dismiss backdrop otherwise let trailing content
-/// drift under the dynamic island.
-struct DeviceSafeAreaInsetsKey: PreferenceKey {
-    static let defaultValue: EdgeInsets = EdgeInsets()
-    static func reduce(value: inout EdgeInsets, nextValue: () -> EdgeInsets) {
-        value = nextValue()
     }
 }
 
