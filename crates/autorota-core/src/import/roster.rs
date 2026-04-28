@@ -12,6 +12,7 @@ use super::{ImportSummary, MergeStrategy, ParsedEmployeeRow, ParsedRoster};
 use crate::db::queries;
 use crate::models::availability::Availability;
 use crate::models::employee::Employee;
+use crate::models::validation::{ValidationError, validate_employee};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ImportError {
@@ -21,6 +22,8 @@ pub enum ImportError {
     Parse(String),
     #[error("db error: {0}")]
     Db(#[from] sqlx::Error),
+    #[error("row {row}: {error}")]
+    Validation { row: usize, error: ValidationError },
 }
 
 /// Pick a parser based on the format hint ("csv" | "json" | "xlsx"). Falls
@@ -46,7 +49,9 @@ pub async fn parse_roster(
         "csv" => parse_csv(bytes)?,
         "json" => parse_json(bytes)?,
         "xlsx" => parse_xlsx(bytes)?,
-        _ => unreachable!(),
+        // Defensive: fmt is set from the if/else above which only emits the
+        // three branches, but a future edit could break that invariant.
+        other => return Err(ImportError::UnsupportedFormat(other.to_string())),
     };
 
     let existing = queries::list_all_employees(pool).await?;
@@ -65,7 +70,7 @@ pub async fn apply_import(
     let mut skipped = 0u32;
 
     let mut tx = pool.begin().await?;
-    for row in rows {
+    for (i, row) in rows.iter().enumerate() {
         if !row.include {
             skipped += 1;
             continue;
@@ -78,11 +83,15 @@ pub async fn apply_import(
                     continue;
                 };
                 merge_into_employee(&mut emp, row);
+                validate_employee(&emp)
+                    .map_err(|error| ImportError::Validation { row: i, error })?;
                 queries::update_employee(&mut *tx, &emp).await?;
                 updated += 1;
             }
             None => {
                 let emp = row_to_new_employee(row);
+                validate_employee(&emp)
+                    .map_err(|error| ImportError::Validation { row: i, error })?;
                 queries::insert_employee(&mut *tx, &emp).await?;
                 inserted += 1;
             }

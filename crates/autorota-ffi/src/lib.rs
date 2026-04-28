@@ -331,6 +331,8 @@ pub fn get_employee(id: i64) -> Result<Option<FfiEmployee>, FfiError> {
 pub fn create_employee(employee: FfiEmployee) -> Result<i64, FfiError> {
     let pool = pool()?;
     let core = ffi_to_employee(employee)?;
+    autorota_core::models::validation::validate_employee(&core)
+        .map_err(|e| FfiError::invalid(error::ErrorCode::InvalidGeneric, e.to_string()))?;
     rt().block_on(queries::insert_employee(pool, &core))
         .map_err(FfiError::from)
 }
@@ -339,6 +341,8 @@ pub fn create_employee(employee: FfiEmployee) -> Result<i64, FfiError> {
 pub fn update_employee(employee: FfiEmployee) -> Result<(), FfiError> {
     let pool = pool()?;
     let core = ffi_to_employee(employee)?;
+    autorota_core::models::validation::validate_employee(&core)
+        .map_err(|e| FfiError::invalid(error::ErrorCode::InvalidGeneric, e.to_string()))?;
     rt().block_on(queries::update_employee(pool, &core))
         .map_err(FfiError::from)
 }
@@ -403,6 +407,8 @@ pub fn list_shift_templates() -> Result<Vec<FfiShiftTemplate>, FfiError> {
 pub fn create_shift_template(template: FfiShiftTemplate) -> Result<i64, FfiError> {
     let pool = pool()?;
     let core = ffi_to_shift_template(template)?;
+    autorota_core::models::validation::validate_shift_template(&core)
+        .map_err(|e| FfiError::invalid(error::ErrorCode::InvalidGeneric, e.to_string()))?;
     rt().block_on(queries::insert_shift_template(pool, &core))
         .map_err(FfiError::from)
 }
@@ -411,6 +417,8 @@ pub fn create_shift_template(template: FfiShiftTemplate) -> Result<i64, FfiError
 pub fn update_shift_template(template: FfiShiftTemplate) -> Result<(), FfiError> {
     let pool = pool()?;
     let core = ffi_to_shift_template(template)?;
+    autorota_core::models::validation::validate_shift_template(&core)
+        .map_err(|e| FfiError::invalid(error::ErrorCode::InvalidGeneric, e.to_string()))?;
     rt().block_on(queries::update_shift_template(pool, &core))
         .map_err(FfiError::from)
 }

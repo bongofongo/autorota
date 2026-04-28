@@ -8,5 +8,6 @@ pub mod save;
 pub mod shift;
 pub mod shift_history;
 pub mod sync;
+pub mod validation;
 
 pub use sync::{BaseSnapshot, MergeConflict, SyncRecord, Tombstone};

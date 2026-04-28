@@ -1,12 +1,30 @@
 use super::grid::ExportGrid;
 
-/// Escape a cell value per RFC 4180.
+/// Per OWASP CSV-injection guidance: a leading `=`, `+`, `-`, `@`, tab,
+/// or carriage-return makes Excel / Numbers / Sheets interpret the cell
+/// as a formula on import. Prefixing with `'` neutralises that without
+/// breaking the visible value (the leading apostrophe is hidden by the
+/// parser).
+fn needs_formula_prefix(value: &str) -> bool {
+    matches!(
+        value.chars().next(),
+        Some('=') | Some('+') | Some('-') | Some('@') | Some('\t') | Some('\r')
+    )
+}
+
+/// Escape a cell value per RFC 4180, plus OWASP CSV-injection
+/// neutralisation for cells that would otherwise be parsed as formulas.
 fn csv_escape(value: &str) -> String {
-    if value.contains(',') || value.contains('"') || value.contains('\n') {
-        let escaped = value.replace('"', "\"\"");
+    let safe: std::borrow::Cow<'_, str> = if needs_formula_prefix(value) {
+        std::borrow::Cow::Owned(format!("'{value}"))
+    } else {
+        std::borrow::Cow::Borrowed(value)
+    };
+    if safe.contains(',') || safe.contains('"') || safe.contains('\n') {
+        let escaped = safe.replace('"', "\"\"");
         format!("\"{escaped}\"")
     } else {
-        value.to_string()
+        safe.into_owned()
     }
 }
 
@@ -112,6 +130,57 @@ mod tests {
         let csv = render_csv(&grid);
         // The newline cell should be quoted.
         assert!(csv.contains("\"Alice\nBob\""));
+    }
+
+    #[test]
+    fn csv_neutralises_formula_prefix_equals() {
+        let grid = ExportGrid {
+            title: "Test".to_string(),
+            column_headers: vec!["Mon".to_string()],
+            row_headers: vec!["Alice".to_string()],
+            cells: vec![vec!["=SUM(A1:A10)".to_string()]],
+            daily_totals: None,
+            weekly_total_cost: None,
+        };
+        let csv = render_csv(&grid);
+        // Leading '=' must be neutralised with a leading apostrophe.
+        assert!(csv.contains("'=SUM(A1:A10)"));
+        assert!(!csv.contains(",=SUM"));
+    }
+
+    #[test]
+    fn csv_neutralises_formula_prefix_plus_minus_at() {
+        let grid = ExportGrid {
+            title: "Test".to_string(),
+            column_headers: vec!["A".to_string(), "B".to_string(), "C".to_string()],
+            row_headers: vec!["Alice".to_string()],
+            cells: vec![vec![
+                "+1+1".to_string(),
+                "-2".to_string(),
+                "@cmd".to_string(),
+            ]],
+            daily_totals: None,
+            weekly_total_cost: None,
+        };
+        let csv = render_csv(&grid);
+        assert!(csv.contains("'+1+1"));
+        assert!(csv.contains("'-2"));
+        assert!(csv.contains("'@cmd"));
+    }
+
+    #[test]
+    fn csv_neutralised_cell_with_comma_still_quoted() {
+        let grid = ExportGrid {
+            title: "Test".to_string(),
+            column_headers: vec!["A".to_string()],
+            row_headers: vec!["Alice".to_string()],
+            cells: vec![vec!["=A1,B1".to_string()]],
+            daily_totals: None,
+            weekly_total_cost: None,
+        };
+        let csv = render_csv(&grid);
+        // Both prefix neutralisation and RFC 4180 quoting must apply.
+        assert!(csv.contains("\"'=A1,B1\""));
     }
 
     #[test]
