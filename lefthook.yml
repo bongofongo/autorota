@@ -23,3 +23,13 @@ pre-push:
       glob: "platforms/apple/**/*.swift"
       # macOS-only; runs the Make target that does compile-check on all 3 platforms.
       run: make swift-build-check
+    swift-test-macos:
+      # ViewModel unit tests against MockAutorotaService — no XCFramework needed
+      # and no simulator boot, so the cost is bounded (~30-60s warm). Runs only
+      # when ViewModels / services / tests change so trivial UI tweaks aren't
+      # gated on the test suite.
+      glob:
+        - "platforms/apple/Apps/AutorotaApp/ViewModels/**/*.swift"
+        - "platforms/apple/Apps/AutorotaApp/Services/**/*.swift"
+        - "platforms/apple/Apps/AutorotaApp/AutorotaAppTests/**/*.swift"
+      run: make swift-test-app-macos
