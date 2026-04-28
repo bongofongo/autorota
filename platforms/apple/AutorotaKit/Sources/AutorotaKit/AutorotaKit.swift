@@ -8,21 +8,53 @@ import Foundation
 
 // MARK: - Database initialisation helper
 
-/// Resolve the app-support database path and initialise the Rust pool.
-/// Call once from your @main App's init() or Scene body before any other API.
-public func autorotaInitDb() throws {
+/// Resolve (and create) the app-support directory used to host the database.
+public func autorotaAppSupportDirectory() throws -> URL {
     let appSupport = try FileManager.default
         .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
     let dir = appSupport.appendingPathComponent("AutorotaApp", isDirectory: true)
     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-    let dbURL = dir.appendingPathComponent("autorota.db")
-    try initDb(dbPath: dbURL.path)
+    return dir
+}
+
+/// Resolved file URL for the default production database.
+public func autorotaDefaultDBURL() throws -> URL {
+    try autorotaAppSupportDirectory().appendingPathComponent("autorota.db")
+}
+
+/// Resolve the app-support database path and initialise the Rust pool.
+/// Call once from your @main App's init() or Scene body before any other API.
+public func autorotaInitDb() throws {
+    try initDb(dbPath: autorotaDefaultDBURL().path)
 }
 
 /// Initialise the Rust pool against an explicit database path. Used by
 /// performance tests that want an ephemeral DB so each run starts fresh.
 public func autorotaInitDb(at path: String) throws {
     try initDb(dbPath: path)
+}
+
+/// Quarantine a corrupted database file by renaming it `db.corrupt-<unix-ts>.sqlite`
+/// in the same directory. Returns the new path on success. The caller is
+/// expected to re-attempt `autorotaInitDb()` afterwards (which will recreate
+/// a fresh empty file).
+@discardableResult
+public func autorotaQuarantineDatabase(at url: URL) throws -> URL {
+    let ts = Int(Date().timeIntervalSince1970)
+    let quarantine = url.deletingLastPathComponent()
+        .appendingPathComponent("db.corrupt-\(ts).sqlite")
+    if FileManager.default.fileExists(atPath: url.path) {
+        try FileManager.default.moveItem(at: url, to: quarantine)
+    }
+    // Best-effort cleanup of WAL/SHM siblings — leaving them around can
+    // cause SQLite to re-attach to the corrupt journal on the next open.
+    for ext in ["-wal", "-shm"] {
+        let sibling = URL(fileURLWithPath: url.path + ext)
+        if FileManager.default.fileExists(atPath: sibling.path) {
+            try? FileManager.default.removeItem(at: sibling)
+        }
+    }
+    return quarantine
 }
 
 // MARK: - Convenience date helpers

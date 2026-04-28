@@ -165,7 +165,9 @@ final class AnalyticsViewModel {
             }
         }
         for key in empMap.keys {
-            empMap[key]!.avgHoursPerWeek = empMap[key]!.totalHours / weeksInRange
+            guard var summary = empMap[key] else { continue }
+            summary.avgHoursPerWeek = summary.totalHours / weeksInRange
+            empMap[key] = summary
         }
         employeeSummaries = Array(empMap.values)
         sortEmployees()

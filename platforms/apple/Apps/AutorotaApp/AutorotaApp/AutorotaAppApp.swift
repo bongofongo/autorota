@@ -3,6 +3,16 @@ import CloudKit
 import SwiftUI
 import TipKit
 
+/// Result of the App's two-pass database init. `failed` short-circuits the
+/// scene to show `DatabaseRecoveryView`; `recovered` lets the app boot
+/// against a fresh DB (the user's prior local-only data is in a quarantined
+/// `db.corrupt-<ts>.sqlite` sibling file).
+enum DBInitOutcome {
+    case ok
+    case recovered(quarantinedTo: String, originalError: String)
+    case failed(message: String)
+}
+
 @main
 struct AutorotaAppApp: App {
 
@@ -12,6 +22,7 @@ struct AutorotaAppApp: App {
     private static let perfMode: PerfModeConfig? = PerfModeConfig.fromLaunchArgs()
 
     init() {
+        let initOutcome: DBInitOutcome
         do {
             #if PERF_HELPERS
             if let cfg = Self.perfMode {
@@ -19,15 +30,19 @@ struct AutorotaAppApp: App {
                 try? FileManager.default.removeItem(atPath: tmp)
                 try autorotaInitDb(at: tmp)
                 try seedPerfCorpus(employees: UInt32(cfg.employees), seed: cfg.seed)
+                UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
+                initOutcome = .ok
             } else {
-                try autorotaInitDb()
+                initOutcome = try Self.initDatabaseWithRecovery()
             }
             #else
-            try autorotaInitDb()
+            initOutcome = try Self.initDatabaseWithRecovery()
             #endif
         } catch {
-            fatalError("Failed to initialise database: \(error)")
+            initOutcome = .failed(message: "\(error)")
         }
+        _dbInitOutcome = State(initialValue: initOutcome)
+
         try? Tips.configure([
             .displayFrequency(.immediate),
             .datastoreLocation(.applicationDefault),
@@ -35,6 +50,25 @@ struct AutorotaAppApp: App {
         // Seam for swapping Mock ↔ Live without rebuilding env wiring.
         let backend: LicenseBackend = LiveLicenseBackend()
         _licenseService = State(initialValue: LicenseService(backend: backend))
+    }
+
+    /// Two-pass DB init: try once, on failure quarantine the file and try
+    /// again from a clean slate. Returns `.ok` on first-try success,
+    /// `.recovered` if the second attempt succeeded (caller should warn the
+    /// user about lost local data), and throws if both attempts failed.
+    private static func initDatabaseWithRecovery() throws -> DBInitOutcome {
+        do {
+            try autorotaInitDb()
+            return .ok
+        } catch {
+            // First attempt failed — likely a corrupt file or schema drift
+            // that the migration runner couldn't reconcile. Quarantine and
+            // retry once before surfacing an unrecoverable error.
+            let dbURL = try autorotaDefaultDBURL()
+            let quarantined = try autorotaQuarantineDatabase(at: dbURL)
+            try autorotaInitDb()
+            return .recovered(quarantinedTo: quarantined.path, originalError: "\(error)")
+        }
     }
 
     private var inPerfMode: Bool {
@@ -53,6 +87,7 @@ struct AutorotaAppApp: App {
     @State private var licenseService: LicenseService
     @State private var showSyncPrompt = false
     @State private var syncCheckComplete = false
+    @State private var dbInitOutcome: DBInitOutcome
 
     private var selectedAppearance: AppAppearance {
         AppAppearance(rawValue: appearance) ?? .system
@@ -65,16 +100,26 @@ struct AutorotaAppApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if syncCheckComplete {
-                    ContentView()
-                } else {
-                    ProgressView("Loading...")
+                switch dbInitOutcome {
+                case .failed(let message):
+                    DatabaseRecoveryView(errorMessage: message)
+                case .ok, .recovered:
+                    if syncCheckComplete {
+                        ContentView()
+                    } else {
+                        ProgressView("Loading...")
+                    }
                 }
             }
             .sheet(isPresented: $showSyncPrompt) {
                 SyncPromptView(
                     onAccept: {
                         showSyncPrompt = false
+                        // User opted into existing iCloud data — slide deck
+                        // is moot. Mark onboarding done and route the next
+                        // OnboardingView render straight to TierPickView.
+                        UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
+                        UserDefaults.standard.set(true, forKey: "pendingOnboardingTierOnly")
                         Task { await syncEngine.start() }
                         do {
                             try setSyncMetadata(key: "sync_initialized", value: "true")
@@ -97,6 +142,9 @@ struct AutorotaAppApp: App {
             .environment(\.accessibilityPalette, selectedPalette)
             .task {
                 if inPerfMode {
+                    // Perf harness needs an immediately-usable license too —
+                    // ContentView gates onboarding on `state == .unset`.
+                    licenseService.forceState(.purchased(tier: .localManager))
                     syncCheckComplete = true
                     return
                 }
@@ -132,6 +180,18 @@ struct AutorotaAppApp: App {
             if initialized != nil {
                 await syncEngine.start()
                 syncCheckComplete = true
+                // If sync hydrates real data on this device but
+                // `hasCompletedOnboarding` is missing (fresh OS install with
+                // an iCloud restore that didn't carry UserDefaults), skip
+                // the slide deck. The user clearly knows the app.
+                Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    if let n = try? countEmployees(), n > 0 {
+                        await MainActor.run {
+                            UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
+                        }
+                    }
+                }
                 return
             }
 
@@ -140,16 +200,23 @@ struct AutorotaAppApp: App {
                 return
             }
 
-            // First launch: check if cloud data exists
-            let localCount = try countEmployees()
-            let hasCloudData = await checkCloudZoneExists()
+            // First launch.
+            let localCount = (try? countEmployees()) ?? 0
+            let zoneState = await checkCloudZone()
 
-            if hasCloudData && localCount == 0 {
+            switch zoneState {
+            case .exists where localCount == 0:
+                // Show the prompt; defer `sync_initialized` until the user
+                // chooses, otherwise a decline would orphan iCloud data.
                 syncCheckComplete = true
                 showSyncPrompt = true
-            } else {
+            case .exists, .missing:
                 await syncEngine.start()
                 try setSyncMetadata(key: "sync_initialized", value: "true")
+                syncCheckComplete = true
+            case .unknown:
+                // Transient CloudKit error (network, throttling, timeout).
+                // Don't persist `sync_initialized` — next launch retries.
                 syncCheckComplete = true
             }
         } catch {
@@ -157,16 +224,43 @@ struct AutorotaAppApp: App {
         }
     }
 
-    private func checkCloudZoneExists() async -> Bool {
+    private enum CloudZoneState { case exists, missing, unknown }
+
+    private func checkCloudZone() async -> CloudZoneState {
         let container = CKContainer(identifier: "iCloud.com.toadmountain.autorota")
         let database = container.privateCloudDatabase
+        let zoneID = SyncRecordMapper.zoneID
         do {
-            let zoneID = SyncRecordMapper.zoneID
-            _ = try await database.recordZone(for: zoneID)
-            return true
+            _ = try await withTimeout(seconds: 5) {
+                try await database.recordZone(for: zoneID)
+            }
+            return .exists
+        } catch let ck as CKError where ck.code == .zoneNotFound || ck.code == .unknownItem {
+            return .missing
         } catch {
-            return false
+            return .unknown
         }
+    }
+}
+
+/// Bounded wait. Throws `TimeoutError` on expiry; cancels the operation task.
+struct TimeoutError: Error {}
+
+func withTimeout<T: Sendable>(
+    seconds: Double,
+    _ operation: @escaping @Sendable () async throws -> T
+) async throws -> T {
+    try await withThrowingTaskGroup(of: T.self) { group in
+        group.addTask { try await operation() }
+        group.addTask {
+            try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            throw TimeoutError()
+        }
+        guard let result = try await group.next() else {
+            throw TimeoutError()
+        }
+        group.cancelAll()
+        return result
     }
 }
 

@@ -1244,6 +1244,14 @@ pub fn apply_remote_record(record: FfiSyncRecord) -> Result<(), FfiError> {
 }
 
 #[uniffi::export]
+pub fn apply_remote_deletion(table_name: String, record_id: i64) -> Result<(), FfiError> {
+    let pool = pool()?;
+    rt().block_on(queries::apply_remote_deletion(pool, &table_name, record_id))
+        .map_err(FfiError::from)?;
+    Ok(())
+}
+
+#[uniffi::export]
 pub fn get_sync_metadata(key: String) -> Result<Option<String>, FfiError> {
     let pool = pool()?;
     rt().block_on(queries::get_sync_metadata(pool, &key))

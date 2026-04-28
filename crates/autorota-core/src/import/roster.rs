@@ -64,7 +64,7 @@ pub async fn apply_import(
     let mut updated = 0u32;
     let mut skipped = 0u32;
 
-    let tx = pool.begin().await?;
+    let mut tx = pool.begin().await?;
     for row in rows {
         if !row.include {
             skipped += 1;
@@ -72,18 +72,18 @@ pub async fn apply_import(
         }
         match row.match_existing_id {
             Some(id) => {
-                let existing = queries::get_employee(pool, id).await?;
+                let existing = queries::get_employee(&mut *tx, id).await?;
                 let Some(mut emp) = existing else {
                     skipped += 1;
                     continue;
                 };
                 merge_into_employee(&mut emp, row);
-                queries::update_employee(pool, &emp).await?;
+                queries::update_employee(&mut *tx, &emp).await?;
                 updated += 1;
             }
             None => {
                 let emp = row_to_new_employee(row);
-                queries::insert_employee(pool, &emp).await?;
+                queries::insert_employee(&mut *tx, &emp).await?;
                 inserted += 1;
             }
         }

@@ -12,8 +12,36 @@ final class AutorotaSyncEngine: @unchecked Sendable {
     }
 
     private(set) var status: SyncStatus = .idle
+    /// Last non-fatal sync issue surfaced for the UI banner. Cleared by the
+    /// next successful pull. Distinct from `status` (which gates engine state)
+    /// so a one-off conflict-merge failure on record N doesn't poison the
+    /// whole engine.
+    private(set) var lastSyncIssue: String?
     private var engine: CKSyncEngine?
     private let logger = Logger(subsystem: "com.toadmountain.autorota", category: "sync")
+
+    enum SyncEngineError: Error, LocalizedError {
+        case mergedFieldsNotUTF8
+
+        var errorDescription: String? {
+            switch self {
+            case .mergedFieldsNotUTF8:
+                return "Merged sync record fields are not valid UTF-8."
+            }
+        }
+    }
+
+    /// Encodes a merged sync record as a JSON string. Throws on
+    /// `JSONSerialization` failure or non-UTF-8 output. Extracted as a
+    /// static so the merge-failure path can be unit-tested without standing
+    /// up a full CKSyncEngine.
+    static func encodeMergedFields(_ merged: [String: Any]) throws -> String {
+        let data = try JSONSerialization.data(withJSONObject: merged)
+        guard let str = String(data: data, encoding: .utf8) else {
+            throw SyncEngineError.mergedFieldsNotUTF8
+        }
+        return str
+    }
 
     /// Initialize the sync engine. Call after `autorotaInitDb()`.
     func start() async {
@@ -205,27 +233,35 @@ extension AutorotaSyncEngine: CKSyncEngineDelegate {
                         serverLastModified: syncRecord.lastModified
                     )
 
-                    if let mergedData = try? JSONSerialization.data(withJSONObject: merged),
-                       let mergedFields = String(data: mergedData, encoding: .utf8) {
-                        let mergedRecord = FfiSyncRecord(
-                            tableName: syncRecord.tableName,
-                            recordId: syncRecord.recordId,
-                            fields: mergedFields,
-                            lastModified: (merged["last_modified"] as? String) ?? syncRecord.lastModified
-                        )
-                        try applyRemoteRecord(record: mergedRecord)
-                    }
+                    let mergedFields = try Self.encodeMergedFields(merged)
+                    let mergedRecord = FfiSyncRecord(
+                        tableName: syncRecord.tableName,
+                        recordId: syncRecord.recordId,
+                        fields: mergedFields,
+                        lastModified: (merged["last_modified"] as? String) ?? syncRecord.lastModified
+                    )
+                    try applyRemoteRecord(record: mergedRecord)
                 } else {
                     try applyRemoteRecord(record: syncRecord)
                 }
             } catch {
-                logger.error("Failed to apply remote record \(syncRecord.tableName)_\(syncRecord.recordId): \(error)")
+                let summary = "Failed to apply remote record \(syncRecord.tableName)_\(syncRecord.recordId): \(error.localizedDescription)"
+                logger.error("\(summary)")
+                lastSyncIssue = summary
             }
         }
 
         for deletion in changes.deletions {
-            guard let (tableName, _) = SyncRecordMapper.parseRecordID(deletion.recordID) else { continue }
-            logger.info("Remote deletion: \(deletion.recordID.recordName) from \(tableName)")
+            guard let (tableName, rowID) = SyncRecordMapper.parseRecordID(deletion.recordID) else { continue }
+            do {
+                try applyRemoteDeletion(tableName: tableName, recordId: rowID)
+                logger.info("Applied remote deletion: \(deletion.recordID.recordName)")
+                NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
+            } catch {
+                let summary = "Failed to apply remote deletion \(deletion.recordID.recordName): \(error.localizedDescription)"
+                logger.error("\(summary)")
+                lastSyncIssue = summary
+            }
         }
     }
 

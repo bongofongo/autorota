@@ -1012,6 +1012,51 @@ async fn apply_remote_record_updates_existing_row() {
 }
 
 #[sqlx::test]
+async fn apply_remote_deletion_soft_deletes_employee() {
+    let pool = test_pool().await;
+    let emp = helpers::make_employee(0, "Alice", "barista", AvailabilityState::Yes);
+    let id = queries::insert_employee(&pool, &emp).await.unwrap();
+
+    queries::apply_remote_deletion(&pool, "employees", id)
+        .await
+        .unwrap();
+
+    // Soft-delete: row still present, deleted = 1, sync_status = 1 (not re-pushed).
+    let all = queries::list_all_employees(&pool).await.unwrap();
+    let row = all.iter().find(|e| e.id == id).expect("row preserved");
+    assert!(row.deleted, "employee should be marked deleted");
+
+    let (status, _, _) = query_sync_status(&pool, "employees", id).await;
+    assert_eq!(status, 1, "remote deletion must not queue a re-push");
+
+    // list_employees should exclude soft-deleted rows.
+    let active = queries::list_employees(&pool).await.unwrap();
+    assert!(active.iter().all(|e| e.id != id));
+}
+
+#[sqlx::test]
+async fn apply_remote_deletion_hard_deletes_role() {
+    let pool = test_pool().await;
+    let id = queries::insert_role(&pool, "Doomed").await.unwrap();
+
+    queries::apply_remote_deletion(&pool, "roles", id)
+        .await
+        .unwrap();
+
+    let roles = queries::list_roles(&pool).await.unwrap();
+    assert!(roles.iter().all(|r| r.id != id), "role should be gone");
+}
+
+#[sqlx::test]
+async fn apply_remote_deletion_unknown_table_is_noop() {
+    let pool = test_pool().await;
+    // No panic, no error — sync against a newer-schema peer must not brick.
+    queries::apply_remote_deletion(&pool, "unknown_future_table", 1)
+        .await
+        .unwrap();
+}
+
+#[sqlx::test]
 async fn sync_status_resets_on_local_update() {
     let pool = test_pool().await;
 

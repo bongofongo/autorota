@@ -34,7 +34,10 @@ type ShiftRow = (
 
 // ─── Employees ───────────────────────────────────────────────
 
-pub async fn insert_employee(pool: &SqlitePool, emp: &Employee) -> Result<i64, sqlx::Error> {
+pub async fn insert_employee<'e, E>(executor: E, emp: &Employee) -> Result<i64, sqlx::Error>
+where
+    E: sqlx::SqliteExecutor<'e>,
+{
     let roles_json = serde_json::to_string(&emp.roles).unwrap_or_default();
     let default_avail = emp.default_availability.to_json().unwrap_or_default();
     let avail = emp.availability.to_json().unwrap_or_default();
@@ -62,19 +65,22 @@ pub async fn insert_employee(pool: &SqlitePool, emp: &Employee) -> Result<i64, s
     .bind(&default_avail)
     .bind(&avail)
     .bind(&now)
-    .fetch_one(pool)
+    .fetch_one(executor)
     .await?;
 
     Ok(id)
 }
 
-pub async fn get_employee(pool: &SqlitePool, id: i64) -> Result<Option<Employee>, sqlx::Error> {
+pub async fn get_employee<'e, E>(executor: E, id: i64) -> Result<Option<Employee>, sqlx::Error>
+where
+    E: sqlx::SqliteExecutor<'e>,
+{
     let row: Option<EmployeeRow> = sqlx::query_as(
         "SELECT id, first_name, last_name, nickname, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, phone, email, preferred_contact, hourly_wage, wage_currency, default_availability, availability, deleted
          FROM employees WHERE id = ?",
     )
     .bind(id)
-    .fetch_optional(pool)
+    .fetch_optional(executor)
     .await?;
 
     Ok(row.map(employee_from_row))
@@ -103,7 +109,10 @@ pub async fn list_all_employees(pool: &SqlitePool) -> Result<Vec<Employee>, sqlx
     Ok(rows.into_iter().map(employee_from_row).collect())
 }
 
-pub async fn update_employee(pool: &SqlitePool, emp: &Employee) -> Result<(), sqlx::Error> {
+pub async fn update_employee<'e, E>(executor: E, emp: &Employee) -> Result<(), sqlx::Error>
+where
+    E: sqlx::SqliteExecutor<'e>,
+{
     let roles_json = serde_json::to_string(&emp.roles).unwrap_or_default();
     let default_avail = emp.default_availability.to_json().unwrap_or_default();
     let avail = emp.availability.to_json().unwrap_or_default();
@@ -132,7 +141,7 @@ pub async fn update_employee(pool: &SqlitePool, emp: &Employee) -> Result<(), sq
     .bind(&avail)
     .bind(&now)
     .bind(emp.id)
-    .execute(pool)
+    .execute(executor)
     .await?;
 
     Ok(())
@@ -2366,6 +2375,49 @@ pub async fn apply_remote_record(
         }
         query = query.bind(&record.fields);
         query.execute(pool).await?;
+    }
+    Ok(())
+}
+
+/// Apply a remote deletion received from sync. For soft-delete tables
+/// (`employees`, `shift_templates`) flips `deleted = 1` and marks the row
+/// synced so it isn't re-pushed. For all other sync tables performs a hard
+/// `DELETE`. No tombstone is created — the deletion already came from the
+/// network.
+///
+/// Unknown table names are a no-op (sync schema drift) so a future client
+/// can introduce new tables without bricking older clients.
+pub async fn apply_remote_deletion(
+    pool: &SqlitePool,
+    table_name: &str,
+    record_id: i64,
+) -> Result<(), sqlx::Error> {
+    let now = chrono::Utc::now().to_rfc3339();
+    match table_name {
+        "employees" | "shift_templates" => {
+            let sql = format!(
+                "UPDATE {} SET deleted = 1, last_modified = ?, sync_status = 1 WHERE id = ?",
+                table_name
+            );
+            sqlx::query(&sql)
+                .bind(&now)
+                .bind(record_id)
+                .execute(pool)
+                .await?;
+        }
+        "rotas"
+        | "shifts"
+        | "assignments"
+        | "roles"
+        | "employee_availability_overrides"
+        | "shift_template_overrides" => {
+            let sql = format!("DELETE FROM {} WHERE id = ?", table_name);
+            sqlx::query(&sql).bind(record_id).execute(pool).await?;
+        }
+        _ => {
+            // Unknown table — log via the caller; treating as no-op keeps the
+            // sync loop alive against newer-schema peers.
+        }
     }
     Ok(())
 }

@@ -256,6 +256,11 @@ typedef void (*UniffiForeignFutureCompleteVoid)(uint64_t, UniffiForeignFutureStr
 void uniffi_autorota_ffi_fn_func_add_save_tag(int64_t save_id, RustBuffer tag, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_APPLY_REMOTE_DELETION
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_APPLY_REMOTE_DELETION
+void uniffi_autorota_ffi_fn_func_apply_remote_deletion(RustBuffer table_name, int64_t record_id, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_APPLY_REMOTE_RECORD
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_APPLY_REMOTE_RECORD
 void uniffi_autorota_ffi_fn_func_apply_remote_record(RustBuffer record, RustCallStatus *_Nonnull out_status
@@ -911,6 +916,12 @@ void ffi_autorota_ffi_rust_future_complete_void(uint64_t handle, RustCallStatus 
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_ADD_SAVE_TAG
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_ADD_SAVE_TAG
 uint16_t uniffi_autorota_ffi_checksum_func_add_save_tag(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_APPLY_REMOTE_DELETION
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_APPLY_REMOTE_DELETION
+uint16_t uniffi_autorota_ffi_checksum_func_apply_remote_deletion(void
     
 );
 #endif

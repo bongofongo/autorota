@@ -5287,6 +5287,13 @@ public func addSaveTag(saveId: Int64, tag: String)throws  {try rustCallWithError
     )
 }
 }
+public func applyRemoteDeletion(tableName: String, recordId: Int64)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_apply_remote_deletion(
+        FfiConverterString.lower(tableName),
+        FfiConverterInt64.lower(recordId),$0
+    )
+}
+}
 public func applyRemoteRecord(record: FfiSyncRecord)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_apply_remote_record(
         FfiConverterTypeFfiSyncRecord.lower(record),$0
@@ -5885,6 +5892,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.contractVersionMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_add_save_tag() != 15356) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_apply_remote_deletion() != 11552) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_apply_remote_record() != 2938) {

@@ -64,8 +64,14 @@ final class ShiftHistoryViewModel {
         let fmt = DateFormatter()
         fmt.dateFormat = "yyyy-MM-dd"
         fmt.locale = Locale(identifier: "en_US_POSIX")
-        let monday = fmt.date(from: mondayStr)!
-        let sunday = cal.date(byAdding: .day, value: 6, to: monday)!
+        guard let monday = fmt.date(from: mondayStr),
+              let sunday = cal.date(byAdding: .day, value: 6, to: monday)
+        else {
+            pastShifts = []
+            currentWeekShifts = []
+            plannedShifts = []
+            return
+        }
         let sundayStr = fmt.string(from: sunday)
 
         var past: [FfiEmployeeShiftRecord] = []

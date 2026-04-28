@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import AutorotaKit
+import TipKit
 
 enum WeekCategory {
     case past, current, future
@@ -88,6 +89,7 @@ final class RotaViewModel {
             warnings = result.warnings
             isDirty = true
             await loadSchedule()
+            await AutorotaEvents.firstScheduleGenerated.donate()
         } catch {
             self.error = userFacingMessage(error)
         }
@@ -307,7 +309,9 @@ final class RotaViewModel {
         fmt.locale = Locale(identifier: "en_US_POSIX")
         guard let monday = fmt.date(from: selectedWeekStart) else { return selectedWeekStart }
         let cal = Calendar(identifier: .iso8601)
-        let target = cal.date(byAdding: .day, value: offset, to: monday)!
+        guard let target = cal.date(byAdding: .day, value: offset, to: monday) else {
+            return selectedWeekStart
+        }
         return fmt.string(from: target)
     }
 
@@ -334,7 +338,9 @@ final class RotaViewModel {
         parseFmt.locale = Locale(identifier: "en_US_POSIX")
         guard let monday = parseFmt.date(from: selectedWeekStart) else { return selectedWeekStart }
         let cal = Calendar(identifier: .iso8601)
-        let sunday = cal.date(byAdding: .day, value: 6, to: monday)!
+        guard let sunday = cal.date(byAdding: .day, value: 6, to: monday) else {
+            return selectedWeekStart
+        }
         let displayFmt = DateFormatter()
         displayFmt.dateFormat = "MMM d"
         let yearFmt = DateFormatter()
