@@ -1,0 +1,123 @@
+name: Perf
+
+# Informational-only — never blocks merge. Both jobs use continue-on-error.
+# Artifacts are uploaded for manual inspection; a short bencher-format summary
+# is written to the GitHub job summary. See docs/perf-testing.md for how to
+# read the output.
+
+on:
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust-bench:
+    name: Rust criterion
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: perf-rust
+
+      - name: Run benches (bencher format)
+        run: |
+          set -o pipefail
+          cargo bench -p autorota-core -- --output-format bencher \
+            | tee bench-output.txt
+          {
+            echo '## Rust criterion (bencher format)'
+            echo
+            echo '```'
+            cat bench-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload criterion HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: criterion-html
+          path: target/criterion/
+          retention-days: 14
+
+      - name: Upload bencher-format summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: criterion-bencher
+          path: bench-output.txt
+          retention-days: 14
+
+  swift-perf:
+    name: Swift XCUITest perf (iOS Simulator)
+    runs-on: macos-15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (Apple targets)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: >-
+            aarch64-apple-darwin
+            x86_64-apple-darwin
+            aarch64-apple-ios
+            aarch64-apple-ios-sim
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: perf-apple
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '26.0'
+
+      - name: Build XCFramework with PERF_HELPERS=1
+        run: PERF_HELPERS=1 bash scripts/build_xcframework.sh
+
+      - name: Run perf tests (iOS Simulator)
+        # XCUITest on macOS hosts requires interactive TCC (Accessibility)
+        # grants that CI runners can't provide. iOS Simulator runs under
+        # simctl with no TCC dependency. The perf target may not yet exist
+        # in the project on a given branch (one-time Xcode setup is
+        # documented in docs/perf-testing.md). If it is missing, this step
+        # exits 0 with a note rather than failing CI.
+        run: |
+          PROJ=platforms/apple/Apps/AutorotaApp/AutorotaApp.xcodeproj
+          if xcodebuild -project "$PROJ" -list 2>/dev/null | grep -q AutorotaAppPerfTests; then
+            xcodebuild test \
+              -project "$PROJ" \
+              -scheme AutorotaApp \
+              -destination 'platform=iOS Simulator,name=iPhone 17 Pro Max' \
+              -testPlan Perf -only-testing:AutorotaAppPerfTests \
+              SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) PERF_HELPERS' \
+              -resultBundlePath perf-results.xcresult \
+              CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
+          else
+            echo "::notice::AutorotaAppPerfTests target not yet configured — see docs/perf-testing.md"
+          fi
+
+      - name: Upload xcresult
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swift-perf-xcresult
+          path: perf-results.xcresult
+          if-no-files-found: ignore
+          retention-days: 14

@@ -19,6 +19,12 @@ public func autorotaInitDb() throws {
     try initDb(dbPath: dbURL.path)
 }
 
+/// Initialise the Rust pool against an explicit database path. Used by
+/// performance tests that want an ephemeral DB so each run starts fresh.
+public func autorotaInitDb(at path: String) throws {
+    try initDb(dbPath: path)
+}
+
 // MARK: - Convenience date helpers
 
 public extension FfiEmployee {

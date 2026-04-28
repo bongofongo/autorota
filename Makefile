@@ -141,6 +141,46 @@ swift-test-all: swift-test-app-macos swift-test-app-ios swift-test-app-ipad swif
 # On a clean machine, run `make swift-build-xcframework` first.
 test-all: rust-test swift-test-all
 
+# ─── Performance ─────────────────────────────────────────────────────────────
+# Rust criterion benches and Swift XCUITest perf target. Results are
+# informational — see docs/perf-testing.md for how to read them.
+
+.PHONY: bench bench-scheduler bench-save bench-export
+.PHONY: swift-perf-xcframework swift-perf-macos swift-perf-ios perf-all
+
+bench: bench-scheduler bench-save bench-export
+
+bench-scheduler:
+	cargo bench -p autorota-core --bench scheduler
+
+bench-save:
+	cargo bench -p autorota-core --bench save
+
+bench-export:
+	cargo bench -p autorota-core --bench export
+
+# Build the XCFramework with the perf-helpers feature so the perf test target
+# can call seedPerfCorpus(). Default release path stays untouched.
+swift-perf-xcframework:
+	PERF_HELPERS=1 bash scripts/build_xcframework.sh --debug
+
+swift-perf-macos: swift-perf-xcframework
+	$(XCB) test $(XCB_QUIET) -destination 'platform=macOS' \
+	  -testPlan Perf -only-testing:AutorotaAppPerfTests \
+	  SWIFT_ACTIVE_COMPILATION_CONDITIONS='$$(inherited) PERF_HELPERS' \
+	  ENABLE_APP_SANDBOX=NO \
+	  CODE_SIGN_ENTITLEMENTS= \
+	  PROVISIONING_PROFILE_SPECIFIER= \
+	  DEVELOPMENT_TEAM= \
+	  CODE_SIGN_IDENTITY="-" CODE_SIGN_STYLE=Manual
+
+swift-perf-ios: swift-perf-xcframework
+	$(XCB) test $(XCB_QUIET) -destination 'platform=iOS Simulator,name=iPhone 17 Pro Max' \
+	  -testPlan Perf -only-testing:AutorotaAppPerfTests \
+	  SWIFT_ACTIVE_COMPILATION_CONDITIONS='$$(inherited) PERF_HELPERS' $(NOSIGN)
+
+perf-all: bench swift-perf-ios
+
 # ─── Devex ───────────────────────────────────────────────────────────────────
 
 .PHONY: install-hooks release-dry-run

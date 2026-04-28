@@ -573,9 +573,9 @@ int8_t uniffi_autorota_ffi_fn_func_rota_has_saves(int64_t rota_id, RustCallStatu
 RustBuffer uniffi_autorota_ffi_fn_func_run_schedule(RustBuffer week_start, RustCallStatus *_Nonnull out_status
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_SEED_SAMPLE_DATA
-#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_SEED_SAMPLE_DATA
-RustBuffer uniffi_autorota_ffi_fn_func_seed_sample_data(int8_t overwrite, RustCallStatus *_Nonnull out_status
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_SEED_PERF_CORPUS
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_SEED_PERF_CORPUS
+void uniffi_autorota_ffi_fn_func_seed_perf_corpus(uint32_t employees, uint64_t seed, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_SET_AVAILABILITY_PROGRESS
@@ -1286,9 +1286,9 @@ uint16_t uniffi_autorota_ffi_checksum_func_run_schedule(void
     
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_SEED_SAMPLE_DATA
-#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_SEED_SAMPLE_DATA
-uint16_t uniffi_autorota_ffi_checksum_func_seed_sample_data(void
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_SEED_PERF_CORPUS
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_SEED_PERF_CORPUS
+uint16_t uniffi_autorota_ffi_checksum_func_seed_perf_corpus(void
     
 );
 #endif

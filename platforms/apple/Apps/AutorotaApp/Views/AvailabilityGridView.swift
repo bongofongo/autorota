@@ -181,6 +181,7 @@ struct AvailabilityGridView: View {
                                     toggle(weekday: day, hour: hour)
                                 }
                             }
+                            .accessibilityIdentifier("rota.gridCell.\(day).\(hour)")
                         }
                     }
                 }

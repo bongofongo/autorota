@@ -1,5 +1,4 @@
 mod error;
-mod seed;
 mod types;
 
 use std::sync::OnceLock;
@@ -285,19 +284,27 @@ pub fn init_db(db_path: String) -> Result<(), FfiError> {
     })
 }
 
-// ── Sample data ───────────────────────────────────────────────────────────────
+// ── Perf corpus (debug / perf-helpers only) ──────────────────────────────────
 
-/// Seed the database with a cafe-themed sample dataset (3 roles, 4 employees,
-/// 5 shift templates). Used by onboarding's "Load sample data" flow.
+/// Populate the database with a deterministic synthetic corpus for performance
+/// testing. Only linked when the `perf-helpers` feature is enabled — release
+/// builds do not include this symbol so the corpus generator never ships.
 ///
-/// If the database already contains any employees, roles, or shift templates,
-/// this returns `SeedAlreadyExists` unless `overwrite` is `true`. When
-/// `overwrite` is `true`, all existing user data (employees, roles, templates,
-/// rotas, shifts, assignments, and dependent rows) is dropped before seeding.
+/// Runs against the existing `POOL` — caller must have invoked `init_db`
+/// against a fresh / ephemeral path first. Idempotency is the caller's
+/// problem; running twice will create duplicates.
+#[cfg(feature = "perf-helpers")]
 #[uniffi::export]
-pub fn seed_sample_data(overwrite: bool) -> Result<FfiSeedReport, FfiError> {
+pub fn seed_perf_corpus(employees: u32, seed: u64) -> Result<(), FfiError> {
     let pool = pool()?;
-    rt().block_on(seed::seed_sample_data(pool, overwrite))
+    let c = autorota_core::testutil::corpus::generate_corpus(employees as usize, 1, seed);
+    rt().block_on(autorota_core::testutil::corpus::seed_corpus_into_pool(
+        pool, &c,
+    ))
+    .map_err(|e| FfiError::Db {
+        code: ErrorCode::DbConnectionFailed,
+        msg: e.to_string(),
+    })
 }
 
 // ── Employees ─────────────────────────────────────────────────────────────────

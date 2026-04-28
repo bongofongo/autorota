@@ -22,6 +22,15 @@ if [[ "${1:-}" == "--debug" ]]; then
   CARGO_FLAGS=""
 fi
 
+# Feature flags applied only to autorota-ffi cargo build calls. uniffi-bindgen
+# does not have these features so we keep them out of $CARGO_FLAGS to avoid
+# "package does not contain this feature" errors on the bindgen run.
+FFI_FEATURE_FLAGS=""
+if [[ "${PERF_HELPERS:-}" == "1" ]]; then
+  FFI_FEATURE_FLAGS="--features perf-helpers"
+  echo "==> PERF_HELPERS=1 — building autorota-ffi with perf-helpers feature"
+fi
+
 WORKSPACE_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CRATE="autorota-ffi"
 LIB_NAME="libautorota_ffi.a"
@@ -44,10 +53,10 @@ SDK_IOS_SIM="$(xcrun --sdk iphonesimulator --show-sdk-path)"
 # ── Step 1: Compile static libraries ────────────────────────────────────────
 # SDKROOT must be set per-target so libsqlite3-sys (and cc-rs) find the right SDK.
 
-SDKROOT="$SDK_MACOS" cargo build -p "$CRATE" $CARGO_FLAGS --target aarch64-apple-darwin
-SDKROOT="$SDK_MACOS" cargo build -p "$CRATE" $CARGO_FLAGS --target x86_64-apple-darwin
-SDKROOT="$SDK_IOS"     cargo build -p "$CRATE" $CARGO_FLAGS --target aarch64-apple-ios
-SDKROOT="$SDK_IOS_SIM" cargo build -p "$CRATE" $CARGO_FLAGS --target aarch64-apple-ios-sim
+SDKROOT="$SDK_MACOS" cargo build -p "$CRATE" $CARGO_FLAGS $FFI_FEATURE_FLAGS --target aarch64-apple-darwin
+SDKROOT="$SDK_MACOS" cargo build -p "$CRATE" $CARGO_FLAGS $FFI_FEATURE_FLAGS --target x86_64-apple-darwin
+SDKROOT="$SDK_IOS"     cargo build -p "$CRATE" $CARGO_FLAGS $FFI_FEATURE_FLAGS --target aarch64-apple-ios
+SDKROOT="$SDK_IOS_SIM" cargo build -p "$CRATE" $CARGO_FLAGS $FFI_FEATURE_FLAGS --target aarch64-apple-ios-sim
 
 # ── Step 2: Fat library for macOS (arm64 + x86_64 for Rosetta) ──────────────
 

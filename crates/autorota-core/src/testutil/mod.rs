@@ -5,6 +5,7 @@
 
 pub mod assertions;
 pub mod builders;
+pub mod corpus;
 pub mod db;
 
 pub use assertions::*;

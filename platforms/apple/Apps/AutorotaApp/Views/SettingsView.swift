@@ -61,7 +61,6 @@ struct SettingsView: View {
     @Environment(LocaleManager.self) private var localeManager
     @Environment(LicenseService.self) private var license
     @State private var showReplayConfirm = false
-    @State private var replayErrorMessage: String?
     private let exportProfileTip = ExportProfileTip()
 
     private var selectedAppearance: AppAppearance {
@@ -263,53 +262,19 @@ struct SettingsView: View {
                 isPresented: $showReplayConfirm,
                 titleVisibility: .visible
             ) {
-                Button("settings.replay_onboarding.keep_data") {
-                    replayOnboarding(reseed: false)
-                }
-                Button("settings.replay_onboarding.reset_sample", role: .destructive) {
-                    replayOnboarding(reseed: true)
+                Button("settings.replay_onboarding.confirm.action") {
+                    replayOnboarding()
                 }
                 Button("onboarding.alert.cancel", role: .cancel) {}
             } message: {
                 Text("settings.replay_onboarding.confirm.body")
             }
-            .alert(
-                "settings.replay_onboarding.error.title",
-                isPresented: Binding(
-                    get: { replayErrorMessage != nil },
-                    set: { if !$0 { replayErrorMessage = nil } }
-                )
-            ) {
-                Button("onboarding.alert.ok") { replayErrorMessage = nil }
-            } message: {
-                Text(replayErrorMessage ?? "")
-            }
         }
     }
 
-    private func replayOnboarding(reseed: Bool) {
-        if reseed {
-            do {
-                _ = try seedSampleData(overwrite: true)
-            } catch let error as FfiError {
-                replayErrorMessage = localizeReplayError(error)
-                return
-            } catch {
-                replayErrorMessage = error.localizedDescription
-                return
-            }
-        }
+    private func replayOnboarding() {
         try? Tips.resetDatastore()
         hasCompletedOnboarding = false
-    }
-
-    private func localizeReplayError(_ error: FfiError) -> String {
-        let code: ErrorCode
-        switch error {
-        case .Db(let c, _), .NotFound(let c, _), .InvalidArgument(let c, _):
-            code = c
-        }
-        return localizeError(code: code, localeId: Locale.current.identifier)
     }
 }
 

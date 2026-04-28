@@ -17,6 +17,11 @@ sqlx.workspace = true
 chrono.workspace = true
 thiserror = "2"
 
+[features]
+# Enables the `autorota_seed_perf_corpus` FFI hook used by XCUITest perf
+# tests. Default-off so release artifacts never link the corpus generator.
+perf-helpers = ["autorota-core/perf-helpers"]
+
 [dev-dependencies]
 tempfile = "3"
 

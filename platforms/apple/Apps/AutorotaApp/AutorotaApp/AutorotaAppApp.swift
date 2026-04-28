@@ -6,9 +6,25 @@ import TipKit
 @main
 struct AutorotaAppApp: App {
 
+    /// True when the process was launched with `--perf-seed-corpus <N>`.
+    /// Disables iCloud sync, onboarding, and exchange-rate fetching so the
+    /// XCUITest perf target measures a known dataset, not first-launch I/O.
+    private static let perfMode: PerfModeConfig? = PerfModeConfig.fromLaunchArgs()
+
     init() {
         do {
+            #if PERF_HELPERS
+            if let cfg = Self.perfMode {
+                let tmp = NSTemporaryDirectory() + "autorota-perf-\(cfg.employees)-\(cfg.seed).db"
+                try? FileManager.default.removeItem(atPath: tmp)
+                try autorotaInitDb(at: tmp)
+                try seedPerfCorpus(employees: UInt32(cfg.employees), seed: cfg.seed)
+            } else {
+                try autorotaInitDb()
+            }
+            #else
             try autorotaInitDb()
+            #endif
         } catch {
             fatalError("Failed to initialise database: \(error)")
         }
@@ -19,6 +35,14 @@ struct AutorotaAppApp: App {
         // Seam for swapping Mock ↔ Live without rebuilding env wiring.
         let backend: LicenseBackend = LiveLicenseBackend()
         _licenseService = State(initialValue: LicenseService(backend: backend))
+    }
+
+    private var inPerfMode: Bool {
+        #if PERF_HELPERS
+        return Self.perfMode != nil
+        #else
+        return false
+        #endif
     }
 
     @AppStorage("appAppearance") private var appearance: String = AppAppearance.system.rawValue
@@ -72,6 +96,10 @@ struct AutorotaAppApp: App {
             .environment(\.locale, localeManager.effectiveLocale)
             .environment(\.accessibilityPalette, selectedPalette)
             .task {
+                if inPerfMode {
+                    syncCheckComplete = true
+                    return
+                }
                 if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil {
                     await licenseService.refresh()
                 }
@@ -139,5 +167,31 @@ struct AutorotaAppApp: App {
         } catch {
             return false
         }
+    }
+}
+
+/// Parsed `--perf-seed-corpus <employees> [seed <hex>]` launch arguments. Only
+/// honoured in builds that link the `seedPerfCorpus` symbol (XCFramework built
+/// with `PERF_HELPERS=1`). Release builds simply ignore the flag because the
+/// symbol resolution will fail at compile time on a vanilla XCFramework — this
+/// type is wrapped in `#if canImport(...)` style indirectly via the call to
+/// `seedPerfCorpus` which exists only in perf-helpers builds.
+private struct PerfModeConfig {
+    let employees: Int
+    let seed: UInt64
+
+    static func fromLaunchArgs() -> PerfModeConfig? {
+        let args = ProcessInfo.processInfo.arguments
+        guard let idx = args.firstIndex(of: "--perf-seed-corpus"),
+              idx + 1 < args.count,
+              let n = Int(args[idx + 1]), n > 0 else {
+            return nil
+        }
+        var seed: UInt64 = 0xA070_C0FF_EE
+        if let sIdx = args.firstIndex(of: "--perf-seed"), sIdx + 1 < args.count,
+           let parsed = UInt64(args[sIdx + 1].replacingOccurrences(of: "0x", with: ""), radix: 16) {
+            seed = parsed
+        }
+        return PerfModeConfig(employees: n, seed: seed)
     }
 }
