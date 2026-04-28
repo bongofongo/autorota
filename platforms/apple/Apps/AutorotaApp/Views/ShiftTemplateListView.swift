@@ -115,7 +115,11 @@ struct ShiftTemplateListView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
+            VStack(spacing: 0) {
+                TipView(addTemplateTip)
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+                Group {
                 if isFullyEmpty {
                     ContentUnavailableView {
                         Label("empty.shifts.title", systemImage: "clock.badge.plus")
@@ -131,6 +135,7 @@ struct ShiftTemplateListView: View {
                     }
                 } else {
                     listContent
+                }
                 }
             }
             .navigationTitle("Shifts")
@@ -150,7 +155,6 @@ struct ShiftTemplateListView: View {
                     } label: {
                         Image(systemName: "plus")
                     }
-                    .popoverTip(addTemplateTip)
                 }
             }
             .sheet(isPresented: $showingAddTemplateSheet) {

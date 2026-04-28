@@ -149,6 +149,8 @@ private struct SaveEntryView: View {
             if isExpanded {
                 Divider()
 
+                TipView(restoreTip)
+
                 HStack(spacing: 8) {
                     restoreButton
                         .frame(maxWidth: .infinity)
@@ -193,7 +195,6 @@ private struct SaveEntryView: View {
         .controlSize(.small)
         .tint(.orange)
         .disabled(vm.isRestoring)
-        .popoverTip(restoreTip)
         .confirmationDialog(
             "Restore schedule?",
             isPresented: $showRestoreConfirmation,

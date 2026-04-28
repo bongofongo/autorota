@@ -777,6 +777,7 @@ struct EmployeeEditSheet: View {
                     DatePicker("Start date", selection: $startDate, displayedComponents: .date)
                 }
                 Section("Roles") {
+                    TipView(employeeRolesTip)
                     if roleVM.roles.isEmpty {
                         Text("No roles defined. Add roles in the Shifts tab.")
                             .foregroundStyle(.secondary)
@@ -791,7 +792,6 @@ struct EmployeeEditSheet: View {
                         ))
                     }
                 }
-                .popoverTip(employeeRolesTip)
                 Section("Hours") {
                     StepperField(label: "Target", suffix: "h/week",
                                  value: $targetHours, range: 0...80, step: 1)
@@ -917,13 +917,13 @@ struct EmployeeEditSheet: View {
                 }
 
                 Section("Availability") {
+                    TipView(availabilityModeTip)
                     Picker("Mode", selection: $availabilityMode) {
                         ForEach(AvailMode.allCases) { m in
                             Text(m.rawValue).tag(m)
                         }
                     }
                     .pickerStyle(.segmented)
-                    .popoverTip(availabilityModeTip)
 
                     switch availabilityMode {
                     case .default:

@@ -35,7 +35,12 @@ struct RotaView: View {
                     ProgressView("Loading schedule…")
                     Spacer()
                 } else if let schedule = vm.schedule {
-                    ScheduleGridView(vm: vm, schedule: schedule)
+                    VStack(spacing: 0) {
+                        TipView(shareTip)
+                            .padding(.horizontal)
+                            .padding(.top, 4)
+                        ScheduleGridView(vm: vm, schedule: schedule)
+                    }
                 } else if employeeCount == 0 {
                     Spacer()
                     ContentUnavailableView {
@@ -52,13 +57,15 @@ struct RotaView: View {
                     }
                     Spacer()
                 } else {
+                    TipView(twoPassTip)
+                        .padding(.horizontal)
+                        .padding(.top, 8)
                     Spacer()
                     ContentUnavailableView(
                         "No Schedule",
                         systemImage: "calendar.badge.plus",
                         description: Text("Tap Generate to create a schedule for this week.")
                     )
-                    .popoverTip(twoPassTip)
                     Spacer()
                 }
             }
@@ -182,7 +189,6 @@ struct RotaView: View {
                 Image(systemName: "ellipsis")
             }
             .accessibilityLabel("More actions")
-            .popoverTip(shareTip)
         }
     }
     #endif

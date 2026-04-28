@@ -14,10 +14,14 @@ struct EmployeeListView: View {
     private let addEmployeeTip = EmployeesAddTip()
     var body: some View {
         NavigationStack {
-            Group {
-                if vm.isLoading && vm.employees.isEmpty {
-                    ProgressView("Loading…")
-                } else if vm.employees.isEmpty {
+            VStack(spacing: 0) {
+                TipView(addEmployeeTip)
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+                Group {
+                    if vm.isLoading && vm.employees.isEmpty {
+                        ProgressView("Loading…")
+                    } else if vm.employees.isEmpty {
                     ContentUnavailableView {
                         Label("empty.employees.title", systemImage: "person.crop.circle.badge.plus")
                     } description: {
@@ -65,6 +69,7 @@ struct EmployeeListView: View {
                         }
                     }
                 }
+                }
             }
             .navigationTitle("Employees")
             .toolbar {
@@ -88,7 +93,6 @@ struct EmployeeListView: View {
                     } label: {
                         Image(systemName: "ellipsis")
                     }
-                    .popoverTip(addEmployeeTip)
                 }
             }
             .sheet(isPresented: $showingAddSheet) {

@@ -136,21 +136,21 @@ struct SettingsView: View {
                     }
                     
                     DisclosureGroup("Export Defaults") {
+                        TipView(exportProfileTip)
                         Picker("Layout", selection: $exportDefaultLayout) {
                             Text("By Employee").tag("employee_by_weekday")
                             Text("By Shift").tag("shift_by_weekday")
                         }
-                        
+
                         Picker("Format", selection: $exportDefaultFormat) {
                             Text("CSV").tag("csv")
                             Text("JSON").tag("json")
                         }
-                        
+
                         Picker("Profile", selection: $exportDefaultProfile) {
                             Text("Staff Schedule").tag("staff_schedule")
                             Text("Manager Report").tag("manager_report")
                         }
-                        .popoverTip(exportProfileTip)
                         
                         Toggle("Show Shift Name", isOn: $exportShowShiftName)
                         Toggle("Show Times", isOn: $exportShowTimes)

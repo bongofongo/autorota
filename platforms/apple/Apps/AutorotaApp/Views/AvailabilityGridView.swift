@@ -85,19 +85,14 @@ struct AvailabilityGridView: View {
         VStack(spacing: 8) {
             if isEditable {
                 toolbarRow
-                    .popoverTip(dragTip)
+                TipView(dragTip)
+                TipView(cycleTip)
             }
 
             GeometryReader { geometry in
                 let cellWidth = cellWidth(for: geometry.size.width)
                 ZStack(alignment: .topLeading) {
-                    // The grid itself
-                    if isEditable {
-                        gridContent(cellWidth: cellWidth)
-                            .popoverTip(cycleTip)
-                    } else {
-                        gridContent(cellWidth: cellWidth)
-                    }
+                    gridContent(cellWidth: cellWidth)
 
                     // Selection highlight overlay
                     if isSelectionModeActive, let rect = selectionRect {
