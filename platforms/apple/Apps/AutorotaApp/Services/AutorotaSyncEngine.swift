@@ -18,7 +18,14 @@ final class AutorotaSyncEngine: @unchecked Sendable {
     /// whole engine.
     private(set) var lastSyncIssue: String?
     private var engine: CKSyncEngine?
+    private var dataChangeObserver: NSObjectProtocol?
     private let logger = Logger(subsystem: "com.toadmountain.autorota", category: "sync")
+
+    deinit {
+        if let observer = dataChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
 
     enum SyncEngineError: Error, LocalizedError {
         case mergedFieldsNotUTF8
@@ -44,12 +51,19 @@ final class AutorotaSyncEngine: @unchecked Sendable {
     }
 
     /// Initialize the sync engine. Call after `autorotaInitDb()`.
+    /// Idempotent — calling twice is a no-op (previously this added a
+    /// duplicate `.autorotaDataChanged` observer per call, causing N pushes
+    /// per local mutation after N starts).
     func start() async {
+        guard engine == nil else {
+            logger.debug("CKSyncEngine.start() called twice; ignoring re-entry")
+            return
+        }
         do {
             let config = try await loadOrCreateConfiguration()
             let engine = CKSyncEngine(config)
             self.engine = engine
-            NotificationCenter.default.addObserver(
+            dataChangeObserver = NotificationCenter.default.addObserver(
                 forName: .autorotaDataChanged,
                 object: nil,
                 queue: .main
@@ -61,6 +75,18 @@ final class AutorotaSyncEngine: @unchecked Sendable {
             logger.error("Failed to start CKSyncEngine: \(error)")
             status = .error(userFacingMessage(error))
         }
+    }
+
+    /// Tear down the engine and remove its observer so the instance can be
+    /// re-`start()`ed cleanly (or released).
+    func stop() {
+        if let observer = dataChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
+            dataChangeObserver = nil
+        }
+        engine = nil
+        status = .idle
+        logger.info("CKSyncEngine stopped")
     }
 
     /// Notify the engine that local data has changed and needs to be pushed.
@@ -286,15 +312,25 @@ extension AutorotaSyncEngine: CKSyncEngineDelegate {
         }
 
         var clearedTombstoneIDs: [Int64] = []
-        for deletedID in changes.deletedRecordIDs {
-            guard let (tableName, rowID) = SyncRecordMapper.parseRecordID(deletedID) else { continue }
+        if !changes.deletedRecordIDs.isEmpty {
+            // Hoist the fetch and index by "table_id" key once — the previous
+            // version called getPendingTombstones() per deletion (O(n²) over
+            // all pending tombstones) and re-fetched on every iteration.
+            let tombstoneIndex: [String: Int64]
             do {
                 let tombstones = try getPendingTombstones()
-                if let tombstone = tombstones.first(where: { $0.tableName == tableName && $0.recordId == rowID }) {
-                    clearedTombstoneIDs.append(tombstone.id)
-                }
+                tombstoneIndex = Dictionary(
+                    uniqueKeysWithValues: tombstones.map { ("\($0.tableName)_\($0.recordId)", $0.id) }
+                )
             } catch {
-                logger.error("Failed to find tombstone for \(deletedID): \(error)")
+                logger.error("Failed to load pending tombstones: \(error)")
+                tombstoneIndex = [:]
+            }
+            for deletedID in changes.deletedRecordIDs {
+                guard let (tableName, rowID) = SyncRecordMapper.parseRecordID(deletedID) else { continue }
+                if let id = tombstoneIndex["\(tableName)_\(rowID)"] {
+                    clearedTombstoneIDs.append(id)
+                }
             }
         }
         if !clearedTombstoneIDs.isEmpty {
