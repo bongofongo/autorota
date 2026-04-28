@@ -6,8 +6,14 @@ struct RotaView: View {
 
     @State private var vm = RotaViewModel()
     @State private var showExportSheet = false
+    /// `-1` means "not yet loaded" — treat as having employees so the existing
+    /// no-schedule CUV (with Generate prompt) is the default. Only an explicit
+    /// `0` triggers the prerequisite empty state.
+    @State private var employeeCount: Int = -1
     private let twoPassTip = RotaTwoPassTip()
+    private let shareTip = RotaShareTip()
     @Environment(RotaUIBridge.self) private var bridge
+    @Environment(EmployeeUIBridge.self) private var employeeBridge
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -30,6 +36,21 @@ struct RotaView: View {
                     Spacer()
                 } else if let schedule = vm.schedule {
                     ScheduleGridView(vm: vm, schedule: schedule)
+                } else if employeeCount == 0 {
+                    Spacer()
+                    ContentUnavailableView {
+                        Label("empty.rota.title", systemImage: "person.crop.circle.badge.exclamationmark")
+                    } description: {
+                        Text("empty.rota.body")
+                    } actions: {
+                        Button {
+                            employeeBridge.requestNewEmployeeSheet = true
+                        } label: {
+                            Label("empty.rota.action", systemImage: "person.badge.plus")
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    Spacer()
                 } else {
                     Spacer()
                     ContentUnavailableView(
@@ -110,7 +131,24 @@ struct RotaView: View {
                     onSaveBeforeBulkSend: { await vm.autoSave() }
                 )
             }
-            .task { await vm.loadSchedule() }
+            .task {
+                await vm.loadSchedule()
+                await refreshEmployeeCount()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .autorotaDataChanged)) { _ in
+                Task { await refreshEmployeeCount() }
+            }
+        }
+    }
+
+    private func refreshEmployeeCount() async {
+        do {
+            let n = try await countEmployeesAsync()
+            await MainActor.run { employeeCount = Int(n) }
+        } catch {
+            // Failure → assume populated so we don't trap the user on the
+            // prerequisite empty state.
+            await MainActor.run { employeeCount = max(employeeCount, 1) }
         }
     }
 
@@ -144,6 +182,7 @@ struct RotaView: View {
                 Image(systemName: "ellipsis")
             }
             .accessibilityLabel("More actions")
+            .popoverTip(shareTip)
         }
     }
     #endif

@@ -92,3 +92,39 @@ struct EditLogRestoreTip: Tip {
         Image(systemName: "arrow.uturn.backward.circle")
     }
 }
+
+struct EmployeesAddTip: Tip {
+    var title: Text {
+        Text("tip.employees.add.title")
+    }
+    var message: Text? {
+        Text("tip.employees.add.message")
+    }
+    var image: Image? {
+        Image(systemName: "person.badge.plus")
+    }
+}
+
+struct ShiftTemplateAddTip: Tip {
+    var title: Text {
+        Text("tip.shifts.template.title")
+    }
+    var message: Text? {
+        Text("tip.shifts.template.message")
+    }
+    var image: Image? {
+        Image(systemName: "clock.badge.plus")
+    }
+}
+
+struct RotaShareTip: Tip {
+    var title: Text {
+        Text("tip.rota.share.title")
+    }
+    var message: Text? {
+        Text("tip.rota.share.message")
+    }
+    var image: Image? {
+        Image(systemName: "square.and.arrow.up")
+    }
+}

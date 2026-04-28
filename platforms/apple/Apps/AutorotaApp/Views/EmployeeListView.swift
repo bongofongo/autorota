@@ -1,4 +1,5 @@
 import SwiftUI
+import TipKit
 import AutorotaKit
 
 struct EmployeeListView: View {
@@ -10,13 +11,25 @@ struct EmployeeListView: View {
     @State private var selectedEmployee: FfiEmployee?
     @State private var sendScheduleTarget: FfiEmployee?
     @State private var showingImport = false
+    private let addEmployeeTip = EmployeesAddTip()
     var body: some View {
         NavigationStack {
             Group {
                 if vm.isLoading && vm.employees.isEmpty {
                     ProgressView("Loading…")
                 } else if vm.employees.isEmpty {
-                    ContentUnavailableView("No Employees", systemImage: "person.slash")
+                    ContentUnavailableView {
+                        Label("empty.employees.title", systemImage: "person.crop.circle.badge.plus")
+                    } description: {
+                        Text("empty.employees.body")
+                    } actions: {
+                        Button {
+                            showingAddSheet = true
+                        } label: {
+                            Label("empty.employees.action", systemImage: "plus")
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
                 } else {
                     List {
                         ForEach(vm.employees, id: \.id) { employee in
@@ -75,6 +88,7 @@ struct EmployeeListView: View {
                     } label: {
                         Image(systemName: "ellipsis")
                     }
+                    .popoverTip(addEmployeeTip)
                 }
             }
             .sheet(isPresented: $showingAddSheet) {

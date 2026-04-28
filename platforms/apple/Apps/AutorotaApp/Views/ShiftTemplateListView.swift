@@ -1,4 +1,5 @@
 import SwiftUI
+import TipKit
 import AutorotaKit
 
 struct ShiftTemplateListView: View {
@@ -10,99 +11,127 @@ struct ShiftTemplateListView: View {
     @State private var editing: FfiShiftTemplate?
     @State private var renamingRole: FfiRole?
     @State private var renameText = ""
+    private let addTemplateTip = ShiftTemplateAddTip()
 
-    var body: some View {
-        NavigationStack {
-            List {
-                // ── Roles ────────────────────────────────────
-                Section {
-                    if roleVM.roles.isEmpty && !roleVM.isLoading {
-                        Text("No roles yet")
-                            .foregroundStyle(.tertiary)
-                            .font(.subheadline)
-                    }
-                    ForEach(roleVM.roles, id: \.id) { role in
-                        Text(role.name)
-                            .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) {
-                                    Task { await roleVM.delete(id: role.id) }
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                                Button {
-                                    renamingRole = role
-                                    renameText = role.name
-                                } label: {
-                                    Label("Rename", systemImage: "pencil")
-                                }
-                                .tint(.orange)
-                            }
-                            .contextMenu {
-                                Button {
-                                    renamingRole = role
-                                    renameText = role.name
-                                } label: {
-                                    Label("Rename", systemImage: "pencil")
-                                }
-                                Button(role: .destructive) {
-                                    Task { await roleVM.delete(id: role.id) }
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                            }
-                    }
-                } header: {
-                    Text("Roles")
+    private var isFullyEmpty: Bool {
+        !vm.isLoading && !roleVM.isLoading
+            && vm.templates.isEmpty && roleVM.roles.isEmpty
+    }
+
+    @ViewBuilder
+    private var listContent: some View {
+        List {
+            // ── Roles ────────────────────────────────────
+            Section {
+                if roleVM.roles.isEmpty && !roleVM.isLoading {
+                    Text("No roles yet")
+                        .foregroundStyle(.tertiary)
+                        .font(.subheadline)
                 }
-                .headerProminence(.increased)
-
-                // ── Shifts ───────────────────────────────────
-                Section {
-                    if vm.templates.isEmpty && !vm.isLoading {
-                        Text("No shifts yet")
-                            .foregroundStyle(.tertiary)
-                            .font(.subheadline)
-                    }
-                    ForEach(vm.templates, id: \.id) { tmpl in
-                        Button {
-                            editing = tmpl
-                        } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(tmpl.name).font(.headline).foregroundStyle(.primary)
-                                Text("\(tmpl.weekdays.joined(separator: ", "))  \(tmpl.startTime)–\(tmpl.endTime)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                HStack(spacing: 4) {
-                                    RoleTag(name: tmpl.requiredRole)
-                                    Text("\(tmpl.minEmployees)–\(tmpl.maxEmployees) staff")
-                                        .font(.caption2)
-                                        .foregroundStyle(.tertiary)
-                                }
+                ForEach(roleVM.roles, id: \.id) { role in
+                    Text(role.name)
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                Task { await roleVM.delete(id: role.id) }
+                            } label: {
+                                Label("Delete", systemImage: "trash")
                             }
+                            Button {
+                                renamingRole = role
+                                renameText = role.name
+                            } label: {
+                                Label("Rename", systemImage: "pencil")
+                            }
+                            .tint(.orange)
                         }
                         .contextMenu {
                             Button {
-                                editing = tmpl
+                                renamingRole = role
+                                renameText = role.name
                             } label: {
-                                Label("Edit", systemImage: "pencil")
+                                Label("Rename", systemImage: "pencil")
                             }
                             Button(role: .destructive) {
-                                Task { await vm.delete(id: tmpl.id) }
+                                Task { await roleVM.delete(id: role.id) }
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
                         }
-                    }
-                    .onDelete { offsets in
-                        for i in offsets {
-                            let t = vm.templates[i]
-                            Task { await vm.delete(id: t.id) }
+                }
+            } header: {
+                Text("Roles")
+            }
+            .headerProminence(.increased)
+
+            // ── Shifts ───────────────────────────────────
+            Section {
+                if vm.templates.isEmpty && !vm.isLoading {
+                    Text("No shifts yet")
+                        .foregroundStyle(.tertiary)
+                        .font(.subheadline)
+                }
+                ForEach(vm.templates, id: \.id) { tmpl in
+                    Button {
+                        editing = tmpl
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(tmpl.name).font(.headline).foregroundStyle(.primary)
+                            Text("\(tmpl.weekdays.joined(separator: ", "))  \(tmpl.startTime)–\(tmpl.endTime)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            HStack(spacing: 4) {
+                                RoleTag(name: tmpl.requiredRole)
+                                Text("\(tmpl.minEmployees)–\(tmpl.maxEmployees) staff")
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                            }
                         }
                     }
-                } header: {
-                    Text("Shifts")
+                    .contextMenu {
+                        Button {
+                            editing = tmpl
+                        } label: {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                        Button(role: .destructive) {
+                            Task { await vm.delete(id: tmpl.id) }
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
                 }
-                .headerProminence(.increased)
+                .onDelete { offsets in
+                    for i in offsets {
+                        let t = vm.templates[i]
+                        Task { await vm.delete(id: t.id) }
+                    }
+                }
+            } header: {
+                Text("Shifts")
+            }
+            .headerProminence(.increased)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if isFullyEmpty {
+                    ContentUnavailableView {
+                        Label("empty.shifts.title", systemImage: "clock.badge.plus")
+                    } description: {
+                        Text("empty.shifts.body")
+                    } actions: {
+                        Button {
+                            showingAddTemplateSheet = true
+                        } label: {
+                            Label("empty.shifts.action", systemImage: "plus")
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                } else {
+                    listContent
+                }
             }
             .navigationTitle("Shifts")
             .toolbar {
@@ -121,6 +150,7 @@ struct ShiftTemplateListView: View {
                     } label: {
                         Image(systemName: "plus")
                     }
+                    .popoverTip(addTemplateTip)
                 }
             }
             .sheet(isPresented: $showingAddTemplateSheet) {
