@@ -157,6 +157,7 @@ struct SettingsView: View {
                         Toggle("Show Role", isOn: $exportShowRole)
                     }
                     
+                    #if !os(macOS)
                     DisclosureGroup("Layout") {
                         #if os(iOS)
                         if UIDevice.current.userInterfaceIdiom == .pad {
@@ -191,7 +192,7 @@ struct SettingsView: View {
                         } header: {
                             Text("Tab Bar (\(layoutManager.configurableTabBarPages.count) of \(TabPage.maxConfigurable))")
                         }
-                        
+
                         if !layoutManager.hiddenPages.isEmpty {
                             Section {
                                 ForEach(layoutManager.hiddenPages) { page in
@@ -213,6 +214,7 @@ struct SettingsView: View {
                             }
                         }
                     }
+                    #endif
                 }
 
                 Section {

@@ -97,12 +97,22 @@ class TabLayoutManager {
     private(set) var configurableTabBarPages: [TabPage]
 
     /// Full tab bar: configurable pages + Settings pinned at the end.
+    /// macOS shows the full sidebar (all configurable pages) so the overflow
+    /// Menu is unnecessary — every page lives directly in the sidebar.
     var tabBarPages: [TabPage] {
+        #if os(macOS)
+        TabPage.configurablePages + [.settings]
+        #else
         configurableTabBarPages + [.settings]
+        #endif
     }
 
     var hiddenPages: [TabPage] {
+        #if os(macOS)
+        []
+        #else
         TabPage.configurablePages.filter { !configurableTabBarPages.contains($0) }
+        #endif
     }
 
     private static let storageKey = "tabBarLayout"
