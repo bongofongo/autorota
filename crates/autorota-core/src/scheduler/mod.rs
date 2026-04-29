@@ -285,7 +285,12 @@ pub fn schedule_pure(
 
     // For each shift, fill remaining slots one at a time
     for shift in &shift_order {
-        let remaining = shift.max_employees - state.slots_filled(shift.id);
+        // saturating_sub: if `slots_filled` ever exceeds `max_employees` (e.g.
+        // duplicate inserts in a corrupted state) we cap at zero rather than
+        // wrapping around `u32::MAX` and looping for billions of iterations.
+        let remaining = shift
+            .max_employees
+            .saturating_sub(state.slots_filled(shift.id));
 
         for _slot in 0..remaining {
             // Find and score all eligible candidates
@@ -304,17 +309,15 @@ pub fn schedule_pure(
                 })
                 .collect();
 
-            if candidates.is_empty() {
-                break;
-            }
-
             // Sort: best score first, then tiebreak (higher hash = wins)
             candidates.sort_by(|a, b| {
                 b.1.cmp(&a.1) // score descending
                     .then(b.2.cmp(&a.2)) // tiebreak descending
             });
 
-            let winner = candidates[0].0;
+            let Some(&(winner, _, _)) = candidates.first() else {
+                break;
+            };
             state.record_assignment(
                 winner.id,
                 Some(winner.display_name()),

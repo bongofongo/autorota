@@ -82,7 +82,11 @@ fn fold_line(line: &str) -> String {
         if !first {
             out.push(' ');
         }
-        out.push_str(std::str::from_utf8(&bytes[i..end]).unwrap());
+        // Safe: the loop above walks `end` back across continuation bytes
+        // (`0b10xxxxxx`) so the slice always lands on a UTF-8 boundary. If the
+        // backwards walk ever underflows (it can't: chunk ≥ 74 ≫ 4-byte max),
+        // `from_utf8_lossy` substitutes U+FFFD rather than panicking.
+        out.push_str(&String::from_utf8_lossy(&bytes[i..end]));
         out.push_str("\r\n");
         i = end;
         first = false;
@@ -256,6 +260,24 @@ mod tests {
         let ics = render_employee_calendar(1, "A", &[(s, "M".into())], None);
         assert!(!ics.contains("TZID"));
         assert!(!ics.contains("VTIMEZONE"));
+    }
+
+    #[test]
+    fn long_unicode_summary_folds_without_panic() {
+        // Repeat a 4-byte UTF-8 codepoint (𝕏 = U+1D54F) until well beyond
+        // the 75-octet fold limit. Ensures `fold_line` walks back across
+        // continuation bytes correctly — a regression net for the
+        // `from_utf8` boundary handling.
+        let mut name = String::new();
+        for _ in 0..40 {
+            name.push('𝕏');
+        }
+        let s = mk_shift(1, (2026, 4, 20), (7, 0), (12, 0), "Barista");
+        let ics = render_employee_calendar(1, &name, &[(s, "Morning".into())], None);
+        assert!(ics.contains("SUMMARY"));
+        for line in ics.split("\r\n") {
+            assert!(line.len() <= 75, "unfolded line too long: {line:?}");
+        }
     }
 
     #[test]

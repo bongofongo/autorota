@@ -112,7 +112,9 @@ pub fn build_sample_week() -> SampleWeek {
     let mut next_assignment_id: i64 = 1;
 
     for (offset, template_id, who) in spec {
-        let tmpl = tmpl_by_id[template_id];
+        let tmpl = tmpl_by_id
+            .get(template_id)
+            .expect("BUG: sample.rs spec references template_id not in sample_templates()");
         let shift = Shift {
             id: next_shift_id,
             template_id: Some(tmpl.id),
@@ -126,7 +128,10 @@ pub fn build_sample_week() -> SampleWeek {
         };
 
         if let Some((emp_id, status)) = who {
-            let employee = employees.iter().find(|e| e.id == *emp_id).unwrap();
+            let employee = employees
+                .iter()
+                .find(|e| e.id == *emp_id)
+                .expect("BUG: sample.rs spec references emp_id not in sample_employees()");
             assignments.push(Assignment {
                 id: next_assignment_id,
                 rota_id: 1,

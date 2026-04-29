@@ -27,6 +27,36 @@ use helpers::{date, make_employee, make_shift, query_sync_status, test_pool, tim
 // ─────────────────────────────────────────────────────────────
 
 #[test]
+fn empty_eligible_pool_does_not_panic() {
+    // Regression net for scheduler/mod.rs:317 — when no candidate satisfies
+    // role/availability/hour constraints, the per-slot loop must break
+    // cleanly rather than indexing into an empty `candidates` Vec.
+    let emp = make_employee(1, "Alice", "barista", AvailabilityState::No);
+    let shift = make_shift(1, date(23), 7, 12, "barista");
+
+    let result = schedule_pure(&[shift], &[emp], &[], &[], 1, week_start());
+
+    assert!(result.assignments.is_empty());
+    assert_eq!(result.warnings.len(), 1);
+}
+
+#[test]
+fn shift_with_zero_capacity_is_skipped() {
+    // Regression net for scheduler/mod.rs:288 — `max_employees - slots_filled`
+    // saturating_sub means a degenerate capacity (or pre-filled state) yields
+    // zero remaining slots without underflowing into a u32::MAX loop.
+    let emp = make_employee(1, "Alice", "barista", AvailabilityState::Yes);
+    let mut shift = make_shift(1, date(23), 7, 12, "barista");
+    shift.min_employees = 0;
+    shift.max_employees = 0;
+
+    let result = schedule_pure(&[shift], &[emp], &[], &[], 1, week_start());
+
+    assert!(result.assignments.is_empty());
+    assert!(result.warnings.is_empty());
+}
+
+#[test]
 fn hour_budget_zero_blocks_all_assignments() {
     let mut emp = make_employee(1, "Alice", "barista", AvailabilityState::Yes);
     emp.target_weekly_hours = 0.0;

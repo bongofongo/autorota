@@ -28,7 +28,23 @@ static POOL: OnceLock<SqlitePool> = OnceLock::new();
 static RUNTIME: OnceLock<Runtime> = OnceLock::new();
 
 fn rt() -> &'static Runtime {
-    RUNTIME.get_or_init(|| Runtime::new().expect("tokio runtime"))
+    // 74 callers reach the runtime via this function and call `block_on` on
+    // the returned reference. Surfacing init failure as a `Result` would
+    // require threading errors through every FFI entry point. Tokio's runtime
+    // initialisation only fails on resource exhaustion or when called from
+    // inside an existing tokio context — neither is recoverable here, so we
+    // log diagnostically before terminating.
+    RUNTIME.get_or_init(|| match Runtime::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!(
+                "FATAL: failed to initialize tokio runtime in autorota-ffi: {e}. \
+                 This means the host process is in an unrecoverable state \
+                 (resource exhaustion or nested async context)."
+            );
+            std::process::abort();
+        }
+    })
 }
 
 fn pool() -> Result<&'static SqlitePool, FfiError> {
@@ -1167,6 +1183,10 @@ pub fn parse_roster_file(
                 code: ErrorCode::InvalidImport,
                 msg: m,
             },
+            import::roster::ImportError::Validation { row, error } => FfiError::InvalidArgument {
+                code: ErrorCode::InvalidImport,
+                msg: format!("row {row}: {error}"),
+            },
         })?;
 
     Ok(FfiParsedRoster {
@@ -1190,6 +1210,10 @@ pub fn apply_roster_import(rows: Vec<FfiParsedEmployeeRow>) -> Result<FfiImportS
             | import::roster::ImportError::UnsupportedFormat(m) => FfiError::InvalidArgument {
                 code: ErrorCode::InvalidImport,
                 msg: m,
+            },
+            import::roster::ImportError::Validation { row, error } => FfiError::InvalidArgument {
+                code: ErrorCode::InvalidImport,
+                msg: format!("row {row}: {error}"),
             },
         })?;
     Ok(FfiImportSummary {
