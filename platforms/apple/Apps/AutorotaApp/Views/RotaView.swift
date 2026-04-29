@@ -21,6 +21,10 @@ struct RotaView: View {
     /// no-schedule CUV (with Generate prompt) is the default. Only an explicit
     /// `0` triggers the prerequisite empty state.
     @State private var employeeCount: Int = -1
+    /// Tracks the currently-running week-change reload so the prior task can
+    /// be cancelled when the user rapidly steps through weeks. Without this,
+    /// a slow load for week N could overwrite a fresh load for week N+1.
+    @State private var weekChangeTask: Task<Void, Never>?
     private let twoPassTip = RotaTwoPassTip()
     private let shareTip = RotaShareTip()
     @Environment(RotaUIBridge.self) private var bridge
@@ -34,9 +38,16 @@ struct RotaView: View {
                     .padding(.horizontal)
                     .padding(.vertical, 8)
                     .onChange(of: vm.selectedWeekStart) { _, _ in
-                        Task { await vm.autoSave() }
-                        vm.resetModes()
-                        Task { await vm.loadSchedule() }
+                        // Cancel any in-flight reload from a prior week step
+                        // so a slow load can't clobber a fresh one.
+                        weekChangeTask?.cancel()
+                        weekChangeTask = Task {
+                            await vm.autoSave()
+                            if Task.isCancelled { return }
+                            vm.resetModes()
+                            if Task.isCancelled { return }
+                            await vm.loadSchedule()
+                        }
                     }
 
                 Divider()
@@ -330,13 +341,29 @@ private struct CategoryBadge: View {
 
 // MARK: - Schedule grid
 
+/// Discriminator for the schedule grid's sheet — replaces three separate
+/// `.sheet(item:)` modifiers, only one of which would ever fire on the same
+/// view. Stacking multiple `.sheet(item:)` modifiers risks SwiftUI dropping
+/// later assignments when a prior sheet is mid-dismiss.
+private enum ScheduleSheet: Identifiable {
+    case employeePicker(FfiShiftInfo)
+    case timeEdit(FfiShiftInfo)
+    case addShift(SheetDate)
+
+    var id: String {
+        switch self {
+        case .employeePicker(let s): return "emp-\(s.id)"
+        case .timeEdit(let s):       return "time-\(s.id)"
+        case .addShift(let d):       return "add-\(d.id)"
+        }
+    }
+}
+
 private struct ScheduleGridView: View {
     let vm: RotaViewModel
     let schedule: FfiWeekSchedule
 
-    @State private var shiftForEmployeePicker: FfiShiftInfo?
-    @State private var shiftForTimeEdit: FfiShiftInfo?
-    @State private var dayForNewShift: SheetDate?
+    @State private var activeSheet: ScheduleSheet?
     @State private var shiftToDelete: Int64?
     @State private var showUnlockPastConfirmation = false
 
@@ -362,14 +389,15 @@ private struct ScheduleGridView: View {
                 .background(.regularMaterial)
             }
         }
-        .sheet(item: $shiftForEmployeePicker) { shift in
-            EmployeePickerSheet(vm: vm, shift: shift)
-        }
-        .sheet(item: $shiftForTimeEdit) { shift in
-            ShiftTimeEditSheet(vm: vm, shift: shift)
-        }
-        .sheet(item: $dayForNewShift) { sheetDate in
-            AddShiftSheet(vm: vm, date: sheetDate.id)
+        .sheet(item: $activeSheet) { sheet in
+            switch sheet {
+            case .employeePicker(let shift):
+                EmployeePickerSheet(vm: vm, shift: shift)
+            case .timeEdit(let shift):
+                ShiftTimeEditSheet(vm: vm, shift: shift)
+            case .addShift(let date):
+                AddShiftSheet(vm: vm, date: date.id)
+            }
         }
         .alert(
             "Delete this shift?",
@@ -423,8 +451,8 @@ private struct ScheduleGridView: View {
                                 vm: vm,
                                 isEditMode: vm.isEditMode,
                                 isLocked: locked,
-                                onAddEmployee: { shiftForEmployeePicker = shift },
-                                onEditTimes: { shiftForTimeEdit = shift },
+                                onAddEmployee: { activeSheet = .employeePicker(shift) },
+                                onEditTimes: { activeSheet = .timeEdit(shift) },
                                 onDeleteShift: { shiftToDelete = shift.id }
                             )
                         }
@@ -437,7 +465,7 @@ private struct ScheduleGridView: View {
                         }
                         if vm.isEditMode && !vm.isDayLocked(day) {
                             Button {
-                                dayForNewShift = SheetDate(vm.dateForWeekday(day))
+                                activeSheet = .addShift(SheetDate(vm.dateForWeekday(day)))
                             } label: {
                                 Label("Add Shift", systemImage: "plus.circle")
                                     .font(.subheadline)
@@ -518,8 +546,8 @@ private struct ScheduleGridView: View {
                         vm: vm,
                         isEditMode: vm.isEditMode,
                         isLocked: locked,
-                        onAddEmployee: { shiftForEmployeePicker = shift },
-                        onEditTimes: { shiftForTimeEdit = shift },
+                        onAddEmployee: { activeSheet = .employeePicker(shift) },
+                        onEditTimes: { activeSheet = .timeEdit(shift) },
                         onDeleteShift: { shiftToDelete = shift.id },
                         isCompact: true
                     )
@@ -528,7 +556,7 @@ private struct ScheduleGridView: View {
 
             if vm.isEditMode && !vm.isDayLocked(day) {
                 Button {
-                    dayForNewShift = SheetDate(vm.dateForWeekday(day))
+                    activeSheet = .addShift(SheetDate(vm.dateForWeekday(day)))
                 } label: {
                     Label("Add Shift", systemImage: "plus.circle")
                         .font(.subheadline)

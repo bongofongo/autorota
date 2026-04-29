@@ -7,6 +7,7 @@ enum WeekCategory {
     case past, current, future
 }
 
+@MainActor
 @Observable
 final class RotaViewModel {
 
