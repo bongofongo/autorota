@@ -53,6 +53,8 @@ struct SettingsView: View {
     @Environment(AutorotaSyncEngine.self) private var syncEngine
     @Environment(LocaleManager.self) private var localeManager
     @Environment(LicenseService.self) private var license
+    @Environment(MenuNavigationBridge.self) private var menuNav
+    @State private var navPath = NavigationPath()
 
     private var selectedAppearance: AppAppearance {
         AppAppearance(rawValue: appearance) ?? .system
@@ -60,15 +62,13 @@ struct SettingsView: View {
 
     var body: some View {
         @Bindable var localeManager = localeManager
-        return NavigationStack {
+        return NavigationStack(path: $navPath) {
             Form {
                 // Navigation links for pages not in the tab bar
                 if !layoutManager.hiddenPages.isEmpty {
                     Section("Other Pages") {
                         ForEach(layoutManager.hiddenPages) { page in
-                            NavigationLink {
-                                page.destinationView
-                            } label: {
+                            NavigationLink(value: page) {
                                 Label(page.title, systemImage: page.systemImage)
                             }
                             .tint(.primary)
@@ -241,7 +241,20 @@ struct SettingsView: View {
             .formStyle(.grouped)
             #endif
             .navigationTitle("Menu")
+            .navigationDestination(for: TabPage.self) { page in
+                page.destinationView
+            }
+            .onAppear { consumePendingMenuDestination() }
+            .onChange(of: menuNav.pendingDestination) { _, _ in
+                consumePendingMenuDestination()
+            }
         }
+    }
+
+    private func consumePendingMenuDestination() {
+        guard let dest = menuNav.pendingDestination else { return }
+        navPath.append(dest)
+        menuNav.pendingDestination = nil
     }
 }
 

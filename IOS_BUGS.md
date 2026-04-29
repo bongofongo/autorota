@@ -11,7 +11,7 @@
 ---
 
 ### 1. Shift tab flickers list placeholder before settling on empty state
-**Status:** open
+**Status:** fixed (this commit)
 
 **Repro**
 1. Launch app on iOS sim with no roles and no shift templates seeded
@@ -35,11 +35,11 @@
 - The flicker is step 2. Tab switching tears down the view, so this runs every time.
 
 **Fix sketch**
-- Add `var hasLoaded = false` to `ShiftTemplateViewModel` and `RoleViewModel`; set `true` at end of `load()` (in both success and error paths)
-- Change `isFullyEmpty` to require `vm.hasLoaded && roleVM.hasLoaded` before deciding either branch
-- While not yet loaded: render a neutral placeholder (empty `Color.clear` or a low-key `ProgressView`) instead of `listContent` — must NOT render the list with empty placeholder rows
-- Alternative: collapse to a single load step that pre-checks counts via FFI before mounting either branch (heavier; prefer the `hasLoaded` flag)
-- Add a snapshot or UI test that mounts the view, runs the `.task`, and asserts no `"No roles yet"` / `"No shifts yet"` text ever appears when the final state is the CUV
+- [x] Add `var hasLoaded = false` to `ShiftTemplateViewModel` and `RoleViewModel`; set `true` at end of `load()` (in both success and error paths)
+- [x] Change `isFullyEmpty` to require `vm.hasLoaded && roleVM.hasLoaded` before deciding either branch
+- [x] While not yet loaded: render a neutral placeholder (empty `Color.clear` or a low-key `ProgressView`) instead of `listContent` — must NOT render the list with empty placeholder rows (using `Color.clear`)
+- [ ] Alternative: collapse to a single load step that pre-checks counts via FFI before mounting either branch (heavier; prefer the `hasLoaded` flag) — _not pursued, `hasLoaded` flag chosen_
+- [ ] Add a snapshot or UI test that mounts the view, runs the `.task`, and asserts no `"No roles yet"` / `"No shifts yet"` text ever appears when the final state is the CUV
 
 **Files**
 - `platforms/apple/Apps/AutorotaApp/Views/ShiftTemplateListView.swift:16-19, 116-141`
@@ -49,7 +49,7 @@
 ---
 
 ### 2. Rota empty-state "Add employee" button does not switch tab when Employees is in overflow Menu
-**Status:** open
+**Status:** fixed (this commit)
 
 **Repro**
 1. Settings → Tab Bar layout: remove Employees from the configurable tab bar (so it lives only in the overflow Menu tab)
@@ -72,14 +72,14 @@
 - `EmployeeListView` (which would observe `requestNewEmployeeSheet` and present the sheet) is never instantiated because the Menu/Settings tab does not host it inline
 
 **Fix sketch**
-- In `ContentView.onChange(of: employeeBridge.requestNewEmployeeSheet)`:
-  - If `layoutManager.tabBarPages.contains(.employees)` → keep current behaviour (`selection = .page(.employees)`)
-  - Else → `selection = .page(.settings)` AND push a navigation request through a new bridge field (e.g. `MenuNavigationBridge.pendingDestination = .employees`) for `SettingsView` / Menu page to consume on appear
-- `SettingsView` (Menu page) needs an `.onChange` or `.onAppear` that, when a pending destination is set, programmatically navigates to the Employees row inside its `NavigationStack` (use `NavigationPath` binding so we can append `.employees` from outside)
-- After the Employees view appears, `EmployeeListView`'s existing `requestNewEmployeeSheet` observer presents the add sheet — leave that flag set until consumed, then reset
-- Reset both flags after consumption to prevent re-fire on next tab switch
-- Add UI test: with Employees removed from tab bar + zero employees, tap empty-state CTA → assert Menu tab active AND add-employee sheet visible
-- Same fix likely needed for any other CTA that targets a tab that may live in overflow (audit `RotaView`, onboarding, etc.)
+- [x] In `ContentView.onChange(of: employeeBridge.requestNewEmployeeSheet)`:
+  - [x] If `layoutManager.tabBarPages.contains(.employees)` → keep current behaviour (`selection = .page(.employees)`)
+  - [x] Else → `selection = .page(.settings)` AND push a navigation request through a new bridge field (e.g. `MenuNavigationBridge.pendingDestination = .employees`) for `SettingsView` / Menu page to consume on appear
+- [x] `SettingsView` (Menu page) needs an `.onChange` or `.onAppear` that, when a pending destination is set, programmatically navigates to the Employees row inside its `NavigationStack` (use `NavigationPath` binding so we can append `.employees` from outside)
+- [x] After the Employees view appears, `EmployeeListView`'s existing `requestNewEmployeeSheet` observer presents the add sheet — leave that flag set until consumed, then reset
+- [x] Reset both flags after consumption to prevent re-fire on next tab switch
+- [ ] Add UI test: with Employees removed from tab bar + zero employees, tap empty-state CTA → assert Menu tab active AND add-employee sheet visible
+- [ ] Same fix likely needed for any other CTA that targets a tab that may live in overflow (audit `RotaView`, onboarding, etc.) — _follow-up audit_
 
 **Files**
 - `platforms/apple/Apps/AutorotaApp/Views/ContentView.swift:56-60`

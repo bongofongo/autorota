@@ -13,9 +13,12 @@ struct ShiftTemplateListView: View {
     @State private var renameText = ""
     private let addTemplateTip = ShiftTemplateAddTip()
 
+    private var bothLoaded: Bool {
+        vm.hasLoaded && roleVM.hasLoaded
+    }
+
     private var isFullyEmpty: Bool {
-        !vm.isLoading && !roleVM.isLoading
-            && vm.templates.isEmpty && roleVM.roles.isEmpty
+        bothLoaded && vm.templates.isEmpty && roleVM.roles.isEmpty
     }
 
     @ViewBuilder
@@ -120,7 +123,12 @@ struct ShiftTemplateListView: View {
                     .padding(.horizontal)
                     .padding(.top, 8)
                 Group {
-                if isFullyEmpty {
+                if !bothLoaded {
+                    // Neutral placeholder until both VMs report hasLoaded.
+                    // Avoids flashing empty list rows before the CUV settles
+                    // (see IOS_BUGS.md #1).
+                    Color.clear
+                } else if isFullyEmpty {
                     ContentUnavailableView {
                         Label("empty.shifts.title", systemImage: "clock.badge.plus")
                     } description: {

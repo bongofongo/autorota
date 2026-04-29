@@ -4,6 +4,7 @@ struct ContentView: View {
     @State private var layoutManager = TabLayoutManager()
     @State private var bridge = RotaUIBridge()
     @State private var employeeBridge = EmployeeUIBridge()
+    @State private var menuNav = MenuNavigationBridge()
     @State private var selection: TabSelection = .page(.rota)
     @State private var lastPage: TabPage = .rota
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
@@ -55,7 +56,16 @@ struct ContentView: View {
         }
         .onChange(of: employeeBridge.requestNewEmployeeSheet) { _, requested in
             if requested {
-                selection = .page(.employees)
+                // If Employees lives in the overflow Menu (iOS/iPad), TabView
+                // would silently drop a `.page(.employees)` selection because
+                // it's not registered as a Tab. Route through the Menu and
+                // push EmployeeListView via MenuNavigationBridge.
+                if layoutManager.tabBarPages.contains(.employees) {
+                    selection = .page(.employees)
+                } else {
+                    menuNav.pendingDestination = .employees
+                    selection = .page(.settings)
+                }
             }
         }
         #if os(iOS)
@@ -118,6 +128,7 @@ struct ContentView: View {
         .environment(layoutManager)
         .environment(bridge)
         .environment(employeeBridge)
+        .environment(menuNav)
         .onChange(of: selection) { _, new in
             if case .page(let p) = new { lastPage = p }
         }
@@ -173,6 +184,7 @@ struct ContentView: View {
         .environment(layoutManager)
         .environment(bridge)
         .environment(employeeBridge)
+        .environment(menuNav)
         .onChange(of: selection) { _, new in
             if case .page(let p) = new { lastPage = p }
         }

@@ -6,6 +6,7 @@ final class RoleViewModel {
 
     var roles: [FfiRole] = []
     var isLoading = false
+    var hasLoaded = false
     var error: String?
 
     private let service: AutorotaServiceProtocol
@@ -23,6 +24,7 @@ final class RoleViewModel {
             self.error = userFacingMessage(error)
         }
         isLoading = false
+        hasLoaded = true
     }
 
     func create(name: String) async {
