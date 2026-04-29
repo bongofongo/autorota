@@ -33,6 +33,7 @@ struct EmployeeListView: View {
                             Label("empty.employees.action", systemImage: "plus")
                         }
                         .buttonStyle(.borderedProminent)
+                        .accessibilityHint(Text("empty.employees.action.a11y_hint"))
                     }
                 } else {
                     List {

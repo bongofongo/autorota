@@ -6,8 +6,12 @@ struct TierPickView: View {
     @State private var infoTier: Tier?
     @State private var isWorking: WorkingAction?
     @State private var errorMessage: String?
+    /// Becomes true after the first purchase/restore failure so we can
+    /// surface a local "Try offline" escape — without it, a hard-gated
+    /// TierPick traps users on devices with no App Store reachability.
+    @State private var offlineEscapeAvailable = false
 
-    private enum WorkingAction: Equatable { case purchase, trial }
+    private enum WorkingAction: Equatable { case purchase, trial, restore }
 
     var body: some View {
         ScrollView {
@@ -16,7 +20,9 @@ struct TierPickView: View {
                 tierCard(.localManager)
                 tierCard(.employee)
                 tierCard(.saas)
-                if license.state != .unset {
+                restoreRow
+                offlineEscapeRow
+                if license.state.allowsMutation {
                     Button {
                         isPresented = false
                     } label: {
@@ -58,6 +64,54 @@ struct TierPickView: View {
                 .foregroundStyle(.secondary)
         }
         .padding(.bottom, 8)
+    }
+
+    @ViewBuilder
+    private var restoreRow: some View {
+        Button {
+            runRestore()
+        } label: {
+            HStack {
+                if isWorking == .restore {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Image(systemName: "arrow.counterclockwise.circle")
+                }
+                Text("license.cta.restore")
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.regular)
+        .disabled(isWorking != nil)
+    }
+
+    @ViewBuilder
+    private var offlineEscapeRow: some View {
+        if offlineEscapeAvailable && license.state == .unset && !isTrialUsed {
+            VStack(spacing: 4) {
+                Button {
+                    runTrial()
+                } label: {
+                    HStack {
+                        if isWorking == .trial {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "wifi.slash")
+                        }
+                        Text("license.cta.try_offline")
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+                .disabled(isWorking != nil)
+                Text("license.cta.offline_hint")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+        }
     }
 
     @ViewBuilder
@@ -192,6 +246,7 @@ struct TierPickView: View {
                 isPresented = false
             } catch {
                 errorMessage = error.localizedDescription
+                offlineEscapeAvailable = true
             }
         }
     }
@@ -205,6 +260,22 @@ struct TierPickView: View {
                 isPresented = false
             } catch {
                 errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func runRestore() {
+        isWorking = .restore
+        Task {
+            defer { isWorking = nil }
+            do {
+                try await license.restorePurchases()
+                if license.state.allowsMutation {
+                    isPresented = false
+                }
+            } catch {
+                errorMessage = error.localizedDescription
+                offlineEscapeAvailable = true
             }
         }
     }

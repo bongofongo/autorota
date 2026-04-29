@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import AutorotaKit
+import TipKit
 
 @Observable
 final class EmployeeViewModel {
@@ -30,6 +31,7 @@ final class EmployeeViewModel {
         do {
             _ = try await service.createEmployee(employee)
             await load()
+            await AutorotaEvents.firstEmployeeAdded.donate()
         } catch {
             self.error = userFacingMessage(error)
         }

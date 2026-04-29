@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import AutorotaKit
+import TipKit
 
 @Observable
 final class ShiftTemplateViewModel {
@@ -30,6 +31,7 @@ final class ShiftTemplateViewModel {
         do {
             _ = try await service.createShiftTemplate(template)
             await load()
+            await AutorotaEvents.firstTemplateAdded.donate()
         } catch {
             self.error = userFacingMessage(error)
         }

@@ -10,23 +10,23 @@ struct SyncPromptView: View {
                 .font(.system(size: 56))
                 .foregroundStyle(.blue)
 
-            Text("iCloud Data Found")
+            Text("sync.prompt.title")
                 .font(.title2.bold())
 
-            Text("Your Autorota data was found on iCloud. Would you like to download it to this device?")
+            Text("sync.prompt.body")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal)
 
             VStack(spacing: 12) {
                 Button(action: onAccept) {
-                    Text("Download from iCloud")
+                    Text("sync.prompt.accept")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
 
                 Button(action: onDecline) {
-                    Text("Start Fresh")
+                    Text("sync.prompt.decline")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)

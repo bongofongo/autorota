@@ -1783,6 +1783,9 @@
         }
       }
     },
+    "Autorota tried to open your local database and recover from corruption, but neither attempt succeeded. Resetting will move the corrupt file aside so the app can start fresh — your data will be preserved on disk and a future version may be able to import it." : {
+
+    },
     "Availability" : {
       "localizations" : {
         "ar" : {
@@ -2585,6 +2588,9 @@
           }
         }
       }
+    },
+    "Couldn't open your data" : {
+
     },
     "Create" : {
       "localizations" : {
@@ -3808,6 +3814,7 @@
       }
     },
     "Download from iCloud" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -4407,6 +4414,9 @@
         }
       }
     },
+    "Email support" : {
+
+    },
     "Employee" : {
       "localizations" : {
         "ar" : {
@@ -4603,6 +4613,127 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "員工"
+          }
+        }
+      }
+    },
+    "empty.employees.action" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Employee"
+          }
+        }
+      }
+    },
+    "empty.employees.action.a11y_hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens a sheet to create your first employee."
+          }
+        }
+      }
+    },
+    "empty.employees.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add your first employee to start building rotas."
+          }
+        }
+      }
+    },
+    "empty.employees.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No team yet"
+          }
+        }
+      }
+    },
+    "empty.rota.action" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Employee"
+          }
+        }
+      }
+    },
+    "empty.rota.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add at least one employee before generating a rota."
+          }
+        }
+      }
+    },
+    "empty.rota.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No team to schedule"
+          }
+        }
+      }
+    },
+    "empty.shifts.action" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Shift"
+          }
+        }
+      }
+    },
+    "empty.shifts.action.a11y_hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens a sheet to create your first shift template."
+          }
+        }
+      }
+    },
+    "empty.shifts.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Define recurring weekday slots employees can be assigned to."
+          }
+        }
+      }
+    },
+    "empty.shifts.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No shifts yet"
           }
         }
       }
@@ -4846,6 +4977,9 @@
           }
         }
       }
+    },
+    "Error detail" : {
+
     },
     "EUR (€)" : {
       "extractionState" : "manual",
@@ -5624,6 +5758,9 @@
         }
       }
     },
+    "Generate" : {
+
+    },
     "Generates PDF, ICS calendar, Markdown summary, and XLSX spreadsheet using your Export tab Employee View settings." : {
       "localizations" : {
         "ar" : {
@@ -5869,105 +6006,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "範例"
-          }
-        }
-      }
-    },
-    "empty.employees.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No team yet"
-          }
-        }
-      }
-    },
-    "empty.employees.body" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add your first employee to start building rotas."
-          }
-        }
-      }
-    },
-    "empty.employees.action" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add Employee"
-          }
-        }
-      }
-    },
-    "empty.shifts.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No shifts yet"
-          }
-        }
-      }
-    },
-    "empty.shifts.body" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Define recurring weekday slots employees can be assigned to."
-          }
-        }
-      }
-    },
-    "empty.shifts.action" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add Shift"
-          }
-        }
-      }
-    },
-    "empty.rota.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No team to schedule"
-          }
-        }
-      }
-    },
-    "empty.rota.body" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add at least one employee before generating a rota."
-          }
-        }
-      }
-    },
-    "empty.rota.action" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add Employee"
           }
         }
       }
@@ -9341,6 +9379,7 @@
       }
     },
     "iCloud Data Found" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -10362,6 +10401,17 @@
         }
       }
     },
+    "license.cta.offline_hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starts a local 7-day trial without contacting the App Store."
+          }
+        }
+      }
+    },
     "license.cta.restore" : {
       "localizations" : {
         "ar" : {
@@ -10450,6 +10500,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "開始 7 天試用"
+          }
+        }
+      }
+    },
+    "license.cta.try_offline" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try in offline mode"
           }
         }
       }
@@ -13149,6 +13210,7 @@
       }
     },
     "More" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -14849,6 +14911,17 @@
         }
       }
     },
+    "onboarding.button.choose_plan" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose plan"
+          }
+        }
+      }
+    },
     "onboarding.button.get_started" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15037,6 +15110,17 @@
         }
       }
     },
+    "onboarding.button.skip.a11y_hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skip the introduction and go to plan selection."
+          }
+        }
+      }
+    },
     "onboarding.cta.add_first_employee" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -15080,6 +15164,72 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新增我的第一位員工"
+          }
+        }
+      }
+    },
+    "onboarding.page.availability.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Capture each employee's preferred hours so the rota respects them automatically."
+          }
+        }
+      }
+    },
+    "onboarding.page.availability.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Track availability"
+          }
+        }
+      }
+    },
+    "onboarding.page.export.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share polished schedules as PDF, CSV, or JSON in seconds."
+          }
+        }
+      }
+    },
+    "onboarding.page.export.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Export anywhere"
+          }
+        }
+      }
+    },
+    "onboarding.page.generate.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One tap fills the week with proposed assignments — fair, balanced, ready to confirm."
+          }
+        }
+      }
+    },
+    "onboarding.page.generate.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto-generate rotas"
           }
         }
       }
@@ -15268,6 +15418,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "你的排班表"
+          }
+        }
+      }
+    },
+    "onboarding.page.schedule.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plan the week in one place. Drag, drop, and balance hours at a glance."
+          }
+        }
+      }
+    },
+    "onboarding.page.schedule.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schedule your team"
           }
         }
       }
@@ -16041,6 +16213,16 @@
         }
       }
     },
+    "Page %lld of %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Page %1$lld of %2$lld"
+          }
+        }
+      }
+    },
     "Past" : {
       "localizations" : {
         "ar" : {
@@ -16775,6 +16957,9 @@
         }
       }
     },
+    "Quit and reopen Autorota" : {
+
+    },
     "RANGE · %lld days" : {
       "localizations" : {
         "ar" : {
@@ -17294,6 +17479,12 @@
           }
         }
       }
+    },
+    "Reset & start fresh" : {
+
+    },
+    "Reset failed: %@" : {
+
     },
     "Reset Keychain" : {
       "localizations" : {
@@ -17894,6 +18085,9 @@
           }
         }
       }
+    },
+    "Schedule · Apr 20–26" : {
+
     },
     "Schedule restored" : {
       "localizations" : {
@@ -18566,6 +18760,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重新播放入門引導"
+          }
+        }
+      }
+    },
+    "settings.replay_onboarding.confirm.action" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View again"
           }
         }
       }
@@ -19454,6 +19659,7 @@
       }
     },
     "Start Fresh" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -19729,6 +19935,50 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "對調"
+          }
+        }
+      }
+    },
+    "sync.prompt.accept" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download from iCloud"
+          }
+        }
+      }
+    },
+    "sync.prompt.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your Autorota data was found on iCloud. Would you like to download it to this device?"
+          }
+        }
+      }
+    },
+    "sync.prompt.decline" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start Fresh"
+          }
+        }
+      }
+    },
+    "sync.prompt.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud Data Found"
           }
         }
       }
@@ -21062,6 +21312,28 @@
         }
       }
     },
+    "tip.employees.add.message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the menu to add employees, set weekly availability, or import a roster."
+          }
+        }
+      }
+    },
+    "tip.employees.add.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add your team"
+          }
+        }
+      }
+    },
     "tip.export.profile.message" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -21156,6 +21428,28 @@
         }
       }
     },
+    "tip.rota.share.message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open the menu to export as PDF, CSV, or JSON, or send schedules to your team."
+          }
+        }
+      }
+    },
+    "tip.rota.share.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share the rota"
+          }
+        }
+      }
+    },
     "tip.rota.twopass.message" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -21246,6 +21540,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "兩輪排班"
+          }
+        }
+      }
+    },
+    "tip.shifts.template.message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Templates auto-create shifts every week. Add one for each part of the day."
+          }
+        }
+      }
+    },
+    "tip.shifts.template.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Define recurring shifts"
           }
         }
       }
@@ -22483,6 +22799,7 @@
       }
     },
     "Your Autorota data was found on iCloud. Would you like to download it to this device?" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -22518,171 +22835,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在 iCloud 上找到您的 Autorota 資料。要下載到此裝置嗎?"
-          }
-        }
-      }
-    },
-    "onboarding.page.schedule.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Schedule your team"
-          }
-        }
-      }
-    },
-    "onboarding.page.schedule.body" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Plan the week in one place. Drag, drop, and balance hours at a glance."
-          }
-        }
-      }
-    },
-    "onboarding.page.availability.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Track availability"
-          }
-        }
-      }
-    },
-    "onboarding.page.availability.body" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Capture each employee's preferred hours so the rota respects them automatically."
-          }
-        }
-      }
-    },
-    "onboarding.page.generate.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Auto-generate rotas"
-          }
-        }
-      }
-    },
-    "onboarding.page.generate.body" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "One tap fills the week with proposed assignments — fair, balanced, ready to confirm."
-          }
-        }
-      }
-    },
-    "onboarding.page.export.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Export anywhere"
-          }
-        }
-      }
-    },
-    "onboarding.page.export.body" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Share polished schedules as PDF, CSV, or JSON in seconds."
-          }
-        }
-      }
-    },
-    "settings.replay_onboarding.confirm.action" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "View again"
-          }
-        }
-      }
-    },
-    "tip.employees.add.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add your team"
-          }
-        }
-      }
-    },
-    "tip.employees.add.message" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tap the menu to add employees, set weekly availability, or import a roster."
-          }
-        }
-      }
-    },
-    "tip.shifts.template.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Define recurring shifts"
-          }
-        }
-      }
-    },
-    "tip.shifts.template.message" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Templates auto-create shifts every week. Add one for each part of the day."
-          }
-        }
-      }
-    },
-    "tip.rota.share.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Share the rota"
-          }
-        }
-      }
-    },
-    "tip.rota.share.message" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open the menu to export as PDF, CSV, or JSON, or send schedules to your team."
           }
         }
       }

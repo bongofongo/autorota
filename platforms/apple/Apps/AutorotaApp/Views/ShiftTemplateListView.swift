@@ -132,6 +132,7 @@ struct ShiftTemplateListView: View {
                             Label("empty.shifts.action", systemImage: "plus")
                         }
                         .buttonStyle(.borderedProminent)
+                        .accessibilityHint(Text("empty.shifts.action.a11y_hint"))
                     }
                 } else {
                     listContent

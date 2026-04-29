@@ -7,10 +7,16 @@ struct ContentView: View {
     @State private var selection: TabSelection = .page(.rota)
     @State private var lastPage: TabPage = .rota
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    /// Set by `AutorotaAppApp` when the user accepts the iCloud sync prompt.
+    /// Onboarding skips the slide deck and lands directly on `TierPickView`.
+    /// Cleared as soon as it is consumed below so a manual replay from
+    /// settings still shows the slides.
+    @AppStorage("pendingOnboardingTierOnly") private var pendingOnboardingTierOnly = false
     #if os(iOS)
     @AppStorage("tabBarEdge") private var tabBarEdgeRaw: String = TabBarEdge.trailing.rawValue
     #endif
     @State private var showOnboarding = false
+    @State private var onboardingStartPage = 0
     @Environment(LicenseService.self) private var license
     #if os(iOS)
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -36,11 +42,14 @@ struct ContentView: View {
         }
         .onAppear {
             if !hasCompletedOnboarding || license.state == .unset {
+                onboardingStartPage = pendingOnboardingTierOnly ? Int.max : 0
+                pendingOnboardingTierOnly = false
                 showOnboarding = true
             }
         }
         .onChange(of: hasCompletedOnboarding) { _, completed in
             if !completed {
+                onboardingStartPage = 0
                 showOnboarding = true
             }
         }
@@ -55,7 +64,7 @@ struct ContentView: View {
                 hasCompletedOnboarding = true
             }
         } content: {
-            OnboardingView(isPresented: $showOnboarding)
+            OnboardingView(isPresented: $showOnboarding, startPage: onboardingStartPage)
                 .environment(employeeBridge)
                 .interactiveDismissDisabled()
         }
@@ -65,9 +74,10 @@ struct ContentView: View {
                 hasCompletedOnboarding = true
             }
         } content: {
-            OnboardingView(isPresented: $showOnboarding)
+            OnboardingView(isPresented: $showOnboarding, startPage: onboardingStartPage)
                 .environment(employeeBridge)
                 .interactiveDismissDisabled()
+                .presentationBackgroundInteraction(.disabled)
         }
         #endif
     }

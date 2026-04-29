@@ -50,7 +50,18 @@ private let pages: [OnboardingPage] = [
 
 struct OnboardingView: View {
     @Binding var isPresented: Bool
-    @State private var currentPage = 0
+    /// Initial page. Pass `pages.count` to skip the slide deck and land
+    /// directly on the tier picker — used after iCloud restore so users
+    /// who already have data don't sit through marketing slides.
+    let startPage: Int
+    @State private var currentPage: Int
+
+    init(isPresented: Binding<Bool>, startPage: Int = 0) {
+        self._isPresented = isPresented
+        let clamped = max(0, min(startPage, pages.count))
+        self.startPage = clamped
+        self._currentPage = State(initialValue: clamped)
+    }
 
     private var isLastPage: Bool { currentPage == pages.count }
 
@@ -59,22 +70,19 @@ struct OnboardingView: View {
             HStack {
                 Spacer()
                 if !isLastPage {
-                    Button("onboarding.button.skip") { currentPage = pages.count }
-                        .font(.title3)
-                        .padding()
+                    Button("onboarding.button.choose_plan") {
+                        withAnimation { currentPage = pages.count }
+                    }
+                    .font(.title3)
+                    .padding()
+                    .accessibilityIdentifier("onboarding.skip")
+                    .accessibilityHint(Text("onboarding.button.skip.a11y_hint"))
                 }
             }
 
-            #if os(iOS)
-            TabView(selection: $currentPage) {
-                ForEach(Array(pages.enumerated()), id: \.element.id) { index, page in
-                    slide(for: page)
-                        .tag(index)
-                }
-                TierPickView(isPresented: $isPresented).tag(pages.count)
-            }
-            .tabViewStyle(.page(indexDisplayMode: .always))
-            #else
+            // Conditional render keeps platform behavior consistent: no
+            // TabView swipe-back from the tier picker, no system page-dot
+            // row that would render under the picker.
             Group {
                 if currentPage < pages.count {
                     slide(for: pages[currentPage])
@@ -82,29 +90,39 @@ struct OnboardingView: View {
                     TierPickView(isPresented: $isPresented)
                 }
             }
+            .animation(.smooth(duration: 0.25), value: currentPage)
 
-            Spacer()
-
-            HStack(spacing: 16) {
-                if currentPage > 0 {
-                    Button("onboarding.button.previous") { withAnimation { currentPage -= 1 } }
-                        .font(.title3)
-                }
+            if currentPage < pages.count {
                 Spacer()
-                pageIndicator
-                Spacer()
-                if !isLastPage {
-                    Button("onboarding.button.next") { withAnimation { currentPage += 1 } }
-                        .font(.title3)
-                }
+                navigationRow
             }
-            .padding(.horizontal, 32)
-            .padding(.bottom, 24)
-            #endif
         }
         #if os(macOS)
         .frame(width: 640, height: 540)
         #endif
+    }
+
+    @ViewBuilder
+    private var navigationRow: some View {
+        HStack(spacing: 16) {
+            if currentPage > 0 {
+                Button("onboarding.button.previous") {
+                    withAnimation { currentPage -= 1 }
+                }
+                .font(.title3)
+            }
+            Spacer()
+            pageIndicator
+            Spacer()
+            Button(currentPage == pages.count - 1
+                   ? "onboarding.button.get_started"
+                   : "onboarding.button.next") {
+                withAnimation { currentPage += 1 }
+            }
+            .font(.title3)
+        }
+        .padding(.horizontal, 32)
+        .padding(.bottom, 24)
     }
 
     @ViewBuilder
@@ -155,17 +173,17 @@ struct OnboardingView: View {
         #endif
     }
 
-    #if os(macOS)
     private var pageIndicator: some View {
         HStack(spacing: 8) {
-            ForEach(0...pages.count, id: \.self) { index in
+            ForEach(0..<pages.count, id: \.self) { index in
                 Circle()
                     .fill(index == currentPage ? Color.accentColor : Color.secondary.opacity(0.3))
                     .frame(width: 8, height: 8)
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Page \(currentPage + 1) of \(pages.count)"))
     }
-    #endif
 }
 
 // MARK: - Carousel slide chrome
@@ -204,16 +222,23 @@ private struct CarouselSlide<Mockup: View>: View {
 //
 // Each mockup loops continuously via TimelineView so the slide feels alive
 // without needing asset videos. The mockups are pure SwiftUI primitives and
-// never read or write any real data.
+// never read or write any real data. Reduce-motion freezes the loop on a
+// stable phase so the slide still has a final composed look.
 
 private struct ScheduleMockup: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private let weekdays = ["M", "T", "W", "T", "F", "S", "S"]
     private let employees = ["Alice", "Bob", "Cara", "Dan", "Eve"]
 
     var body: some View {
-        TimelineView(.animation) { ctx in
-            let phase = phase(at: ctx.date)
-            grid(phase: phase)
+        Group {
+            if reduceMotion {
+                grid(phase: 1.0)
+            } else {
+                TimelineView(.animation) { ctx in
+                    grid(phase: phase(at: ctx.date))
+                }
+            }
         }
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
         .overlay(
@@ -267,10 +292,18 @@ private struct ScheduleMockup: View {
 }
 
 private struct AvailabilityMockup: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        TimelineView(.animation) { ctx in
-            let phase = Int((ctx.date.timeIntervalSinceReferenceDate * 2).truncatingRemainder(dividingBy: 3))
-            grid(phase: phase)
+        Group {
+            if reduceMotion {
+                grid(phase: 0)
+            } else {
+                TimelineView(.animation) { ctx in
+                    let phase = Int((ctx.date.timeIntervalSinceReferenceDate * 2).truncatingRemainder(dividingBy: 3))
+                    grid(phase: phase)
+                }
+            }
         }
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
         .overlay(
@@ -311,10 +344,18 @@ private struct AvailabilityMockup: View {
 }
 
 private struct AutoGenerateMockup: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        TimelineView(.animation) { ctx in
-            let phase = (ctx.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 4.0)) / 4.0
-            stack(phase: phase)
+        Group {
+            if reduceMotion {
+                stack(phase: 1.0)
+            } else {
+                TimelineView(.animation) { ctx in
+                    let phase = (ctx.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 4.0)) / 4.0
+                    stack(phase: phase)
+                }
+            }
         }
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
         .overlay(
@@ -367,10 +408,18 @@ private struct AutoGenerateMockup: View {
 }
 
 private struct ExportMockup: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        TimelineView(.animation) { ctx in
-            let phase = ctx.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 5.0)
-            page(phase: phase)
+        Group {
+            if reduceMotion {
+                page(phase: 0)
+            } else {
+                TimelineView(.animation) { ctx in
+                    let phase = ctx.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 5.0)
+                    page(phase: phase)
+                }
+            }
         }
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
         .overlay(
@@ -431,21 +480,27 @@ private struct ExportMockup: View {
 
 /// Tiny pulsing dot rendered on top of every onboarding hero so a static
 /// screenshot still feels alive. Sized small enough to never compete with
-/// the underlying art.
+/// the underlying art. Frozen at full scale under reduce-motion.
 private struct LiveDecoration: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
-        TimelineView(.animation) { ctx in
-            dot(at: ctx.date)
+        if reduceMotion {
+            dot(scale: 1.0, opacity: 0.85)
+        } else {
+            TimelineView(.animation) { ctx in
+                let phase = sin(ctx.date.timeIntervalSinceReferenceDate * 2.0)
+                dot(scale: 1.0 + 0.25 * phase, opacity: 0.7 + 0.3 * phase)
+            }
         }
     }
 
-    private func dot(at date: Date) -> some View {
-        let phase = sin(date.timeIntervalSinceReferenceDate * 2.0)
-        return Circle()
+    private func dot(scale: Double, opacity: Double) -> some View {
+        Circle()
             .fill(Color.accentColor)
             .frame(width: 10, height: 10)
-            .scaleEffect(1.0 + 0.25 * phase)
-            .opacity(0.7 + 0.3 * phase)
+            .scaleEffect(scale)
+            .opacity(opacity)
             .shadow(color: Color.accentColor.opacity(0.4), radius: 4)
     }
 }
