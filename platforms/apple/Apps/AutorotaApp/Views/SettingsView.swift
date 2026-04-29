@@ -76,13 +76,15 @@ struct SettingsView: View {
                     }
                 }
 
-                Section("Appearance") {
-                    Picker("Theme", selection: $appearance) {
+                Section {
+                    Picker("settings.appearance.theme", selection: $appearance) {
                         ForEach(AppAppearance.allCases, id: \.rawValue) { option in
                             Text(option.label).tag(option.rawValue)
                         }
                     }
                     .pickerStyle(.segmented)
+                } header: {
+                    Text("settings.appearance.section_header")
                 }
 
                 Section {

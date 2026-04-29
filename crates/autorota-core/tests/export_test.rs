@@ -436,9 +436,17 @@ fn single_employee_grid_ad_hoc_shift_fallback() {
     );
 
     let monday_cell = &grid.cells[0][0];
+    // Fallback name is just the role (no times); the `show_times` flag
+    // appends the time range as a separate line. Times must appear once.
     assert!(
-        monday_cell.contains("server 14:00-18:00"),
-        "Ad-hoc shift should fall back to 'Role HH:MM-HH:MM' format, got: {}",
+        monday_cell.contains("server"),
+        "Ad-hoc cell should include role name, got: {}",
+        monday_cell
+    );
+    assert_eq!(
+        monday_cell.matches("14:00-18:00").count(),
+        1,
+        "Time range should not be duplicated, got: {}",
         monday_cell
     );
 }

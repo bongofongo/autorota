@@ -99,6 +99,8 @@ struct EmployeeEditSheet: View {
 
     @State private var selectionModeActive = false
 
+    @State private var validationMessage: String?
+
     private var isEditing: Bool { existing != nil }
 
     private static func isValidEmail(_ s: String) -> Bool {
@@ -436,9 +438,18 @@ struct EmployeeEditSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }
-                        .disabled(firstName.trimmingCharacters(in: .whitespaces).isEmpty ||
-                                  lastName.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
+            }
+            .alert(
+                "Missing required fields",
+                isPresented: Binding(
+                    get: { validationMessage != nil },
+                    set: { if !$0 { validationMessage = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) { validationMessage = nil }
+            } message: {
+                Text(validationMessage ?? "")
             }
             .alert(
                 "Remove \(existing.map { "\($0.firstName) \($0.lastName)" } ?? "Employee")?",
@@ -507,12 +518,35 @@ struct EmployeeEditSheet: View {
         let fmt = DateFormatter()
         fmt.dateFormat = "yyyy-MM-dd"
 
-        let finalDefault = AvailabilityGridView.slotsWithOutOfRangeSetToNo(
-            slots: defaultAvailabilitySlots, start: defaultVisibleStart, end: defaultVisibleEnd)
-
         let trimmedFirst = firstName.trimmingCharacters(in: .whitespaces)
         let trimmedLast = lastName.trimmingCharacters(in: .whitespaces)
         let trimmedNick = nickname.trimmingCharacters(in: .whitespaces)
+        let trimmedEmail = email.trimmingCharacters(in: .whitespaces)
+
+        var missing: [String] = []
+        if trimmedFirst.isEmpty { missing.append(String(localized: "First Name")) }
+        if trimmedLast.isEmpty { missing.append(String(localized: "Last Name")) }
+        var invalid: [String] = []
+        if !trimmedEmail.isEmpty, !Self.isValidEmail(trimmedEmail) {
+            invalid.append(String(localized: "Email"))
+        }
+        if preferredContact != .none, !phone.isEmpty, !phoneFormatter.isValid(phone) {
+            invalid.append(String(localized: "Phone"))
+        }
+        if !missing.isEmpty || !invalid.isEmpty {
+            var lines: [String] = []
+            if !missing.isEmpty {
+                lines.append(String(localized: "Missing: ") + missing.joined(separator: ", "))
+            }
+            if !invalid.isEmpty {
+                lines.append(String(localized: "Invalid: ") + invalid.joined(separator: ", "))
+            }
+            validationMessage = lines.joined(separator: "\n")
+            return
+        }
+
+        let finalDefault = AvailabilityGridView.slotsWithOutOfRangeSetToNo(
+            slots: defaultAvailabilitySlots, start: defaultVisibleStart, end: defaultVisibleEnd)
         let displayWage: Float? = Float(hourlyWageText.trimmingCharacters(in: .whitespaces))
         let parsedWage: Float? = displayWage.map { exchangeRates.convert($0, from: displayCurrency, to: wageCurrency) }
         let emp = FfiEmployee(
@@ -551,9 +585,11 @@ struct EmployeeEditSheet: View {
                 await viewModel.update(emp)
                 savedEmpId = emp.id
             } else {
-                await viewModel.create(emp)
-                dismiss()
-                return
+                guard let newId = await viewModel.create(emp) else {
+                    dismiss()
+                    return
+                }
+                savedEmpId = newId
             }
 
             let defaultForWeekday: (String) -> [DayAvailabilitySlot] = { wd in

@@ -297,6 +297,7 @@ struct ShiftTemplateEditSheet: View {
                             Text(r.name).tag(r.name)
                         }
                     }
+                    .pickerStyle(.menu)
                     Stepper("Min staff: \(minStaff)", value: $minStaff, in: 1...20)
                     Stepper("Max staff: \(maxStaff)", value: $maxStaff, in: 1...20)
                         .onChange(of: minStaff) { _, v in if maxStaff < v { maxStaff = v } }

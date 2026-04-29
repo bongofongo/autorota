@@ -27,13 +27,16 @@ final class EmployeeViewModel {
         isLoading = false
     }
 
-    func create(_ employee: FfiEmployee) async {
+    @discardableResult
+    func create(_ employee: FfiEmployee) async -> Int64? {
         do {
-            _ = try await service.createEmployee(employee)
+            let newId = try await service.createEmployee(employee)
             await load()
             await AutorotaEvents.firstEmployeeAdded.donate()
+            return newId
         } catch {
             self.error = userFacingMessage(error)
+            return nil
         }
     }
 

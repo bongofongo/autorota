@@ -104,17 +104,19 @@ pub fn build_grid(
                 .map(|e| e.display_name())
                 .or_else(|| a.employee_name.clone())
                 .unwrap_or_else(|| format!("Employee #{}", a.employee_id));
+            // Fallback name for ad-hoc shifts (no template) intentionally
+            // omits times — the cell assembler appends them via `show_times`,
+            // so embedding them here would render the times twice.
             let shift_name = shift
                 .template_id
                 .and_then(|tid| tmpl_map.get(&tid))
                 .map(|t| t.name.clone())
                 .unwrap_or_else(|| {
-                    format!(
-                        "{} {}-{}",
-                        shift.required_role,
-                        shift.start_time.format("%H:%M"),
-                        shift.end_time.format("%H:%M"),
-                    )
+                    if shift.required_role.is_empty() {
+                        "Shift".to_string()
+                    } else {
+                        shift.required_role.clone()
+                    }
                 });
             Some(ResolvedAssignment {
                 employee_name,
@@ -480,17 +482,18 @@ pub fn build_single_employee_grid(
                 .iter()
                 .filter_map(|a| {
                     let shift = shift_map.get(&a.shift_id)?;
+                    // Fallback for ad-hoc shifts: omit times (the `show_times`
+                    // branch below adds them) to avoid duplication.
                     let shift_name = shift
                         .template_id
                         .and_then(|tid| tmpl_map.get(&tid))
                         .map(|t| t.name.clone())
                         .unwrap_or_else(|| {
-                            format!(
-                                "{} {}-{}",
-                                shift.required_role,
-                                shift.start_time.format("%H:%M"),
-                                shift.end_time.format("%H:%M"),
-                            )
+                            if shift.required_role.is_empty() {
+                                "Shift".to_string()
+                            } else {
+                                shift.required_role.clone()
+                            }
                         });
 
                     let mut line_parts = Vec::new();
@@ -737,8 +740,46 @@ mod tests {
         let config = staff_config(ExportLayout::EmployeeByWeekday);
         let grid = build_grid(&config, ws, &assignments, &shifts, &employees, &templates);
 
-        // Shift name should fall back to "Server 14:00-18:00" pattern.
-        assert!(grid.cells[0][0].contains("Server 14:00-18:00"));
+        // Fallback uses the role as the name; times are appended separately
+        // by the `show_times` branch and must not be duplicated.
+        assert_eq!(grid.cells[0][0], "Server\n14:00-18:00");
+    }
+
+    #[test]
+    fn ad_hoc_shift_no_duplicate_times() {
+        // Regression: when both `show_shift_name` and `show_times` are true,
+        // an ad-hoc shift's time range must appear exactly once.
+        let ws = week_start();
+        let mon = ws;
+
+        let templates: Vec<ShiftTemplate> = vec![];
+        let shifts = vec![make_shift(1, None, mon, (8, 0), (17, 0), "Barista")];
+        let employees = vec![make_employee(1, "Alice", "Smith")];
+        let assignments = vec![make_assignment(1, 1, 1, None)];
+
+        let config = staff_config(ExportLayout::EmployeeByWeekday);
+        let grid = build_grid(&config, ws, &assignments, &shifts, &employees, &templates);
+
+        let cell = &grid.cells[0][0];
+        assert_eq!(cell.matches("08:00-17:00").count(), 1, "cell was {cell:?}");
+    }
+
+    #[test]
+    fn ad_hoc_shift_fallback_no_role() {
+        // Empty role falls back to a generic "Shift" label rather than
+        // a leading space.
+        let ws = week_start();
+        let mon = ws;
+
+        let templates: Vec<ShiftTemplate> = vec![];
+        let shifts = vec![make_shift(1, None, mon, (9, 0), (12, 0), "")];
+        let employees = vec![make_employee(1, "Alice", "Smith")];
+        let assignments = vec![make_assignment(1, 1, 1, None)];
+
+        let config = staff_config(ExportLayout::EmployeeByWeekday);
+        let grid = build_grid(&config, ws, &assignments, &shifts, &employees, &templates);
+
+        assert_eq!(grid.cells[0][0], "Shift\n09:00-12:00");
     }
 
     #[test]

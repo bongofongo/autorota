@@ -52,12 +52,15 @@ struct RotaView: View {
 
                 Divider()
 
-                if vm.isLoading {
+                if let schedule = vm.schedule {
+                    // Keep the existing schedule visible while a reload is
+                    // in flight (week switch, swap, etc.) so the view doesn't
+                    // tear down to a spinner and flicker back.
+                    ScheduleGridView(vm: vm, schedule: schedule)
+                } else if vm.isLoading {
                     Spacer()
                     ProgressView("Loading schedule…")
                     Spacer()
-                } else if let schedule = vm.schedule {
-                    ScheduleGridView(vm: vm, schedule: schedule)
                 } else if employeeCount == 0 {
                     Spacer()
                     ContentUnavailableView {
@@ -965,6 +968,7 @@ private struct AddShiftSheet: View {
                         Text(role.name).tag(role.name)
                     }
                 }
+                .pickerStyle(.menu)
             }
             #if os(macOS)
             .formStyle(.grouped)
