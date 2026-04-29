@@ -256,6 +256,9 @@ struct SettingsView: View {
                 }
 
             }
+            #if os(macOS)
+            .formStyle(.grouped)
+            #endif
             .navigationTitle("Menu")
             .confirmationDialog(
                 "settings.replay_onboarding.confirm.title",

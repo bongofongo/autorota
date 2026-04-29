@@ -24,6 +24,7 @@ struct AnalyticsView: View {
                     scrollContent
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .navigationTitle("Analytics")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -33,7 +34,9 @@ struct AnalyticsView: View {
                 vm.displayCurrency = displayCurrency
                 await vm.load()
             }
+            #if os(iOS)
             .refreshable { await vm.load() }
+            #endif
             .onChange(of: displayCurrency) {
                 vm.displayCurrency = displayCurrency
                 Task { await vm.load() }
