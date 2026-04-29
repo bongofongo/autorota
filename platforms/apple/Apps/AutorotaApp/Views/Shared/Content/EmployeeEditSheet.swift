@@ -101,6 +101,11 @@ struct EmployeeEditSheet: View {
 
     @State private var validationMessage: String?
 
+    private enum FocusedField: Hashable {
+        case firstName, lastName, nickname
+    }
+    @FocusState private var focusedField: FocusedField?
+
     private var isEditing: Bool { existing != nil }
 
     private static func isValidEmail(_ s: String) -> Bool {
@@ -194,8 +199,17 @@ struct EmployeeEditSheet: View {
             Form {
                 Section("Info") {
                     TextField("First Name", text: $firstName)
+                        .focused($focusedField, equals: .firstName)
+                        .submitLabel(.next)
+                        .onSubmit { focusedField = .lastName }
                     TextField("Last Name", text: $lastName)
+                        .focused($focusedField, equals: .lastName)
+                        .submitLabel(.next)
+                        .onSubmit { focusedField = .nickname }
                     TextField("Nickname (optional)", text: $nickname)
+                        .focused($focusedField, equals: .nickname)
+                        .submitLabel(.done)
+                        .onSubmit { focusedField = nil }
                     DatePicker("Start date", selection: $startDate, displayedComponents: .date)
                 }
                 Section("Roles") {
@@ -331,6 +345,7 @@ struct EmployeeEditSheet: View {
                     }
                 }
 
+                if isEditing {
                 Section("Availability") {
                     TipView(availabilityModeTip)
                     Picker("Mode", selection: $availabilityMode) {
@@ -417,6 +432,7 @@ struct EmployeeEditSheet: View {
                             weekdaySubheaders: subheaders
                         )
                     }
+                }
                 }
                 if isEditing {
                     Section {

@@ -82,10 +82,22 @@ struct OnboardingView: View {
 
             // Conditional render keeps platform behavior consistent: no
             // TabView swipe-back from the tier picker, no system page-dot
-            // row that would render under the picker.
+            // row that would render under the picker. On iOS/iPadOS the
+            // slide deck is wrapped in a paged TabView so users can swipe
+            // horizontally between intro slides; macOS keeps button-only
+            // nav since the page style isn't available there.
             Group {
                 if currentPage < pages.count {
+                    #if os(iOS)
+                    TabView(selection: $currentPage) {
+                        ForEach(pages.indices, id: \.self) { i in
+                            slide(for: pages[i]).tag(i)
+                        }
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    #else
                     slide(for: pages[currentPage])
+                    #endif
                 } else {
                     TierPickView(isPresented: $isPresented)
                 }
