@@ -209,6 +209,10 @@ struct SettingsView: View {
 
                 SubscriptionSettingsSection()
 
+                #if DEBUG
+                DebugResetSection()
+                #endif
+
                 Section("iCloud Sync") {
                     HStack {
                         Text("Status")

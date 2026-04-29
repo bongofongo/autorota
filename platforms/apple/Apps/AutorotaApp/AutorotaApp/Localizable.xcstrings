@@ -3159,6 +3159,9 @@
         }
       }
     },
+    "DEBUG · App" : {
+
+    },
     "DEBUG · License" : {
       "localizations" : {
         "ar" : {
@@ -3518,6 +3521,9 @@
           }
         }
       }
+    },
+    "Deletes all local data and quits. Reopen to start onboarding from scratch." : {
+
     },
     "Details" : {
       "localizations" : {
@@ -17485,7 +17491,16 @@
         }
       }
     },
+    "Reset & Quit" : {
+
+    },
     "Reset & start fresh" : {
+
+    },
+    "Reset and quit?" : {
+
+    },
+    "Reset App to Fresh State" : {
 
     },
     "Reset failed: %@" : {
@@ -20164,6 +20179,9 @@
         }
       }
     },
+    "Tab Bar Layout" : {
+
+    },
     "Tag" : {
       "localizations" : {
         "ar" : {
@@ -22727,6 +22745,9 @@
           }
         }
       }
+    },
+    "Wipes database, license, and onboarding state, then quits. App preferences (theme, currency, language) are kept." : {
+
     },
     "You can review or edit any employee from the picker below." : {
       "localizations" : {
