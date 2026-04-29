@@ -159,16 +159,20 @@ final class AutorotaSyncEngine: @unchecked Sendable {
     // MARK: - Configuration Persistence
 
     private func loadOrCreateConfiguration() async throws -> CKSyncEngine.Configuration {
-        var savedState: CKSyncEngine.State.Serialization?
-
         // Treat an empty string sentinel as "no saved state" so the
         // account-switch teardown path can clear without needing a
         // dedicated FFI delete call.
-        if let stateData = try getSyncMetadata(key: "ck_engine_state"),
-           !stateData.isEmpty,
-           let data = stateData.data(using: .utf8) {
-            savedState = try JSONDecoder().decode(CKSyncEngine.State.Serialization.self, from: data)
-        }
+        let savedState = AutorotaSyncEngine.decodeSavedState(
+            stored: try getSyncMetadata(key: "ck_engine_state"),
+            onCorruption: { [weak self] reason in
+                guard let self else { return }
+                self.logger.error("Corrupted ck_engine_state: \(reason). Dropping; CKSyncEngine will re-fetch from CloudKit.")
+                self.lastSyncIssue = "Sync state was corrupted (\(reason)) and reset; first sync after recovery may be slower."
+                // Clear so the next launch doesn't crash-loop on the
+                // same corrupted blob.
+                try? setSyncMetadata(key: "ck_engine_state", value: "")
+            }
+        )
 
         let database = CKContainer(identifier: "iCloud.com.toadmountain.autorota").privateCloudDatabase
         let config = CKSyncEngine.Configuration(
@@ -177,6 +181,33 @@ final class AutorotaSyncEngine: @unchecked Sendable {
             delegate: self
         )
         return config
+    }
+
+    /// Decode the persisted CKSyncEngine state, treating empty/missing
+    /// values and decode failures uniformly as "no saved state". When the
+    /// stored blob fails to decode, `onCorruption` is invoked so the caller
+    /// can clear the corrupt value and surface a recovery event — without
+    /// this guard, a single bad JSON blob would crash-loop every launch
+    /// because `start()` re-throws the decode error and the engine never
+    /// initialises.
+    static func decodeSavedState(
+        stored: String?,
+        onCorruption: (String) -> Void
+    ) -> CKSyncEngine.State.Serialization? {
+        guard let stored, !stored.isEmpty else { return nil }
+        guard let data = stored.data(using: .utf8) else {
+            onCorruption("not valid UTF-8")
+            return nil
+        }
+        do {
+            return try JSONDecoder().decode(
+                CKSyncEngine.State.Serialization.self,
+                from: data
+            )
+        } catch {
+            onCorruption("JSON decode failed: \(error.localizedDescription)")
+            return nil
+        }
     }
 
     private func saveEngineState(_ state: CKSyncEngine.State.Serialization) {
