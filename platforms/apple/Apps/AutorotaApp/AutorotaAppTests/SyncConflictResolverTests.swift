@@ -95,6 +95,54 @@ struct SyncConflictResolverTests {
         #expect(merged["name"] as? String == "Alicia")
     }
 
+    @Test("merge with no actual changes does not advance last_modified")
+    func noOpMergePreservesLocalLastModified() {
+        // base == local == server: nothing changed. The previous
+        // implementation used `max(local, server)` unconditionally,
+        // which advanced the timestamp every time a row was fetched
+        // even though no field actually moved. That falsely re-marked
+        // the row as dirty downstream.
+        let merged = SyncConflictResolver.merge(
+            base: ["name": "Alice", "age": NSNumber(value: 30)],
+            local: ["name": "Alice", "age": NSNumber(value: 30)],
+            server: ["name": "Alice", "age": NSNumber(value: 30)],
+            localLastModified: t0,
+            serverLastModified: t1
+        )
+        #expect(merged["last_modified"] as? String == t0,
+                "no-op merge should preserve local last_modified, got \(String(describing: merged["last_modified"]))")
+    }
+
+    @Test("merge that integrates a server change advances last_modified")
+    func realChangeAdvancesLastModified() {
+        let merged = SyncConflictResolver.merge(
+            base: ["name": "Alice"],
+            local: ["name": "Alice"],
+            server: ["name": "Bob"],
+            localLastModified: t0,
+            serverLastModified: t1
+        )
+        #expect(merged["last_modified"] as? String == t1,
+                "merge that took server's value should advance last_modified")
+    }
+
+    @Test("merge where local won every field does not advance last_modified")
+    func localWonAllFieldsKeepsLocalLastModified() {
+        // Local edited; server has stale base value. Merge keeps local.
+        // No server change was integrated, so the timestamp should not
+        // jump forward to the server's time.
+        let merged = SyncConflictResolver.merge(
+            base: ["name": "Alice"],
+            local: ["name": "Alicia"],
+            server: ["name": "Alice"],
+            localLastModified: t0,
+            serverLastModified: t1
+        )
+        #expect(merged["name"] as? String == "Alicia")
+        #expect(merged["last_modified"] as? String == t0,
+                "no server-side change was integrated; last_modified should not advance")
+    }
+
     // MARK: - Equality
 
     @Test("Bool true and NSNumber 1 are unequal")

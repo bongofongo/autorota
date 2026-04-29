@@ -32,6 +32,12 @@ enum SyncConflictResolver {
         }
 
         var result = local // Start with local, apply server changes
+        // Track whether the merge actually wrote a non-local value into
+        // any field. Without this, `last_modified` was unconditionally
+        // advanced to `max(local, server)` even when neither side
+        // changed anything — falsely marking the row as modified and
+        // re-pushing identical bytes to CloudKit on every fetch.
+        var serverWonAnyField = false
 
         for key in Set(local.keys).union(server.keys) {
             if key == "id" || key == "last_modified" { continue }
@@ -56,6 +62,7 @@ enum SyncConflictResolver {
                 // Only server changed this field — take server's value (which
                 // may be NSNull / deletion sentinel for an intentional clear).
                 result[key] = unwrapDeletion(serverVal)
+                serverWonAnyField = true
             } else if localChanged && !serverChanged {
                 // Only local changed — keep local (already in result)
                 continue
@@ -63,14 +70,22 @@ enum SyncConflictResolver {
                 // Both changed — later timestamp wins, server as tiebreaker
                 if serverLastModified >= localLastModified {
                     result[key] = unwrapDeletion(serverVal)
+                    serverWonAnyField = true
                 }
                 // else keep local (already in result)
             }
             // Neither changed — keep base/local (already in result)
         }
 
-        // Use the later timestamp
-        result["last_modified"] = max(localLastModified, serverLastModified)
+        // Only advance the timestamp when the merge actually integrated
+        // a server-side change. Pure no-op merges (everything equal to
+        // base) preserve the local clock, so syncing a row that nothing
+        // changed doesn't trigger a re-push downstream.
+        if serverWonAnyField {
+            result["last_modified"] = max(localLastModified, serverLastModified)
+        } else {
+            result["last_modified"] = localLastModified
+        }
 
         return result
     }
