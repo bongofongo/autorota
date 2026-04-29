@@ -67,7 +67,13 @@ final class AutorotaSyncEngine: @unchecked Sendable {
                 forName: .autorotaDataChanged,
                 object: nil,
                 queue: .main
-            ) { [weak self] _ in
+            ) { [weak self] note in
+                // Drop our own remote-sync echoes — applying a CloudKit fetch
+                // also posts `.autorotaDataChanged` so the UI refreshes, and
+                // without this guard we'd push that very change back to
+                // CloudKit on the next tick. Legacy posts that omit the
+                // payload (back-compat) still trigger a push.
+                if note.autorotaDataChange?.source == .remoteSync { return }
                 self?.schedulePush()
             }
             logger.info("CKSyncEngine started")
@@ -282,7 +288,11 @@ extension AutorotaSyncEngine: CKSyncEngineDelegate {
             do {
                 try applyRemoteDeletion(tableName: tableName, recordId: rowID)
                 logger.info("Applied remote deletion: \(deletion.recordID.recordName)")
-                NotificationCenter.default.post(name: .autorotaDataChanged, object: nil)
+                NotificationCenter.default.postAutorotaDataChange(
+                    source: .remoteSync,
+                    tables: AutorotaDataChange.Table.from(tableName: tableName),
+                    rowIDs: [rowID]
+                )
             } catch {
                 let summary = "Failed to apply remote deletion \(deletion.recordID.recordName): \(error.localizedDescription)"
                 logger.error("\(summary)")
