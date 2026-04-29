@@ -57,12 +57,7 @@ struct RotaView: View {
                     ProgressView("Loading schedule…")
                     Spacer()
                 } else if let schedule = vm.schedule {
-                    VStack(spacing: 0) {
-                        TipView(shareTip)
-                            .padding(.horizontal)
-                            .padding(.top, 4)
-                        ScheduleGridView(vm: vm, schedule: schedule)
-                    }
+                    ScheduleGridView(vm: vm, schedule: schedule)
                 } else if employeeCount == 0 {
                     Spacer()
                     ContentUnavailableView {
@@ -79,9 +74,6 @@ struct RotaView: View {
                     }
                     Spacer()
                 } else {
-                    TipView(twoPassTip)
-                        .padding(.horizontal)
-                        .padding(.top, 8)
                     Spacer()
                     ContentUnavailableView(
                         "No Schedule",
@@ -91,15 +83,18 @@ struct RotaView: View {
                     Spacer()
                 }
             }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                rotaTopTip
+            }
             .navigationTitle("Rota")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     overflowMenu
                 }
             }
-            #endif
             .onChange(of: vm.isEditMode) { _, new in
                 if reduceMotion {
                     bridge.isEditMode = new
@@ -187,14 +182,33 @@ struct RotaView: View {
         }
     }
 
+    // MARK: - Top-of-page tip
+
+    /// `safeAreaInset(edge: .top)` content. Reserves the tip's space without
+    /// reflowing siblings — an inline TipView in the body cascaded into a
+    /// sidebar reflow on macOS `.sidebarAdaptable` (same regression fixed for
+    /// `EmployeeListView`).
+    @ViewBuilder
+    private var rotaTopTip: some View {
+        if !vm.isLoading {
+            if vm.schedule != nil {
+                TipView(shareTip)
+                    .padding(.horizontal)
+                    .padding(.top, 4)
+            } else if employeeCount != 0 {
+                TipView(twoPassTip)
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+            }
+        }
+    }
+
     // MARK: - Toolbar menu
 
-    #if os(iOS)
     /// Mirrors `EmployeeListView`'s primary-action component: an `ellipsis`
     /// `Menu` (or a plain checkmark `Button` while editing) anchored in the
-    /// navigation toolbar. Used by both iPhone and iPad on iOS so the Rota
-    /// page surfaces its actions through the same top-right control as the
-    /// rest of the app.
+    /// navigation toolbar. Surfaces Generate / Edit / Share / Delete on every
+    /// platform — without this the macOS Rota page has no Generate affordance.
     @ViewBuilder
     private var overflowMenu: some View {
         if vm.isEditMode {
@@ -219,7 +233,6 @@ struct RotaView: View {
             .accessibilityLabel("More actions")
         }
     }
-    #endif
 
     // MARK: - Overflow menu actions
 

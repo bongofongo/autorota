@@ -46,13 +46,6 @@ struct SettingsView: View {
     @AppStorage("appAppearance") private var appearance: String = AppAppearance.system.rawValue
     @AppStorage("colorBlindnessMode") private var colorBlindnessMode: String = ColorBlindnessMode.none.rawValue
     @AppStorage("appCurrency") private var currency: String = AppCurrency.usd.rawValue
-    @AppStorage("exportDefaultLayout") private var exportDefaultLayout: String = "employee_by_weekday"
-    @AppStorage("exportDefaultFormat") private var exportDefaultFormat: String = "csv"
-    @AppStorage("exportDefaultProfile") private var exportDefaultProfile: String = "staff_schedule"
-    @AppStorage("exportShowShiftName") private var exportShowShiftName: Bool = true
-    @AppStorage("exportShowTimes") private var exportShowTimes: Bool = true
-    @AppStorage("exportShowRole") private var exportShowRole: Bool = true
-    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding: Bool = false
     #if os(iOS)
     @AppStorage("tabBarEdge") private var tabBarEdgeRaw: String = TabBarEdge.trailing.rawValue
     #endif
@@ -60,8 +53,6 @@ struct SettingsView: View {
     @Environment(AutorotaSyncEngine.self) private var syncEngine
     @Environment(LocaleManager.self) private var localeManager
     @Environment(LicenseService.self) private var license
-    @State private var showReplayConfirm = false
-    private let exportProfileTip = ExportProfileTip()
 
     private var selectedAppearance: AppAppearance {
         AppAppearance(rawValue: appearance) ?? .system
@@ -112,6 +103,18 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Picker("Currency", selection: $currency) {
+                        ForEach(AppCurrency.allCases, id: \.rawValue) { option in
+                            Text(option.label).tag(option.rawValue)
+                        }
+                    }
+                } header: {
+                    Text("Currency")
+                } footer: {
+                    Text("Used to display employee wages and totals.")
+                }
+
+                Section {
                     Picker("Color Vision", selection: $colorBlindnessMode) {
                         ForEach(ColorBlindnessMode.allCases, id: \.rawValue) { option in
                             Text(option.label).tag(option.rawValue)
@@ -128,37 +131,9 @@ struct SettingsView: View {
                     Text("Adjusts availability, status, and chart colors so they remain distinguishable for the selected type of color vision.")
                 }
 
-                Section("Experience") {
-                    Picker("Currency", selection: $currency) {
-                        ForEach(AppCurrency.allCases, id: \.rawValue) { option in
-                            Text(option.label).tag(option.rawValue)
-                        }
-                    }
-                    
-                    DisclosureGroup("Export Defaults") {
-                        TipView(exportProfileTip)
-                        Picker("Layout", selection: $exportDefaultLayout) {
-                            Text("By Employee").tag("employee_by_weekday")
-                            Text("By Shift").tag("shift_by_weekday")
-                        }
-
-                        Picker("Format", selection: $exportDefaultFormat) {
-                            Text("CSV").tag("csv")
-                            Text("JSON").tag("json")
-                        }
-
-                        Picker("Profile", selection: $exportDefaultProfile) {
-                            Text("Staff Schedule").tag("staff_schedule")
-                            Text("Manager Report").tag("manager_report")
-                        }
-                        
-                        Toggle("Show Shift Name", isOn: $exportShowShiftName)
-                        Toggle("Show Times", isOn: $exportShowTimes)
-                        Toggle("Show Role", isOn: $exportShowRole)
-                    }
-                    
-                    #if !os(macOS)
-                    DisclosureGroup("Layout") {
+                #if !os(macOS)
+                Section {
+                    DisclosureGroup("Tab Bar Layout") {
                         #if os(iOS)
                         if UIDevice.current.userInterfaceIdiom == .pad {
                             Section {
@@ -214,8 +189,8 @@ struct SettingsView: View {
                             }
                         }
                     }
-                    #endif
                 }
+                #endif
 
                 Section {
                     NavigationLink {
@@ -224,9 +199,9 @@ struct SettingsView: View {
                         Label("Help & Guide", systemImage: "questionmark.circle")
                     }
                     Button {
-                        showReplayConfirm = true
+                        try? Tips.resetDatastore()
                     } label: {
-                        Label("settings.replay_onboarding", systemImage: "arrow.counterclockwise.circle")
+                        Label("Replay Tooltips", systemImage: "arrow.counterclockwise.circle")
                     }
                     .tint(.primary)
                 }
@@ -262,24 +237,7 @@ struct SettingsView: View {
             .formStyle(.grouped)
             #endif
             .navigationTitle("Menu")
-            .confirmationDialog(
-                "settings.replay_onboarding.confirm.title",
-                isPresented: $showReplayConfirm,
-                titleVisibility: .visible
-            ) {
-                Button("settings.replay_onboarding.confirm.action") {
-                    replayOnboarding()
-                }
-                Button("onboarding.alert.cancel", role: .cancel) {}
-            } message: {
-                Text("settings.replay_onboarding.confirm.body")
-            }
         }
-    }
-
-    private func replayOnboarding() {
-        try? Tips.resetDatastore()
-        hasCompletedOnboarding = false
     }
 }
 

@@ -5109,6 +5109,7 @@
       }
     },
     "Experience" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -5189,6 +5190,7 @@
       }
     },
     "Export Defaults" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -17400,6 +17402,9 @@
         }
       }
     },
+    "Replay Tooltips" : {
+
+    },
     "Required role" : {
       "localizations" : {
         "ar" : {
@@ -19251,6 +19256,7 @@
       }
     },
     "Show Role" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -19291,6 +19297,7 @@
       }
     },
     "Show Shift Name" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -19331,6 +19338,7 @@
       }
     },
     "Show Times" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -22109,6 +22117,9 @@
           }
         }
       }
+    },
+    "Used to display employee wages and totals." : {
+
     },
     "View" : {
       "localizations" : {
