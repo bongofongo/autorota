@@ -19,6 +19,13 @@ final class AutorotaSyncEngine: @unchecked Sendable {
     private(set) var lastSyncIssue: String?
     private var engine: CKSyncEngine?
     private var dataChangeObserver: NSObjectProtocol?
+    /// In-flight debounce timer for `schedulePush()`. Each new local
+    /// mutation cancels the previous timer and starts a fresh window so a
+    /// burst of edits coalesces into one push instead of N. The window is
+    /// chosen to be longer than typical UI interaction latency
+    /// (~250 ms) but shorter than user-perceptible sync delay.
+    private var pendingPushTask: Task<Void, Never>?
+    static let pushDebounceWindow: Duration = .milliseconds(500)
     private let logger = Logger(subsystem: "com.toadmountain.autorota", category: "sync")
 
     deinit {
@@ -90,13 +97,31 @@ final class AutorotaSyncEngine: @unchecked Sendable {
             NotificationCenter.default.removeObserver(observer)
             dataChangeObserver = nil
         }
+        pendingPushTask?.cancel()
+        pendingPushTask = nil
         engine = nil
         status = .idle
         logger.info("CKSyncEngine stopped")
     }
 
     /// Notify the engine that local data has changed and needs to be pushed.
+    /// Debounced: rapid bursts of mutations (e.g. running a schedule that
+    /// touches many assignments, or applying a roster import) collapse
+    /// into a single push at the end of the burst.
     func schedulePush() {
+        pendingPushTask?.cancel()
+        pendingPushTask = Task { [weak self] in
+            try? await Task.sleep(for: AutorotaSyncEngine.pushDebounceWindow)
+            guard !Task.isCancelled else { return }
+            await self?.performScheduledPush()
+        }
+    }
+
+    /// Internal: actually queue the pending changes with `CKSyncEngine`.
+    /// Separated from `schedulePush()` so the debounce wrapper can
+    /// collapse bursts of mutations into one push.
+    @MainActor
+    private func performScheduledPush() {
         guard let engine else { return }
         engine.state.add(pendingDatabaseChanges: [
             .saveZone(CKRecordZone(zoneID: SyncRecordMapper.zoneID))
