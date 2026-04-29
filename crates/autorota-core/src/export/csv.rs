@@ -5,11 +5,26 @@ use super::grid::ExportGrid;
 /// as a formula on import. Prefixing with `'` neutralises that without
 /// breaking the visible value (the leading apostrophe is hidden by the
 /// parser).
+///
+/// Crucially, we skip leading whitespace (including the Unicode line
+/// separators) before checking the first sentinel char — without this,
+/// `" =cmd"` and `"\u{2028}=cmd"` slip past the bare `chars().next()`
+/// check and Excel still parses them as formulas.
 fn needs_formula_prefix(value: &str) -> bool {
+    let first = value
+        .chars()
+        .find(|c| !is_csv_skippable_whitespace(*c));
     matches!(
-        value.chars().next(),
+        first,
         Some('=') | Some('+') | Some('-') | Some('@') | Some('\t') | Some('\r')
     )
+}
+
+/// Whitespace characters Excel/Numbers/Sheets strip before formula
+/// recognition. Includes U+0085 (NEL), U+2028 (LS), U+2029 (PS) which
+/// `char::is_whitespace` already covers, plus regular ASCII whitespace.
+fn is_csv_skippable_whitespace(c: char) -> bool {
+    c == ' ' || c == '\u{00A0}' || c == '\u{0085}' || c == '\u{2028}' || c == '\u{2029}'
 }
 
 /// Escape a cell value per RFC 4180, plus OWASP CSV-injection
@@ -181,6 +196,29 @@ mod tests {
         let csv = render_csv(&grid);
         // Both prefix neutralisation and RFC 4180 quoting must apply.
         assert!(csv.contains("\"'=A1,B1\""));
+    }
+
+    #[test]
+    fn csv_neutralises_whitespace_prefixed_formula() {
+        // OWASP regression net: leading space + sentinel char must still be
+        // neutralised. Excel strips ASCII whitespace before parsing the cell
+        // as a formula.
+        for prefix in [" ", "\u{00A0}", "\u{2028}", "\u{2029}", "\u{0085}"] {
+            let payload = format!("{prefix}=SUM(A1:A10)");
+            let grid = ExportGrid {
+                title: "Test".to_string(),
+                column_headers: vec!["Mon".to_string()],
+                row_headers: vec!["Alice".to_string()],
+                cells: vec![vec![payload.clone()]],
+                daily_totals: None,
+                weekly_total_cost: None,
+            };
+            let csv = render_csv(&grid);
+            assert!(
+                csv.contains(&format!("'{payload}")),
+                "expected apostrophe-prefixed neutralisation for {payload:?}, got {csv:?}"
+            );
+        }
     }
 
     #[test]

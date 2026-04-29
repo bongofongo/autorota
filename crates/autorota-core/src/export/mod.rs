@@ -31,6 +31,38 @@ pub enum ExportError {
     EmployeeNotFound(i64),
     #[error("pdf render error: {0}")]
     Pdf(String),
+    #[error("export grid too large: {rows} rows × {cols} cols ({total} cells exceeds {limit})")]
+    TooLarge {
+        rows: usize,
+        cols: usize,
+        total: usize,
+        limit: usize,
+    },
+}
+
+/// Cap on the total number of cells in an export grid (rows × columns).
+/// Empirically, an `ExportGrid` of 1M cells is ~tens of MB depending on cell
+/// content, which is the upper bound we'll hand to PDF/CSV/JSON renderers
+/// before they'll start hitting OOM on phones / older laptops.
+pub(crate) const EXPORT_GRID_CELL_LIMIT: usize = 1_000_000;
+
+/// Bound-check an `ExportGrid` before handing it to a renderer. Cheap; runs
+/// after `build_grid` has already allocated, so this is a safety net rather
+/// than an OOM preventer — but it stops downstream PDF/XLSX renderers from
+/// melting on degenerate inputs.
+pub(crate) fn check_grid_bounds(grid: &grid::ExportGrid) -> Result<(), ExportError> {
+    let rows = grid.row_headers.len();
+    let cols = grid.column_headers.len();
+    let total = rows.saturating_mul(cols);
+    if total > EXPORT_GRID_CELL_LIMIT {
+        return Err(ExportError::TooLarge {
+            rows,
+            cols,
+            total,
+            limit: EXPORT_GRID_CELL_LIMIT,
+        });
+    }
+    Ok(())
 }
 
 /// Export a week's schedule as CSV, JSON, or PDF.
@@ -86,6 +118,7 @@ pub(crate) fn render_week_export(
                 employees,
                 templates,
             );
+            check_grid_bounds(&export_grid)?;
 
             let data = match config.format {
                 ExportFormat::Csv => csv::render_csv(&export_grid),
@@ -120,6 +153,7 @@ pub(crate) fn render_week_export(
                 employees,
                 templates,
             );
+            check_grid_bounds(&main_grid)?;
             let mut by_role_cfg = config.clone();
             by_role_cfg.layout = config::ExportLayout::ShiftByWeekday;
             let role_sections = grid::build_grids_by_role(
@@ -130,6 +164,9 @@ pub(crate) fn render_week_export(
                 employees,
                 templates,
             );
+            for (_, g) in role_sections.iter() {
+                check_grid_bounds(g)?;
+            }
 
             let mut sheets: Vec<(String, &grid::ExportGrid)> =
                 vec![("Schedule".to_string(), &main_grid)];
@@ -163,6 +200,7 @@ pub(crate) fn render_week_export(
                         employees,
                         templates,
                     );
+                    check_grid_bounds(&export_grid)?;
                     pdf::weekly::render(&export_grid, week_start).map_err(ExportError::Pdf)?
                 }
                 PdfTemplate::PerEmployee => {
@@ -176,6 +214,7 @@ pub(crate) fn render_week_export(
                         employees,
                         templates,
                     );
+                    check_grid_bounds(&export_grid)?;
                     pdf::employee::render(&export_grid, week_start).map_err(ExportError::Pdf)?
                 }
                 PdfTemplate::ByRole => {
@@ -189,6 +228,9 @@ pub(crate) fn render_week_export(
                         employees,
                         templates,
                     );
+                    for (_, g) in sections.iter() {
+                        check_grid_bounds(g)?;
+                    }
                     pdf::by_role::render(&sections, week_start).map_err(ExportError::Pdf)?
                 }
             };
@@ -283,6 +325,7 @@ pub(crate) fn render_employee_export(
         &config.cell_content,
         is_manager,
     );
+    check_grid_bounds(&export_grid)?;
 
     let slug = employee_name.to_lowercase().replace(' ', "-");
 
@@ -383,4 +426,52 @@ pub(crate) fn render_employee_export(
             })
         }
     }
+}
+
+#[cfg(test)]
+mod bounds_tests {
+    use super::*;
+
+    #[test]
+    fn check_grid_bounds_accepts_normal_grid() {
+        let g = grid::ExportGrid {
+            title: "T".into(),
+            column_headers: vec!["c".into(); 7],
+            row_headers: vec!["r".into(); 50],
+            cells: vec![vec![String::new(); 7]; 50],
+            daily_totals: None,
+            weekly_total_cost: None,
+        };
+        assert!(check_grid_bounds(&g).is_ok());
+    }
+
+    #[test]
+    fn check_grid_bounds_rejects_oversize_grid() {
+        // 1001 × 1001 = 1,002,001 cells — just over the cell limit. Skip
+        // allocating the full cell matrix to keep the test cheap;
+        // `check_grid_bounds` only inspects header lengths.
+        let oversize = grid::ExportGrid {
+            title: "T".into(),
+            column_headers: vec!["c".into(); 1001],
+            row_headers: vec!["r".into(); 1001],
+            cells: Vec::new(),
+            daily_totals: None,
+            weekly_total_cost: None,
+        };
+        match check_grid_bounds(&oversize) {
+            Err(ExportError::TooLarge {
+                rows,
+                cols,
+                total,
+                limit,
+            }) => {
+                assert_eq!(rows, 1001);
+                assert_eq!(cols, 1001);
+                assert_eq!(total, 1_002_001);
+                assert_eq!(limit, EXPORT_GRID_CELL_LIMIT);
+            }
+            other => panic!("expected TooLarge, got {other:?}"),
+        }
+    }
+
 }

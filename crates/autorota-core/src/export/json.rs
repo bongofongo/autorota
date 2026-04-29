@@ -4,6 +4,14 @@ use serde::Serialize;
 use super::config::ExportConfig;
 use super::grid::ExportGrid;
 
+/// Replace NaN / ±Infinity with `0.0` before handing an `f32` to serde_json.
+/// `serde_json` errors on non-finite floats ("JSON does not support NaN or
+/// infinity"); historically the call sites used `.expect(...)` and would
+/// panic on a corrupted wage / hour value rather than produce empty cost.
+fn finite_or_zero(value: f32) -> f32 {
+    if value.is_finite() { value } else { 0.0 }
+}
+
 #[derive(Serialize)]
 struct JsonExport {
     metadata: Metadata,
@@ -55,13 +63,13 @@ pub fn render_json(grid: &ExportGrid, config: &ExportConfig, week_start: NaiveDa
         let daily = dt
             .iter()
             .map(|d| DayTotal {
-                hours: d.total_hours,
-                cost: d.total_cost,
+                hours: finite_or_zero(d.total_hours),
+                cost: finite_or_zero(d.total_cost),
             })
             .collect();
         Totals {
             daily,
-            weekly_cost: grid.weekly_total_cost.unwrap_or(0.0),
+            weekly_cost: finite_or_zero(grid.weekly_total_cost.unwrap_or(0.0)),
         }
     });
 
@@ -132,7 +140,7 @@ pub fn render_employee_json(
         },
         columns: grid.column_headers.clone(),
         rows,
-        total_cost: grid.weekly_total_cost,
+        total_cost: grid.weekly_total_cost.map(finite_or_zero),
     };
 
     serde_json::to_string_pretty(&export).expect("JSON serialization should not fail")
@@ -202,6 +210,38 @@ mod tests {
         assert_eq!(parsed["totals"]["daily"][0]["hours"], 5.0);
         assert_eq!(parsed["totals"]["daily"][0]["cost"], 75.0);
         assert_eq!(parsed["totals"]["weekly_cost"], 75.0);
+    }
+
+    #[test]
+    fn json_with_non_finite_totals_does_not_panic() {
+        // Regression net for the `.expect("JSON serialization should not
+        // fail")` path: a corrupt wage / hour value (NaN, ±Infinity) used to
+        // detonate `serde_json::to_string_pretty`. Now those values
+        // collapse to 0.0 so the export still produces valid JSON.
+        let config = ExportConfigBuilder::manager()
+            .layout(ExportLayout::ShiftByWeekday)
+            .format(ExportFormat::Json)
+            .build();
+
+        let grid = ExportGrid {
+            title: "Test".to_string(),
+            column_headers: vec!["Mon".to_string()],
+            row_headers: vec!["Morning".to_string()],
+            cells: vec![vec!["Alice".to_string()]],
+            daily_totals: Some(vec![DaySummary {
+                total_hours: f32::NAN,
+                total_cost: f32::INFINITY,
+            }]),
+            weekly_total_cost: Some(f32::NEG_INFINITY),
+        };
+
+        let ws = NaiveDate::from_ymd_opt(2026, 3, 23).unwrap();
+        let json_str = render_json(&grid, &config, ws);
+        let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+
+        assert_eq!(parsed["totals"]["daily"][0]["hours"], 0.0);
+        assert_eq!(parsed["totals"]["daily"][0]["cost"], 0.0);
+        assert_eq!(parsed["totals"]["weekly_cost"], 0.0);
     }
 
     #[test]

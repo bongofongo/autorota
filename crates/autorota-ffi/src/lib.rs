@@ -930,6 +930,12 @@ pub fn export_week_schedule(
                 code: ErrorCode::InvalidPdf,
                 msg,
             },
+            err @ autorota_core::export::ExportError::TooLarge { .. } => {
+                FfiError::InvalidArgument {
+                    code: ErrorCode::InvalidGeneric,
+                    msg: err.to_string(),
+                }
+            }
         })?;
 
     Ok(FfiExportResult {
@@ -1000,6 +1006,12 @@ pub fn export_employee_schedule(
                 code: ErrorCode::InvalidPdf,
                 msg,
             },
+            err @ autorota_core::export::ExportError::TooLarge { .. } => {
+                FfiError::InvalidArgument {
+                    code: ErrorCode::InvalidGeneric,
+                    msg: err.to_string(),
+                }
+            }
         })?;
 
     Ok(FfiExportResult {

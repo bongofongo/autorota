@@ -35,13 +35,42 @@ pub fn score_employee(
     };
 
     // Prefer employees who are furthest below their target weekly hours.
+    // Clamp before casting: an `f32 → i32 as` cast on NaN or a value outside
+    // `i32::MIN..=i32::MAX` yields an undefined-looking saturated result and
+    // can break tiebreak ordering. We force `0` for non-finite inputs (i.e.
+    // corrupted target_weekly_hours / daily caps) so scoring stays
+    // deterministic.
     let remaining_to_target = employee.target_weekly_hours - weekly_hours;
-    let fairness_rank = (remaining_to_target * 100.0) as i32;
+    let fairness_rank = clamped_centi_score(remaining_to_target);
 
     let daily_remaining = employee.max_daily_hours - daily_hours - shift.duration_hours();
-    let daily_budget_rank = (daily_remaining * 100.0) as i32;
+    let daily_budget_rank = clamped_centi_score(daily_remaining);
 
     (availability_rank, fairness_rank, daily_budget_rank)
+}
+
+/// Multiply by 100 (so we keep two decimal places of precision in an integer
+/// rank) and saturate to the `i32` range. NaN collapses to 0; ±Inf saturate
+/// to the corresponding `i32` extreme so a corrupted budget that "wants
+/// infinite hours" still produces a stable, deterministic ordering.
+fn clamped_centi_score(hours: f32) -> i32 {
+    if hours.is_nan() {
+        return 0;
+    }
+    if hours == f32::INFINITY {
+        return i32::MAX;
+    }
+    if hours == f32::NEG_INFINITY {
+        return i32::MIN;
+    }
+    let scaled = hours * 100.0;
+    if scaled >= i32::MAX as f32 {
+        i32::MAX
+    } else if scaled <= i32::MIN as f32 {
+        i32::MIN
+    } else {
+        scaled as i32
+    }
 }
 
 #[cfg(test)]
@@ -83,6 +112,21 @@ mod tests {
         let score_maybe = score_employee(&emp, &shift, 0.0, 0.0, None);
 
         assert!(score_yes > score_maybe);
+    }
+
+    #[test]
+    fn nan_inputs_do_not_panic_and_score_zero() {
+        // Regression net for the `(f32 * 100) as i32` pipeline: NaN /
+        // Infinity must not break tiebreak ordering or produce undefined
+        // ranks.
+        assert_eq!(clamped_centi_score(f32::NAN), 0);
+        assert_eq!(clamped_centi_score(f32::INFINITY), i32::MAX);
+        assert_eq!(clamped_centi_score(f32::NEG_INFINITY), i32::MIN);
+        assert_eq!(clamped_centi_score(f32::MAX), i32::MAX);
+        assert_eq!(clamped_centi_score(f32::MIN), i32::MIN);
+        assert_eq!(clamped_centi_score(0.0), 0);
+        assert_eq!(clamped_centi_score(2.5), 250);
+        assert_eq!(clamped_centi_score(-2.5), -250);
     }
 
     #[test]

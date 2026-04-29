@@ -20,3 +20,9 @@ crates/app-desktop/dist/
 
 # Xcode export options (contain signing identities / team IDs)
 platforms/apple/ExportOptions*.plist
+
+# SQLite test artifacts left behind by sqlx / cargo test runs
+crates/autorota-core/migrations/test.db
+crates/autorota-core/migrations/test.db-journal
+crates/autorota-core/migrations/test.db-wal
+crates/autorota-core/migrations/test.db-shm
