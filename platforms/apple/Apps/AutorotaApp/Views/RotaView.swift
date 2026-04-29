@@ -1,6 +1,17 @@
 import SwiftUI
 import AutorotaKit
 import TipKit
+import os
+
+private extension Logger {
+    /// Logger for SwiftUI views in `RotaView` — use for diagnostics around
+    /// silent date-arithmetic fallbacks and other defensive guards that
+    /// would otherwise crash the picker.
+    static let weekPicker = Logger(
+        subsystem: "com.toadmountain.autorota",
+        category: "rota.week-picker"
+    )
+}
 
 struct RotaView: View {
 
@@ -153,9 +164,15 @@ struct RotaView: View {
             let n = try await countEmployeesAsync()
             await MainActor.run { employeeCount = Int(n) }
         } catch {
-            // Failure → assume populated so we don't trap the user on the
-            // prerequisite empty state.
-            await MainActor.run { employeeCount = max(employeeCount, 1) }
+            // Keep `-1` (unknown) so the no-schedule CUV renders without
+            // suppressing the prerequisite empty state on next refresh.
+            await MainActor.run {
+                if employeeCount < 0 { employeeCount = -1 }
+            }
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            if let n = try? await countEmployeesAsync() {
+                await MainActor.run { employeeCount = Int(n) }
+            }
         }
     }
 
@@ -267,7 +284,16 @@ private struct WeekPickerView: View {
         fmt.locale = Locale(identifier: "en_US_POSIX")
         guard let date = fmt.date(from: selectedWeek) else { return selectedWeek }
         let cal = Calendar(identifier: .iso8601)
-        let shifted = cal.date(byAdding: .weekOfYear, value: weeks, to: date)!
+        // `cal.date(byAdding:)` only fails for arithmetically impossible
+        // additions (year overflow, etc.). Treat that as "stay on the
+        // current week" so the picker doesn't crash on extreme inputs;
+        // log so the silent fallback is debuggable.
+        guard let shifted = cal.date(byAdding: .weekOfYear, value: weeks, to: date) else {
+            Logger.weekPicker.warning(
+                "cal.date(byAdding: .weekOfYear, value: \(weeks)) returned nil; staying on \(selectedWeek)"
+            )
+            return selectedWeek
+        }
         return fmt.string(from: shifted)
     }
 }
@@ -873,9 +899,19 @@ private struct AddShiftSheet: View {
     let vm: RotaViewModel
     let date: String
     @Environment(\.dismiss) private var dismiss
-    @State private var startDate = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: Date())!
-    @State private var endDate = Calendar.current.date(bySettingHour: 17, minute: 0, second: 0, of: Date())!
+    // `Calendar.current.date(bySettingHour:...)` only returns nil if the
+    // resulting time doesn't exist (e.g. spring-forward DST gap). The 09:00
+    // / 17:00 defaults are picked specifically so this can't happen on any
+    // real-world day; if it ever does, we fall back to "now" rather than
+    // force-unwrap and crash.
+    @State private var startDate = AddShiftSheet.defaultTime(hour: 9)
+    @State private var endDate = AddShiftSheet.defaultTime(hour: 17)
     @State private var selectedRole: String = ""
+
+    private static func defaultTime(hour: Int) -> Date {
+        Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: Date())
+            ?? Date()
+    }
 
     var body: some View {
         NavigationStack {
