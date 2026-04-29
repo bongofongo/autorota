@@ -8,61 +8,29 @@
 
 /* Begin PBXBuildFile section */
 		5B9675142F72071C00205001 /* AutorotaKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5B9675132F72071C00205001 /* AutorotaKit */; };
-		5B9675212F72075A00205001 /* EmployeeListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B96751D2F72075A00205001 /* EmployeeListView.swift */; };
-		5B9675222F72075A00205001 /* ShiftTemplateListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B96751F2F72075A00205001 /* ShiftTemplateListView.swift */; };
-		5B9675232F72075A00205001 /* RotaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B96751E2F72075A00205001 /* RotaView.swift */; };
 		5B9675252F72075A00205001 /* RotaViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B9675172F72075A00205001 /* RotaViewModel.swift */; };
 		5B9675262F72075A00205001 /* ShiftTemplateViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B9675182F72075A00205001 /* ShiftTemplateViewModel.swift */; };
 		5B9675272F72075A00205001 /* EmployeeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B9675162F72075A00205001 /* EmployeeViewModel.swift */; };
-		5B9675282F72075A00205001 /* EmployeeDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B96751C2F72075A00205001 /* EmployeeDetailView.swift */; };
-		5B9675292F72075A00205001 /* AvailabilityGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B96751A2F72075A00205001 /* AvailabilityGridView.swift */; };
-		5B96752A2F72075A00205001 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B96751B2F72075A00205001 /* ContentView.swift */; };
 		5B9675302F72075A00205001 /* RoleViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B9675312F72075A00205001 /* RoleViewModel.swift */; };
 		CC0001012F80000000205001 /* AutorotaServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0001032F80000000205001 /* AutorotaServiceProtocol.swift */; };
 		CC0001013200000000205001 /* AccessibilityPalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0001023200000000205001 /* AccessibilityPalette.swift */; };
 		CC0001022F80000000205001 /* LiveAutorotaService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0001042F80000000205001 /* LiveAutorotaService.swift */; };
 		CC0003012F80000000205001 /* OverrideViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0003022F80000000205001 /* OverrideViewModel.swift */; };
-		CC0003032F80000000205001 /* OverridesTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0003042F80000000205001 /* OverridesTabView.swift */; };
-		CC0004012F80000000205001 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0004022F80000000205001 /* SettingsView.swift */; };
 		CC0005012F80000000205001 /* ShiftHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0005022F80000000205001 /* ShiftHistoryViewModel.swift */; };
-		CC0005032F80000000205001 /* EmployeeShiftHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0005042F80000000205001 /* EmployeeShiftHistoryView.swift */; };
-		CC0006012F90000000205001 /* TabPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0006022F90000000205001 /* TabPage.swift */; };
-		CC0006052F90000000205001 /* RotaUIBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0006062F90000000205001 /* RotaUIBridge.swift */; };
-		CC00060A2F90000000205001 /* RotaOverflowPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00060B2F90000000205001 /* RotaOverflowPopover.swift */; };
 		CC0007012FA0000000205001 /* ExchangeRateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0007022FA0000000205001 /* ExchangeRateService.swift */; };
-		CC0008012FB0000000205001 /* ExportSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0008022FB0000000205001 /* ExportSheetView.swift */; };
 		CC0009012FC0000000205001 /* AutorotaSyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0009022FC0000000205001 /* AutorotaSyncEngine.swift */; };
 		CC0009032FC0000000205001 /* SyncRecordMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0009042FC0000000205001 /* SyncRecordMapper.swift */; };
 		CC0009052FC0000000205001 /* SyncConflictResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0009062FC0000000205001 /* SyncConflictResolver.swift */; };
-		CC0009072FC0000000205001 /* SyncPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0009082FC0000000205001 /* SyncPromptView.swift */; };
 		CC0010012FD0000000205001 /* EditLogViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0010022FD0000000205001 /* EditLogViewModel.swift */; };
-		CC0010032FD0000000205001 /* EditLogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0010042FD0000000205001 /* EditLogView.swift */; };
-		CC0011012FE0000000205001 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0011022FE0000000205001 /* OnboardingView.swift */; };
-		CC0011032FE0000000205001 /* HelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0011042FE0000000205001 /* HelpView.swift */; };
 		CC0012012FF0000000205001 /* AnalyticsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0012022FF0000000205001 /* AnalyticsViewModel.swift */; };
-		CC0012032FF0000000205001 /* AnalyticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0012042FF0000000205001 /* AnalyticsView.swift */; };
-		CC0013013000000000205001 /* ExportTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0013023000000000205001 /* ExportTabView.swift */; };
 		CC0014013000000000205001 /* EmployeeExportViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0014023000000000205001 /* EmployeeExportViewModel.swift */; };
-		CC0015013010000000205001 /* EmployeeUIBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0015023010000000205001 /* EmployeeUIBridge.swift */; };
-		CC0015033010000000205001 /* WeeklyAvailabilityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0015043010000000205001 /* WeeklyAvailabilityView.swift */; };
 		CC0016013020000000205001 /* AvailabilityProgressViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0016023020000000205001 /* AvailabilityProgressViewModel.swift */; };
-		CC0016033020000000205001 /* CarouselAvailabilityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0016043020000000205001 /* CarouselAvailabilityView.swift */; };
 		CC0017013030000000205001 /* FfiError+UserMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0017023030000000205001 /* FfiError+UserMessage.swift */; };
-		CC0018013040000000205001 /* AllAvailabilitiesSetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0018023040000000205001 /* AllAvailabilitiesSetView.swift */; };
-		CC0019013050000000205001 /* SendSchedulePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0019023050000000205001 /* SendSchedulePicker.swift */; };
-		CC0019033050000000205001 /* RosterImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0019043050000000205001 /* RosterImportView.swift */; };
 		CC0020013060000000205001 /* PhoneNumberFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0020023060000000205001 /* PhoneNumberFormatter.swift */; };
-		CC0021013070000000205001 /* PhoneInputField.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0021023070000000205001 /* PhoneInputField.swift */; };
-		CC0022013080000000205001 /* ExportPreviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0022023080000000205001 /* ExportPreviewSheet.swift */; };
-		CC0023013090000000205001 /* RotaExportPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0023023090000000205001 /* RotaExportPreview.swift */; };
 		CC0024013100000000205001 /* BulkSendSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0024023100000000205001 /* BulkSendSettings.swift */; };
 		CC0025013100000000205001 /* MessageBodyBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0025023100000000205001 /* MessageBodyBuilder.swift */; };
 		CC0026013100000000205001 /* BulkSendDispatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0026023100000000205001 /* BulkSendDispatcher.swift */; };
 		CC0027013040000000205001 /* LocaleManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0027023040000000205001 /* LocaleManager.swift */; };
-		CC0027013100000000205001 /* MessageComposeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0027023100000000205001 /* MessageComposeView.swift */; };
-		CC0028013100000000205001 /* MailComposeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0028023100000000205001 /* MailComposeView.swift */; };
-		CC0029013100000000205001 /* BulkSendChecklistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0029023100000000205001 /* BulkSendChecklistView.swift */; };
-		CC0030013100000000205001 /* BulkSendSkipListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0030023100000000205001 /* BulkSendSkipListView.swift */; };
 		CC0040013110000000205001 /* Tier.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0040023110000000205001 /* Tier.swift */; };
 		CC0041013110000000205001 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0041023110000000205001 /* KeychainStore.swift */; };
 		CC0042013110000000205001 /* LicenseGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0042023110000000205001 /* LicenseGate.swift */; };
@@ -72,11 +40,6 @@
 		CC0046013110000000205001 /* LicenseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0046023110000000205001 /* LicenseService.swift */; };
 		CC0047013110000000205001 /* PricingCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0047023110000000205001 /* PricingCatalog.swift */; };
 		CC0048013110000000205001 /* GatedAutorotaService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0048023110000000205001 /* GatedAutorotaService.swift */; };
-		CC0049013110000000205001 /* TierPickView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0049023110000000205001 /* TierPickView.swift */; };
-		CC0050013110000000205001 /* TierInfoModal.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0050023110000000205001 /* TierInfoModal.swift */; };
-		CC0051013110000000205001 /* ReadOnlyBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0051023110000000205001 /* ReadOnlyBanner.swift */; };
-		CC0052013110000000205001 /* SubscriptionSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0052023110000000205001 /* SubscriptionSettingsSection.swift */; };
-		CC0053013110000000205001 /* FloatingTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0053023110000000205001 /* FloatingTabBar.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -102,59 +65,27 @@
 		5B9675162F72075A00205001 /* EmployeeViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmployeeViewModel.swift; sourceTree = "<group>"; };
 		5B9675172F72075A00205001 /* RotaViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RotaViewModel.swift; sourceTree = "<group>"; };
 		5B9675182F72075A00205001 /* ShiftTemplateViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiftTemplateViewModel.swift; sourceTree = "<group>"; };
-		5B96751A2F72075A00205001 /* AvailabilityGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvailabilityGridView.swift; sourceTree = "<group>"; };
-		5B96751B2F72075A00205001 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		5B96751C2F72075A00205001 /* EmployeeDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmployeeDetailView.swift; sourceTree = "<group>"; };
-		5B96751D2F72075A00205001 /* EmployeeListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmployeeListView.swift; sourceTree = "<group>"; };
-		5B96751E2F72075A00205001 /* RotaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RotaView.swift; sourceTree = "<group>"; };
-		5B96751F2F72075A00205001 /* ShiftTemplateListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiftTemplateListView.swift; sourceTree = "<group>"; };
 		5B9675312F72075A00205001 /* RoleViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoleViewModel.swift; sourceTree = "<group>"; };
 		CC0001023200000000205001 /* AccessibilityPalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityPalette.swift; sourceTree = "<group>"; };
 		CC0001032F80000000205001 /* AutorotaServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutorotaServiceProtocol.swift; sourceTree = "<group>"; };
 		CC0001042F80000000205001 /* LiveAutorotaService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveAutorotaService.swift; sourceTree = "<group>"; };
 		CC0002052F80000000205001 /* AutorotaAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AutorotaAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC0003022F80000000205001 /* OverrideViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverrideViewModel.swift; sourceTree = "<group>"; };
-		CC0003042F80000000205001 /* OverridesTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverridesTabView.swift; sourceTree = "<group>"; };
-		CC0004022F80000000205001 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		CC0005022F80000000205001 /* ShiftHistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiftHistoryViewModel.swift; sourceTree = "<group>"; };
-		CC0005042F80000000205001 /* EmployeeShiftHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmployeeShiftHistoryView.swift; sourceTree = "<group>"; };
-		CC0006022F90000000205001 /* TabPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabPage.swift; sourceTree = "<group>"; };
-		CC0006062F90000000205001 /* RotaUIBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RotaUIBridge.swift; sourceTree = "<group>"; };
-		CC00060B2F90000000205001 /* RotaOverflowPopover.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RotaOverflowPopover.swift; sourceTree = "<group>"; };
 		CC0007022FA0000000205001 /* ExchangeRateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExchangeRateService.swift; sourceTree = "<group>"; };
-		CC0008022FB0000000205001 /* ExportSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSheetView.swift; sourceTree = "<group>"; };
 		CC0009022FC0000000205001 /* AutorotaSyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutorotaSyncEngine.swift; sourceTree = "<group>"; };
 		CC0009042FC0000000205001 /* SyncRecordMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncRecordMapper.swift; sourceTree = "<group>"; };
 		CC0009062FC0000000205001 /* SyncConflictResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncConflictResolver.swift; sourceTree = "<group>"; };
-		CC0009082FC0000000205001 /* SyncPromptView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncPromptView.swift; sourceTree = "<group>"; };
 		CC0010022FD0000000205001 /* EditLogViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditLogViewModel.swift; sourceTree = "<group>"; };
-		CC0010042FD0000000205001 /* EditLogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditLogView.swift; sourceTree = "<group>"; };
-		CC0011022FE0000000205001 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
-		CC0011042FE0000000205001 /* HelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpView.swift; sourceTree = "<group>"; };
 		CC0012022FF0000000205001 /* AnalyticsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsViewModel.swift; sourceTree = "<group>"; };
-		CC0012042FF0000000205001 /* AnalyticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsView.swift; sourceTree = "<group>"; };
-		CC0013023000000000205001 /* ExportTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportTabView.swift; sourceTree = "<group>"; };
 		CC0014023000000000205001 /* EmployeeExportViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmployeeExportViewModel.swift; sourceTree = "<group>"; };
-		CC0015023010000000205001 /* EmployeeUIBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmployeeUIBridge.swift; sourceTree = "<group>"; };
-		CC0015043010000000205001 /* WeeklyAvailabilityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeeklyAvailabilityView.swift; sourceTree = "<group>"; };
 		CC0016023020000000205001 /* AvailabilityProgressViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvailabilityProgressViewModel.swift; sourceTree = "<group>"; };
-		CC0016043020000000205001 /* CarouselAvailabilityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarouselAvailabilityView.swift; sourceTree = "<group>"; };
 		CC0017023030000000205001 /* FfiError+UserMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FfiError+UserMessage.swift"; sourceTree = "<group>"; };
-		CC0018023040000000205001 /* AllAvailabilitiesSetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllAvailabilitiesSetView.swift; sourceTree = "<group>"; };
-		CC0019023050000000205001 /* SendSchedulePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SendSchedulePicker.swift; sourceTree = "<group>"; };
-		CC0019043050000000205001 /* RosterImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RosterImportView.swift; sourceTree = "<group>"; };
 		CC0020023060000000205001 /* PhoneNumberFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneNumberFormatter.swift; sourceTree = "<group>"; };
-		CC0021023070000000205001 /* PhoneInputField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneInputField.swift; sourceTree = "<group>"; };
-		CC0022023080000000205001 /* ExportPreviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPreviewSheet.swift; sourceTree = "<group>"; };
-		CC0023023090000000205001 /* RotaExportPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RotaExportPreview.swift; sourceTree = "<group>"; };
 		CC0024023100000000205001 /* BulkSendSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BulkSendSettings.swift; sourceTree = "<group>"; };
 		CC0025023100000000205001 /* MessageBodyBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageBodyBuilder.swift; sourceTree = "<group>"; };
 		CC0026023100000000205001 /* BulkSendDispatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BulkSendDispatcher.swift; sourceTree = "<group>"; };
 		CC0027023040000000205001 /* LocaleManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocaleManager.swift; sourceTree = "<group>"; };
-		CC0027023100000000205001 /* MessageComposeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageComposeView.swift; sourceTree = "<group>"; };
-		CC0028023100000000205001 /* MailComposeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MailComposeView.swift; sourceTree = "<group>"; };
-		CC0029023100000000205001 /* BulkSendChecklistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BulkSendChecklistView.swift; sourceTree = "<group>"; };
-		CC0030023100000000205001 /* BulkSendSkipListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BulkSendSkipListView.swift; sourceTree = "<group>"; };
 		CC0040023110000000205001 /* Tier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tier.swift; sourceTree = "<group>"; };
 		CC0041023110000000205001 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		CC0042023110000000205001 /* LicenseGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LicenseGate.swift; sourceTree = "<group>"; };
@@ -164,11 +95,6 @@
 		CC0046023110000000205001 /* LicenseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LicenseService.swift; sourceTree = "<group>"; };
 		CC0047023110000000205001 /* PricingCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PricingCatalog.swift; sourceTree = "<group>"; };
 		CC0048023110000000205001 /* GatedAutorotaService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatedAutorotaService.swift; sourceTree = "<group>"; };
-		CC0049023110000000205001 /* TierPickView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TierPickView.swift; sourceTree = "<group>"; };
-		CC0050023110000000205001 /* TierInfoModal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TierInfoModal.swift; sourceTree = "<group>"; };
-		CC0051023110000000205001 /* ReadOnlyBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadOnlyBanner.swift; sourceTree = "<group>"; };
-		CC0052023110000000205001 /* SubscriptionSettingsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionSettingsSection.swift; sourceTree = "<group>"; };
-		CC0053023110000000205001 /* FloatingTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingTabBar.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -180,6 +106,11 @@
 		5B9675062F7205E900205001 /* AutorotaApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = AutorotaApp;
+			sourceTree = "<group>";
+		};
+		5B9675202F72075A00205001 /* Views */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Views;
 			sourceTree = "<group>";
 		};
 		CC0002062F80000000205001 /* AutorotaAppTests */ = {
@@ -255,50 +186,6 @@
 			path = ViewModels;
 			sourceTree = "<group>";
 		};
-		5B9675202F72075A00205001 /* Views */ = {
-			isa = PBXGroup;
-			children = (
-				CC0018023040000000205001 /* AllAvailabilitiesSetView.swift */,
-				CC0012042FF0000000205001 /* AnalyticsView.swift */,
-				5B96751A2F72075A00205001 /* AvailabilityGridView.swift */,
-				CC0029023100000000205001 /* BulkSendChecklistView.swift */,
-				CC0030023100000000205001 /* BulkSendSkipListView.swift */,
-				CC0016043020000000205001 /* CarouselAvailabilityView.swift */,
-				CC0010042FD0000000205001 /* EditLogView.swift */,
-				5B96751B2F72075A00205001 /* ContentView.swift */,
-				5B96751C2F72075A00205001 /* EmployeeDetailView.swift */,
-				5B96751D2F72075A00205001 /* EmployeeListView.swift */,
-				CC0005042F80000000205001 /* EmployeeShiftHistoryView.swift */,
-				CC0008022FB0000000205001 /* ExportSheetView.swift */,
-				CC0013023000000000205001 /* ExportTabView.swift */,
-				CC0011042FE0000000205001 /* HelpView.swift */,
-				CC0028023100000000205001 /* MailComposeView.swift */,
-				CC0027023100000000205001 /* MessageComposeView.swift */,
-				CC0011022FE0000000205001 /* OnboardingView.swift */,
-				CC0003042F80000000205001 /* OverridesTabView.swift */,
-				5B96751E2F72075A00205001 /* RotaView.swift */,
-				CC0004022F80000000205001 /* SettingsView.swift */,
-				5B96751F2F72075A00205001 /* ShiftTemplateListView.swift */,
-				CC0009082FC0000000205001 /* SyncPromptView.swift */,
-				CC0006022F90000000205001 /* TabPage.swift */,
-				CC0006062F90000000205001 /* RotaUIBridge.swift */,
-				CC00060B2F90000000205001 /* RotaOverflowPopover.swift */,
-				CC0015023010000000205001 /* EmployeeUIBridge.swift */,
-				CC0015043010000000205001 /* WeeklyAvailabilityView.swift */,
-				CC0019023050000000205001 /* SendSchedulePicker.swift */,
-				CC0019043050000000205001 /* RosterImportView.swift */,
-				CC0021023070000000205001 /* PhoneInputField.swift */,
-				CC0022023080000000205001 /* ExportPreviewSheet.swift */,
-				CC0023023090000000205001 /* RotaExportPreview.swift */,
-				CC0051023110000000205001 /* ReadOnlyBanner.swift */,
-				CC0052023110000000205001 /* SubscriptionSettingsSection.swift */,
-				CC0050023110000000205001 /* TierInfoModal.swift */,
-				CC0049023110000000205001 /* TierPickView.swift */,
-				CC0053023110000000205001 /* FloatingTabBar.swift */,
-			);
-			path = Views;
-			sourceTree = "<group>";
-		};
 		CC0001052F80000000205001 /* Services */ = {
 			isa = PBXGroup;
 			children = (
@@ -368,6 +255,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				5B9675062F7205E900205001 /* AutorotaApp */,
+				5B9675202F72075A00205001 /* Views */,
 			);
 			name = AutorotaApp;
 			packageProductDependencies = (
@@ -487,61 +375,29 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				5B9675212F72075A00205001 /* EmployeeListView.swift in Sources */,
-				5B9675222F72075A00205001 /* ShiftTemplateListView.swift in Sources */,
-				5B9675232F72075A00205001 /* RotaView.swift in Sources */,
 				5B9675252F72075A00205001 /* RotaViewModel.swift in Sources */,
 				5B9675262F72075A00205001 /* ShiftTemplateViewModel.swift in Sources */,
 				5B9675272F72075A00205001 /* EmployeeViewModel.swift in Sources */,
 				5B9675302F72075A00205001 /* RoleViewModel.swift in Sources */,
-				5B9675282F72075A00205001 /* EmployeeDetailView.swift in Sources */,
-				5B9675292F72075A00205001 /* AvailabilityGridView.swift in Sources */,
-				5B96752A2F72075A00205001 /* ContentView.swift in Sources */,
 				CC0001012F80000000205001 /* AutorotaServiceProtocol.swift in Sources */,
 				CC0001013200000000205001 /* AccessibilityPalette.swift in Sources */,
 				CC0001022F80000000205001 /* LiveAutorotaService.swift in Sources */,
 				CC0003012F80000000205001 /* OverrideViewModel.swift in Sources */,
-				CC0003032F80000000205001 /* OverridesTabView.swift in Sources */,
-				CC0004012F80000000205001 /* SettingsView.swift in Sources */,
 				CC0005012F80000000205001 /* ShiftHistoryViewModel.swift in Sources */,
-				CC0005032F80000000205001 /* EmployeeShiftHistoryView.swift in Sources */,
-				CC0006012F90000000205001 /* TabPage.swift in Sources */,
-				CC0006052F90000000205001 /* RotaUIBridge.swift in Sources */,
-				CC00060A2F90000000205001 /* RotaOverflowPopover.swift in Sources */,
 				CC0007012FA0000000205001 /* ExchangeRateService.swift in Sources */,
-				CC0008012FB0000000205001 /* ExportSheetView.swift in Sources */,
 				CC0009012FC0000000205001 /* AutorotaSyncEngine.swift in Sources */,
 				CC0017013030000000205001 /* FfiError+UserMessage.swift in Sources */,
 				CC0027013040000000205001 /* LocaleManager.swift in Sources */,
 				CC0009032FC0000000205001 /* SyncRecordMapper.swift in Sources */,
 				CC0009052FC0000000205001 /* SyncConflictResolver.swift in Sources */,
-				CC0009072FC0000000205001 /* SyncPromptView.swift in Sources */,
 				CC0010012FD0000000205001 /* EditLogViewModel.swift in Sources */,
-				CC0010032FD0000000205001 /* EditLogView.swift in Sources */,
-				CC0011012FE0000000205001 /* OnboardingView.swift in Sources */,
-				CC0011032FE0000000205001 /* HelpView.swift in Sources */,
 				CC0012012FF0000000205001 /* AnalyticsViewModel.swift in Sources */,
-				CC0012032FF0000000205001 /* AnalyticsView.swift in Sources */,
-				CC0013013000000000205001 /* ExportTabView.swift in Sources */,
 				CC0014013000000000205001 /* EmployeeExportViewModel.swift in Sources */,
-				CC0015013010000000205001 /* EmployeeUIBridge.swift in Sources */,
-				CC0015033010000000205001 /* WeeklyAvailabilityView.swift in Sources */,
 				CC0016013020000000205001 /* AvailabilityProgressViewModel.swift in Sources */,
-				CC0016033020000000205001 /* CarouselAvailabilityView.swift in Sources */,
-				CC0018013040000000205001 /* AllAvailabilitiesSetView.swift in Sources */,
-				CC0019013050000000205001 /* SendSchedulePicker.swift in Sources */,
-				CC0019033050000000205001 /* RosterImportView.swift in Sources */,
 				CC0020013060000000205001 /* PhoneNumberFormatter.swift in Sources */,
-				CC0021013070000000205001 /* PhoneInputField.swift in Sources */,
-				CC0022013080000000205001 /* ExportPreviewSheet.swift in Sources */,
-				CC0023013090000000205001 /* RotaExportPreview.swift in Sources */,
 				CC0024013100000000205001 /* BulkSendSettings.swift in Sources */,
 				CC0025013100000000205001 /* MessageBodyBuilder.swift in Sources */,
 				CC0026013100000000205001 /* BulkSendDispatcher.swift in Sources */,
-				CC0027013100000000205001 /* MessageComposeView.swift in Sources */,
-				CC0028013100000000205001 /* MailComposeView.swift in Sources */,
-				CC0029013100000000205001 /* BulkSendChecklistView.swift in Sources */,
-				CC0030013100000000205001 /* BulkSendSkipListView.swift in Sources */,
 				CC0040013110000000205001 /* Tier.swift in Sources */,
 				CC0041013110000000205001 /* KeychainStore.swift in Sources */,
 				CC0042013110000000205001 /* LicenseGate.swift in Sources */,
@@ -551,11 +407,6 @@
 				CC0046013110000000205001 /* LicenseService.swift in Sources */,
 				CC0047013110000000205001 /* PricingCatalog.swift in Sources */,
 				CC0048013110000000205001 /* GatedAutorotaService.swift in Sources */,
-				CC0049013110000000205001 /* TierPickView.swift in Sources */,
-				CC0050013110000000205001 /* TierInfoModal.swift in Sources */,
-				CC0051013110000000205001 /* ReadOnlyBanner.swift in Sources */,
-				CC0052013110000000205001 /* SubscriptionSettingsSection.swift in Sources */,
-				CC0053013110000000205001 /* FloatingTabBar.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

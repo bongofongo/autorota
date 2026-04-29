@@ -94,7 +94,7 @@ swift-build-xcframework-debug:
 
 # ─── Apple — build-only (compile check, no simulator) ────────────────────────
 
-.PHONY: swift-build-check-macos swift-build-check-ios swift-build-check-ipad swift-build-check
+.PHONY: swift-build-check-macos swift-build-check-ios swift-build-check-ipad swift-build-check swift-platform-lint
 
 swift-build-check-macos:
 	$(XCB) build $(XCB_QUIET) -destination 'platform=macOS' $(NOSIGN)
@@ -105,7 +105,10 @@ swift-build-check-ios:
 swift-build-check-ipad:
 	$(XCB) build $(XCB_QUIET) -destination 'platform=iOS Simulator,name=iPad Pro 13-inch (M5)' $(NOSIGN)
 
-swift-build-check: swift-build-check-macos swift-build-check-ios swift-build-check-ipad
+swift-platform-lint:
+	@bash scripts/check-platform-isolation.sh
+
+swift-build-check: swift-platform-lint swift-build-check-macos swift-build-check-ios swift-build-check-ipad
 
 # ─── Apple — ViewModel unit tests (mock service, no live FFI) ────────────────
 
