@@ -161,7 +161,11 @@ final class AutorotaSyncEngine: @unchecked Sendable {
     private func loadOrCreateConfiguration() async throws -> CKSyncEngine.Configuration {
         var savedState: CKSyncEngine.State.Serialization?
 
+        // Treat an empty string sentinel as "no saved state" so the
+        // account-switch teardown path can clear without needing a
+        // dedicated FFI delete call.
         if let stateData = try getSyncMetadata(key: "ck_engine_state"),
+           !stateData.isEmpty,
            let data = stateData.data(using: .utf8) {
             savedState = try JSONDecoder().decode(CKSyncEngine.State.Serialization.self, from: data)
         }
@@ -377,7 +381,84 @@ extension AutorotaSyncEngine: CKSyncEngineDelegate {
         }
 
         for failure in changes.failedRecordSaves {
-            logger.warning("Failed to save record \(failure.record.recordID): \(failure.error)")
+            classifyAndSurfaceFailure(record: failure.record, error: failure.error)
+        }
+    }
+
+    /// Bucket a CloudKit record-save failure into transient vs permanent
+    /// and surface the most diagnostic message via `lastSyncIssue` so the
+    /// banner is actionable instead of silent. Returns the classification
+    /// for unit-testable mapping.
+    @discardableResult
+    func classifyAndSurfaceFailure(record: CKRecord, error: Error) -> SyncFailureClass {
+        let classification = AutorotaSyncEngine.classify(error: error)
+        switch classification {
+        case .retriable(let retryAfter):
+            // CKSyncEngine retries transient errors automatically; we just
+            // log so a long-running storm is visible.
+            let retry = retryAfter.map { String(format: " (retryAfter: %.1fs)", $0) } ?? ""
+            logger.warning(
+                "Transient save failure for \(record.recordID)\(retry): \(error.localizedDescription)"
+            )
+        case .permanent(let reason):
+            // Permanent failures need user-visible surfacing — the record
+            // will keep failing on retry until the user / dev addresses it.
+            let summary = "Permanent save failure for \(record.recordID.recordName) (\(reason)): \(error.localizedDescription)"
+            logger.error("\(summary)")
+            lastSyncIssue = summary
+        case .unknown:
+            let summary = "Unknown save failure for \(record.recordID.recordName): \(error.localizedDescription)"
+            logger.error("\(summary)")
+            lastSyncIssue = summary
+        }
+        return classification
+    }
+
+    /// Failure classification surfaced to callers / tests.
+    enum SyncFailureClass: Equatable {
+        /// Worth retrying. `retryAfter`, when non-nil, is the
+        /// CloudKit-suggested back-off in seconds.
+        case retriable(retryAfter: Double?)
+        /// Will not succeed on retry without operator intervention.
+        case permanent(reason: String)
+        /// Unrecognised error — treat conservatively but don't loop.
+        case unknown
+    }
+
+    /// Bucket a `CKError` (or anything else) by code. Reference:
+    /// https://developer.apple.com/documentation/cloudkit/ckerror/code
+    static func classify(error: Error) -> SyncFailureClass {
+        guard let ck = error as? CKError else { return .unknown }
+        let retryAfter = ck.userInfo[CKErrorRetryAfterKey] as? Double
+        switch ck.code {
+        // Transient — CloudKit / network / load shedding. Retry safely.
+        case .networkUnavailable,
+             .networkFailure,
+             .serviceUnavailable,
+             .requestRateLimited,
+             .zoneBusy,
+             .accountTemporarilyUnavailable:
+            return .retriable(retryAfter: retryAfter)
+
+        // Permanent — schema, auth, or quota problems that don't fix
+        // themselves on retry.
+        case .quotaExceeded:
+            return .permanent(reason: "quotaExceeded")
+        case .permissionFailure:
+            return .permanent(reason: "permissionFailure")
+        case .invalidArguments:
+            return .permanent(reason: "invalidArguments")
+        case .badContainer, .badDatabase:
+            return .permanent(reason: "badContainerOrDatabase")
+        case .notAuthenticated:
+            return .permanent(reason: "notAuthenticated")
+        case .userDeletedZone:
+            return .permanent(reason: "userDeletedZone")
+        case .managedAccountRestricted:
+            return .permanent(reason: "managedAccountRestricted")
+
+        default:
+            return .unknown
         }
     }
 
@@ -392,8 +473,23 @@ extension AutorotaSyncEngine: CKSyncEngineDelegate {
             logger.info("iCloud account signed out — sync paused")
             status = .idle
         case .switchAccounts:
-            logger.warning("iCloud account switched — data may be stale")
-            status = .error("iCloud account changed. Please restart the app.")
+            // Tear the engine down and rebuild it for the new account
+            // rather than asking the user to relaunch. The local DB still
+            // belongs to the old account, but the sync engine's state
+            // serialization is account-specific, so we drop it (empty
+            // string acts as a "clear" because `loadOrCreateConfiguration`
+            // skips decode when the persisted value is empty).
+            logger.warning("iCloud account switched — re-initialising sync engine")
+            stop()
+            Task { [weak self] in
+                guard let self else { return }
+                do {
+                    try setSyncMetadata(key: "ck_engine_state", value: "")
+                } catch {
+                    self.logger.error("Failed to clear engine state on account switch: \(error)")
+                }
+                await self.start()
+            }
         @unknown default:
             break
         }
