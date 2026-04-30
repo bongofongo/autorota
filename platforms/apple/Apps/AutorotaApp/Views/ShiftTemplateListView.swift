@@ -62,7 +62,17 @@ struct ShiftTemplateListView: View {
                         }
                 }
             } header: {
-                Text("Roles")
+                HStack {
+                    Text("Roles")
+                    Spacer()
+                    Button {
+                        showingAddRoleSheet = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Add role")
+                }
             }
             .headerProminence(.increased)
 
@@ -110,7 +120,17 @@ struct ShiftTemplateListView: View {
                     }
                 }
             } header: {
-                Text("Shifts")
+                HStack {
+                    Text("Shifts")
+                    Spacer()
+                    Button {
+                        showingAddTemplateSheet = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Add shift")
+                }
             }
             .headerProminence(.increased)
         }
@@ -148,24 +168,6 @@ struct ShiftTemplateListView: View {
                 }
             }
             .navigationTitle("Shifts")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Button {
-                            showingAddTemplateSheet = true
-                        } label: {
-                            Label("New Shift", systemImage: "clock.badge.plus")
-                        }
-                        Button {
-                            showingAddRoleSheet = true
-                        } label: {
-                            Label("New Role", systemImage: "tag")
-                        }
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                }
-            }
             .sheet(isPresented: $showingAddTemplateSheet) {
                 ShiftTemplateEditSheet(viewModel: vm, roles: roleVM.roles)
             }
@@ -269,13 +271,18 @@ struct ShiftTemplateEditSheet: View {
 
     @State private var name = ""
     @State private var selectedDays: Set<String> = []
-    @State private var startTime = Date()
-    @State private var endTime = Date()
+    @State private var startTime = ShiftTemplateEditSheet.defaultTime(hour: 9)
+    @State private var endTime = ShiftTemplateEditSheet.defaultTime(hour: 17)
     @State private var role = ""
     @State private var minStaff = 1
     @State private var maxStaff = 1
 
     private var isEditing: Bool { existing != nil }
+
+    private static func defaultTime(hour: Int) -> Date {
+        Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: Date())
+            ?? Date()
+    }
 
     var body: some View {
         NavigationStack {
@@ -284,6 +291,12 @@ struct ShiftTemplateEditSheet: View {
                     TextField("Shift name", text: $name)
                 }
                 Section("Days") {
+                    Toggle("Everyday", isOn: Binding(
+                        get: { selectedDays == Set(Self.allDays) },
+                        set: { on in
+                            selectedDays = on ? Set(Self.allDays) : []
+                        }
+                    ))
                     ForEach(Self.allDays, id: \.self) { day in
                         Toggle(day, isOn: Binding(
                             get: { selectedDays.contains(day) },
