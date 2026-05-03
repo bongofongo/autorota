@@ -139,13 +139,13 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Download XCFramework
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: xcframework
           path: platforms/apple/AutorotaKit/XCFrameworks/
 
       - name: Download generated bindings
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: generated-bindings
           path: platforms/apple/AutorotaKit/Sources/AutorotaKit/generated/
@@ -180,13 +180,13 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Download XCFramework
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: xcframework
           path: platforms/apple/AutorotaKit/XCFrameworks/
 
       - name: Download generated bindings
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: generated-bindings
           path: platforms/apple/AutorotaKit/Sources/AutorotaKit/generated/
