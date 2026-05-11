@@ -1216,6 +1216,12 @@
         }
       }
     },
+    "Add role" : {
+
+    },
+    "Add shift" : {
+
+    },
     "Add Shift" : {
       "localizations" : {
         "ar" : {
@@ -5033,6 +5039,9 @@
           }
         }
       }
+    },
+    "Everyday" : {
+
     },
     "Exceptions" : {
       "localizations" : {

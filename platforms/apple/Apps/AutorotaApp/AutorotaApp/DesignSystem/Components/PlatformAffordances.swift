@@ -57,12 +57,16 @@ extension View {
 
     func dismissesKeyboardOnTap() -> some View {
         #if canImport(UIKit)
-        onTapGesture {
-            UIApplication.shared.sendAction(
-                #selector(UIResponder.resignFirstResponder),
-                to: nil, from: nil, for: nil
-            )
-        }
+        // simultaneousGesture (not onTapGesture) so taps on Picker rows,
+        // NavigationLinks, and other child controls aren't swallowed.
+        simultaneousGesture(
+            TapGesture().onEnded {
+                UIApplication.shared.sendAction(
+                    #selector(UIResponder.resignFirstResponder),
+                    to: nil, from: nil, for: nil
+                )
+            }
+        )
         #else
         self
         #endif
