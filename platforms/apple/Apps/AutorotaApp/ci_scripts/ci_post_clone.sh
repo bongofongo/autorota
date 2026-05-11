@@ -19,15 +19,27 @@ echo "==> ci_post_clone.sh starting"
 echo "    REPO_ROOT=$REPO_ROOT"
 echo "    PWD=$(pwd)"
 
-# ── 1. Install Rust (rustup, non-interactive, minimal profile) ──────────────
+# ── 1. Install rustup via Homebrew ──────────────────────────────────────────
+# Xcode Cloud's post-clone phase has flaky DNS for static.rust-lang.org, so the
+# canonical `curl https://sh.rustup.rs | sh` bootstrapper fails (build #5 hit
+# four "Could not resolve host" errors and aborted). Homebrew is preinstalled
+# on Cloud runners and pulls bottles from GitHub-hosted CDNs that resolve
+# reliably — use it to drop the rustup binaries, then bootstrap the toolchain.
 if ! command -v rustup >/dev/null 2>&1; then
-  echo "==> Installing rustup"
-  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-    | sh -s -- -y --default-toolchain stable --profile minimal --no-modify-path
+  echo "==> Installing rustup via Homebrew"
+  brew install rustup
 fi
 
+# Bootstrap a stable toolchain on first run (idempotent — no-op if already set).
+if ! rustup show active-toolchain >/dev/null 2>&1; then
+  echo "==> Bootstrapping stable toolchain"
+  rustup-init -y --default-toolchain stable --profile minimal --no-modify-path
+fi
+
+# rustup-init writes ~/.cargo/env; brew rustup also drops shims in ~/.cargo/bin.
 # shellcheck disable=SC1091
-source "$HOME/.cargo/env"
+[[ -f "$HOME/.cargo/env" ]] && source "$HOME/.cargo/env"
+export PATH="$HOME/.cargo/bin:$PATH"
 
 echo "==> Rust version: $(rustc --version)"
 

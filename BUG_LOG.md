@@ -2,6 +2,12 @@
 
 Concise running log of bugs encountered. Each entry is one bullet with sub-bullets. New entries appended at top. Patched entries remain `pending verification` until the user confirms.
 
+- **Xcode Cloud archive build fails: rustup install can't resolve static.rust-lang.org**
+  - Date fixed: 2026-05-11 (pending verification)
+  - Where / what / repro: Xcode Cloud build #5 (commit `5037895`), `ci_post_clone.sh`. The `curl https://sh.rustup.rs | sh` bootstrapper downloaded the installer script, but its secondary fetch of `rustup-init` from `static.rust-lang.org` returned `curl: (6) Could not resolve host: static.rust-lang.org` four times then aborted. Without Rust, `scripts/build_xcframework.sh` never ran, so `xcodebuild -describeSchemes` failed with `local binary target 'AutorotaFFI' … does not contain a binary artifact`. Repro: push to `main`, watch the Xcode Cloud Default workflow.
+  - Patched: yes — pending user verification
+  - Fix: `platforms/apple/Apps/AutorotaApp/ci_scripts/ci_post_clone.sh` now installs rustup via `brew install rustup` (Homebrew is preinstalled on Cloud runners and pulls bottles from GitHub-hosted CDNs), then bootstraps the toolchain with `rustup-init -y --default-toolchain stable --profile minimal --no-modify-path`. Both steps guarded by idempotency checks. Targets and `build_xcframework.sh` invocation unchanged.
+
 - **Menu tab "Other Pages" rows un-tappable after first navigation**
   - Date fixed: —
   - Where / what / repro: Menu tab → "Other Pages" section. After tapping one entry (e.g. Exceptions) and returning, tapping a second entry (e.g. Edit Log) only flashes the row dark grey — no navigation. Repro from a fresh state: open Menu, tap Exceptions, go back, tap Edit Log.
