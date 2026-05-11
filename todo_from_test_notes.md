@@ -18,7 +18,6 @@ Swipe navigation should be enabled on the onboarding advert/intro screens **in a
 
 - **Action:** add horizontal swipe gesture recognizer alongside Next button. Both should advance/reverse the same state.
 
-
 ### ✨ Auto-advance on first/last name entry
 When inputting an employee's name, hitting **Return** on the first-name field should auto-focus the last-name field (and similarly across related grouped fields). Goal: reduce friction when entering a batch of employees.
 
