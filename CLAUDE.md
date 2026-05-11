@@ -53,6 +53,7 @@ Set `VERBOSE=1` for full build output. `NOSIGN=1` is set automatically in make t
 
 - Use `make` targets or XcodeBuildMCP tools, not raw `xcodebuild`
 - After editing Swift, run build-check targets to verify compilation — not full test suite
+- When a bug is patched (or believed to be patched), append a concise entry to `BUG_LOG.md` marked patched-pending-verification so the user can confirm the fix actually holds
 - ViewModel tests use `MockAutorotaService` and don't need the XCFramework
 - SPM integration tests in `AutorotaKit/Tests/` need the XCFramework built first
 - Xcode 26+ required; deployment targets iOS/iPadOS 26.2, macOS 26.1, visionOS 26.2
