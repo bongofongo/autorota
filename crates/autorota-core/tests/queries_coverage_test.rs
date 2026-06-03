@@ -121,7 +121,13 @@ async fn update_shift_template_persists_changes() {
     loaded.name = "Early Morning".to_string();
     loaded.start_time = time(6);
     loaded.end_time = time(11);
+    // Role is now driven by role_requirements; required_role is denormalised
+    // from the primary requirement.
     loaded.required_role = "cashier".to_string();
+    loaded.role_requirements = vec![autorota_core::models::shift::RoleRequirement {
+        role: "cashier".to_string(),
+        min_count: 2,
+    }];
     loaded.min_employees = 2;
     loaded.max_employees = 3;
     queries::update_shift_template(&pool, &loaded)

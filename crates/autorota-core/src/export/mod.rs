@@ -473,5 +473,4 @@ mod bounds_tests {
             other => panic!("expected TooLarge, got {other:?}"),
         }
     }
-
 }

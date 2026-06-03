@@ -10,7 +10,7 @@ struct ShiftTemplateViewModelTests {
         FfiShiftTemplate(
             id: id, name: name, weekdays: ["Mon", "Tue", "Wed"],
             startTime: "07:00", endTime: "12:00", requiredRole: "Barista",
-            minEmployees: 1, maxEmployees: 2, deleted: false
+            minEmployees: 1, maxEmployees: 2, roleRequirements: [], deleted: false
         )
     }
 

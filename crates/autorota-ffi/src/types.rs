@@ -55,6 +55,17 @@ pub struct FfiEmployee {
     pub deleted: bool,
 }
 
+// ── Role requirement (multi-role shifts) ──────────────────────────────────────
+
+/// A per-role staffing minimum on a shift or template: at least `min_count`
+/// assigned employees must hold `role`. One employee covers one unit of each
+/// required role they hold.
+#[derive(Clone, uniffi::Record)]
+pub struct FfiRoleRequirement {
+    pub role: String,
+    pub min_count: u32,
+}
+
 // ── Shift Template ────────────────────────────────────────────────────────────
 
 #[derive(Clone, uniffi::Record)]
@@ -67,6 +78,8 @@ pub struct FfiShiftTemplate {
     pub required_role: String,
     pub min_employees: u32,
     pub max_employees: u32,
+    /// Per-role minimums. Empty ⇒ wildcard (any available staff).
+    pub role_requirements: Vec<FfiRoleRequirement>,
     pub deleted: bool,
 }
 
@@ -83,6 +96,8 @@ pub struct FfiShift {
     pub required_role: String,
     pub min_employees: u32,
     pub max_employees: u32,
+    /// Per-role minimums. Empty ⇒ wildcard (any available staff).
+    pub role_requirements: Vec<FfiRoleRequirement>,
 }
 
 // ── Assignment ────────────────────────────────────────────────────────────────
@@ -136,6 +151,8 @@ pub struct FfiShiftInfo {
     pub required_role: String,
     pub min_employees: u32,
     pub max_employees: u32,
+    /// Per-role minimums. Empty ⇒ wildcard (any available staff).
+    pub role_requirements: Vec<FfiRoleRequirement>,
 }
 
 #[derive(Clone, uniffi::Record)]
@@ -159,6 +176,8 @@ pub struct FfiShortfallWarning {
     pub start_time: String,
     pub end_time: String,
     pub required_role: String,
+    /// Which role fell short, or `None` for an overall headcount shortfall.
+    pub role: Option<String>,
 }
 
 #[derive(Clone, uniffi::Record)]

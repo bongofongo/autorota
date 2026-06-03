@@ -220,6 +220,7 @@ mod tests {
             required_role: role.into(),
             min_employees: 1,
             max_employees: 1,
+            role_requirements: vec![],
         }
     }
 

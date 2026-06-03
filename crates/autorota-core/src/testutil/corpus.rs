@@ -24,7 +24,7 @@ use crate::models::availability::{Availability, AvailabilityState};
 use crate::models::employee::Employee;
 use crate::models::overrides::{DayAvailability, EmployeeAvailabilityOverride, OverrideSource};
 use crate::models::rota::Rota;
-use crate::models::shift::{Shift, ShiftTemplate};
+use crate::models::shift::{RoleRequirement, Shift, ShiftTemplate};
 
 pub const ROLES: &[&str] = &["barista", "lead", "kitchen"];
 
@@ -175,7 +175,7 @@ fn build_templates() -> Vec<ShiftTemplate> {
         Weekday::Sun,
     ];
 
-    vec![
+    let templates: Vec<ShiftTemplate> = vec![
         ShiftTemplate {
             id: 1,
             name: "Morning open".to_string(),
@@ -185,6 +185,7 @@ fn build_templates() -> Vec<ShiftTemplate> {
             required_role: "barista".to_string(),
             min_employees: 2,
             max_employees: 3,
+            role_requirements: Vec::new(),
             deleted: false,
         },
         ShiftTemplate {
@@ -196,6 +197,7 @@ fn build_templates() -> Vec<ShiftTemplate> {
             required_role: "barista".to_string(),
             min_employees: 3,
             max_employees: 4,
+            role_requirements: Vec::new(),
             deleted: false,
         },
         ShiftTemplate {
@@ -207,6 +209,7 @@ fn build_templates() -> Vec<ShiftTemplate> {
             required_role: "barista".to_string(),
             min_employees: 2,
             max_employees: 3,
+            role_requirements: Vec::new(),
             deleted: false,
         },
         ShiftTemplate {
@@ -218,6 +221,7 @@ fn build_templates() -> Vec<ShiftTemplate> {
             required_role: "lead".to_string(),
             min_employees: 1,
             max_employees: 1,
+            role_requirements: Vec::new(),
             deleted: false,
         },
         ShiftTemplate {
@@ -229,6 +233,7 @@ fn build_templates() -> Vec<ShiftTemplate> {
             required_role: "kitchen".to_string(),
             min_employees: 1,
             max_employees: 2,
+            role_requirements: Vec::new(),
             deleted: false,
         },
         ShiftTemplate {
@@ -240,9 +245,26 @@ fn build_templates() -> Vec<ShiftTemplate> {
             required_role: "barista".to_string(),
             min_employees: 3,
             max_employees: 4,
+            role_requirements: Vec::new(),
             deleted: false,
         },
-    ]
+    ];
+
+    // Mirror the migration backfill: derive one role requirement from each
+    // template's legacy single role so corpus scheduler tests keep their
+    // "needs N of role" behavior.
+    templates
+        .into_iter()
+        .map(|mut t| {
+            if t.role_requirements.is_empty() && !t.required_role.is_empty() {
+                t.role_requirements = vec![RoleRequirement {
+                    role: t.required_role.clone(),
+                    min_count: t.min_employees,
+                }];
+            }
+            t
+        })
+        .collect()
 }
 
 fn build_employees(rng: &mut ChaCha8Rng, count: usize) -> Vec<Employee> {
@@ -347,6 +369,7 @@ fn build_shifts(
                 required_role: tmpl.required_role.clone(),
                 min_employees: tmpl.min_employees,
                 max_employees: tmpl.max_employees,
+                role_requirements: tmpl.role_requirements.clone(),
             });
             next_id += 1;
         }

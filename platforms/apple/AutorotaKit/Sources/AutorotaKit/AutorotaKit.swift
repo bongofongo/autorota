@@ -225,9 +225,15 @@ public func updateShiftTimesAsync(id: Int64, startTime: String, endTime: String)
     }.value
 }
 
-public func createAdHocShiftAsync(rotaId: Int64, date: String, startTime: String, endTime: String, requiredRole: String) async throws -> Int64 {
+public func updateShiftAsync(id: Int64, minEmployees: UInt32, maxEmployees: UInt32, roleRequirements: [FfiRoleRequirement]) async throws {
     try await Task.detached(priority: .userInitiated) {
-        try createAdHocShift(rotaId: rotaId, date: date, startTime: startTime, endTime: endTime, requiredRole: requiredRole)
+        try updateShift(id: id, minEmployees: minEmployees, maxEmployees: maxEmployees, roleRequirements: roleRequirements)
+    }.value
+}
+
+public func createAdHocShiftAsync(rotaId: Int64, date: String, startTime: String, endTime: String, requiredRole: String, roleRequirements: [FfiRoleRequirement]) async throws -> Int64 {
+    try await Task.detached(priority: .userInitiated) {
+        try createAdHocShift(rotaId: rotaId, date: date, startTime: startTime, endTime: endTime, requiredRole: requiredRole, roleRequirements: roleRequirements)
     }.value
 }
 

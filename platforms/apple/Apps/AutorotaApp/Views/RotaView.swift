@@ -86,7 +86,7 @@ struct RotaView: View {
             .safeAreaInset(edge: .top, spacing: 0) {
                 rotaTopTip
             }
-            .navigationTitle("Rota")
+            .navigationTitle("")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -251,8 +251,8 @@ struct RotaView: View {
                     vm.showDeleteScheduleConfirmation = true
                 })
                 actions.append(RotaOverflowAction(
-                    title: "Edit",
-                    systemImage: "pencil"
+                    title: "Swap staff",
+                    systemImage: "arrow.left.arrow.right"
                 ) {
                     Task { await vm.enterEditMode() }
                 })
@@ -359,15 +359,13 @@ private struct CategoryBadge: View {
 /// view. Stacking multiple `.sheet(item:)` modifiers risks SwiftUI dropping
 /// later assignments when a prior sheet is mid-dismiss.
 private enum ScheduleSheet: Identifiable {
-    case employeePicker(FfiShiftInfo)
-    case timeEdit(FfiShiftInfo)
+    case shiftEditor(FfiShiftInfo)
     case addShift(SheetDate)
 
     var id: String {
         switch self {
-        case .employeePicker(let s): return "emp-\(s.id)"
-        case .timeEdit(let s):       return "time-\(s.id)"
-        case .addShift(let d):       return "add-\(d.id)"
+        case .shiftEditor(let s): return "shift-\(s.id)"
+        case .addShift(let d):    return "add-\(d.id)"
         }
     }
 }
@@ -377,8 +375,21 @@ private struct ScheduleGridView: View {
     let schedule: FfiWeekSchedule
 
     @State private var activeSheet: ScheduleSheet?
-    @State private var shiftToDelete: Int64?
+    /// A sheet whose presentation is deferred until the past-week edit prompt is
+    /// confirmed. nil when no confirmation is pending.
+    @State private var pendingSheet: ScheduleSheet?
     @State private var showUnlockPastConfirmation = false
+
+    /// Present a sheet, first prompting for confirmation if this is the first
+    /// edit on a locked past week. Confirming unlocks edits for the visit.
+    private func requestSheet(_ sheet: ScheduleSheet) {
+        if vm.weekCategory == .past && !vm.pastUnlocked {
+            pendingSheet = sheet
+            showUnlockPastConfirmation = true
+        } else {
+            activeSheet = sheet
+        }
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -404,29 +415,11 @@ private struct ScheduleGridView: View {
         }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
-            case .employeePicker(let shift):
-                EmployeePickerSheet(vm: vm, shift: shift)
-            case .timeEdit(let shift):
-                ShiftTimeEditSheet(vm: vm, shift: shift)
+            case .shiftEditor(let shift):
+                ShiftEditorSheet(vm: vm, shift: shift)
             case .addShift(let date):
                 AddShiftSheet(vm: vm, date: date.id)
             }
-        }
-        .alert(
-            "Delete this shift?",
-            isPresented: Binding(
-                get: { shiftToDelete != nil },
-                set: { if !$0 { shiftToDelete = nil } }
-            )
-        ) {
-            Button("Cancel", role: .cancel) { shiftToDelete = nil }
-            Button("Delete", role: .destructive) {
-                if let id = shiftToDelete {
-                    Task { await vm.deleteShift(id: id) }
-                }
-            }
-        } message: {
-            Text("This shift and all its assignments will be permanently deleted.")
         }
         .alert(
             "Edit past rota?",
@@ -434,14 +427,21 @@ private struct ScheduleGridView: View {
         ) {
             Button("Edit", role: .destructive) {
                 vm.pastUnlocked = true
+                if let sheet = pendingSheet {
+                    pendingSheet = nil
+                    activeSheet = sheet
+                }
             }
             Button("Cancel", role: .cancel) {
-                vm.isEditMode = false
+                pendingSheet = nil
+                if vm.isEditMode { vm.isEditMode = false }
             }
         } message: {
             Text("This rota is from a past week. Are you sure you want to make changes?")
         }
         .onChange(of: vm.isEditMode) { _, new in
+            // Entering edit mode (for the swap gesture) on a locked past week
+            // also prompts for confirmation.
             if new && vm.weekCategory == .past && !vm.pastUnlocked {
                 showUnlockPastConfirmation = true
             }
@@ -457,45 +457,29 @@ private struct ScheduleGridView: View {
                     let shifts = vm.shiftsByDay.first(where: { $0.weekday == day })?.shifts ?? []
                     Section {
                         ForEach(shifts, id: \.id) { shift in
-                            let locked = vm.isShiftLocked(shift)
                             ShiftCard(
                                 shift: shift,
                                 assignments: vm.assignments(for: shift.id),
                                 vm: vm,
                                 isEditMode: vm.isEditMode,
-                                isLocked: locked,
-                                onAddEmployee: { activeSheet = .employeePicker(shift) },
-                                onEditTimes: { activeSheet = .timeEdit(shift) },
-                                onDeleteShift: { shiftToDelete = shift.id }
+                                isLocked: vm.isShiftLocked(shift),
+                                onEdit: { requestSheet(.shiftEditor(shift)) }
                             )
                         }
-                        if shifts.isEmpty && !vm.isEditMode {
+                        if shifts.isEmpty {
                             Text("No shifts")
                                 .font(.caption)
                                 .foregroundStyle(.tertiary)
                                 .italic()
                                 .padding(.horizontal)
                         }
-                        if vm.isEditMode && !vm.isDayLocked(day) {
-                            Button {
-                                activeSheet = .addShift(SheetDate(vm.dateForWeekday(day)))
-                            } label: {
-                                Label("Add Shift", systemImage: "plus.circle")
-                                    .font(.subheadline)
-                            }
-                            .padding(.horizontal)
-                        }
                     } header: {
-                        HStack(spacing: 6) {
-                            Text(day)
-                                .font(.headline)
-                            DayFlourish(isToday: vm.isDayToday(day), isPast: vm.isDayPast(day))
-                            Spacer()
-                        }
-                        .padding(.horizontal)
-                        .padding(.vertical, 4)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(.regularMaterial)
+                        DayHeader(
+                            day: day,
+                            isToday: vm.isDayToday(day),
+                            isPast: vm.isDayPast(day),
+                            onAddShift: { requestSheet(.addShift(SheetDate(vm.dateForWeekday(day)))) }
+                        )
                     }
                 }
             }
@@ -529,22 +513,17 @@ private struct ScheduleGridView: View {
     @ViewBuilder
     private func dayColumn(day: String, width: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Column header
-            HStack(spacing: 6) {
-                Text(day)
-                    .font(.headline)
-                DayFlourish(isToday: vm.isDayToday(day), isPast: vm.isDayPast(day))
-                Spacer()
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .frame(maxWidth: .infinity)
-            .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            // Column header — tap to add a shift on this day
+            DayHeader(
+                day: day,
+                isToday: vm.isDayToday(day),
+                isPast: vm.isDayPast(day),
+                onAddShift: { requestSheet(.addShift(SheetDate(vm.dateForWeekday(day)))) }
+            )
 
             // Shifts
             let shifts = vm.shiftsByDay.first(where: { $0.weekday == day })?.shifts ?? []
-            if shifts.isEmpty && !vm.isEditMode {
+            if shifts.isEmpty {
                 Text("No shifts")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
@@ -552,29 +531,16 @@ private struct ScheduleGridView: View {
                     .padding(.horizontal, 8)
             } else {
                 ForEach(shifts, id: \.id) { shift in
-                    let locked = vm.isShiftLocked(shift)
                     ShiftCard(
                         shift: shift,
                         assignments: vm.assignments(for: shift.id),
                         vm: vm,
                         isEditMode: vm.isEditMode,
-                        isLocked: locked,
-                        onAddEmployee: { activeSheet = .employeePicker(shift) },
-                        onEditTimes: { activeSheet = .timeEdit(shift) },
-                        onDeleteShift: { shiftToDelete = shift.id },
+                        isLocked: vm.isShiftLocked(shift),
+                        onEdit: { requestSheet(.shiftEditor(shift)) },
                         isCompact: true
                     )
                 }
-            }
-
-            if vm.isEditMode && !vm.isDayLocked(day) {
-                Button {
-                    activeSheet = .addShift(SheetDate(vm.dateForWeekday(day)))
-                } label: {
-                    Label("Add Shift", systemImage: "plus.circle")
-                        .font(.subheadline)
-                }
-                .padding(.horizontal, 8)
             }
 
             Spacer(minLength: 0)
@@ -583,25 +549,50 @@ private struct ScheduleGridView: View {
     }
 }
 
-// MARK: - Day flourish
+// MARK: - Day header
 
-/// Small colored dot in day headers indicating past/today. No dot for future days.
-private struct DayFlourish: View {
+/// Minimalist, Apple-Calendar-style weekday header: left-justified title over a
+/// thin underline whose color encodes time alignment (past / today / future).
+/// Tapping anywhere on the header adds a shift to that day.
+private struct DayHeader: View {
+    let day: String
     let isToday: Bool
     let isPast: Bool
+    let onAddShift: () -> Void
 
     var body: some View {
-        if let color = dotColor {
-            Circle()
-                .fill(color)
-                .frame(width: 6, height: 6)
+        Button(action: onAddShift) {
+            HStack(spacing: 8) {
+                Text(day)
+                    .font(.headline)
+                    .foregroundStyle(isPast ? .secondary : .primary)
+                Spacer()
+                Image(systemName: "plus")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal)
+            .padding(.top, 6)
+            .padding(.bottom, 5)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(underlineColor)
+                    .frame(height: isToday ? 2 : 1)
+            }
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .background(.background)
+        .accessibilityLabel("Add shift on \(day)")
     }
 
-    private var dotColor: Color? {
-        if isToday { return .blue }
-        if isPast { return .secondary }
-        return nil
+    /// Muted underline tint by time alignment: today accented, past gray,
+    /// future faint.
+    private var underlineColor: Color {
+        if isToday { return .accentColor }
+        if isPast { return .secondary.opacity(0.35) }
+        return .secondary.opacity(0.15)
     }
 }
 
@@ -613,46 +604,20 @@ private struct ShiftCard: View {
     let vm: RotaViewModel
     let isEditMode: Bool
     let isLocked: Bool
-    let onAddEmployee: () -> Void
-    let onEditTimes: () -> Void
-    let onDeleteShift: () -> Void
+    /// Tap-to-edit: opens the unified shift editor for this shift.
+    let onEdit: () -> Void
     var isCompact: Bool = false
-
-    private var canEdit: Bool { isEditMode && !isLocked }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             // Header row
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    if canEdit {
-                        Button(action: onEditTimes) {
-                            HStack(spacing: 4) {
-                                Text("\(shift.startTime) – \(shift.endTime)")
-                                    .font(.subheadline.bold())
-                                Image(systemName: "pencil")
-                                    .font(.caption2)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.primary)
-                    } else {
-                        Text("\(shift.startTime) – \(shift.endTime)")
-                            .font(.subheadline.bold())
-                    }
+                    Text("\(shift.startTime) – \(shift.endTime)")
+                        .font(.subheadline.bold())
                     RoleTag(name: shift.requiredRole)
                 }
                 Spacer()
-
-                if canEdit {
-                    Button(action: onDeleteShift) {
-                        Image(systemName: "trash")
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Delete shift")
-                }
 
                 Text("\(assignments.count)/\(shift.maxEmployees)")
                     .font(.caption.monospacedDigit())
@@ -670,22 +635,12 @@ private struct ShiftCard: View {
                     AssignmentRow(
                         entry: entry,
                         vm: vm,
+                        shift: shift,
                         isEditMode: isEditMode,
                         isLocked: isLocked,
                         isCompact: isCompact
                     )
                 }
-            }
-
-            // Add employee button
-            if canEdit && assignments.count < Int(shift.maxEmployees) {
-                Button(action: onAddEmployee) {
-                    Label("Add", systemImage: "plus.circle.fill")
-                        .font(.caption)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .tint(.blue)
             }
         }
         .padding(10)
@@ -696,8 +651,13 @@ private struct ShiftCard: View {
         )
         .opacity(isLocked && isEditMode ? 0.5 : 1.0)
         .padding(.horizontal, isCompact ? 6 : 16)
+        // Tapping anywhere not occupied by an inner control (swap name tags in
+        // edit mode) opens the editor.
+        .contentShape(Rectangle())
+        .onTapGesture { onEdit() }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(shiftA11yLabel)
+        .accessibilityAction(named: "Edit shift") { onEdit() }
     }
 
     private var shiftA11yLabel: String {
@@ -707,11 +667,29 @@ private struct ShiftCard: View {
     }
 }
 
+// MARK: - Conflict glyph
+
+/// Compact warning indicator shown next to a conflicted assignment in the grid.
+/// Hard conflicts use an orange triangle; the soft `.maybe` hint uses an amber
+/// question mark.
+private struct ConflictGlyph: View {
+    let reason: ConflictReason
+
+    var body: some View {
+        Image(systemName: reason.isHard ? "exclamationmark.triangle.fill" : "questionmark.circle.fill")
+            .font(.caption2)
+            .foregroundStyle(reason.isHard ? .orange : Color.yellow)
+            .help(reason.label)
+            .accessibilityLabel(reason.label)
+    }
+}
+
 // MARK: - Assignment row
 
 private struct AssignmentRow: View {
     let entry: FfiScheduleEntry
     let vm: RotaViewModel
+    let shift: FfiShiftInfo
     let isEditMode: Bool
     let isLocked: Bool
     var isCompact: Bool = false
@@ -719,6 +697,7 @@ private struct AssignmentRow: View {
     private var isSwapSource: Bool { vm.isSwapSource(assignmentId: entry.assignmentId) }
     private var isSwapTarget: Bool { vm.isSwapTarget(entry: entry) }
     private var canEdit: Bool { isEditMode && !isLocked }
+    private var conflict: ConflictReason? { vm.conflict(employeeId: entry.employeeId, shift: shift) }
 
     var body: some View {
         // When a swap target, wrap in a tappable button-style row
@@ -764,7 +743,7 @@ private struct AssignmentRow: View {
     // Normal row for all other states
     private var baseRow: some View {
         let employeeName = entry.employeeName
-        return HStack {
+        return HStack(spacing: 6) {
             if canEdit {
                 // Tappable name tag — initiates or cancels swap
                 Button {
@@ -802,18 +781,11 @@ private struct AssignmentRow: View {
                     .accessibilityLabel("Assigned: \(employeeName)")
             }
 
-            Spacer()
-
-            if canEdit && !vm.hasSwapSource {
-                Button {
-                    Task { await vm.deleteAssignment(id: entry.assignmentId) }
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.red)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Remove assignment")
+            if let conflict {
+                ConflictGlyph(reason: conflict)
             }
+
+            Spacer()
         }
         .padding(.vertical, 2)
         .padding(.horizontal, 4)
@@ -821,66 +793,126 @@ private struct AssignmentRow: View {
 
 }
 
-// MARK: - Employee picker sheet
+// MARK: - Conflict badge (labeled)
 
-private struct EmployeePickerSheet: View {
-    let vm: RotaViewModel
-    let shift: FfiShiftInfo
-    @Environment(\.dismiss) private var dismiss
+/// Labeled conflict indicator used in the editor's assignment + picker lists.
+private struct ConflictBadge: View {
+    let reason: ConflictReason
 
     var body: some View {
-        NavigationStack {
-            let available = vm.availableEmployees(for: shift.id)
-            if available.isEmpty {
-                ContentUnavailableView(
-                    "No Available Employees",
-                    systemImage: "person.slash",
-                    description: Text("All employees are already assigned to this shift.")
-                )
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { dismiss() }
-                    }
-                }
-            } else {
-                List(available, id: \.id) { employee in
-                    Button {
-                        Task {
-                            await vm.addEmployeeToShift(shiftId: shift.id, employeeId: employee.id)
-                            dismiss()
-                        }
-                    } label: {
-                        Text(employee.displayName)
-                    }
-                }
-                .navigationTitle("Add Employee")
-                #if os(iOS)
-                .navigationBarTitleDisplayMode(.inline)
-                #endif
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { dismiss() }
-                    }
-                }
-            }
-        }
-        #if os(iOS)
-        .presentationDetents([.medium])
-        #endif
-        #if os(macOS)
-        .frame(minWidth: 320, idealWidth: 400, minHeight: 300, idealHeight: 450)
-        #endif
+        Label(reason.label, systemImage: reason.isHard ? "exclamationmark.triangle.fill" : "questionmark.circle.fill")
+            .font(.caption2)
+            .foregroundStyle(reason.isHard ? .orange : .secondary)
+            .labelStyle(.titleAndIcon)
     }
 }
 
-// MARK: - Shift time edit sheet
+// MARK: - Role and staffing section
 
-private struct ShiftTimeEditSheet: View {
+/// Editable "Role and staffing" form section shared by the shift editor, the
+/// add-shift sheet, and the template editor. Min staff is clamped to the
+/// role-derived floor (the largest role minimum); empty requirements mean a
+/// wildcard shift.
+struct RoleStaffingSection: View {
+    let roles: [FfiRole]
+    @Binding var minStaff: Int
+    @Binding var maxStaff: Int
+    @Binding var roleReqs: [FfiRoleRequirement]
+
+    /// Largest single role minimum — the floor the overall min can't go below.
+    private var floor: Int { roleReqs.map { Int($0.minCount) }.max() ?? 0 }
+    private var effMin: Int { max(minStaff, floor) }
+    private var availableRoles: [FfiRole] {
+        let used = Set(roleReqs.map { $0.role })
+        return roles.filter { !used.contains($0.name) }
+    }
+
+    var body: some View {
+        Section {
+            Stepper(
+                value: Binding(get: { effMin }, set: { minStaff = $0 }),
+                in: max(floor, 1)...99
+            ) {
+                HStack {
+                    Text("Min staff")
+                    Spacer()
+                    Text("\(effMin)").foregroundStyle(.secondary).monospacedDigit()
+                }
+            }
+            Stepper(
+                value: Binding(get: { max(maxStaff, effMin) }, set: { maxStaff = $0 }),
+                in: effMin...99
+            ) {
+                HStack {
+                    Text("Max staff")
+                    Spacer()
+                    Text("\(max(maxStaff, effMin))").foregroundStyle(.secondary).monospacedDigit()
+                }
+            }
+
+            ForEach($roleReqs, id: \.role) { $req in
+                Stepper(
+                    value: Binding(
+                        get: { Int(req.minCount) },
+                        set: { $req.minCount.wrappedValue = UInt32(max(1, $0)) }
+                    ),
+                    in: 1...99
+                ) {
+                    HStack {
+                        Text(req.role)
+                        Spacer()
+                        Text("min \(req.minCount)").foregroundStyle(.secondary).monospacedDigit()
+                    }
+                }
+                .swipeActions {
+                    Button(role: .destructive) {
+                        roleReqs.removeAll { $0.role == req.role }
+                    } label: {
+                        Label("Remove", systemImage: "trash")
+                    }
+                }
+            }
+
+            if !availableRoles.isEmpty {
+                Menu {
+                    ForEach(availableRoles, id: \.id) { role in
+                        Button(role.name) {
+                            roleReqs.append(FfiRoleRequirement(role: role.name, minCount: 1))
+                        }
+                    }
+                } label: {
+                    Label("Add role", systemImage: "plus.circle")
+                }
+            }
+        } header: {
+            Text("Role and staffing")
+        } footer: {
+            if roleReqs.isEmpty {
+                Text("Any staff with availability can be assigned.")
+            } else {
+                Text("One person who holds several required roles covers each of them.")
+            }
+        }
+    }
+}
+
+// MARK: - Unified shift editor sheet
+
+/// Single editor for a shift: edit times, manage assigned employees (with
+/// availability/overlap warnings), and delete the shift. Opened by tapping a
+/// shift card. Replaces the former separate time-edit and employee-picker
+/// sheets. Role/capacity are read-only here in this pass.
+private struct ShiftEditorSheet: View {
     let vm: RotaViewModel
     let shift: FfiShiftInfo
     @Environment(\.dismiss) private var dismiss
     @State private var startDate: Date
     @State private var endDate: Date
+    @State private var minStaff: Int
+    @State private var maxStaff: Int
+    @State private var roleReqs: [FfiRoleRequirement]
+    @State private var showAddEmployee = false
+    @State private var showDeleteConfirm = false
 
     init(vm: RotaViewModel, shift: FfiShiftInfo) {
         self.vm = vm
@@ -891,18 +923,74 @@ private struct ShiftTimeEditSheet: View {
         let base = Calendar.current.startOfDay(for: Date())
         _startDate = State(initialValue: fmt.date(from: shift.startTime) ?? base)
         _endDate = State(initialValue: fmt.date(from: shift.endTime) ?? base)
+        _minStaff = State(initialValue: Int(shift.minEmployees))
+        _maxStaff = State(initialValue: Int(shift.maxEmployees))
+        _roleReqs = State(initialValue: shift.roleRequirements)
     }
+
+    private var assignments: [FfiScheduleEntry] { vm.assignments(for: shift.id) }
 
     var body: some View {
         NavigationStack {
             Form {
-                DatePicker("Start Time", selection: $startDate, displayedComponents: .hourAndMinute)
-                DatePicker("End Time", selection: $endDate, displayedComponents: .hourAndMinute)
+                Section("Time") {
+                    DatePicker("Start", selection: $startDate, displayedComponents: .hourAndMinute)
+                    DatePicker("End", selection: $endDate, displayedComponents: .hourAndMinute)
+                }
+
+                RoleStaffingSection(
+                    roles: vm.roles,
+                    minStaff: $minStaff,
+                    maxStaff: $maxStaff,
+                    roleReqs: $roleReqs
+                )
+
+                Section("Assigned") {
+                    if assignments.isEmpty {
+                        Text("No one assigned")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(assignments, id: \.assignmentId) { entry in
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(entry.employeeName)
+                                    if let conflict = vm.conflict(employeeId: entry.employeeId, shift: shift) {
+                                        ConflictBadge(reason: conflict)
+                                    }
+                                }
+                                Spacer()
+                                Button(role: .destructive) {
+                                    Task { await vm.deleteAssignment(id: entry.assignmentId) }
+                                } label: {
+                                    Image(systemName: "minus.circle.fill")
+                                        .foregroundStyle(.red)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Remove \(entry.employeeName)")
+                            }
+                        }
+                    }
+                    if assignments.count < Int(shift.maxEmployees) {
+                        Button {
+                            showAddEmployee = true
+                        } label: {
+                            Label("Add employee", systemImage: "plus.circle.fill")
+                        }
+                    }
+                }
+
+                Section {
+                    Button(role: .destructive) {
+                        showDeleteConfirm = true
+                    } label: {
+                        Label("Delete shift", systemImage: "trash")
+                    }
+                }
             }
             #if os(macOS)
             .formStyle(.grouped)
             #endif
-            .navigationTitle("Edit Shift Time")
+            .navigationTitle("Edit Shift")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -917,19 +1005,101 @@ private struct ShiftTimeEditSheet: View {
                         fmt.locale = Locale(identifier: "en_US_POSIX")
                         let start = fmt.string(from: startDate)
                         let end = fmt.string(from: endDate)
+                        // Effective min is clamped to the role-derived floor.
+                        let floor = roleReqs.map { Int($0.minCount) }.max() ?? 0
+                        let effMin = max(minStaff, floor)
+                        let effMax = max(maxStaff, effMin)
                         Task {
                             await vm.updateShiftTimes(id: shift.id, startTime: start, endTime: end)
+                            await vm.updateShift(
+                                id: shift.id,
+                                minEmployees: UInt32(effMin),
+                                maxEmployees: UInt32(effMax),
+                                roleRequirements: roleReqs
+                            )
                             dismiss()
                         }
                     }
                 }
             }
+            .sheet(isPresented: $showAddEmployee) {
+                AddEmployeePickerSheet(vm: vm, shift: shift)
+            }
+            .alert("Delete this shift?", isPresented: $showDeleteConfirm) {
+                Button("Cancel", role: .cancel) {}
+                Button("Delete", role: .destructive) {
+                    Task {
+                        await vm.deleteShift(id: shift.id)
+                        dismiss()
+                    }
+                }
+            } message: {
+                Text("This shift and all its assignments will be permanently deleted.")
+            }
         }
         #if os(iOS)
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
         #endif
         #if os(macOS)
-        .frame(minWidth: 340, idealWidth: 400, minHeight: 200, idealHeight: 280)
+        .frame(minWidth: 360, idealWidth: 440, minHeight: 360, idealHeight: 520)
+        #endif
+    }
+}
+
+// MARK: - Add employee picker sheet
+
+/// Picker for adding an employee to a shift. Candidates that can't work the
+/// shift (overlap / no availability / exception) show a warning but stay
+/// tappable — the manager can assign anyway (warn but allow).
+private struct AddEmployeePickerSheet: View {
+    let vm: RotaViewModel
+    let shift: FfiShiftInfo
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            let available = vm.availableEmployees(for: shift.id)
+            Group {
+                if available.isEmpty {
+                    ContentUnavailableView(
+                        "No Available Employees",
+                        systemImage: "person.slash",
+                        description: Text("Everyone is already assigned to this shift.")
+                    )
+                } else {
+                    List(available, id: \.id) { employee in
+                        Button {
+                            Task {
+                                await vm.addEmployeeToShift(shiftId: shift.id, employeeId: employee.id)
+                                dismiss()
+                            }
+                        } label: {
+                            HStack {
+                                Text(employee.displayName)
+                                Spacer()
+                                if let conflict = vm.conflict(employeeId: employee.id, shift: shift) {
+                                    ConflictBadge(reason: conflict)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Add Employee")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+        #if os(iOS)
+        .presentationDetents([.medium, .large])
+        #endif
+        #if os(macOS)
+        .frame(minWidth: 320, idealWidth: 400, minHeight: 300, idealHeight: 450)
         #endif
     }
 }
@@ -947,7 +1117,9 @@ private struct AddShiftSheet: View {
     // force-unwrap and crash.
     @State private var startDate = AddShiftSheet.defaultTime(hour: 9)
     @State private var endDate = AddShiftSheet.defaultTime(hour: 17)
-    @State private var selectedRole: String = ""
+    @State private var minStaff = 1
+    @State private var maxStaff = 1
+    @State private var roleReqs: [FfiRoleRequirement] = []
 
     private static func defaultTime(hour: Int) -> Date {
         Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: Date())
@@ -957,14 +1129,16 @@ private struct AddShiftSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                DatePicker("Start Time", selection: $startDate, displayedComponents: .hourAndMinute)
-                DatePicker("End Time", selection: $endDate, displayedComponents: .hourAndMinute)
-                Picker("Role", selection: $selectedRole) {
-                    Text("Any Role").tag("")
-                    ForEach(vm.roles, id: \.id) { role in
-                        Text(role.name).tag(role.name)
-                    }
+                Section("Time") {
+                    DatePicker("Start", selection: $startDate, displayedComponents: .hourAndMinute)
+                    DatePicker("End", selection: $endDate, displayedComponents: .hourAndMinute)
                 }
+                RoleStaffingSection(
+                    roles: vm.roles,
+                    minStaff: $minStaff,
+                    maxStaff: $maxStaff,
+                    roleReqs: $roleReqs
+                )
             }
             #if os(macOS)
             .formStyle(.grouped)
@@ -984,10 +1158,16 @@ private struct AddShiftSheet: View {
                         fmt.locale = Locale(identifier: "en_US_POSIX")
                         let start = fmt.string(from: startDate)
                         let end = fmt.string(from: endDate)
+                        let floor = roleReqs.map { Int($0.minCount) }.max() ?? 0
+                        let effMin = max(minStaff, floor)
+                        let effMax = max(maxStaff, effMin)
                         Task {
                             await vm.createAdHocShift(
                                 date: date, startTime: start,
-                                endTime: end, requiredRole: selectedRole
+                                endTime: end, requiredRole: "",
+                                roleRequirements: roleReqs,
+                                minEmployees: UInt32(effMin),
+                                maxEmployees: UInt32(effMax)
                             )
                             dismiss()
                         }

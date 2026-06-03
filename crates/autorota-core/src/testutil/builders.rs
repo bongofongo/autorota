@@ -14,7 +14,7 @@ use crate::models::overrides::{
     DayAvailability, EmployeeAvailabilityOverride, OverrideSource, ShiftTemplateOverride,
 };
 use crate::models::rota::Rota;
-use crate::models::shift::{Shift, ShiftTemplate};
+use crate::models::shift::{RoleRequirement, Shift, ShiftTemplate};
 use crate::models::shift_history::EmployeeShiftRecord;
 
 static NEXT_EMPLOYEE_ID: AtomicI64 = AtomicI64::new(1000);
@@ -184,6 +184,7 @@ impl ShiftBuilder {
                 required_role: "barista".to_string(),
                 min_employees: 1,
                 max_employees: 1,
+                role_requirements: vec![],
             },
         }
     }
@@ -232,14 +233,44 @@ impl ShiftBuilder {
         self
     }
 
+    /// Set explicit multi-role requirements (overrides the synthesized legacy role).
+    pub fn require_roles(mut self, reqs: &[(&str, u32)]) -> Self {
+        self.inner.role_requirements = reqs
+            .iter()
+            .map(|(role, min)| RoleRequirement {
+                role: role.to_string(),
+                min_count: *min,
+            })
+            .collect();
+        self
+    }
+
     pub fn capacity(mut self, min: u32, max: u32) -> Self {
         self.inner.min_employees = min;
         self.inner.max_employees = max;
         self
     }
 
-    pub fn build(self) -> Shift {
+    pub fn build(mut self) -> Shift {
+        synthesize_role_requirement(
+            &mut self.inner.role_requirements,
+            &self.inner.required_role,
+            self.inner.min_employees,
+        );
         self.inner
+    }
+}
+
+/// Mirror the DB migration backfill: if no explicit role requirements were set
+/// but a legacy single role is present, derive one requirement whose minimum is
+/// the overall `min_employees`. Keeps pre-multi-role test fixtures behaving as
+/// "needs N of that role".
+fn synthesize_role_requirement(reqs: &mut Vec<RoleRequirement>, role: &str, min: u32) {
+    if reqs.is_empty() && !role.is_empty() {
+        reqs.push(RoleRequirement {
+            role: role.to_string(),
+            min_count: min,
+        });
     }
 }
 
@@ -264,6 +295,7 @@ impl ShiftTemplateBuilder {
                 required_role: "barista".to_string(),
                 min_employees: 1,
                 max_employees: 2,
+                role_requirements: vec![],
                 deleted: false,
             },
         }
@@ -308,6 +340,18 @@ impl ShiftTemplateBuilder {
         self
     }
 
+    /// Set explicit multi-role requirements (overrides the synthesized legacy role).
+    pub fn require_roles(mut self, reqs: &[(&str, u32)]) -> Self {
+        self.inner.role_requirements = reqs
+            .iter()
+            .map(|(role, min)| RoleRequirement {
+                role: role.to_string(),
+                min_count: *min,
+            })
+            .collect();
+        self
+    }
+
     pub fn capacity(mut self, min: u32, max: u32) -> Self {
         self.inner.min_employees = min;
         self.inner.max_employees = max;
@@ -319,7 +363,12 @@ impl ShiftTemplateBuilder {
         self
     }
 
-    pub fn build(self) -> ShiftTemplate {
+    pub fn build(mut self) -> ShiftTemplate {
+        synthesize_role_requirement(
+            &mut self.inner.role_requirements,
+            &self.inner.required_role,
+            self.inner.min_employees,
+        );
         self.inner
     }
 }

@@ -1302,6 +1302,9 @@
         }
       }
     },
+    "Add shift on %@" : {
+
+    },
     "Add tag" : {
       "localizations" : {
         "ar" : {
@@ -1470,6 +1473,7 @@
       }
     },
     "All employees are already assigned to this shift." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -1629,6 +1633,9 @@
         }
       }
     },
+    "Any staff with availability can be assigned." : {
+
+    },
     "Appearance" : {
       "localizations" : {
         "ar" : {
@@ -1748,6 +1755,9 @@
           }
         }
       }
+    },
+    "Assigned" : {
+
     },
     "Assigned: %@" : {
       "localizations" : {
@@ -4226,6 +4236,9 @@
         }
       }
     },
+    "Edit shift" : {
+
+    },
     "Edit Shift" : {
       "localizations" : {
         "ar" : {
@@ -4307,6 +4320,7 @@
       }
     },
     "Edit Shift Time" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -4791,6 +4805,7 @@
       }
     },
     "End Time" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -5041,6 +5056,9 @@
       }
     },
     "Everyday" : {
+
+    },
+    "Everyone is already assigned to this shift." : {
 
     },
     "Exceptions" : {
@@ -12699,7 +12717,11 @@
         }
       }
     },
+    "Max staff" : {
+
+    },
     "Max staff: %lld" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -12979,7 +13001,14 @@
         }
       }
     },
+    "min %u" : {
+
+    },
+    "Min staff" : {
+
+    },
     "Min staff: %lld" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -13986,6 +14015,9 @@
           }
         }
       }
+    },
+    "No one assigned" : {
+
     },
     "No past shifts." : {
       "localizations" : {
@@ -16070,6 +16102,9 @@
         }
       }
     },
+    "One person who holds several required roles covers each of them." : {
+
+    },
     "Opened" : {
       "localizations" : {
         "ar" : {
@@ -17177,6 +17212,9 @@
         }
       }
     },
+    "Remove %@" : {
+
+    },
     "Remove %@?" : {
       "localizations" : {
         "ar" : {
@@ -17218,6 +17256,7 @@
       }
     },
     "Remove assignment" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -17421,6 +17460,7 @@
 
     },
     "Required role" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -17716,6 +17756,7 @@
       }
     },
     "Role & Staffing" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -17754,6 +17795,9 @@
           }
         }
       }
+    },
+    "Role and staffing" : {
+
     },
     "Role name" : {
       "localizations" : {
@@ -19772,6 +19816,7 @@
       }
     },
     "Start Time" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -20836,6 +20881,9 @@
           }
         }
       }
+    },
+    "Time" : {
+
     },
     "Times" : {
       "localizations" : {

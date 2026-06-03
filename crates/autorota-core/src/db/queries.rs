@@ -14,7 +14,7 @@ use crate::models::save::{
     SaveEmployeeAvailabilityOverrideSnapshot, SaveShiftSnapshot, SaveSnapshot, ShiftDiff,
     diff_snapshots,
 };
-use crate::models::shift::{Shift, ShiftTemplate};
+use crate::models::shift::{RoleRequirement, Shift, ShiftTemplate};
 use crate::models::shift_history::EmployeeShiftRecord;
 use crate::models::sync::{BaseSnapshot, SyncRecord, Tombstone};
 use std::collections::{HashMap, HashSet};
@@ -254,7 +254,36 @@ pub async fn insert_shift_template(
     .fetch_one(pool)
     .await?;
 
+    set_template_role_requirements(
+        pool,
+        id,
+        &effective_role_requirements(
+            &tmpl.role_requirements,
+            &tmpl.required_role,
+            tmpl.min_employees,
+        ),
+    )
+    .await?;
+
     Ok(id)
+}
+
+/// Mirror the migration backfill: if no explicit role requirements are present
+/// but a legacy single role is, derive one requirement. Keeps the `required_role`
+/// denormalisation and `role_requirements` table self-consistent.
+fn effective_role_requirements(
+    reqs: &[RoleRequirement],
+    required_role: &str,
+    min_employees: u32,
+) -> Vec<RoleRequirement> {
+    if reqs.is_empty() && !required_role.is_empty() {
+        vec![RoleRequirement {
+            role: required_role.to_string(),
+            min_count: min_employees,
+        }]
+    } else {
+        reqs.to_vec()
+    }
 }
 
 pub async fn list_shift_templates(pool: &SqlitePool) -> Result<Vec<ShiftTemplate>, sqlx::Error> {
@@ -265,10 +294,11 @@ pub async fn list_shift_templates(pool: &SqlitePool) -> Result<Vec<ShiftTemplate
     .fetch_all(pool)
     .await?;
 
-    Ok(rows
+    let templates: Vec<ShiftTemplate> = rows
         .into_iter()
         .filter_map(shift_template_from_row)
-        .collect())
+        .collect();
+    hydrate_template_requirements(pool, templates).await
 }
 
 /// Like `list_shift_templates` but includes soft-deleted templates (for historical lookups).
@@ -282,10 +312,11 @@ pub async fn list_all_shift_templates(
     .fetch_all(pool)
     .await?;
 
-    Ok(rows
+    let templates: Vec<ShiftTemplate> = rows
         .into_iter()
         .filter_map(shift_template_from_row)
-        .collect())
+        .collect();
+    hydrate_template_requirements(pool, templates).await
 }
 
 pub async fn update_shift_template(
@@ -312,6 +343,17 @@ pub async fn update_shift_template(
     .execute(pool)
     .await?;
 
+    set_template_role_requirements(
+        pool,
+        tmpl.id,
+        &effective_role_requirements(
+            &tmpl.role_requirements,
+            &tmpl.required_role,
+            tmpl.min_employees,
+        ),
+    )
+    .await?;
+
     Ok(())
 }
 
@@ -324,6 +366,90 @@ pub async fn delete_shift_template(pool: &SqlitePool, id: i64) -> Result<(), sql
     .bind(id)
     .execute(pool)
     .await?;
+    Ok(())
+}
+
+// ─── Role requirements (multi-role shifts) ───────────────────
+
+async fn load_role_requirements(
+    pool: &SqlitePool,
+    table: &str,
+    fk_column: &str,
+    fk_value: i64,
+) -> Result<Vec<RoleRequirement>, sqlx::Error> {
+    let sql = format!("SELECT role, min_count FROM {table} WHERE {fk_column} = ? ORDER BY id");
+    let rows: Vec<(String, u32)> = sqlx::query_as(&sql).bind(fk_value).fetch_all(pool).await?;
+    Ok(rows
+        .into_iter()
+        .map(|(role, min_count)| RoleRequirement { role, min_count })
+        .collect())
+}
+
+async fn replace_role_requirements(
+    pool: &SqlitePool,
+    table: &str,
+    fk_column: &str,
+    fk_value: i64,
+    reqs: &[RoleRequirement],
+) -> Result<(), sqlx::Error> {
+    sqlx::query(&format!("DELETE FROM {table} WHERE {fk_column} = ?"))
+        .bind(fk_value)
+        .execute(pool)
+        .await?;
+    for req in reqs {
+        sqlx::query(&format!(
+            "INSERT INTO {table} ({fk_column}, role, min_count) VALUES (?, ?, ?)"
+        ))
+        .bind(fk_value)
+        .bind(&req.role)
+        .bind(req.min_count)
+        .execute(pool)
+        .await?;
+    }
+    Ok(())
+}
+
+/// Denormalised "primary role" kept on the parent row so legacy single-role
+/// consumers (export grouping, diffs) still work: the first requirement's role,
+/// or empty for a wildcard.
+fn primary_role(reqs: &[RoleRequirement]) -> String {
+    reqs.first().map(|r| r.role.clone()).unwrap_or_default()
+}
+
+/// Replace the role requirements attached to a materialised shift.
+pub async fn set_shift_role_requirements(
+    pool: &SqlitePool,
+    shift_id: i64,
+    reqs: &[RoleRequirement],
+) -> Result<(), sqlx::Error> {
+    replace_role_requirements(pool, "shift_role_requirements", "shift_id", shift_id, reqs).await?;
+    sqlx::query("UPDATE shifts SET required_role = ?, sync_status = 0 WHERE id = ?")
+        .bind(primary_role(reqs))
+        .bind(shift_id)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// Replace the role requirements attached to a shift template.
+pub async fn set_template_role_requirements(
+    pool: &SqlitePool,
+    template_id: i64,
+    reqs: &[RoleRequirement],
+) -> Result<(), sqlx::Error> {
+    replace_role_requirements(
+        pool,
+        "template_role_requirements",
+        "template_id",
+        template_id,
+        reqs,
+    )
+    .await?;
+    sqlx::query("UPDATE shift_templates SET required_role = ?, sync_status = 0 WHERE id = ?")
+        .bind(primary_role(reqs))
+        .bind(template_id)
+        .execute(pool)
+        .await?;
     Ok(())
 }
 
@@ -354,8 +480,22 @@ fn shift_template_from_row(row: ShiftTemplateRow) -> Option<ShiftTemplate> {
         required_role,
         min_employees: min_emp,
         max_employees: max_emp,
+        role_requirements: vec![],
         deleted,
     })
+}
+
+/// Attach each template's role requirements (loaded separately to avoid a join).
+async fn hydrate_template_requirements(
+    pool: &SqlitePool,
+    mut templates: Vec<ShiftTemplate>,
+) -> Result<Vec<ShiftTemplate>, sqlx::Error> {
+    for tmpl in &mut templates {
+        tmpl.role_requirements =
+            load_role_requirements(pool, "template_role_requirements", "template_id", tmpl.id)
+                .await?;
+    }
+    Ok(templates)
 }
 
 /// Materialise concrete Shift rows from all templates for a given rota/week.
@@ -397,6 +537,7 @@ pub async fn materialise_shifts(
                     required_role: tmpl.required_role.clone(),
                     min_employees,
                     max_employees,
+                    role_requirements: tmpl.role_requirements.clone(),
                 };
                 let id = insert_shift(pool, &shift).await?;
                 shifts.push(crate::models::shift::Shift { id, ..shift });
@@ -413,6 +554,7 @@ pub async fn materialise_shifts(
                 required_role: tmpl.required_role.clone(),
                 min_employees: tmpl.min_employees,
                 max_employees: tmpl.max_employees,
+                role_requirements: tmpl.role_requirements.clone(),
             };
 
             let id = insert_shift(pool, &shift).await?;
@@ -576,6 +718,17 @@ pub async fn insert_shift(pool: &SqlitePool, shift: &Shift) -> Result<i64, sqlx:
     .fetch_one(pool)
     .await?;
 
+    set_shift_role_requirements(
+        pool,
+        id,
+        &effective_role_requirements(
+            &shift.role_requirements,
+            &shift.required_role,
+            shift.min_employees,
+        ),
+    )
+    .await?;
+
     Ok(id)
 }
 
@@ -591,7 +744,12 @@ pub async fn list_shifts_for_rota(
     .fetch_all(pool)
     .await?;
 
-    Ok(rows.into_iter().filter_map(shift_from_row).collect())
+    let mut shifts: Vec<Shift> = rows.into_iter().filter_map(shift_from_row).collect();
+    for shift in &mut shifts {
+        shift.role_requirements =
+            load_role_requirements(pool, "shift_role_requirements", "shift_id", shift.id).await?;
+    }
+    Ok(shifts)
 }
 
 fn shift_from_row(row: ShiftRow) -> Option<Shift> {
@@ -607,6 +765,7 @@ fn shift_from_row(row: ShiftRow) -> Option<Shift> {
         required_role,
         min_employees: min_emp,
         max_employees: max_emp,
+        role_requirements: vec![],
     })
 }
 
@@ -690,6 +849,25 @@ pub async fn update_shift_times(
         .bind(id)
         .execute(pool)
         .await?;
+    Ok(())
+}
+
+pub async fn update_shift_capacity(
+    pool: &SqlitePool,
+    id: i64,
+    min_employees: u32,
+    max_employees: u32,
+) -> Result<(), sqlx::Error> {
+    let now = chrono::Utc::now().to_rfc3339();
+    sqlx::query(
+        "UPDATE shifts SET min_employees = ?, max_employees = ?, last_modified = ?, sync_status = 0 WHERE id = ?",
+    )
+    .bind(min_employees)
+    .bind(max_employees)
+    .bind(&now)
+    .bind(id)
+    .execute(pool)
+    .await?;
     Ok(())
 }
 

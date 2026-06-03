@@ -400,5 +400,17 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         run_migration_tx(pool, m23).await?;
     }
 
+    // Migration 024: multi-role shifts (per-role minimums on shifts/templates).
+    let has_role_requirements: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='shift_role_requirements'",
+    )
+    .fetch_one(pool)
+    .await?;
+
+    if !has_role_requirements {
+        let m24 = include_str!("../../migrations/024_shift_role_requirements.sql");
+        run_migration_tx(pool, m24).await?;
+    }
+
     Ok(())
 }

@@ -12,7 +12,7 @@ struct RotaViewModelTests {
         FfiShiftInfo(
             id: id, date: "2026-03-23", weekday: weekday,
             startTime: start, endTime: end, requiredRole: "Barista",
-            minEmployees: 1, maxEmployees: 2
+            minEmployees: 1, maxEmployees: 2, roleRequirements: []
         )
     }
 
@@ -126,6 +126,95 @@ struct RotaViewModelTests {
         let available = vm.availableEmployees(for: 1)
         #expect(available.count == 1)
         #expect(available[0].id == 2)
+    }
+
+    // MARK: - Conflict detection
+
+    private func makeEmployee(id: Int64 = 1, availability: [AvailabilitySlot] = []) -> FfiEmployee {
+        FfiEmployee(
+            id: id, firstName: "Emp\(id)", lastName: "X", nickname: nil, displayName: "Emp\(id)",
+            roles: ["Barista"], startDate: "2025-01-01", targetWeeklyHours: 20,
+            weeklyHoursDeviation: 5, maxDailyHours: 8, notes: nil, bankDetails: nil,
+            phone: nil, email: nil, preferredContact: nil, hourlyWage: nil, wageCurrency: nil,
+            defaultAvailability: [], availability: availability, deleted: false
+        )
+    }
+
+    /// Monday availability slots over the default shift window (07:00–12:00).
+    private func monSlots(_ state: String, hours: ClosedRange<Int> = 7...11) -> [AvailabilitySlot] {
+        hours.map { AvailabilitySlot(weekday: "Mon", hour: UInt8($0), state: state) }
+    }
+
+    private func makeOverride(employeeId: Int64 = 1, source: String, state: String, hours: ClosedRange<Int> = 7...11) -> FfiEmployeeAvailabilityOverride {
+        FfiEmployeeAvailabilityOverride(
+            id: 1, employeeId: employeeId, date: "2026-03-23",
+            availability: hours.map { DayAvailabilitySlot(hour: UInt8($0), state: state) },
+            notes: nil, source: source
+        )
+    }
+
+    /// Build a VM whose conflict caches are populated via `loadSchedule`.
+    private func loadedVM(_ mock: MockAutorotaService) async -> RotaViewModel {
+        let vm = RotaViewModel(service: mock)
+        vm.selectedWeekStart = "2026-03-23"
+        await vm.loadSchedule()
+        return vm
+    }
+
+    @Test func conflictOverlapWithExistingBooking() async {
+        let mock = MockAutorotaService()
+        mock.stubbedEmployees = [makeEmployee(id: 1, availability: monSlots("Yes"))]
+        // Emp 1 is already booked on shift 1 (07:00–12:00).
+        mock.stubbedWeekSchedule = makeSchedule(entries: [makeEntry(assignmentId: 10, shiftId: 1, employeeId: 1)])
+        let vm = await loadedVM(mock)
+        // Candidate shift 2 (10:00–14:00) overlaps the existing booking.
+        let c = vm.conflict(employeeId: 1, shift: makeShiftInfo(id: 2, start: "10:00", end: "14:00"))
+        #expect(c == .overlap("07:00–12:00"))
+    }
+
+    @Test func conflictWeeklyNoAvailability() async {
+        let mock = MockAutorotaService()
+        mock.stubbedEmployees = [makeEmployee(id: 1, availability: monSlots("No"))]
+        mock.stubbedWeekSchedule = makeSchedule()
+        let vm = await loadedVM(mock)
+        #expect(vm.conflict(employeeId: 1, shift: makeShiftInfo()) == .noAvailability)
+    }
+
+    @Test func conflictExceptionOverride() async {
+        let mock = MockAutorotaService()
+        mock.stubbedEmployees = [makeEmployee(id: 1, availability: monSlots("Yes"))]
+        mock.stubbedWeekSchedule = makeSchedule()
+        mock.stubbedAvailabilityOverrides = [makeOverride(source: "exception", state: "No")]
+        let vm = await loadedVM(mock)
+        #expect(vm.conflict(employeeId: 1, shift: makeShiftInfo()) == .exception)
+    }
+
+    @Test func conflictManualDateOverride() async {
+        let mock = MockAutorotaService()
+        mock.stubbedEmployees = [makeEmployee(id: 1, availability: monSlots("Yes"))]
+        mock.stubbedWeekSchedule = makeSchedule()
+        mock.stubbedAvailabilityOverrides = [makeOverride(source: "manual", state: "No")]
+        let vm = await loadedVM(mock)
+        #expect(vm.conflict(employeeId: 1, shift: makeShiftInfo()) == .dateOverride)
+    }
+
+    @Test func conflictMaybeIsSoft() async {
+        let mock = MockAutorotaService()
+        // Empty availability resolves to Maybe over the window.
+        mock.stubbedEmployees = [makeEmployee(id: 1, availability: [])]
+        mock.stubbedWeekSchedule = makeSchedule()
+        let vm = await loadedVM(mock)
+        let c = vm.conflict(employeeId: 1, shift: makeShiftInfo())
+        #expect(c == .maybe)
+        #expect(c?.isHard == false)
+    }
+
+    @Test func conflictNoneWhenAvailable() async {
+        let mock = MockAutorotaService()
+        mock.stubbedEmployees = [makeEmployee(id: 1, availability: monSlots("Yes"))]
+        mock.stubbedWeekSchedule = makeSchedule()
+        let vm = await loadedVM(mock)
+        #expect(vm.conflict(employeeId: 1, shift: makeShiftInfo()) == nil)
     }
 
     // MARK: - Swap state machine
@@ -250,7 +339,7 @@ struct RotaViewModelTests {
         let mock = MockAutorotaService()
         let warning = FfiShortfallWarning(
             shiftId: 1, needed: 2, filled: 1, weekday: "Mon",
-            startTime: "07:00", endTime: "12:00", requiredRole: "Barista"
+            startTime: "07:00", endTime: "12:00", requiredRole: "Barista", role: "Barista"
         )
         mock.stubbedScheduleResult = FfiScheduleResult(assignments: [], warnings: [warning])
         mock.stubbedWeekSchedule = makeSchedule()

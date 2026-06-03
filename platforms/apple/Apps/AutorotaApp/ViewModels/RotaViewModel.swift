@@ -30,6 +30,12 @@ final class RotaViewModel {
     var employees: [FfiEmployee] = []
     var roles: [FfiRole] = []
 
+    // Conflict-detection caches, refreshed on every schedule load so the editor
+    // and grid can flag unavailable/double-booked assignments without entering
+    // edit mode. See `conflict(employeeId:shift:)`.
+    private var employeesById: [Int64: FfiEmployee] = [:]
+    private var availabilityOverridesByKey: [String: FfiEmployeeAvailabilityOverride] = [:]
+
     // Swap
     var swapSourceAssignmentId: Int64?
     var swapSourceShiftId: Int64?
@@ -72,7 +78,53 @@ final class RotaViewModel {
         } catch {
             self.error = userFacingMessage(error)
         }
+        await refreshConflictData()
         isLoading = false
+    }
+
+    /// Load the employees + availability overrides used to flag assignment
+    /// conflicts. Best-effort: failures leave the caches as-is (no warnings)
+    /// rather than blocking the schedule view.
+    private func refreshConflictData() async {
+        if let emps = try? await service.listEmployees() {
+            employees = emps
+            employeesById = Dictionary(uniqueKeysWithValues: emps.map { ($0.id, $0) })
+        }
+        if let overrides = try? await service.listAllEmployeeAvailabilityOverrides() {
+            availabilityOverridesByKey = Dictionary(
+                overrides.map { ("\($0.employeeId)-\($0.date)", $0) },
+                uniquingKeysWith: { first, _ in first }
+            )
+        }
+        if let loadedRoles = try? await service.listRoles() {
+            roles = loadedRoles
+        }
+    }
+
+    // MARK: - Conflict detection
+
+    /// The conflict (if any) for keeping or assigning `employeeId` on `shift`.
+    /// Overlap with an existing booking takes priority; then availability
+    /// (date override before weekly template); `.maybe` is the softest. nil
+    /// means the employee can work the shift. Mirrors scheduler eligibility.
+    func conflict(employeeId: Int64, shift: FfiShiftInfo) -> ConflictReason? {
+        guard let schedule else { return nil }
+        let otherEntries = schedule.entries.filter { $0.employeeId == employeeId }
+        if let overlap = ShiftConflict.overlapConflict(shift: shift, employeeEntries: otherEntries) {
+            return overlap
+        }
+        guard let emp = employeesById[employeeId] else { return nil }
+        let weekday = shift.weekday
+        var weekly: [Int: AvailWorst] = [:]
+        for slot in emp.availability where slot.weekday == weekday {
+            weekly[Int(slot.hour)] = ShiftConflict.parseState(slot.state)
+        }
+        let dateOverride = availabilityOverridesByKey["\(employeeId)-\(shift.date)"]
+        return ShiftConflict.availabilityConflict(
+            shift: shift,
+            weeklyState: { weekly[$0] ?? .maybe },
+            dateOverride: dateOverride
+        )
     }
 
     func runSchedule() async {
@@ -237,12 +289,48 @@ final class RotaViewModel {
         }
     }
 
-    func createAdHocShift(date: String, startTime: String, endTime: String, requiredRole: String) async {
+    func createAdHocShift(
+        date: String,
+        startTime: String,
+        endTime: String,
+        requiredRole: String,
+        roleRequirements: [FfiRoleRequirement] = [],
+        minEmployees: UInt32 = 1,
+        maxEmployees: UInt32 = 1
+    ) async {
         guard let rotaId = schedule?.rotaId else { return }
         do {
-            _ = try await service.createAdHocShift(
+            let id = try await service.createAdHocShift(
                 rotaId: rotaId, date: date, startTime: startTime,
-                endTime: endTime, requiredRole: requiredRole
+                endTime: endTime, requiredRole: requiredRole,
+                roleRequirements: roleRequirements
+            )
+            // Ad-hoc creation fixes capacity at 1/1; apply the requested
+            // capacity + requirements in a follow-up update.
+            if minEmployees != 1 || maxEmployees != 1 || !roleRequirements.isEmpty {
+                try await service.updateShift(
+                    id: id, minEmployees: minEmployees,
+                    maxEmployees: maxEmployees, roleRequirements: roleRequirements
+                )
+            }
+            isDirty = true
+            await loadSchedule()
+        } catch {
+            self.error = userFacingMessage(error)
+        }
+    }
+
+    /// Update a shift's capacity (min/max) and role requirements.
+    func updateShift(
+        id: Int64,
+        minEmployees: UInt32,
+        maxEmployees: UInt32,
+        roleRequirements: [FfiRoleRequirement]
+    ) async {
+        do {
+            try await service.updateShift(
+                id: id, minEmployees: minEmployees,
+                maxEmployees: maxEmployees, roleRequirements: roleRequirements
             )
             isDirty = true
             await loadSchedule()

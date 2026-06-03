@@ -1,6 +1,15 @@
 use chrono::{Datelike, NaiveDate, NaiveTime, Timelike, Weekday};
 use serde::{Deserialize, Serialize};
 
+/// A single per-role staffing requirement on a shift or template: at least
+/// `min_count` assigned employees must hold `role`. One employee who holds
+/// several required roles satisfies one unit of each simultaneously.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RoleRequirement {
+    pub role: String,
+    pub min_count: u32,
+}
+
 /// A reusable weekly pattern that generates concrete Shifts.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShiftTemplate {
@@ -9,9 +18,16 @@ pub struct ShiftTemplate {
     pub weekdays: Vec<Weekday>,
     pub start_time: NaiveTime,
     pub end_time: NaiveTime,
+    /// Legacy single-role field. No longer used for scheduling; kept for
+    /// backward compatibility and migration. See `role_requirements`.
     pub required_role: String,
+    /// Overall minimum headcount. The *effective* minimum is the larger of this
+    /// and the role-derived floor (see `Shift::effective_min`).
     pub min_employees: u32,
     pub max_employees: u32,
+    /// Per-role minimums. Empty ⇒ wildcard (any available staff).
+    #[serde(default)]
+    pub role_requirements: Vec<RoleRequirement>,
     /// Soft-delete flag: true if the template has been removed.
     #[serde(default)]
     pub deleted: bool,
@@ -26,22 +42,45 @@ pub struct Shift {
     pub date: NaiveDate,
     pub start_time: NaiveTime,
     pub end_time: NaiveTime,
+    /// Legacy single-role field. No longer used for scheduling; kept for
+    /// backward compatibility and migration. See `role_requirements`.
     pub required_role: String,
+    /// Overall minimum headcount (possibly raised above the role-derived floor).
     pub min_employees: u32,
     pub max_employees: u32,
+    /// Per-role minimums. Empty ⇒ wildcard (any available staff).
+    #[serde(default)]
+    pub role_requirements: Vec<RoleRequirement>,
 }
 
 impl ShiftTemplate {
-    /// Returns true if this template requires a specific role (not a wildcard).
+    /// Returns true if this template constrains roles.
     pub fn has_required_role(&self) -> bool {
-        !self.required_role.is_empty()
+        !self.role_requirements.is_empty()
     }
 }
 
 impl Shift {
-    /// Returns true if this shift requires a specific role (not a wildcard).
+    /// Returns true if this shift constrains roles.
     pub fn has_required_role(&self) -> bool {
-        !self.required_role.is_empty()
+        !self.role_requirements.is_empty()
+    }
+
+    /// The headcount floor implied by the role minimums: the largest single
+    /// role minimum (one person can cover several distinct roles, but a role
+    /// needing N distinct holders forces N people). Zero when unconstrained.
+    pub fn derived_min(&self) -> u32 {
+        self.role_requirements
+            .iter()
+            .map(|r| r.min_count)
+            .max()
+            .unwrap_or(0)
+    }
+
+    /// The minimum headcount that actually applies: the larger of the manual
+    /// `min_employees` and the role-derived floor.
+    pub fn effective_min(&self) -> u32 {
+        self.min_employees.max(self.derived_min())
     }
 
     pub fn duration_hours(&self) -> f32 {
@@ -124,6 +163,37 @@ mod tests {
     fn has_required_role_false_for_empty() {
         let mut s = make_shift((7, 0), (12, 0), (2026, 3, 23));
         s.required_role = "".into();
+        s.role_requirements.clear();
         assert!(!s.has_required_role());
+    }
+
+    #[test]
+    fn derived_and_effective_min() {
+        // 2 baristas → floor 2; 1 barista + 1 opening → floor 1 (shared cover).
+        let mut s = make_shift((7, 0), (12, 0), (2026, 3, 23));
+        s.role_requirements = vec![
+            RoleRequirement {
+                role: "barista".into(),
+                min_count: 1,
+            },
+            RoleRequirement {
+                role: "opening".into(),
+                min_count: 1,
+            },
+        ];
+        s.min_employees = 1;
+        assert_eq!(s.derived_min(), 1);
+        assert_eq!(s.effective_min(), 1);
+
+        s.role_requirements = vec![RoleRequirement {
+            role: "barista".into(),
+            min_count: 2,
+        }];
+        assert_eq!(s.derived_min(), 2);
+        assert_eq!(s.effective_min(), 2);
+
+        // Manual min can raise above the role floor.
+        s.min_employees = 3;
+        assert_eq!(s.effective_min(), 3);
     }
 }

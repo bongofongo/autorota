@@ -433,6 +433,7 @@ fn make_test_template() -> ShiftTemplate {
         required_role: "barista".into(),
         min_employees: 1,
         max_employees: 2,
+        role_requirements: vec![],
         deleted: false,
     }
 }

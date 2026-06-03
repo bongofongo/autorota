@@ -307,6 +307,7 @@ async fn shift_template_crud() {
         required_role: "barista".to_string(),
         min_employees: 1,
         max_employees: 2,
+        role_requirements: vec![],
         deleted: false,
     };
 
@@ -357,6 +358,7 @@ async fn full_scheduling_flow() {
         required_role: "barista".to_string(),
         min_employees: 1,
         max_employees: 1,
+        role_requirements: vec![],
         deleted: false,
     };
     let tmpl_id = queries::insert_shift_template(&pool, &tmpl).await.unwrap();
@@ -376,6 +378,7 @@ async fn full_scheduling_flow() {
         required_role: "barista".to_string(),
         min_employees: 1,
         max_employees: 1,
+        role_requirements: vec![],
     };
     let shift_id = queries::insert_shift(&pool, &shift).await.unwrap();
 
@@ -479,6 +482,7 @@ async fn role_rename_cascades() {
         required_role: "Barista".to_string(),
         min_employees: 1,
         max_employees: 1,
+        role_requirements: vec![],
         deleted: false,
     };
     queries::insert_shift_template(&pool, &tmpl).await.unwrap();
@@ -597,6 +601,7 @@ async fn materialise_shifts_creates_correct_dates() {
         required_role: "barista".to_string(),
         min_employees: 1,
         max_employees: 1,
+        role_requirements: vec![],
         deleted: false,
     };
     queries::insert_shift_template(&pool, &tmpl).await.unwrap();
@@ -663,6 +668,7 @@ async fn soft_deleted_employee_assignments_survive() {
         required_role: "barista".to_string(),
         min_employees: 1,
         max_employees: 1,
+        role_requirements: vec![],
     };
     let shift_id = queries::insert_shift(&pool, &shift).await.unwrap();
     let assignment = Assignment {
@@ -708,6 +714,7 @@ async fn swap_assignment_shifts_exchanges_shift_ids() {
         required_role: "barista".to_string(),
         min_employees: 1,
         max_employees: 1,
+        role_requirements: vec![],
     };
     let s2 = Shift {
         id: 0,
@@ -719,6 +726,7 @@ async fn swap_assignment_shifts_exchanges_shift_ids() {
         required_role: "barista".to_string(),
         min_employees: 1,
         max_employees: 1,
+        role_requirements: vec![],
     };
     let shift_id_1 = queries::insert_shift(&pool, &s1).await.unwrap();
     let shift_id_2 = queries::insert_shift(&pool, &s2).await.unwrap();
@@ -812,6 +820,7 @@ async fn update_shift_times_persists() {
         required_role: "barista".to_string(),
         min_employees: 1,
         max_employees: 1,
+        role_requirements: vec![],
     };
     let shift_id = queries::insert_shift(&pool, &shift).await.unwrap();
 
@@ -846,6 +855,7 @@ async fn delete_shifts_for_rota_preserves_adhoc() {
         required_role: "barista".to_string(),
         min_employees: 1,
         max_employees: 1,
+        role_requirements: vec![],
         deleted: false,
     };
     let tmpl_id = queries::insert_shift_template(&pool, &tmpl).await.unwrap();
@@ -861,6 +871,7 @@ async fn delete_shifts_for_rota_preserves_adhoc() {
         required_role: "barista".to_string(),
         min_employees: 1,
         max_employees: 1,
+        role_requirements: vec![],
     };
     queries::insert_shift(&pool, &template_shift).await.unwrap();
 
@@ -875,6 +886,7 @@ async fn delete_shifts_for_rota_preserves_adhoc() {
         required_role: "barista".to_string(),
         min_employees: 1,
         max_employees: 1,
+        role_requirements: vec![],
     };
     queries::insert_shift(&pool, &adhoc_shift).await.unwrap();
 
@@ -916,6 +928,7 @@ async fn list_employee_shift_history_returns_joined_records() {
         required_role: "barista".to_string(),
         min_employees: 1,
         max_employees: 1,
+        role_requirements: vec![],
     };
     let shift_id = queries::insert_shift(&pool, &shift).await.unwrap();
 
@@ -1148,6 +1161,7 @@ async fn delete_rota_creates_cascade_tombstones() {
         required_role: "barista".to_string(),
         min_employees: 1,
         max_employees: 1,
+        role_requirements: vec![],
     };
     let shift_id = queries::insert_shift(&pool, &shift).await.unwrap();
 
@@ -1262,6 +1276,7 @@ async fn pending_sync_records_json_has_all_columns() {
         required_role: "barista".to_string(),
         min_employees: 1,
         max_employees: 1,
+        role_requirements: vec![],
     };
     let shift_id = queries::insert_shift(&pool, &shift).await.unwrap();
 

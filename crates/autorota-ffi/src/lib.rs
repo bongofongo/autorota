@@ -11,7 +11,7 @@ use autorota_core::models::overrides::{
     DayAvailability, EmployeeAvailabilityOverride, OverrideSource, ShiftTemplateOverride,
 };
 use autorota_core::models::rota::Rota;
-use autorota_core::models::shift::{Shift, ShiftTemplate};
+use autorota_core::models::shift::{RoleRequirement, Shift, ShiftTemplate};
 use autorota_core::models::shift_history::EmployeeShiftRecord;
 use chrono::{Datelike, Local, NaiveDate, NaiveTime, Weekday};
 use sqlx::SqlitePool;
@@ -181,6 +181,26 @@ fn ffi_to_employee(e: FfiEmployee) -> Result<Employee, FfiError> {
     })
 }
 
+// ── Role requirement conversions ──────────────────────────────────────────────
+
+fn role_reqs_to_ffi(rs: Vec<RoleRequirement>) -> Vec<FfiRoleRequirement> {
+    rs.into_iter()
+        .map(|r| FfiRoleRequirement {
+            role: r.role,
+            min_count: r.min_count,
+        })
+        .collect()
+}
+
+fn ffi_to_role_reqs(rs: Vec<FfiRoleRequirement>) -> Vec<RoleRequirement> {
+    rs.into_iter()
+        .map(|r| RoleRequirement {
+            role: r.role,
+            min_count: r.min_count,
+        })
+        .collect()
+}
+
 // ── ShiftTemplate conversions ─────────────────────────────────────────────────
 
 fn shift_template_to_ffi(t: ShiftTemplate) -> FfiShiftTemplate {
@@ -197,6 +217,7 @@ fn shift_template_to_ffi(t: ShiftTemplate) -> FfiShiftTemplate {
         required_role: t.required_role,
         min_employees: t.min_employees,
         max_employees: t.max_employees,
+        role_requirements: role_reqs_to_ffi(t.role_requirements),
         deleted: t.deleted,
     }
 }
@@ -216,6 +237,7 @@ fn ffi_to_shift_template(t: FfiShiftTemplate) -> Result<ShiftTemplate, FfiError>
         required_role: t.required_role,
         min_employees: t.min_employees,
         max_employees: t.max_employees,
+        role_requirements: ffi_to_role_reqs(t.role_requirements),
         deleted: t.deleted,
     })
 }
@@ -233,6 +255,7 @@ fn shift_to_ffi(s: Shift) -> FfiShift {
         required_role: s.required_role,
         min_employees: s.min_employees,
         max_employees: s.max_employees,
+        role_requirements: role_reqs_to_ffi(s.role_requirements),
     }
 }
 
@@ -606,6 +629,23 @@ pub fn update_shift_times(id: i64, start_time: String, end_time: String) -> Resu
         .map_err(FfiError::from)
 }
 
+/// Update a materialised shift's capacity and role requirements.
+#[uniffi::export]
+pub fn update_shift(
+    id: i64,
+    min_employees: u32,
+    max_employees: u32,
+    role_requirements: Vec<FfiRoleRequirement>,
+) -> Result<(), FfiError> {
+    let pool = pool()?;
+    let reqs = ffi_to_role_reqs(role_requirements);
+    rt().block_on(async move {
+        queries::update_shift_capacity(pool, id, min_employees, max_employees).await?;
+        queries::set_shift_role_requirements(pool, id, &reqs).await
+    })
+    .map_err(FfiError::from)
+}
+
 #[uniffi::export]
 pub fn create_ad_hoc_shift(
     rota_id: i64,
@@ -613,6 +653,7 @@ pub fn create_ad_hoc_shift(
     start_time: String,
     end_time: String,
     required_role: String,
+    role_requirements: Vec<FfiRoleRequirement>,
 ) -> Result<i64, FfiError> {
     let pool = pool()?;
     let shift = Shift {
@@ -625,6 +666,7 @@ pub fn create_ad_hoc_shift(
         required_role,
         min_employees: 1,
         max_employees: 1,
+        role_requirements: ffi_to_role_reqs(role_requirements),
     };
     rt().block_on(queries::insert_shift(pool, &shift))
         .map_err(FfiError::from)
@@ -754,6 +796,7 @@ pub fn run_schedule(week_start: String) -> Result<FfiScheduleResult, FfiError> {
                 start_time: w.start_time,
                 end_time: w.end_time,
                 required_role: w.required_role,
+                role: w.role,
             })
             .collect(),
     })
@@ -815,6 +858,7 @@ pub fn get_week_schedule(week_start: String) -> Result<Option<FfiWeekSchedule>, 
                 required_role: s.required_role.clone(),
                 min_employees: s.min_employees,
                 max_employees: s.max_employees,
+                role_requirements: role_reqs_to_ffi(s.role_requirements.clone()),
             })
             .collect();
 
@@ -1521,6 +1565,7 @@ mod tests {
             required_role: "Barista".into(),
             min_employees: 1,
             max_employees: 2,
+            role_requirements: vec![],
             deleted: false,
         };
 
@@ -1650,6 +1695,7 @@ mod tests {
             required_role: "Barista".into(),
             min_employees: 1,
             max_employees: 1,
+            role_requirements: vec![],
             deleted: false,
         };
 
@@ -1686,6 +1732,7 @@ mod tests {
             "14:00".into(),
             "18:00".into(),
             "Barista".into(),
+            vec![],
         )
         .unwrap();
 

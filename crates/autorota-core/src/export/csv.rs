@@ -11,9 +11,7 @@ use super::grid::ExportGrid;
 /// `" =cmd"` and `"\u{2028}=cmd"` slip past the bare `chars().next()`
 /// check and Excel still parses them as formulas.
 fn needs_formula_prefix(value: &str) -> bool {
-    let first = value
-        .chars()
-        .find(|c| !is_csv_skippable_whitespace(*c));
+    let first = value.chars().find(|c| !is_csv_skippable_whitespace(*c));
     matches!(
         first,
         Some('=') | Some('+') | Some('-') | Some('@') | Some('\t') | Some('\r')

@@ -29,6 +29,7 @@ final class MockAutorotaService: AutorotaServiceProtocol, @unchecked Sendable {
     var stubbedScheduleResult = FfiScheduleResult(assignments: [], warnings: [])
     var stubbedShifts: [FfiShift] = []
     var stubbedShiftHistory: [FfiEmployeeShiftRecord] = []
+    var stubbedAvailabilityOverrides: [FfiEmployeeAvailabilityOverride] = []
     var errorToThrow: Error? = nil
 
     // MARK: - Roles
@@ -174,7 +175,12 @@ final class MockAutorotaService: AutorotaServiceProtocol, @unchecked Sendable {
         if let e = errorToThrow { throw e }
     }
 
-    func createAdHocShift(rotaId: Int64, date: String, startTime: String, endTime: String, requiredRole: String) async throws -> Int64 {
+    func updateShift(id: Int64, minEmployees: UInt32, maxEmployees: UInt32, roleRequirements: [FfiRoleRequirement]) async throws {
+        callLog.append("updateShift:\(id):\(minEmployees)/\(maxEmployees):\(roleRequirements.map { "\($0.role)=\($0.minCount)" }.joined(separator: ","))")
+        if let e = errorToThrow { throw e }
+    }
+
+    func createAdHocShift(rotaId: Int64, date: String, startTime: String, endTime: String, requiredRole: String, roleRequirements: [FfiRoleRequirement]) async throws -> Int64 {
         callLog.append("createAdHocShift:\(date)")
         if let e = errorToThrow { throw e }
         return 1
@@ -224,7 +230,7 @@ final class MockAutorotaService: AutorotaServiceProtocol, @unchecked Sendable {
     func listAllEmployeeAvailabilityOverrides() async throws -> [FfiEmployeeAvailabilityOverride] {
         callLog.append("listAllEmployeeAvailabilityOverrides")
         if let e = errorToThrow { throw e }
-        return []
+        return stubbedAvailabilityOverrides
     }
 
     func deleteEmployeeAvailabilityOverride(id: Int64) async throws {

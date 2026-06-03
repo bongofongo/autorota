@@ -45,7 +45,8 @@ protocol AutorotaServiceProtocol: Sendable {
     // Shifts
     func deleteShift(id: Int64) async throws
     func updateShiftTimes(id: Int64, startTime: String, endTime: String) async throws
-    func createAdHocShift(rotaId: Int64, date: String, startTime: String, endTime: String, requiredRole: String) async throws -> Int64
+    func updateShift(id: Int64, minEmployees: UInt32, maxEmployees: UInt32, roleRequirements: [FfiRoleRequirement]) async throws
+    func createAdHocShift(rotaId: Int64, date: String, startTime: String, endTime: String, requiredRole: String, roleRequirements: [FfiRoleRequirement]) async throws -> Int64
     func listShiftsForRota(rotaId: Int64) async throws -> [FfiShift]
 
     // Shift History

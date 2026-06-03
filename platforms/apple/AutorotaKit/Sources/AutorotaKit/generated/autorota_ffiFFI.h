@@ -284,7 +284,7 @@ int64_t uniffi_autorota_ffi_fn_func_count_employees(RustCallStatus *_Nonnull out
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_CREATE_AD_HOC_SHIFT
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_CREATE_AD_HOC_SHIFT
-int64_t uniffi_autorota_ffi_fn_func_create_ad_hoc_shift(int64_t rota_id, RustBuffer date, RustBuffer start_time, RustBuffer end_time, RustBuffer required_role, RustCallStatus *_Nonnull out_status
+int64_t uniffi_autorota_ffi_fn_func_create_ad_hoc_shift(int64_t rota_id, RustBuffer date, RustBuffer start_time, RustBuffer end_time, RustBuffer required_role, RustBuffer role_requirements, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_CREATE_ASSIGNMENT
@@ -611,6 +611,11 @@ void uniffi_autorota_ffi_fn_func_update_employee(RustBuffer employee, RustCallSt
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_UPDATE_ROLE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_UPDATE_ROLE
 void uniffi_autorota_ffi_fn_func_update_role(int64_t id, RustBuffer name, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_UPDATE_SHIFT
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_UPDATE_SHIFT
+void uniffi_autorota_ffi_fn_func_update_shift(int64_t id, uint32_t min_employees, uint32_t max_employees, RustBuffer role_requirements, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_UPDATE_SHIFT_TEMPLATE
@@ -1336,6 +1341,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_update_employee(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_UPDATE_ROLE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_UPDATE_ROLE
 uint16_t uniffi_autorota_ffi_checksum_func_update_role(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_UPDATE_SHIFT
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_UPDATE_SHIFT
+uint16_t uniffi_autorota_ffi_checksum_func_update_shift(void
     
 );
 #endif

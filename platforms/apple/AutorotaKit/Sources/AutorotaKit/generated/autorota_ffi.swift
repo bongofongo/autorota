@@ -2735,6 +2735,77 @@ public func FfiConverterTypeFfiRole_lower(_ value: FfiRole) -> RustBuffer {
 }
 
 
+/**
+ * A per-role staffing minimum on a shift or template: at least `min_count`
+ * assigned employees must hold `role`. One employee covers one unit of each
+ * required role they hold.
+ */
+public struct FfiRoleRequirement {
+    public var role: String
+    public var minCount: UInt32
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(role: String, minCount: UInt32) {
+        self.role = role
+        self.minCount = minCount
+    }
+}
+
+
+
+extension FfiRoleRequirement: Equatable, Hashable {
+    public static func ==(lhs: FfiRoleRequirement, rhs: FfiRoleRequirement) -> Bool {
+        if lhs.role != rhs.role {
+            return false
+        }
+        if lhs.minCount != rhs.minCount {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(role)
+        hasher.combine(minCount)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFfiRoleRequirement: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiRoleRequirement {
+        return
+            try FfiRoleRequirement(
+                role: FfiConverterString.read(from: &buf), 
+                minCount: FfiConverterUInt32.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FfiRoleRequirement, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.role, into: &buf)
+        FfiConverterUInt32.write(value.minCount, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiRoleRequirement_lift(_ buf: RustBuffer) throws -> FfiRoleRequirement {
+    return try FfiConverterTypeFfiRoleRequirement.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiRoleRequirement_lower(_ value: FfiRoleRequirement) -> RustBuffer {
+    return FfiConverterTypeFfiRoleRequirement.lower(value)
+}
+
+
 public struct FfiRota {
     public var id: Int64
     public var weekStart: String
@@ -3269,10 +3340,17 @@ public struct FfiShift {
     public var requiredRole: String
     public var minEmployees: UInt32
     public var maxEmployees: UInt32
+    /**
+     * Per-role minimums. Empty ⇒ wildcard (any available staff).
+     */
+    public var roleRequirements: [FfiRoleRequirement]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(id: Int64, templateId: Int64?, rotaId: Int64, date: String, startTime: String, endTime: String, requiredRole: String, minEmployees: UInt32, maxEmployees: UInt32) {
+    public init(id: Int64, templateId: Int64?, rotaId: Int64, date: String, startTime: String, endTime: String, requiredRole: String, minEmployees: UInt32, maxEmployees: UInt32, 
+        /**
+         * Per-role minimums. Empty ⇒ wildcard (any available staff).
+         */roleRequirements: [FfiRoleRequirement]) {
         self.id = id
         self.templateId = templateId
         self.rotaId = rotaId
@@ -3282,6 +3360,7 @@ public struct FfiShift {
         self.requiredRole = requiredRole
         self.minEmployees = minEmployees
         self.maxEmployees = maxEmployees
+        self.roleRequirements = roleRequirements
     }
 }
 
@@ -3316,6 +3395,9 @@ extension FfiShift: Equatable, Hashable {
         if lhs.maxEmployees != rhs.maxEmployees {
             return false
         }
+        if lhs.roleRequirements != rhs.roleRequirements {
+            return false
+        }
         return true
     }
 
@@ -3329,6 +3411,7 @@ extension FfiShift: Equatable, Hashable {
         hasher.combine(requiredRole)
         hasher.combine(minEmployees)
         hasher.combine(maxEmployees)
+        hasher.combine(roleRequirements)
     }
 }
 
@@ -3348,7 +3431,8 @@ public struct FfiConverterTypeFfiShift: FfiConverterRustBuffer {
                 endTime: FfiConverterString.read(from: &buf), 
                 requiredRole: FfiConverterString.read(from: &buf), 
                 minEmployees: FfiConverterUInt32.read(from: &buf), 
-                maxEmployees: FfiConverterUInt32.read(from: &buf)
+                maxEmployees: FfiConverterUInt32.read(from: &buf), 
+                roleRequirements: FfiConverterSequenceTypeFfiRoleRequirement.read(from: &buf)
         )
     }
 
@@ -3362,6 +3446,7 @@ public struct FfiConverterTypeFfiShift: FfiConverterRustBuffer {
         FfiConverterString.write(value.requiredRole, into: &buf)
         FfiConverterUInt32.write(value.minEmployees, into: &buf)
         FfiConverterUInt32.write(value.maxEmployees, into: &buf)
+        FfiConverterSequenceTypeFfiRoleRequirement.write(value.roleRequirements, into: &buf)
     }
 }
 
@@ -3479,10 +3564,17 @@ public struct FfiShiftInfo {
     public var requiredRole: String
     public var minEmployees: UInt32
     public var maxEmployees: UInt32
+    /**
+     * Per-role minimums. Empty ⇒ wildcard (any available staff).
+     */
+    public var roleRequirements: [FfiRoleRequirement]
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(id: Int64, date: String, weekday: String, startTime: String, endTime: String, requiredRole: String, minEmployees: UInt32, maxEmployees: UInt32) {
+    public init(id: Int64, date: String, weekday: String, startTime: String, endTime: String, requiredRole: String, minEmployees: UInt32, maxEmployees: UInt32, 
+        /**
+         * Per-role minimums. Empty ⇒ wildcard (any available staff).
+         */roleRequirements: [FfiRoleRequirement]) {
         self.id = id
         self.date = date
         self.weekday = weekday
@@ -3491,6 +3583,7 @@ public struct FfiShiftInfo {
         self.requiredRole = requiredRole
         self.minEmployees = minEmployees
         self.maxEmployees = maxEmployees
+        self.roleRequirements = roleRequirements
     }
 }
 
@@ -3522,6 +3615,9 @@ extension FfiShiftInfo: Equatable, Hashable {
         if lhs.maxEmployees != rhs.maxEmployees {
             return false
         }
+        if lhs.roleRequirements != rhs.roleRequirements {
+            return false
+        }
         return true
     }
 
@@ -3534,6 +3630,7 @@ extension FfiShiftInfo: Equatable, Hashable {
         hasher.combine(requiredRole)
         hasher.combine(minEmployees)
         hasher.combine(maxEmployees)
+        hasher.combine(roleRequirements)
     }
 }
 
@@ -3552,7 +3649,8 @@ public struct FfiConverterTypeFfiShiftInfo: FfiConverterRustBuffer {
                 endTime: FfiConverterString.read(from: &buf), 
                 requiredRole: FfiConverterString.read(from: &buf), 
                 minEmployees: FfiConverterUInt32.read(from: &buf), 
-                maxEmployees: FfiConverterUInt32.read(from: &buf)
+                maxEmployees: FfiConverterUInt32.read(from: &buf), 
+                roleRequirements: FfiConverterSequenceTypeFfiRoleRequirement.read(from: &buf)
         )
     }
 
@@ -3565,6 +3663,7 @@ public struct FfiConverterTypeFfiShiftInfo: FfiConverterRustBuffer {
         FfiConverterString.write(value.requiredRole, into: &buf)
         FfiConverterUInt32.write(value.minEmployees, into: &buf)
         FfiConverterUInt32.write(value.maxEmployees, into: &buf)
+        FfiConverterSequenceTypeFfiRoleRequirement.write(value.roleRequirements, into: &buf)
     }
 }
 
@@ -3593,11 +3692,18 @@ public struct FfiShiftTemplate {
     public var requiredRole: String
     public var minEmployees: UInt32
     public var maxEmployees: UInt32
+    /**
+     * Per-role minimums. Empty ⇒ wildcard (any available staff).
+     */
+    public var roleRequirements: [FfiRoleRequirement]
     public var deleted: Bool
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(id: Int64, name: String, weekdays: [String], startTime: String, endTime: String, requiredRole: String, minEmployees: UInt32, maxEmployees: UInt32, deleted: Bool) {
+    public init(id: Int64, name: String, weekdays: [String], startTime: String, endTime: String, requiredRole: String, minEmployees: UInt32, maxEmployees: UInt32, 
+        /**
+         * Per-role minimums. Empty ⇒ wildcard (any available staff).
+         */roleRequirements: [FfiRoleRequirement], deleted: Bool) {
         self.id = id
         self.name = name
         self.weekdays = weekdays
@@ -3606,6 +3712,7 @@ public struct FfiShiftTemplate {
         self.requiredRole = requiredRole
         self.minEmployees = minEmployees
         self.maxEmployees = maxEmployees
+        self.roleRequirements = roleRequirements
         self.deleted = deleted
     }
 }
@@ -3638,6 +3745,9 @@ extension FfiShiftTemplate: Equatable, Hashable {
         if lhs.maxEmployees != rhs.maxEmployees {
             return false
         }
+        if lhs.roleRequirements != rhs.roleRequirements {
+            return false
+        }
         if lhs.deleted != rhs.deleted {
             return false
         }
@@ -3653,6 +3763,7 @@ extension FfiShiftTemplate: Equatable, Hashable {
         hasher.combine(requiredRole)
         hasher.combine(minEmployees)
         hasher.combine(maxEmployees)
+        hasher.combine(roleRequirements)
         hasher.combine(deleted)
     }
 }
@@ -3673,6 +3784,7 @@ public struct FfiConverterTypeFfiShiftTemplate: FfiConverterRustBuffer {
                 requiredRole: FfiConverterString.read(from: &buf), 
                 minEmployees: FfiConverterUInt32.read(from: &buf), 
                 maxEmployees: FfiConverterUInt32.read(from: &buf), 
+                roleRequirements: FfiConverterSequenceTypeFfiRoleRequirement.read(from: &buf), 
                 deleted: FfiConverterBool.read(from: &buf)
         )
     }
@@ -3686,6 +3798,7 @@ public struct FfiConverterTypeFfiShiftTemplate: FfiConverterRustBuffer {
         FfiConverterString.write(value.requiredRole, into: &buf)
         FfiConverterUInt32.write(value.minEmployees, into: &buf)
         FfiConverterUInt32.write(value.maxEmployees, into: &buf)
+        FfiConverterSequenceTypeFfiRoleRequirement.write(value.roleRequirements, into: &buf)
         FfiConverterBool.write(value.deleted, into: &buf)
     }
 }
@@ -3857,10 +3970,17 @@ public struct FfiShortfallWarning {
     public var startTime: String
     public var endTime: String
     public var requiredRole: String
+    /**
+     * Which role fell short, or `None` for an overall headcount shortfall.
+     */
+    public var role: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(shiftId: Int64, needed: UInt32, filled: UInt32, weekday: String, startTime: String, endTime: String, requiredRole: String) {
+    public init(shiftId: Int64, needed: UInt32, filled: UInt32, weekday: String, startTime: String, endTime: String, requiredRole: String, 
+        /**
+         * Which role fell short, or `None` for an overall headcount shortfall.
+         */role: String?) {
         self.shiftId = shiftId
         self.needed = needed
         self.filled = filled
@@ -3868,6 +3988,7 @@ public struct FfiShortfallWarning {
         self.startTime = startTime
         self.endTime = endTime
         self.requiredRole = requiredRole
+        self.role = role
     }
 }
 
@@ -3896,6 +4017,9 @@ extension FfiShortfallWarning: Equatable, Hashable {
         if lhs.requiredRole != rhs.requiredRole {
             return false
         }
+        if lhs.role != rhs.role {
+            return false
+        }
         return true
     }
 
@@ -3907,6 +4031,7 @@ extension FfiShortfallWarning: Equatable, Hashable {
         hasher.combine(startTime)
         hasher.combine(endTime)
         hasher.combine(requiredRole)
+        hasher.combine(role)
     }
 }
 
@@ -3924,7 +4049,8 @@ public struct FfiConverterTypeFfiShortfallWarning: FfiConverterRustBuffer {
                 weekday: FfiConverterString.read(from: &buf), 
                 startTime: FfiConverterString.read(from: &buf), 
                 endTime: FfiConverterString.read(from: &buf), 
-                requiredRole: FfiConverterString.read(from: &buf)
+                requiredRole: FfiConverterString.read(from: &buf), 
+                role: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -3936,6 +4062,7 @@ public struct FfiConverterTypeFfiShortfallWarning: FfiConverterRustBuffer {
         FfiConverterString.write(value.startTime, into: &buf)
         FfiConverterString.write(value.endTime, into: &buf)
         FfiConverterString.write(value.requiredRole, into: &buf)
+        FfiConverterOptionString.write(value.role, into: &buf)
     }
 }
 
@@ -5028,6 +5155,31 @@ fileprivate struct FfiConverterSequenceTypeFfiRole: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeFfiRoleRequirement: FfiConverterRustBuffer {
+    typealias SwiftType = [FfiRoleRequirement]
+
+    public static func write(_ value: [FfiRoleRequirement], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeFfiRoleRequirement.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [FfiRoleRequirement] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [FfiRoleRequirement]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeFfiRoleRequirement.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeFfiSave: FfiConverterRustBuffer {
     typealias SwiftType = [FfiSave]
 
@@ -5322,14 +5474,15 @@ public func countEmployees()throws  -> Int64 {
     )
 })
 }
-public func createAdHocShift(rotaId: Int64, date: String, startTime: String, endTime: String, requiredRole: String)throws  -> Int64 {
+public func createAdHocShift(rotaId: Int64, date: String, startTime: String, endTime: String, requiredRole: String, roleRequirements: [FfiRoleRequirement])throws  -> Int64 {
     return try  FfiConverterInt64.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_create_ad_hoc_shift(
         FfiConverterInt64.lower(rotaId),
         FfiConverterString.lower(date),
         FfiConverterString.lower(startTime),
         FfiConverterString.lower(endTime),
-        FfiConverterString.lower(requiredRole),$0
+        FfiConverterString.lower(requiredRole),
+        FfiConverterSequenceTypeFfiRoleRequirement.lower(roleRequirements),$0
     )
 })
 }
@@ -5847,6 +6000,18 @@ public func updateRole(id: Int64, name: String)throws  {try rustCallWithError(Ff
     )
 }
 }
+/**
+ * Update a materialised shift's capacity and role requirements.
+ */
+public func updateShift(id: Int64, minEmployees: UInt32, maxEmployees: UInt32, roleRequirements: [FfiRoleRequirement])throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_update_shift(
+        FfiConverterInt64.lower(id),
+        FfiConverterUInt32.lower(minEmployees),
+        FfiConverterUInt32.lower(maxEmployees),
+        FfiConverterSequenceTypeFfiRoleRequirement.lower(roleRequirements),$0
+    )
+}
+}
 public func updateShiftTemplate(template: FfiShiftTemplate)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_update_shift_template(
         FfiConverterTypeFfiShiftTemplate.lower(template),$0
@@ -5909,7 +6074,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_autorota_ffi_checksum_func_count_employees() != 39440) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_autorota_ffi_checksum_func_create_ad_hoc_shift() != 52379) {
+    if (uniffi_autorota_ffi_checksum_func_create_ad_hoc_shift() != 42906) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_create_assignment() != 51200) {
@@ -6102,6 +6267,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_update_role() != 50775) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_update_shift() != 53762) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_update_shift_template() != 52563) {

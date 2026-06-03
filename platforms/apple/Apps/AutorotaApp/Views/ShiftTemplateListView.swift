@@ -273,9 +273,9 @@ struct ShiftTemplateEditSheet: View {
     @State private var selectedDays: Set<String> = []
     @State private var startTime = ShiftTemplateEditSheet.defaultTime(hour: 9)
     @State private var endTime = ShiftTemplateEditSheet.defaultTime(hour: 17)
-    @State private var role = ""
     @State private var minStaff = 1
     @State private var maxStaff = 1
+    @State private var roleReqs: [FfiRoleRequirement] = []
 
     private var isEditing: Bool { existing != nil }
 
@@ -311,17 +311,12 @@ struct ShiftTemplateEditSheet: View {
                     DatePicker("Start", selection: $startTime, displayedComponents: .hourAndMinute)
                     DatePicker("End", selection: $endTime, displayedComponents: .hourAndMinute)
                 }
-                Section("Role & Staffing") {
-                    Picker("Required role", selection: $role) {
-                        Text("Any Role").tag("")
-                        ForEach(roles, id: \.id) { r in
-                            Text(r.name).tag(r.name)
-                        }
-                    }
-                    Stepper("Min staff: \(minStaff)", value: $minStaff, in: 1...20)
-                    Stepper("Max staff: \(maxStaff)", value: $maxStaff, in: 1...20)
-                        .onChange(of: minStaff) { _, v in if maxStaff < v { maxStaff = v } }
-                }
+                RoleStaffingSection(
+                    roles: roles,
+                    minStaff: $minStaff,
+                    maxStaff: $maxStaff,
+                    roleReqs: $roleReqs
+                )
             }
             .dismissesKeyboardOnTap()
             #if os(macOS)
@@ -350,9 +345,9 @@ struct ShiftTemplateEditSheet: View {
             fmt.dateFormat = "HH:mm"
             startTime = fmt.date(from: t.startTime) ?? Date()
             endTime = fmt.date(from: t.endTime) ?? Date()
-            role = t.requiredRole
             minStaff = Int(t.minEmployees)
             maxStaff = Int(t.maxEmployees)
+            roleReqs = t.roleRequirements
         }
     }
 
@@ -361,15 +356,19 @@ struct ShiftTemplateEditSheet: View {
         fmt.dateFormat = "HH:mm"
         let orderedDays = Self.allDays.filter { selectedDays.contains($0) }
 
+        let floor = roleReqs.map { Int($0.minCount) }.max() ?? 0
+        let effMin = max(minStaff, floor)
+        let effMax = max(maxStaff, effMin)
         let tmpl = FfiShiftTemplate(
             id: existing?.id ?? 0,
             name: name,
             weekdays: orderedDays,
             startTime: fmt.string(from: startTime),
             endTime: fmt.string(from: endTime),
-            requiredRole: role,
-            minEmployees: UInt32(minStaff),
-            maxEmployees: UInt32(maxStaff),
+            requiredRole: roleReqs.first?.role ?? "",
+            minEmployees: UInt32(effMin),
+            maxEmployees: UInt32(effMax),
+            roleRequirements: roleReqs,
             deleted: false
         )
         Task {

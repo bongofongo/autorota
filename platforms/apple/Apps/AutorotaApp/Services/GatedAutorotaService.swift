@@ -100,9 +100,12 @@ struct GatedAutorotaService: AutorotaServiceProtocol {
     func updateShiftTimes(id: Int64, startTime: String, endTime: String) async throws {
         try check(); try await inner.updateShiftTimes(id: id, startTime: startTime, endTime: endTime)
     }
-    func createAdHocShift(rotaId: Int64, date: String, startTime: String, endTime: String, requiredRole: String) async throws -> Int64 {
+    func updateShift(id: Int64, minEmployees: UInt32, maxEmployees: UInt32, roleRequirements: [FfiRoleRequirement]) async throws {
+        try check(); try await inner.updateShift(id: id, minEmployees: minEmployees, maxEmployees: maxEmployees, roleRequirements: roleRequirements)
+    }
+    func createAdHocShift(rotaId: Int64, date: String, startTime: String, endTime: String, requiredRole: String, roleRequirements: [FfiRoleRequirement]) async throws -> Int64 {
         try check()
-        return try await inner.createAdHocShift(rotaId: rotaId, date: date, startTime: startTime, endTime: endTime, requiredRole: requiredRole)
+        return try await inner.createAdHocShift(rotaId: rotaId, date: date, startTime: startTime, endTime: endTime, requiredRole: requiredRole, roleRequirements: roleRequirements)
     }
     func listShiftsForRota(rotaId: Int64) async throws -> [FfiShift] {
         try await inner.listShiftsForRota(rotaId: rotaId)

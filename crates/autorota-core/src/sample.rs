@@ -125,6 +125,7 @@ pub fn build_sample_week() -> SampleWeek {
             required_role: tmpl.required_role.clone(),
             min_employees: tmpl.min_employees,
             max_employees: tmpl.max_employees,
+            role_requirements: tmpl.role_requirements.clone(),
         };
 
         if let Some((emp_id, status)) = who {
@@ -207,6 +208,14 @@ fn tmpl(id: i64, name: &str, role: &str, start_h: u32, end_h: u32) -> ShiftTempl
         required_role: role.to_string(),
         min_employees: 1,
         max_employees: 2,
+        role_requirements: if role.is_empty() {
+            vec![]
+        } else {
+            vec![crate::models::shift::RoleRequirement {
+                role: role.to_string(),
+                min_count: 1,
+            }]
+        },
         deleted: false,
     }
 }

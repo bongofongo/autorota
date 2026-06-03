@@ -206,8 +206,12 @@ struct LiveAutorotaService: AutorotaServiceProtocol {
         try await updateShiftTimesAsync(id: id, startTime: startTime, endTime: endTime)
         notify([.shift], rowIDs: [id])
     }
-    func createAdHocShift(rotaId: Int64, date: String, startTime: String, endTime: String, requiredRole: String) async throws -> Int64 {
-        let id = try await createAdHocShiftAsync(rotaId: rotaId, date: date, startTime: startTime, endTime: endTime, requiredRole: requiredRole)
+    func updateShift(id: Int64, minEmployees: UInt32, maxEmployees: UInt32, roleRequirements: [FfiRoleRequirement]) async throws {
+        try await updateShiftAsync(id: id, minEmployees: minEmployees, maxEmployees: maxEmployees, roleRequirements: roleRequirements)
+        notify([.shift], rowIDs: [id])
+    }
+    func createAdHocShift(rotaId: Int64, date: String, startTime: String, endTime: String, requiredRole: String, roleRequirements: [FfiRoleRequirement]) async throws -> Int64 {
+        let id = try await createAdHocShiftAsync(rotaId: rotaId, date: date, startTime: startTime, endTime: endTime, requiredRole: requiredRole, roleRequirements: roleRequirements)
         notify([.shift], rowIDs: [id])
         return id
     }

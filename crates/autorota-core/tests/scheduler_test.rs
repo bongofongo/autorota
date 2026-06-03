@@ -379,3 +379,141 @@ fn role_shift_excludes_no_role_employee() {
     assert!(result.assignments.is_empty());
     assert_eq!(result.warnings.len(), 1);
 }
+
+// ─── Multi-role shifts (per-role minimums with shared coverage) ───
+
+use autorota_core::models::employee::Employee;
+use autorota_core::testutil::{EmployeeBuilder, ShiftBuilder};
+
+fn emp_roles(id: i64, name: &str, roles: &[&str]) -> Employee {
+    EmployeeBuilder::new(name)
+        .id(id)
+        .roles(roles)
+        .available(AvailabilityState::Yes)
+        .build()
+}
+
+#[test]
+fn two_baristas_need_two_distinct_people() {
+    let a = emp_roles(1, "A", &["barista"]);
+    let b = emp_roles(2, "B", &["barista"]);
+    let shift = ShiftBuilder::new()
+        .id(1)
+        .date(date(23))
+        .times(7, 12)
+        .require_roles(&[("barista", 2)])
+        .capacity(2, 2)
+        .build();
+
+    let r = schedule_pure(&[shift], &[a, b], &[], &[], 1, week_start());
+    assert_eq!(r.assignments.len(), 2);
+    assert!(r.warnings.is_empty(), "warnings: {:?}", r.warnings);
+}
+
+#[test]
+fn dual_role_person_covers_both_minimums() {
+    let dual = emp_roles(1, "Dual", &["barista", "opening"]);
+    let shift = ShiftBuilder::new()
+        .id(1)
+        .date(date(23))
+        .times(7, 12)
+        .require_roles(&[("barista", 1), ("opening", 1)])
+        .capacity(1, 1)
+        .build();
+
+    let r = schedule_pure(&[shift], &[dual], &[], &[], 1, week_start());
+    assert_eq!(r.assignments.len(), 1, "one dual-role person covers both");
+    assert!(r.warnings.is_empty(), "warnings: {:?}", r.warnings);
+}
+
+#[test]
+fn two_single_role_people_cover_two_roles() {
+    let bar = emp_roles(1, "Bar", &["barista"]);
+    let open = emp_roles(2, "Open", &["opening"]);
+    let shift = ShiftBuilder::new()
+        .id(1)
+        .date(date(23))
+        .times(7, 12)
+        .require_roles(&[("barista", 1), ("opening", 1)])
+        .capacity(2, 2)
+        .build();
+
+    let r = schedule_pure(&[shift], &[bar, open], &[], &[], 1, week_start());
+    assert_eq!(r.assignments.len(), 2);
+    let ids: Vec<i64> = r.assignments.iter().map(|a| a.employee_id).collect();
+    assert!(ids.contains(&1) && ids.contains(&2));
+    assert!(r.warnings.is_empty(), "warnings: {:?}", r.warnings);
+}
+
+#[test]
+fn two_baristas_one_opening_filled_by_two() {
+    let a = emp_roles(1, "A", &["barista", "opening"]);
+    let b = emp_roles(2, "B", &["barista"]);
+    let shift = ShiftBuilder::new()
+        .id(1)
+        .date(date(23))
+        .times(7, 12)
+        .require_roles(&[("barista", 2), ("opening", 1)])
+        .capacity(2, 2)
+        .build();
+
+    let r = schedule_pure(&[shift], &[a, b], &[], &[], 1, week_start());
+    assert_eq!(r.assignments.len(), 2, "two baristas, one also the opener");
+    assert!(r.warnings.is_empty(), "warnings: {:?}", r.warnings);
+}
+
+#[test]
+fn min_staff_raised_above_floor_pulls_extra_bodies() {
+    // barista floor is 1, but the overall min is raised to 2.
+    let a = emp_roles(1, "A", &["barista"]);
+    let b = emp_roles(2, "B", &["cashier"]);
+    let shift = ShiftBuilder::new()
+        .id(1)
+        .date(date(23))
+        .times(7, 12)
+        .require_roles(&[("barista", 1)])
+        .capacity(2, 3)
+        .build();
+
+    let r = schedule_pure(&[shift], &[a, b], &[], &[], 1, week_start());
+    assert_eq!(r.assignments.len(), 2, "barista plus one extra body");
+    assert!(r.warnings.is_empty(), "warnings: {:?}", r.warnings);
+}
+
+#[test]
+fn wildcard_shift_fills_anyone() {
+    let a = emp_roles(1, "A", &["cashier"]);
+    let b = emp_roles(2, "B", &["dishwasher"]);
+    let shift = ShiftBuilder::new()
+        .id(1)
+        .date(date(23))
+        .times(7, 12)
+        .role("")
+        .capacity(1, 2)
+        .build();
+
+    let r = schedule_pure(&[shift], &[a, b], &[], &[], 1, week_start());
+    assert_eq!(r.assignments.len(), 2);
+    assert!(r.warnings.is_empty(), "warnings: {:?}", r.warnings);
+}
+
+#[test]
+fn unfillable_role_warns_and_reserves_slot() {
+    // Only a cashier is available for a barista-only slot — left open, warned.
+    let cashier = emp_roles(1, "C", &["cashier"]);
+    let shift = ShiftBuilder::new()
+        .id(1)
+        .date(date(23))
+        .times(7, 12)
+        .require_roles(&[("barista", 1)])
+        .capacity(1, 1)
+        .build();
+
+    let r = schedule_pure(&[shift], &[cashier], &[], &[], 1, week_start());
+    assert!(
+        r.assignments.is_empty(),
+        "cashier must not fill a barista slot"
+    );
+    assert_eq!(r.warnings.len(), 1);
+    assert_eq!(r.warnings[0].role.as_deref(), Some("barista"));
+}
