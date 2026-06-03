@@ -1,17 +1,6 @@
 import SwiftUI
 import AutorotaKit
 import TipKit
-import os
-
-private extension Logger {
-    /// Logger for SwiftUI views in `RotaView` — use for diagnostics around
-    /// silent date-arithmetic fallbacks and other defensive guards that
-    /// would otherwise crash the picker.
-    static let weekPicker = Logger(
-        subsystem: "com.toadmountain.autorota",
-        category: "rota.week-picker"
-    )
-}
 
 struct RotaView: View {
 
@@ -34,24 +23,6 @@ struct RotaView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                WeekPickerView(selectedWeek: $vm.selectedWeekStart, category: vm.weekCategory)
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-                    .onChange(of: vm.selectedWeekStart) { _, _ in
-                        // Cancel any in-flight reload from a prior week step
-                        // so a slow load can't clobber a fresh one.
-                        weekChangeTask?.cancel()
-                        weekChangeTask = Task {
-                            await vm.autoSave()
-                            if Task.isCancelled { return }
-                            vm.resetModes()
-                            if Task.isCancelled { return }
-                            await vm.loadSchedule()
-                        }
-                    }
-
-                Divider()
-
                 if vm.isLoading {
                     Spacer()
                     ProgressView("Loading schedule…")
@@ -90,7 +61,37 @@ struct RotaView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
+            .onChange(of: vm.selectedWeekStart) { _, _ in
+                // Cancel any in-flight reload from a prior week step so a slow
+                // load can't clobber a fresh one.
+                weekChangeTask?.cancel()
+                weekChangeTask = Task {
+                    await vm.autoSave()
+                    if Task.isCancelled { return }
+                    vm.resetModes()
+                    if Task.isCancelled { return }
+                    await vm.loadSchedule()
+                }
+            }
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    HStack(spacing: 8) {
+                        Button { vm.shiftWeek(by: -1) } label: {
+                            Image(systemName: "chevron.left")
+                        }
+                        .accessibilityIdentifier("rota.prevWeek")
+
+                        Text(vm.weekDateRangeShort)
+                            .font(.headline)
+                            .accessibilityIdentifier("rota.weekTitle")
+                        CategoryBadge(category: vm.weekCategory)
+
+                        Button { vm.shiftWeek(by: 1) } label: {
+                            Image(systemName: "chevron.right")
+                        }
+                        .accessibilityIdentifier("rota.nextWeek")
+                    }
+                }
                 ToolbarItem(placement: .primaryAction) {
                     overflowMenu
                 }
@@ -275,52 +276,7 @@ struct RotaView: View {
     }
 }
 
-// MARK: - Week picker
-
-private struct WeekPickerView: View {
-    @Binding var selectedWeek: String
-    let category: WeekCategory
-
-    var body: some View {
-        HStack {
-            Button(action: { selectedWeek = shifted(by: -1) }) {
-                Image(systemName: "chevron.left")
-            }
-            .accessibilityIdentifier("rota.prevWeek")
-            Spacer()
-            HStack(spacing: 8) {
-                Text("Week of \(selectedWeek)")
-                    .font(.subheadline.bold())
-                    .accessibilityIdentifier("rota.weekTitle")
-                CategoryBadge(category: category)
-            }
-            Spacer()
-            Button(action: { selectedWeek = shifted(by: 1) }) {
-                Image(systemName: "chevron.right")
-            }
-            .accessibilityIdentifier("rota.nextWeek")
-        }
-    }
-
-    private func shifted(by weeks: Int) -> String {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        fmt.locale = Locale(identifier: "en_US_POSIX")
-        guard let date = fmt.date(from: selectedWeek) else { return selectedWeek }
-        let cal = Calendar(identifier: .iso8601)
-        // `cal.date(byAdding:)` only fails for arithmetically impossible
-        // additions (year overflow, etc.). Treat that as "stay on the
-        // current week" so the picker doesn't crash on extreme inputs;
-        // log so the silent fallback is debuggable.
-        guard let shifted = cal.date(byAdding: .weekOfYear, value: weeks, to: date) else {
-            Logger.weekPicker.warning(
-                "cal.date(byAdding: .weekOfYear, value: \(weeks)) returned nil; staying on \(selectedWeek)"
-            )
-            return selectedWeek
-        }
-        return fmt.string(from: shifted)
-    }
-}
+// MARK: - Week category badge
 
 private struct CategoryBadge: View {
     let category: WeekCategory
@@ -476,6 +432,7 @@ private struct ScheduleGridView: View {
                     } header: {
                         DayHeader(
                             day: day,
+                            dateLabel: vm.dayOfMonthLabel(day),
                             isToday: vm.isDayToday(day),
                             isPast: vm.isDayPast(day),
                             onAddShift: { requestSheet(.addShift(SheetDate(vm.dateForWeekday(day)))) }
@@ -516,6 +473,7 @@ private struct ScheduleGridView: View {
             // Column header — tap to add a shift on this day
             DayHeader(
                 day: day,
+                dateLabel: vm.dayOfMonthLabel(day),
                 isToday: vm.isDayToday(day),
                 isPast: vm.isDayPast(day),
                 onAddShift: { requestSheet(.addShift(SheetDate(vm.dateForWeekday(day)))) }
@@ -556,6 +514,8 @@ private struct ScheduleGridView: View {
 /// Tapping anywhere on the header adds a shift to that day.
 private struct DayHeader: View {
     let day: String
+    /// Full-month day-of-month, e.g. "June 1".
+    let dateLabel: String
     let isToday: Bool
     let isPast: Bool
     let onAddShift: () -> Void
@@ -563,7 +523,7 @@ private struct DayHeader: View {
     var body: some View {
         Button(action: onAddShift) {
             HStack(spacing: 8) {
-                Text(day)
+                Text("\(day) · \(dateLabel)")
                     .font(.headline)
                     .foregroundStyle(isPast ? .secondary : .primary)
                 Spacer()
@@ -579,6 +539,7 @@ private struct DayHeader: View {
                 Rectangle()
                     .fill(underlineColor)
                     .frame(height: isToday ? 2 : 1)
+                    .padding(.horizontal, 12)
             }
             .contentShape(Rectangle())
         }
@@ -610,18 +571,19 @@ private struct ShiftCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // Header row
+            // Header row — capacity over shift times, right-aligned. Role is
+            // intentionally omitted from the grid card (still shown on tap in
+            // the shift editor); shift times sit beneath the capacity count.
             HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(shift.startTime) – \(shift.endTime)")
-                        .font(.subheadline.bold())
-                    RoleTag(name: shift.requiredRole)
-                }
                 Spacer()
-
-                Text("\(assignments.count)/\(shift.maxEmployees)")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(assignments.count < Int(shift.minEmployees) ? .red : .secondary)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("\(assignments.count)/\(shift.maxEmployees)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(assignments.count < Int(shift.minEmployees) ? .red : .secondary)
+                    Text("\(shift.startTime) – \(shift.endTime)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             // Assignment rows
@@ -670,17 +632,19 @@ private struct ShiftCard: View {
 // MARK: - Conflict glyph
 
 /// Compact warning indicator shown next to a conflicted assignment in the grid.
-/// Hard conflicts use an orange triangle; the soft `.maybe` hint uses an amber
-/// question mark.
+/// Only hard conflicts render (orange triangle); the soft `.maybe` hint is
+/// intentionally suppressed.
 private struct ConflictGlyph: View {
     let reason: ConflictReason
 
     var body: some View {
-        Image(systemName: reason.isHard ? "exclamationmark.triangle.fill" : "questionmark.circle.fill")
-            .font(.caption2)
-            .foregroundStyle(reason.isHard ? .orange : Color.yellow)
-            .help(reason.label)
-            .accessibilityLabel(reason.label)
+        if reason.isHard {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.caption2)
+                .foregroundStyle(.orange)
+                .help(reason.label)
+                .accessibilityLabel(reason.label)
+        }
     }
 }
 
@@ -796,14 +760,17 @@ private struct AssignmentRow: View {
 // MARK: - Conflict badge (labeled)
 
 /// Labeled conflict indicator used in the editor's assignment + picker lists.
+/// Only hard conflicts render; the soft `.maybe` hint is suppressed.
 private struct ConflictBadge: View {
     let reason: ConflictReason
 
     var body: some View {
-        Label(reason.label, systemImage: reason.isHard ? "exclamationmark.triangle.fill" : "questionmark.circle.fill")
-            .font(.caption2)
-            .foregroundStyle(reason.isHard ? .orange : .secondary)
-            .labelStyle(.titleAndIcon)
+        if reason.isHard {
+            Label(reason.label, systemImage: "exclamationmark.triangle.fill")
+                .font(.caption2)
+                .foregroundStyle(.orange)
+                .labelStyle(.titleAndIcon)
+        }
     }
 }
 

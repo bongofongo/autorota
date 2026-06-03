@@ -2,6 +2,15 @@ import Foundation
 import Observation
 import AutorotaKit
 import TipKit
+import os
+
+private extension Logger {
+    /// Logger for week-arithmetic fallbacks in the rota view model.
+    static let weekPicker = Logger(
+        subsystem: "com.toadmountain.autorota",
+        category: "rota.week-picker"
+    )
+}
 
 enum WeekCategory {
     case past, current, future
@@ -389,6 +398,37 @@ final class RotaViewModel {
         weekCategory == .past && !pastUnlocked
     }
 
+    /// Step the selected week forward/back by `weeks`, mutating `selectedWeekStart`.
+    /// `cal.date(byAdding:)` only fails for arithmetically impossible additions
+    /// (year overflow, etc.); treat that as "stay put" and log so the silent
+    /// fallback is debuggable.
+    func shiftWeek(by weeks: Int) {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        guard let date = fmt.date(from: selectedWeekStart) else { return }
+        let cal = Calendar(identifier: .iso8601)
+        guard let shifted = cal.date(byAdding: .weekOfYear, value: weeks, to: date) else {
+            Logger.weekPicker.warning(
+                "cal.date(byAdding: .weekOfYear, value: \(weeks)) returned nil; staying on \(self.selectedWeekStart)"
+            )
+            return
+        }
+        selectedWeekStart = fmt.string(from: shifted)
+    }
+
+    /// Full-month day-of-month label for a weekday in the selected week, e.g. "June 1".
+    func dayOfMonthLabel(_ weekday: String) -> String {
+        let iso = dateForWeekday(weekday)
+        let parseFmt = DateFormatter()
+        parseFmt.dateFormat = "yyyy-MM-dd"
+        parseFmt.locale = Locale(identifier: "en_US_POSIX")
+        guard let date = parseFmt.date(from: iso) else { return "" }
+        let displayFmt = DateFormatter()
+        displayFmt.dateFormat = "MMMM d"
+        return displayFmt.string(from: date)
+    }
+
     /// Date string for a weekday offset in the selected week (Mon=0, Tue=1, ..., Sun=6).
     func dateForWeekday(_ weekday: String) -> String {
         let offsets = ["Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6]
@@ -435,6 +475,21 @@ final class RotaViewModel {
         let yearFmt = DateFormatter()
         yearFmt.dateFormat = "yyyy"
         return "\(displayFmt.string(from: monday)) – \(displayFmt.string(from: sunday)), \(yearFmt.string(from: sunday))"
+    }
+
+    /// Concise date range for the nav-bar title, e.g. "Jun 8 – Jun 15" (no year).
+    var weekDateRangeShort: String {
+        let parseFmt = DateFormatter()
+        parseFmt.dateFormat = "yyyy-MM-dd"
+        parseFmt.locale = Locale(identifier: "en_US_POSIX")
+        guard let monday = parseFmt.date(from: selectedWeekStart) else { return selectedWeekStart }
+        let cal = Calendar(identifier: .iso8601)
+        guard let sunday = cal.date(byAdding: .day, value: 6, to: monday) else {
+            return selectedWeekStart
+        }
+        let displayFmt = DateFormatter()
+        displayFmt.dateFormat = "MMM d"
+        return "\(displayFmt.string(from: monday)) – \(displayFmt.string(from: sunday))"
     }
 
     /// Shifts grouped by weekday for display.
