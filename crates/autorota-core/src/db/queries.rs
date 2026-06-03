@@ -416,6 +416,18 @@ fn primary_role(reqs: &[RoleRequirement]) -> String {
     reqs.first().map(|r| r.role.clone()).unwrap_or_default()
 }
 
+/// Serialise a requirement list into the sync-only `role_requirements_json`
+/// mirror column. Shape: `[{"role":"barista","min_count":2}, ...]`.
+fn role_requirements_to_json(reqs: &[RoleRequirement]) -> String {
+    serde_json::to_string(reqs).unwrap_or_else(|_| "[]".to_string())
+}
+
+/// Inverse of [`role_requirements_to_json`]: parse the synced mirror column
+/// back into a requirement list. Malformed/empty JSON yields an empty list.
+fn role_requirements_from_json(s: &str) -> Vec<RoleRequirement> {
+    serde_json::from_str(s).unwrap_or_default()
+}
+
 /// Replace the role requirements attached to a materialised shift.
 pub async fn set_shift_role_requirements(
     pool: &SqlitePool,
@@ -423,11 +435,15 @@ pub async fn set_shift_role_requirements(
     reqs: &[RoleRequirement],
 ) -> Result<(), sqlx::Error> {
     replace_role_requirements(pool, "shift_role_requirements", "shift_id", shift_id, reqs).await?;
-    sqlx::query("UPDATE shifts SET required_role = ?, sync_status = 0 WHERE id = ?")
-        .bind(primary_role(reqs))
-        .bind(shift_id)
-        .execute(pool)
-        .await?;
+    sqlx::query(
+        "UPDATE shifts SET required_role = ?, role_requirements_json = ?, sync_status = 0, last_modified = ? WHERE id = ?",
+    )
+    .bind(primary_role(reqs))
+    .bind(role_requirements_to_json(reqs))
+    .bind(chrono::Utc::now().to_rfc3339())
+    .bind(shift_id)
+    .execute(pool)
+    .await?;
     Ok(())
 }
 
@@ -445,11 +461,15 @@ pub async fn set_template_role_requirements(
         reqs,
     )
     .await?;
-    sqlx::query("UPDATE shift_templates SET required_role = ?, sync_status = 0 WHERE id = ?")
-        .bind(primary_role(reqs))
-        .bind(template_id)
-        .execute(pool)
-        .await?;
+    sqlx::query(
+        "UPDATE shift_templates SET required_role = ?, role_requirements_json = ?, sync_status = 0, last_modified = ? WHERE id = ?",
+    )
+    .bind(primary_role(reqs))
+    .bind(role_requirements_to_json(reqs))
+    .bind(chrono::Utc::now().to_rfc3339())
+    .bind(template_id)
+    .execute(pool)
+    .await?;
     Ok(())
 }
 
@@ -2403,6 +2423,7 @@ pub fn syncable_columns(table_name: &str) -> Vec<&'static str> {
             "required_role",
             "min_employees",
             "max_employees",
+            "role_requirements_json",
             "deleted",
             "last_modified",
         ],
@@ -2417,6 +2438,7 @@ pub fn syncable_columns(table_name: &str) -> Vec<&'static str> {
             "required_role",
             "min_employees",
             "max_employees",
+            "role_requirements_json",
             "last_modified",
         ],
         "assignments" => vec![
@@ -2554,6 +2576,55 @@ pub async fn apply_remote_record(
         query = query.bind(&record.fields);
         query.execute(pool).await?;
     }
+
+    // Re-materialise role-requirement child rows from the synced JSON mirror so
+    // scheduling queries (which read the child tables) stay correct. Writes the
+    // child tables directly via replace_role_requirements — must NOT go through
+    // set_*_role_requirements, which would bump sync_status back to 0 and re-push
+    // (apply intentionally set it to 1).
+    match record.table_name.as_str() {
+        "shifts" => {
+            let json: Option<String> =
+                sqlx::query_scalar("SELECT role_requirements_json FROM shifts WHERE id = ?")
+                    .bind(record.record_id)
+                    .fetch_optional(pool)
+                    .await?
+                    .flatten();
+            if let Some(j) = json {
+                let reqs = role_requirements_from_json(&j);
+                replace_role_requirements(
+                    pool,
+                    "shift_role_requirements",
+                    "shift_id",
+                    record.record_id,
+                    &reqs,
+                )
+                .await?;
+            }
+        }
+        "shift_templates" => {
+            let json: Option<String> = sqlx::query_scalar(
+                "SELECT role_requirements_json FROM shift_templates WHERE id = ?",
+            )
+            .bind(record.record_id)
+            .fetch_optional(pool)
+            .await?
+            .flatten();
+            if let Some(j) = json {
+                let reqs = role_requirements_from_json(&j);
+                replace_role_requirements(
+                    pool,
+                    "template_role_requirements",
+                    "template_id",
+                    record.record_id,
+                    &reqs,
+                )
+                .await?;
+            }
+        }
+        _ => {}
+    }
+
     Ok(())
 }
 

@@ -412,5 +412,16 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         run_migration_tx(pool, m24).await?;
     }
 
+    // Migration 025: sync mirror column for role requirements.
+    let has_rr_json: bool = sqlx::query_scalar(
+        "SELECT COUNT(*) > 0 FROM pragma_table_info('shifts') WHERE name = 'role_requirements_json'",
+    )
+    .fetch_one(pool)
+    .await?;
+    if !has_rr_json {
+        let m25 = include_str!("../../migrations/025_role_requirements_sync.sql");
+        run_migration_tx(pool, m25).await?;
+    }
+
     Ok(())
 }

@@ -5,7 +5,7 @@ use autorota_core::db::queries;
 use autorota_core::models::assignment::{Assignment, AssignmentStatus};
 use autorota_core::models::availability::{Availability, AvailabilityState};
 use autorota_core::models::employee::Employee;
-use autorota_core::models::shift::{Shift, ShiftTemplate};
+use autorota_core::models::shift::{RoleRequirement, Shift, ShiftTemplate};
 use autorota_core::models::sync::SyncRecord;
 use chrono::{NaiveDate, NaiveTime, Weekday};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
@@ -1328,4 +1328,210 @@ async fn pending_sync_records_json_has_all_columns() {
             );
         }
     }
+}
+
+// ── Role-requirement sync mirror tests (migration 025) ──
+
+/// Helper: insert a rota + one ad-hoc shift, returning (rota_id, shift_id).
+async fn seed_rota_shift(pool: &sqlx::SqlitePool) -> (i64, i64) {
+    let week = NaiveDate::from_ymd_opt(2026, 3, 23).unwrap();
+    let rota_id = queries::insert_rota(pool, week).await.unwrap();
+    let shift = Shift {
+        id: 0,
+        template_id: None,
+        rota_id,
+        date: week,
+        start_time: NaiveTime::from_hms_opt(8, 0, 0).unwrap(),
+        end_time: NaiveTime::from_hms_opt(16, 0, 0).unwrap(),
+        required_role: String::new(),
+        min_employees: 1,
+        max_employees: 1,
+        role_requirements: vec![],
+    };
+    let shift_id = queries::insert_shift(pool, &shift).await.unwrap();
+    (rota_id, shift_id)
+}
+
+#[tokio::test]
+async fn push_shift_role_requirements_carries_json_and_primary_role() {
+    let pool = test_pool().await;
+    let (_rota_id, shift_id) = seed_rota_shift(&pool).await;
+
+    let reqs = vec![
+        RoleRequirement {
+            role: "barista".to_string(),
+            min_count: 2,
+        },
+        RoleRequirement {
+            role: "opening".to_string(),
+            min_count: 1,
+        },
+    ];
+    queries::set_shift_role_requirements(&pool, shift_id, &reqs)
+        .await
+        .unwrap();
+
+    let pending = queries::get_pending_sync_records(&pool, "shifts")
+        .await
+        .unwrap();
+    let rec = pending
+        .iter()
+        .find(|r| r.record_id == shift_id)
+        .expect("shift should be pending sync");
+    let json: serde_json::Value = serde_json::from_str(&rec.fields).unwrap();
+    let obj = json.as_object().unwrap();
+
+    // Primary role denormalised to first requirement.
+    assert_eq!(obj["required_role"], "barista");
+
+    // Mirror column holds the full list.
+    let mirror: Vec<RoleRequirement> =
+        serde_json::from_str(obj["role_requirements_json"].as_str().unwrap()).unwrap();
+    assert_eq!(mirror, reqs);
+}
+
+#[tokio::test]
+async fn apply_shift_role_requirements_rematerialises_children() {
+    let pool = test_pool().await;
+    let (rota_id, shift_id) = seed_rota_shift(&pool).await;
+
+    // Remote record sets the mirror to a two-role requirement list. Must carry
+    // every NOT NULL syncable column so the generic UPDATE doesn't null them.
+    let fields = format!(
+        r#"{{
+            "id": {shift_id},
+            "template_id": null,
+            "rota_id": {rota_id},
+            "date": "2026-03-23",
+            "start_time": "08:00:00",
+            "end_time": "16:00:00",
+            "required_role": "barista",
+            "min_employees": 1,
+            "max_employees": 1,
+            "role_requirements_json": "[{{\"role\":\"barista\",\"min_count\":2}}]",
+            "last_modified": "2026-03-30T12:00:00Z"
+        }}"#
+    );
+    let record = SyncRecord {
+        table_name: "shifts".to_string(),
+        record_id: shift_id,
+        fields,
+        last_modified: "2026-03-30T12:00:00Z".to_string(),
+    };
+    queries::apply_remote_record(&pool, &record).await.unwrap();
+
+    // Child rows re-materialised so scheduling queries see the requirement.
+    let shifts = queries::list_shifts_for_rota(&pool, rota_id).await.unwrap();
+    let shift = shifts.iter().find(|s| s.id == shift_id).unwrap();
+    assert_eq!(
+        shift.role_requirements,
+        vec![RoleRequirement {
+            role: "barista".to_string(),
+            min_count: 2,
+        }]
+    );
+
+    // Applied as synced — must NOT be re-pushed.
+    let (status, _, _) = query_sync_status(&pool, "shifts", shift_id).await;
+    assert_eq!(status, 1, "applied record should stay synced, not re-push");
+}
+
+#[tokio::test]
+async fn apply_empty_role_requirements_clears_to_wildcard() {
+    let pool = test_pool().await;
+    let (rota_id, shift_id) = seed_rota_shift(&pool).await;
+
+    // Start with a requirement, then a remote record clears it.
+    queries::set_shift_role_requirements(
+        &pool,
+        shift_id,
+        &[RoleRequirement {
+            role: "barista".to_string(),
+            min_count: 1,
+        }],
+    )
+    .await
+    .unwrap();
+
+    let fields = format!(
+        r#"{{
+            "id": {shift_id},
+            "template_id": null,
+            "rota_id": {rota_id},
+            "date": "2026-03-23",
+            "start_time": "08:00:00",
+            "end_time": "16:00:00",
+            "required_role": "",
+            "min_employees": 1,
+            "max_employees": 1,
+            "role_requirements_json": "[]",
+            "last_modified": "2026-03-30T12:00:00Z"
+        }}"#
+    );
+    let record = SyncRecord {
+        table_name: "shifts".to_string(),
+        record_id: shift_id,
+        fields,
+        last_modified: "2026-03-30T12:00:00Z".to_string(),
+    };
+    queries::apply_remote_record(&pool, &record).await.unwrap();
+
+    let shifts = queries::list_shifts_for_rota(&pool, rota_id).await.unwrap();
+    let shift = shifts.iter().find(|s| s.id == shift_id).unwrap();
+    assert!(
+        shift.role_requirements.is_empty(),
+        "cleared requirements should leave a wildcard shift"
+    );
+}
+
+#[tokio::test]
+async fn migration_025_backfills_json_from_child_rows() {
+    use sqlx::Row;
+
+    let dir = tempfile::tempdir().unwrap();
+    let db_path = dir.path().join("backfill_025.db");
+    let url = format!("sqlite:{}", db_path.display());
+
+    // First connect runs all migrations; drop the 025 column and seed child rows
+    // to simulate a pre-025 DB that still carries migration-024 requirements.
+    {
+        let pool = db::connect(&url).await.unwrap();
+        let (_rota_id, shift_id) = seed_rota_shift(&pool).await;
+        // Drop from both tables — the 025 guard keys on the `shifts` column, and
+        // its ALTER touches both, so both must be absent for a clean re-apply.
+        sqlx::query("ALTER TABLE shifts DROP COLUMN role_requirements_json")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("ALTER TABLE shift_templates DROP COLUMN role_requirements_json")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(
+            "INSERT INTO shift_role_requirements (shift_id, role, min_count) VALUES (?, 'barista', 2)",
+        )
+        .bind(shift_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        pool.close().await;
+    }
+
+    // Reconnect: the 025 guard sees the column missing and re-applies it,
+    // backfilling from the child rows.
+    let pool = db::connect(&url).await.unwrap();
+    let json: String = sqlx::query("SELECT role_requirements_json FROM shifts ORDER BY id LIMIT 1")
+        .fetch_one(&pool)
+        .await
+        .unwrap()
+        .get(0);
+    let reqs: Vec<RoleRequirement> = serde_json::from_str(&json).unwrap();
+    assert_eq!(
+        reqs,
+        vec![RoleRequirement {
+            role: "barista".to_string(),
+            min_count: 2,
+        }],
+        "025 backfill should mirror the child rows"
+    );
 }

@@ -12,6 +12,14 @@ enum SyncConflictResolver {
 
     /// Performs a three-way merge between base, local, and server versions of a record.
     ///
+    /// Multi-role shift requirements ride sync as one opaque string field
+    /// (`role_requirements_json`), so the whole requirement list merges as a
+    /// single unit under the per-field policy below: if only one side changed
+    /// it from base, that side wins; if both changed it differently, the server
+    /// value wins (whole-list last-writer-wins). Per-element merge (device A
+    /// adds "opening" while device B bumps "barista" to 2) is a deliberate
+    /// non-goal — lists are small and edited rarely.
+    ///
     /// - Parameters:
     ///   - base: The field values at last successful sync (from sync_base_snapshot). Nil if no base exists (first sync).
     ///   - local: The current local field values (from SQLite).

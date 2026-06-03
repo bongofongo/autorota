@@ -2,6 +2,12 @@
 
 Concise running log of bugs encountered. Each entry is one bullet with sub-bullets. New entries appended at top. Patched entries remain `pending verification` until the user confirms.
 
+- **Multi-role shift requirements silently lost across iCloud sync**
+  - Date fixed: 2026-06-03 (pending verification)
+  - Where / what / repro: per-role minimums (migration 024 child tables `shift_role_requirements` / `template_role_requirements`) carried no sync columns and weren't in `syncable_columns`, so they never pushed to / pulled from CloudKit. On a second device a multi-role shift/template arrived with an empty requirement list → silently treated as a wildcard (any staff), losing staffing intent. Only the denormalised primary `required_role` synced.
+  - Patched: yes — pending user verification
+  - Fix (per `SYNC_MULTIROLE_FIX.md`): added migration `025_role_requirements_sync.sql` (sync-only `role_requirements_json` TEXT mirror on `shifts` + `shift_templates`, backfilled from child tables); registered it in `db/mod.rs::run_migrations`; `set_shift_role_requirements` / `set_template_role_requirements` now also write the JSON mirror and bump `last_modified`; added `role_requirements_json` to the `shifts`/`shift_templates` arms of `syncable_columns` (push + apply automatic); `apply_remote_record` re-materialises child rows from the synced JSON via `replace_role_requirements` (NOT `set_*`, to avoid flipping `sync_status` back to 0). No Swift/FFI changes (field-agnostic pipeline); added doc comment on whole-list LWW in `SyncConflictResolver`. 4 new Rust tests in `db_integration.rs` (push, apply round-trip, clear-to-wildcard, 025 backfill) — all green. **Before production:** add `role_requirements_json` String field to `Shift` + `ShiftTemplate` CloudKit record types.
+
 - **Xcode Cloud archive build fails: rustup install can't resolve static.rust-lang.org**
   - Date fixed: 2026-05-11 (pending verification)
   - Where / what / repro: Xcode Cloud build #5 (commit `5037895`), `ci_post_clone.sh`. The `curl https://sh.rustup.rs | sh` bootstrapper downloaded the installer script, but its secondary fetch of `rustup-init` from `static.rust-lang.org` returned `curl: (6) Could not resolve host: static.rust-lang.org` four times then aborted. Without Rust, `scripts/build_xcframework.sh` never ran, so `xcodebuild -describeSchemes` failed with `local binary target 'AutorotaFFI' … does not contain a binary artifact`. Repro: push to `main`, watch the Xcode Cloud Default workflow.
