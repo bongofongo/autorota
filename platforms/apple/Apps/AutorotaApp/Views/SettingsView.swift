@@ -1,5 +1,4 @@
 import SwiftUI
-import TipKit
 import AutorotaKit
 
 enum AppCurrency: String, CaseIterable {
@@ -42,24 +41,19 @@ enum AppAppearance: String, CaseIterable {
     }
 }
 
+/// The Menu tab — a landing/hub. Surfaces the overflow "Other Pages" as a tappable
+/// icon-tile grid, then pushes into grouped sub-pages (Settings, Help, Subscription)
+/// and shows iCloud sync status inline.
 struct SettingsView: View {
-    @AppStorage("appAppearance") private var appearance: String = AppAppearance.system.rawValue
-    @AppStorage("colorBlindnessMode") private var colorBlindnessMode: String = ColorBlindnessMode.none.rawValue
-    @AppStorage("appCurrency") private var currency: String = AppCurrency.usd.rawValue
-    #if os(iOS)
-    @AppStorage("tabBarEdge") private var tabBarEdgeRaw: String = TabBarEdge.trailing.rawValue
-    #endif
     @Environment(TabLayoutManager.self) private var layoutManager
     @Environment(AutorotaSyncEngine.self) private var syncEngine
-    @Environment(LocaleManager.self) private var localeManager
-    @Environment(LicenseService.self) private var license
     @Environment(MenuNavigationBridge.self) private var menuNav
     /// Drives programmatic pushes from `MenuNavigationBridge` (e.g. an "Add
     /// employee" CTA fired while Employees lives in the overflow Menu).
     @State private var navPath: [TabPage] = []
-    private var selectedAppearance: AppAppearance {
-        AppAppearance(rawValue: appearance) ?? .system
-    }
+    #if os(iOS)
+    @Environment(\.verticalSizeClass) private var vSizeClass
+    #endif
 
     private func consumePendingDestination() {
         guard let dest = menuNav.pendingDestination else { return }
@@ -67,158 +61,71 @@ struct SettingsView: View {
         menuNav.pendingDestination = nil
     }
 
+    /// Cap on a single tile's width so cells stay compact and the grid centers on
+    /// wide screens instead of stretching edge-to-edge.
+    private let maxTileWidth: CGFloat = 150
+
+    /// 2 columns in portrait (2x2), 4 in landscape (single row of four). iPhone
+    /// landscape reports a compact vertical size class; iPad/macOS stay at 2.
+    private var tileColumnCount: Int {
+        #if os(iOS)
+        vSizeClass == .compact ? 4 : 2
+        #else
+        2
+        #endif
+    }
+
+    private var tileColumns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: Spacing.sm), count: tileColumnCount)
+    }
+
+    /// Total grid width when every cell is at its max — used to cap then center.
+    private var maxGridWidth: CGFloat {
+        CGFloat(tileColumnCount) * maxTileWidth + CGFloat(tileColumnCount - 1) * Spacing.sm
+    }
+
     var body: some View {
-        @Bindable var localeManager = localeManager
-        return NavigationStack(path: $navPath) {
-            Form {
-                // Navigation links for pages not in the tab bar
+        NavigationStack(path: $navPath) {
+            List {
+                // Overflow pages not in the tab bar, as an app-launcher grid.
                 if !layoutManager.hiddenPages.isEmpty {
-                    Section("Other Pages") {
-                        ForEach(layoutManager.hiddenPages) { page in
-                            NavigationLink(value: page) {
-                                Label(page.title, systemImage: page.systemImage)
-                            }
-                            .tint(.primary)
-                        }
-                    }
-                }
-
-                Section("Appearance") {
-                    Picker("Theme", selection: $appearance) {
-                        ForEach(AppAppearance.allCases, id: \.rawValue) { option in
-                            Text(option.label).tag(option.rawValue)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                }
-
-                Section {
-                    Picker("settings.language.title", selection: $localeManager.selectedIdentifier) {
-                        Text("settings.language.match_system").tag(String?.none)
-                        Text(verbatim: "English").tag(String?("en"))
-                        Text(verbatim: "中文（简体）").tag(String?("zh-Hans"))
-                        Text(verbatim: "中文（繁體）").tag(String?("zh-Hant"))
-                        Text(verbatim: "العربية").tag(String?("ar"))
-                        Text(verbatim: "বাংলা").tag(String?("bn"))
-                        Text(verbatim: "हिन्दी").tag(String?("hi"))
-                        Text(verbatim: "Español").tag(String?("es"))
-                    }
-                } header: {
-                    Text("settings.language.section_header")
-                } footer: {
-                    Text("settings.language.restart_note")
-                }
-
-                Section {
-                    Picker("Currency", selection: $currency) {
-                        ForEach(AppCurrency.allCases, id: \.rawValue) { option in
-                            Text(option.label).tag(option.rawValue)
-                        }
-                    }
-                } header: {
-                    Text("Currency")
-                } footer: {
-                    Text("Used to display employee wages and totals.")
-                }
-
-                Section {
-                    Picker("Color Vision", selection: $colorBlindnessMode) {
-                        ForEach(ColorBlindnessMode.allCases, id: \.rawValue) { option in
-                            Text(option.label).tag(option.rawValue)
-                        }
-                    }
-                    AccessibilityPaletteSwatches(
-                        palette: AccessibilityPalette.palette(
-                            for: ColorBlindnessMode(rawValue: colorBlindnessMode) ?? .none
-                        )
-                    )
-                } header: {
-                    Text("Accessibility")
-                } footer: {
-                    Text("Adjusts availability, status, and chart colors so they remain distinguishable for the selected type of color vision.")
-                }
-
-                #if !os(macOS)
-                Section {
-                    DisclosureGroup("Tab Bar Layout") {
-                        #if os(iOS)
-                        if UIDevice.current.userInterfaceIdiom == .pad {
-                            Section {
-                                Picker("Bar Edge", selection: $tabBarEdgeRaw) {
-                                    ForEach(TabBarEdge.allCases) { edge in
-                                        Text(edge.label).tag(edge.rawValue)
-                                    }
+                    Section {
+                        LazyVGrid(columns: tileColumns, spacing: Spacing.sm) {
+                            ForEach(layoutManager.hiddenPages) { page in
+                                Button {
+                                    navPath.append(page)
+                                } label: {
+                                    pageTile(page)
                                 }
-                                .pickerStyle(.segmented)
-                            } header: {
-                                Text("Floating Rail")
-                            } footer: {
-                                Text("In landscape the navigation rail anchors to this edge of the screen. Portrait shows a floating bar at the bottom regardless.")
+                                .buttonStyle(.plain)
                             }
                         }
-                        #endif
-                        Section {
-                            ForEach(layoutManager.configurableTabBarPages) { page in
-                                HStack {
-                                    Label(page.title, systemImage: page.systemImage)
-                                    Spacer()
-                                    Button {
-                                        withAnimation { layoutManager.removeFromTabBar(page) }
-                                    } label: {
-                                        Image(systemName: "arrow.down.circle.fill")
-                                            .foregroundStyle(.red)
-                                    }
-                                    .accessibilityLabel("Hide \(page.titleString) from tab bar")
-                                }
-                            }
-                        } header: {
-                            Text("Tab Bar (\(layoutManager.configurableTabBarPages.count) of \(TabPage.maxConfigurable))")
-                        }
-
-                        if !layoutManager.hiddenPages.isEmpty {
-                            Section {
-                                ForEach(layoutManager.hiddenPages) { page in
-                                    HStack {
-                                        Label(page.title, systemImage: page.systemImage)
-                                        Spacer()
-                                        Button {
-                                            withAnimation { layoutManager.addToTabBar(page) }
-                                        } label: {
-                                            Image(systemName: "arrow.up.circle.fill")
-                                                .foregroundStyle(layoutManager.configurableTabBarPages.count >= TabPage.maxConfigurable ? .gray : .blue)
-                                        }
-                                        .disabled(layoutManager.configurableTabBarPages.count >= TabPage.maxConfigurable)
-                                        .accessibilityLabel("Add \(page.titleString) to tab bar")
-                                    }
-                                }
-                            } header: {
-                                Text("Hidden")
-                            }
-                        }
+                        .frame(maxWidth: maxGridWidth)   // cap total width…
+                        .frame(maxWidth: .infinity)       // …then center in the row
+                        .padding(.vertical, Spacing.xs)
+                        .listRowInsets(EdgeInsets(top: Spacing.sm, leading: Spacing.md, bottom: Spacing.sm, trailing: Spacing.md))
+                        .listRowBackground(Color.clear)
                     }
                 }
-                #endif
 
                 Section {
                     NavigationLink {
-                        HelpView()
+                        AppSettingsView()
                     } label: {
-                        Label("Help & Guide", systemImage: "questionmark.circle")
+                        Label("Settings", systemImage: "gearshape")
                     }
-                    Button {
-                        try? Tips.resetDatastore()
+                    NavigationLink {
+                        HelpCenterView()
                     } label: {
-                        Label("Replay Tooltips", systemImage: "arrow.counterclockwise.circle")
+                        Label("Help", systemImage: "questionmark.circle")
                     }
-                    .tint(.primary)
+                    NavigationLink {
+                        SubscriptionView()
+                    } label: {
+                        Label("Subscription", systemImage: "creditcard")
+                    }
                 }
-
-
-                SubscriptionSettingsSection()
-
-                #if DEBUG
-                DebugResetSection()
-                #endif
+                .tint(.primary)
 
                 Section("iCloud Sync") {
                     HStack {
@@ -242,11 +149,7 @@ struct SettingsView: View {
                         }
                     }
                 }
-
             }
-            #if os(macOS)
-            .formStyle(.grouped)
-            #endif
             .navigationTitle("Menu")
             .navigationDestination(for: TabPage.self) { page in
                 // Reuse this stack — do not let the pushed page nest its own
@@ -258,33 +161,33 @@ struct SettingsView: View {
         .onAppear { consumePendingDestination() }
         .onChange(of: menuNav.pendingDestination) { _, _ in consumePendingDestination() }
     }
-}
 
-private struct AccessibilityPaletteSwatches: View {
-    let palette: AccessibilityPalette
-
-    var body: some View {
-        HStack(spacing: 8) {
-            swatch(palette.yes, label: "Yes")
-            swatch(palette.maybe, label: "Maybe")
-            swatch(palette.no, label: "No")
-        }
-        .padding(.vertical, 4)
-    }
-
-    private func swatch(_ color: Color, label: String) -> some View {
-        VStack(spacing: 4) {
-            RoundedRectangle(cornerRadius: 4)
-                .fill(color)
-                .frame(height: 20)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 4)
-                        .strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5)
-                )
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+    private func pageTile(_ page: TabPage) -> some View {
+        VStack(spacing: Spacing.xs) {
+            Image(systemName: page.systemImage)
+                .font(.title3)
+                .foregroundStyle(.tint)
+                .frame(height: 24)
+            Text(page.title)
+                .font(AppFont.caption)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity)
+        .padding(.vertical, Spacing.sm)
+        .background(
+            RoundedRectangle(cornerRadius: SurfaceRadius.medium, style: .continuous)
+                .fill(tileBackground)
+        )
+        .contentShape(Rectangle())
+    }
+
+    private var tileBackground: Color {
+        #if os(macOS)
+        Color(nsColor: .windowBackgroundColor)
+        #else
+        Color(uiColor: .systemBackground)
+        #endif
     }
 }

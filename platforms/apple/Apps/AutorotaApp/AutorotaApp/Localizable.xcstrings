@@ -859,6 +859,9 @@
         }
       }
     },
+    "About" : {
+
+    },
     "About recipients" : {
       "localizations" : {
         "ar" : {
@@ -5978,6 +5981,9 @@
           }
         }
       }
+    },
+    "Help" : {
+
     },
     "Help & Guide" : {
       "localizations" : {
@@ -16248,6 +16254,7 @@
       }
     },
     "Other Pages" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -17073,6 +17080,9 @@
           }
         }
       }
+    },
+    "Re-show the in-app tips you've already dismissed." : {
+
     },
     "Ready (%lld)" : {
       "localizations" : {
@@ -18625,6 +18635,9 @@
         }
       }
     },
+    "Settings" : {
+
+    },
     "settings.language.match_system" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -19964,6 +19977,9 @@
           }
         }
       }
+    },
+    "Subscription" : {
+
     },
     "Suffix" : {
       "localizations" : {
@@ -22226,6 +22242,9 @@
       }
     },
     "Used to display employee wages and totals." : {
+
+    },
+    "Version" : {
 
     },
     "View" : {
