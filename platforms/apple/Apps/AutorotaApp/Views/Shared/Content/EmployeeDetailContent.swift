@@ -39,6 +39,7 @@ struct EmployeeDetailContent: View {
     @State private var shiftVM = ShiftHistoryViewModel()
     @State private var showingAddOverride = false
     @State private var editingOverride: FfiEmployeeAvailabilityOverride? = nil
+    @State private var editingOverrideGroup: OverrideGroup? = nil
 
     @State private var lastWeekExpanded = false
     @State private var thisWeekExpanded = false
@@ -474,18 +475,24 @@ struct EmployeeDetailContent: View {
                 } else {
                     ForEach(groupedOverrides) { group in
                         Button {
-                            if let first = group.items.first { editingOverride = first }
+                            if group.isRange {
+                                editingOverrideGroup = group
+                            } else if let first = group.items.first {
+                                editingOverride = first
+                            }
                         } label: {
                             overrideGroupRow(group)
                         }
                         .buttonStyle(.plain)
                         .contextMenu {
-                            if let first = group.items.first {
-                                Button {
+                            Button {
+                                if group.isRange {
+                                    editingOverrideGroup = group
+                                } else if let first = group.items.first {
                                     editingOverride = first
-                                } label: {
-                                    Label(group.isRange ? "Edit First Day" : "Edit", systemImage: "pencil")
                                 }
+                            } label: {
+                                Label(group.isRange ? "Edit Range" : "Edit", systemImage: "pencil")
                             }
                             Button(role: .destructive) {
                                 Task {
@@ -529,6 +536,13 @@ struct EmployeeDetailContent: View {
         .sheet(item: $editingOverride, onDismiss: { Task { await overrideVM.loadForEmployee(id: employee.id) } }) { ovr in
             EmployeeAvailabilityOverrideSheet(
                 vm: overrideVM, employees: [employee], existing: ovr,
+                preselectedEmployeeId: employee.id
+            )
+        }
+        .sheet(item: $editingOverrideGroup, onDismiss: { Task { await overrideVM.loadForEmployee(id: employee.id) } }) { group in
+            EmployeeAvailabilityOverrideSheet(
+                vm: overrideVM, employees: [employee], existing: nil,
+                existingRange: group.items,
                 preselectedEmployeeId: employee.id
             )
         }

@@ -1141,15 +1141,25 @@ pub async fn upsert_employee_availability_override(
 ) -> Result<i64, sqlx::Error> {
     let avail_json = ovr.availability.to_json().unwrap_or_default();
     let now = chrono::Utc::now().to_rfc3339();
-    // `source` is NOT updated on conflict — once a row is classified as
-    // "exception" (via the Exceptions UI) we do not want a subsequent edit
-    // through the regular availability grid to silently downgrade it to
-    // "manual". Upgrades from manual → exception likewise preserve whatever
-    // the UI originally chose.
+    // `source` is sticky in one direction only: an existing "exception" row is
+    // never downgraded to "manual" by a later edit through the regular
+    // availability grid (which writes "manual"). But a "manual" row CAN be
+    // promoted to "exception" when the user explicitly classifies it via the
+    // Exceptions UI. Without this promotion, saving an exception over a day
+    // that already had a manual per-date edit would silently stay "manual" —
+    // so it would neither show the exception border nor appear in the
+    // Exceptions list, even though the new availability was written.
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO employee_availability_overrides (employee_id, date, availability, notes, source, last_modified, sync_status)
          VALUES (?, ?, ?, ?, ?, ?, 0)
-         ON CONFLICT(employee_id, date) DO UPDATE SET availability = excluded.availability, notes = excluded.notes, last_modified = excluded.last_modified, sync_status = 0
+         ON CONFLICT(employee_id, date) DO UPDATE SET
+             availability = excluded.availability,
+             notes = excluded.notes,
+             source = CASE WHEN excluded.source = 'exception'
+                           THEN 'exception'
+                           ELSE employee_availability_overrides.source END,
+             last_modified = excluded.last_modified,
+             sync_status = 0
          RETURNING id",
     )
     .bind(ovr.employee_id)

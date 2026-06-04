@@ -52,9 +52,7 @@ struct RosterImportView: View {
                     }
                 }
             }
-            .alert("Import Error", isPresented: .constant(error != nil)) {
-                Button("OK") { error = nil }
-            } message: { Text(error ?? "") }
+            .errorAlert($error)
             #if os(iOS)
             .sheet(isPresented: $showDocPicker) {
                 DocumentPicker { url in Task { await loadFile(url) } }

@@ -223,6 +223,7 @@ final class RotaViewModel {
     func exitEditMode() {
         isEditMode = false
         pastUnlocked = false
+        cancelSwap()
         if isDirty {
             Task { await autoSave() }
         }

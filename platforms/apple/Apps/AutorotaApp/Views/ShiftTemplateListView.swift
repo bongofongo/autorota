@@ -12,6 +12,7 @@ struct ShiftTemplateListView: View {
     @State private var renamingRole: FfiRole?
     @State private var renameText = ""
     private let addTemplateTip = ShiftTemplateAddTip()
+    @Environment(\.isMenuPushed) private var isMenuPushed
 
     private var bothLoaded: Bool {
         vm.hasLoaded && roleVM.hasLoaded
@@ -137,7 +138,7 @@ struct ShiftTemplateListView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        OptionalNavigationStack(embed: !isMenuPushed) {
             VStack(spacing: 0) {
                 TipView(addTemplateTip)
                     .padding(.horizontal)
@@ -195,11 +196,10 @@ struct ShiftTemplateListView: View {
             } message: {
                 Text("Enter a new name for \"\(renamingRole?.name ?? "")\".")
             }
-            .alert("Error", isPresented: .constant(vm.error != nil || roleVM.error != nil)) {
-                Button("OK") { vm.error = nil; roleVM.error = nil }
-            } message: {
-                Text(vm.error ?? roleVM.error ?? "")
-            }
+            .errorAlert(Binding(
+                get: { vm.error ?? roleVM.error },
+                set: { if $0 == nil { vm.error = nil; roleVM.error = nil } }
+            ))
             .task {
                 await vm.load()
                 await roleVM.load()

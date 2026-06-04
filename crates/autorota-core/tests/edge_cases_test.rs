@@ -314,6 +314,104 @@ async fn availability_override_upsert_replaces_existing() {
 }
 
 #[tokio::test]
+async fn availability_override_source_promotes_manual_to_exception() {
+    let pool = test_pool().await;
+    let emp_id = queries::insert_employee(&pool, &make_simple_employee("Alice"))
+        .await
+        .unwrap();
+
+    // A manual per-date grid edit lands first.
+    let mut day = DayAvailability::default();
+    day.set(8, AvailabilityState::Yes);
+    let manual = EmployeeAvailabilityOverride {
+        id: 0,
+        employee_id: emp_id,
+        date: date(23),
+        availability: day,
+        notes: None,
+        source: OverrideSource::Manual,
+    };
+    queries::upsert_employee_availability_override(&pool, &manual)
+        .await
+        .unwrap();
+
+    // The user then classifies the same day as an exception via the Exceptions UI.
+    let mut day2 = DayAvailability::default();
+    day2.set(8, AvailabilityState::No);
+    let exception = EmployeeAvailabilityOverride {
+        id: 0,
+        employee_id: emp_id,
+        date: date(23),
+        availability: day2,
+        notes: Some("sick".into()),
+        source: OverrideSource::Exception,
+    };
+    queries::upsert_employee_availability_override(&pool, &exception)
+        .await
+        .unwrap();
+
+    let got = queries::get_employee_availability_override(&pool, emp_id, date(23))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        got.source,
+        OverrideSource::Exception,
+        "manual row must be promoted to exception when classified via the Exceptions UI"
+    );
+    assert_eq!(got.availability.get(8), AvailabilityState::No);
+}
+
+#[tokio::test]
+async fn availability_override_source_exception_not_downgraded_by_manual() {
+    let pool = test_pool().await;
+    let emp_id = queries::insert_employee(&pool, &make_simple_employee("Alice"))
+        .await
+        .unwrap();
+
+    // An exception is recorded first.
+    let mut day = DayAvailability::default();
+    day.set(8, AvailabilityState::No);
+    let exception = EmployeeAvailabilityOverride {
+        id: 0,
+        employee_id: emp_id,
+        date: date(23),
+        availability: day,
+        notes: Some("holiday".into()),
+        source: OverrideSource::Exception,
+    };
+    queries::upsert_employee_availability_override(&pool, &exception)
+        .await
+        .unwrap();
+
+    // A later edit through the regular grid writes "manual".
+    let mut day2 = DayAvailability::default();
+    day2.set(8, AvailabilityState::Maybe);
+    let manual = EmployeeAvailabilityOverride {
+        id: 0,
+        employee_id: emp_id,
+        date: date(23),
+        availability: day2,
+        notes: None,
+        source: OverrideSource::Manual,
+    };
+    queries::upsert_employee_availability_override(&pool, &manual)
+        .await
+        .unwrap();
+
+    let got = queries::get_employee_availability_override(&pool, emp_id, date(23))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        got.source,
+        OverrideSource::Exception,
+        "an exception must never be silently downgraded to manual by a grid edit"
+    );
+    assert_eq!(got.availability.get(8), AvailabilityState::Maybe);
+}
+
+#[tokio::test]
 async fn availability_override_list_for_employee() {
     let pool = test_pool().await;
     let alice = queries::insert_employee(&pool, &make_simple_employee("Alice"))

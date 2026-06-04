@@ -12,8 +12,9 @@ struct EmployeeListView: View {
     @State private var sendScheduleTarget: FfiEmployee?
     @State private var showingImport = false
     private let addEmployeeTip = EmployeesAddTip()
+    @Environment(\.isMenuPushed) private var isMenuPushed
     var body: some View {
-        NavigationStack {
+        OptionalNavigationStack(embed: !isMenuPushed) {
             Group {
                 if vm.isLoading && vm.employees.isEmpty {
                     ProgressView("Loading…")
@@ -122,11 +123,7 @@ struct EmployeeListView: View {
                     .frame(minWidth: 700, minHeight: 500)
             }
             #endif
-            .alert("Error", isPresented: .constant(vm.error != nil), actions: {
-                Button("OK") { vm.error = nil }
-            }, message: {
-                Text(vm.error ?? "")
-            })
+            .errorAlert($vm.error)
             .task {
                 await vm.load()
                 consumePendingNewEmployeeRequest()

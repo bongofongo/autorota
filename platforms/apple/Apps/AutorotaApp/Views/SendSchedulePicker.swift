@@ -100,11 +100,7 @@ struct SendSchedulePicker: View {
                     }
                 }
             }
-            .alert("Send Error", isPresented: .constant(error != nil)) {
-                Button("OK") { error = nil }
-            } message: {
-                Text(error ?? "")
-            }
+            .errorAlert($error)
             #if os(iOS)
             .sheet(isPresented: $showShareSheet, onDismiss: { cleanup(); dismiss() }) {
                 if !bundleURLs.isEmpty {

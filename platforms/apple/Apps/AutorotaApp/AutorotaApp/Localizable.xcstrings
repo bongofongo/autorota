@@ -2375,6 +2375,9 @@
         }
       }
     },
+    "Collapse days" : {
+
+    },
     "Color Vision" : {
       "localizations" : {
         "ar" : {
@@ -4127,6 +4130,7 @@
       }
     },
     "Edit First Day" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -4245,6 +4249,9 @@
           }
         }
       }
+    },
+    "Edit Range" : {
+
     },
     "Edit shift" : {
 
@@ -5151,6 +5158,9 @@
         }
       }
     },
+    "Expand days" : {
+
+    },
     "Experience" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -5274,6 +5284,7 @@
       }
     },
     "Export Error" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -9719,6 +9730,7 @@
       }
     },
     "Import Error" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -18453,6 +18465,7 @@
       }
     },
     "Send Error" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -19536,6 +19549,12 @@
           }
         }
       }
+    },
+    "Something went wrong" : {
+
+    },
+    "Something went wrong. Please try again." : {
+
     },
     "Sort" : {
       "localizations" : {
@@ -21955,6 +21974,9 @@
           }
         }
       }
+    },
+    "Try Again" : {
+
     },
     "Unassigned" : {
       "localizations" : {

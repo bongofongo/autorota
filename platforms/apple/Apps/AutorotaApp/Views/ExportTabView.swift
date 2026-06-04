@@ -26,13 +26,14 @@ struct ExportTabView: View {
     private let service: AutorotaServiceProtocol
 
     @State private var previewScope: ExportPreviewSheet.Scope?
+    @Environment(\.isMenuPushed) private var isMenuPushed
 
     init(service: AutorotaServiceProtocol = GatedAutorotaService()) {
         self.service = service
     }
 
     var body: some View {
-        NavigationStack {
+        OptionalNavigationStack(embed: !isMenuPushed) {
             Form {
                 fullViewSection
                 employeeViewSection

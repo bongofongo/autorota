@@ -130,7 +130,16 @@ struct ContentView: View {
         .environment(employeeBridge)
         .environment(menuNav)
         .onChange(of: selection) { _, new in
-            if case .page(let p) = new { lastPage = p }
+            handleSelectionChange(new)
+        }
+    }
+
+    /// Leaving the Rota page exits its swap/edit mode — same effect as the
+    /// checkmark. Setting the shared flag drives `RotaView.exitEditMode()`.
+    private func handleSelectionChange(_ new: TabSelection) {
+        if case .page(let p) = new { lastPage = p }
+        if new != .page(.rota) && bridge.isEditMode {
+            bridge.isEditMode = false
         }
     }
 
@@ -186,7 +195,7 @@ struct ContentView: View {
         .environment(employeeBridge)
         .environment(menuNav)
         .onChange(of: selection) { _, new in
-            if case .page(let p) = new { lastPage = p }
+            handleSelectionChange(new)
         }
     }
 

@@ -2,6 +2,25 @@
 
 Concise running log of bugs encountered. Each entry is one bullet with sub-bullets. New entries appended at top. Patched entries remain `pending verification` until the user confirms.
 
+- **Editing a date-range exception only edited the first day (single-day editor, not the range)**
+  - Date fixed: 2026-06-04 (pending verification)
+  - Where / what / repro: create a multi-day exception (e.g. Mon–Fri), then tap it to edit. Instead of the range editor, a single-day editor opened on the first day. A range exception has no entity of its own — it's N per-day `FfiEmployeeAvailabilityOverride` rows grouped in the UI (`OverridesTabView.EmpOverrideGroup`); edit entry points passed one day's override and the sheet's range UI was create-only (`isDateRange` toggle gated `if !isEditing`, `prefill()` loaded one day).
+  - Patched: yes — pending user verification
+  - Fix (`platforms/apple/Apps/AutorotaApp/Views/OverridesTabView.swift`): `EmployeeAvailabilityOverrideSheet` gained `existingRange: [FfiEmployeeAvailabilityOverride]?`; `isEditing` covers it; `prefill()` seeds range bounds + per-day `slotsByDate` + notes; `save()` (range path) first deletes original days dropped from the new span, then upserts each day in range (editable bounds — extend adds, shrink deletes); `deleteExisting()` removes all rows in the range. Routing: range groups now use a manual disclosure — tapping the row opens the whole-range editor (`editingEmpGroup`), the trailing chevron expands the group, and expanded day rows still open the single-day editor (`editingEmpOverride`). Context menu offers "Edit Exception" + "Delete All". UI-only change; no Rust/FFI/tests. macOS/iOS/iPad compile-checks green.
+  - Follow-up (2026-06-04): the Employee detail page (`EmployeeDetailContent.swift`) has its **own** exceptions list with a separate local `OverrideGroup` type and still edited `group.items.first` for ranges — same bug, second site. Fixed by reusing the sheet's `existingRange:` support: added `editingOverrideGroup` state, route range taps (and the context-menu "Edit Range") to the whole-range editor, single-day taps to the single editor, plus a matching `.sheet(item:)`. Kept the flat summary rows (no per-day expansion) per decision. Compile-checks green.
+
+- **Exceptions: saved exception changes availability but isn't recorded as an exception (no grid border, missing from Exceptions list)**
+  - Date fixed: 2026-06-04 (pending verification)
+  - Where / what / repro: create a per-date availability edit via the weekly grid (writes a `source="manual"` override row), then add an Exception for that same employee+date via the Exceptions tab. The new availability is written, but the day shows no orange exception border on the grid and the row never appears in the Exceptions list. Both symptoms are one bug.
+  - Patched: yes — pending user verification
+  - Fix: `upsert_employee_availability_override` (`crates/autorota-core/src/db/queries.rs`) deliberately never updated `source` on `ON CONFLICT`, so an existing `manual` row could never be promoted to `exception`. The grid border (`WeeklyAvailabilityView.swift:166`, `CarouselAvailabilityView`, `EmployeeEditSheet`) and the list filter (`OverridesTabView.swift`) both key off `source == "exception"`. Changed the upsert to `source = CASE WHEN excluded.source = 'exception' THEN 'exception' ELSE <existing> END` — `exception` is sticky (a later grid edit writing `manual` never downgrades it) but a `manual` row can be promoted when classified via the Exceptions UI. Two new Rust tests in `edge_cases_test.rs` (promotion + no-downgrade) — green. No Swift/FFI change.
+
+- **Unprofessional error alerts + silently swallowed errors**
+  - Date fixed: 2026-06-04 (pending verification)
+  - Where / what / repro: 8 views used ad-hoc `.alert("Error", isPresented: .constant(vm.error != nil))` with raw `error.localizedDescription`; `OverridesTabView` set `vm.error` but had no `.alert`, so failed exception saves dismissed silently. Non-FFI errors could surface developer gibberish ("The operation couldn't be completed. (Module.Error error 1.)").
+  - Patched: yes — pending user verification
+  - Fix: new `Views/Shared/ErrorAlert.swift` `.errorAlert($binding, retry:)` modifier (friendly "Something went wrong" title, optional Try Again); replaced all ad-hoc alerts (RotaView, EmployeeListView, ShiftTemplateListView, AnalyticsView, EmployeeShiftHistoryView, ExportSheetView, RosterImportView, SendSchedulePicker, BulkSendChecklistView) and wired the previously-missing alert into `OverridesTabView`. Hardened `userFacingMessage` to prefer `LocalizedError.errorDescription`, then Cocoa `NSLocalizedDescriptionKey`, else a clean generic fallback.
+
 - **Multi-role shift requirements silently lost across iCloud sync**
   - Date fixed: 2026-06-03 (pending verification)
   - Where / what / repro: per-role minimums (migration 024 child tables `shift_role_requirements` / `template_role_requirements`) carried no sync columns and weren't in `syncable_columns`, so they never pushed to / pulled from CloudKit. On a second device a multi-role shift/template arrived with an empty requirement list → silently treated as a wildcard (any staff), losing staffing intent. Only the denormalised primary `required_role` synced.
@@ -16,10 +35,10 @@ Concise running log of bugs encountered. Each entry is one bullet with sub-bulle
   - Followup (build #7): the brew install resolved the DNS issue but build still failed with `cargo: command not found` from `build_xcframework.sh`. Two reasons: (a) the brew `rustup` formula is **keg-only** (conflicts with `rust`), so its bin dir was never on PATH and `rustup-init` was only findable by warm-runner luck; (b) the `rustup show active-toolchain` guard reported success on a warm runner where prior state had a toolchain registered, so `rustup-init` was skipped and the `~/.cargo/bin/{cargo,rustc}` shims were never created. Patched by: explicitly adding `$(brew --prefix rustup)/bin` to PATH; pinning `RUSTUP_HOME`/`CARGO_HOME` to `$HOME/.{rustup,cargo}`; replacing the active-toolchain guard with a direct `[[ -x $CARGO_HOME/bin/cargo ]]` shim check; appending `$CARGO_HOME/bin` to PATH; and adding a fail-fast loop that aborts if `rustup`/`rustc`/`cargo` are still missing before the build script runs.
 
 - **Menu tab "Other Pages" rows un-tappable after first navigation**
-  - Date fixed: —
-  - Where / what / repro: Menu tab → "Other Pages" section. After tapping one entry (e.g. Exceptions) and returning, tapping a second entry (e.g. Edit Log) only flashes the row dark grey — no navigation. Repro from a fresh state: open Menu, tap Exceptions, go back, tap Edit Log.
-  - Patched: no — one fix attempt failed, see `bugs/unpatched/menu-other-pages-untappable-after-first-nav.md`
-  - Fix: n/a (open). Hypothesis: nested NavigationStacks (every destination view wraps itself in its own `NavigationStack`).
+  - Date fixed: 2026-06-04 (pending verification)
+  - Where / what / repro: Menu tab → "Other Pages" section. After tapping one entry (e.g. Exceptions) and returning, tapping a second entry (e.g. Edit Log) only flashes the row dark grey — no navigation (earlier it would show a blank screen then dismiss). Repro from a fresh state: open Menu, tap Exceptions, go back, tap Edit Log.
+  - Patched: yes — pending user verification
+  - Fix: confirmed root cause was nested `NavigationStack`s — each `TabPage.destinationView` (RotaView/EmployeeListView/ShiftTemplateListView/OverridesTabView/EditLogView/AnalyticsView/ExportTabView) wraps itself in its own stack; pushing one into the Menu's stack nests them and iOS 26 leaves the outer stack inert after a pop. Added `OptionalNavigationStack` + an `\.isMenuPushed` environment value (`Views/Shared/OptionalNavigationStack.swift`); each root view now wraps its body in `OptionalNavigationStack(embed: !isMenuPushed)`, and `SettingsView`'s `navigationDestination` renders the page with `.environment(\.isMenuPushed, true)` so menu pushes reuse the Menu's single stack (no nesting). As tab roots `isMenuPushed` defaults to false → each still owns its stack.
 
 - **"Required role" Picker in shift template editor cannot be opened**
   - Date fixed: —
@@ -28,10 +47,10 @@ Concise running log of bugs encountered. Each entry is one bullet with sub-bulle
   - Fix: n/a (open — see `IOS_BUGS.md` #3 for investigation notes)
 
 - **Rota empty-state "Add employee" button does nothing when Employees is in overflow Menu**
-  - Date fixed: —
+  - Date fixed: 2026-06-04 (pending verification)
   - Where / what / repro: Rota tab CUV's "Add employee" button. Repro: remove Employees from the configurable tab bar so it lives only in overflow Menu; with no employees, open Rota tab and tap "Add employee" — no tab switch, no sheet.
-  - Patched: no
-  - Fix: n/a (open — see `IOS_BUGS.md` #2 for proposed fix sketch)
+  - Patched: yes — pending user verification
+  - Fix: side-effect of the Menu-navigation fix above. The `MenuNavigationBridge` (set at `ContentView.swift:66`, which routes to `.page(.settings)` + `pendingDestination = .employees`) was dead — `SettingsView` no longer consumed it after an earlier failed patch. Re-wired: `SettingsView` now holds `@State navPath: [TabPage]` bound to `NavigationStack(path:)` and consumes `menuNav.pendingDestination` on appear / change to push the target page. Now functional because the nested-stack bug it depended on is fixed.
 
 - **Shifts tab list-placeholder flicker on empty state**
   - Date fixed: 2026-04-30 (commit `5cb5e37`)

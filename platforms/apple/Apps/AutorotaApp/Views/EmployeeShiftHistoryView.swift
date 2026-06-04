@@ -39,11 +39,7 @@ struct EmployeeShiftHistoryView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .task { await vm.load(employeeId: employeeId) }
-        .alert("Error", isPresented: .constant(vm.error != nil)) {
-            Button("OK") { vm.error = nil }
-        } message: {
-            Text(vm.error ?? "")
-        }
+        .errorAlert($vm.error)
     }
 
     // MARK: - Sections

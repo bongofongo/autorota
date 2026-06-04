@@ -15,12 +15,14 @@ struct OverridesTabView: View {
     @State private var templateVM = ShiftTemplateViewModel()
     @State private var showingEmpSheet = false
     @State private var editingEmpOverride: FfiEmployeeAvailabilityOverride? = nil
+    @State private var editingEmpGroup: EmpOverrideGroup? = nil
     @State private var showingTmplSheet = false
     @State private var editingTmplOverride: FfiShiftTemplateOverride? = nil
     @State private var empViewMode: EmpViewMode = .allByDate
     @State private var expandedEmployees: Set<Int64> = []
     @State private var expandedGroups: Set<String> = []
     @Environment(\.accessibilityPalette) private var palette
+    @Environment(\.isMenuPushed) private var isMenuPushed
 
     enum EmpViewMode: String, CaseIterable, Identifiable {
         case allByDate = "All · Soonest Date"
@@ -129,15 +131,47 @@ struct OverridesTabView: View {
     @ViewBuilder
     private func empOverrideGroupButton(group: EmpOverrideGroup) -> some View {
         if group.isRange {
-            DisclosureGroup(
-                isExpanded: Binding(
-                    get: { expandedGroups.contains(group.id) },
-                    set: { exp in
-                        if exp { expandedGroups.insert(group.id) }
-                        else { expandedGroups.remove(group.id) }
+            // Manual disclosure: tapping the row edits the whole range, while
+            // the trailing chevron expands the group for per-day editing.
+            let isExpanded = expandedGroups.contains(group.id)
+            HStack(spacing: 8) {
+                Button { editingEmpGroup = group } label: {
+                    EmpOverrideGroupRow(group: group, employeeLookup: employeeLookup)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    if isExpanded { expandedGroups.remove(group.id) }
+                    else { expandedGroups.insert(group.id) }
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(isExpanded ? "Collapse days" : "Expand days")
+            }
+            .contextMenu {
+                Button { editingEmpGroup = group } label: {
+                    Label("Edit Exception", systemImage: "pencil")
+                }
+                Button(role: .destructive) {
+                    Task {
+                        for ovr in group.items {
+                            await vm.deleteEmployeeOverride(id: ovr.id)
+                        }
+                        await vm.loadAll()
                     }
-                )
-            ) {
+                } label: {
+                    Label("Delete All (\(group.items.count))", systemImage: "trash")
+                }
+            }
+
+            if isExpanded {
                 ForEach(group.items) { ovr in
                     Button { editingEmpOverride = ovr } label: {
                         EmpOverrideDayRow(ovr: ovr, color: availabilityColor(for: ovr.availability))
@@ -157,20 +191,6 @@ struct OverridesTabView: View {
                         }
                     }
                 }
-            } label: {
-                EmpOverrideGroupRow(group: group, employeeLookup: employeeLookup)
-                    .contextMenu {
-                        Button(role: .destructive) {
-                            Task {
-                                for ovr in group.items {
-                                    await vm.deleteEmployeeOverride(id: ovr.id)
-                                }
-                                await vm.loadAll()
-                            }
-                        } label: {
-                            Label("Delete All (\(group.items.count))", systemImage: "trash")
-                        }
-                    }
             }
         } else {
             Button {
@@ -202,7 +222,7 @@ struct OverridesTabView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        OptionalNavigationStack(embed: !isMenuPushed) {
             List {
                 // Employee availability overrides
                 Section {
@@ -314,6 +334,7 @@ struct OverridesTabView: View {
                 }
             }
             .navigationTitle("Exceptions")
+            .errorAlert($vm.error)
             .task {
                 await vm.loadAll()
                 await employeeVM.load()
@@ -324,6 +345,14 @@ struct OverridesTabView: View {
             }
             .sheet(item: $editingEmpOverride, onDismiss: { Task { await vm.loadAll() } }) { ovr in
                 EmployeeAvailabilityOverrideSheet(vm: vm, employees: employeeVM.employees, existing: ovr)
+            }
+            .sheet(item: $editingEmpGroup, onDismiss: { Task { await vm.loadAll() } }) { group in
+                EmployeeAvailabilityOverrideSheet(
+                    vm: vm,
+                    employees: employeeVM.employees,
+                    existing: nil,
+                    existingRange: group.items
+                )
             }
             .sheet(isPresented: $showingTmplSheet, onDismiss: { Task { await vm.loadAll() } }) {
                 ShiftTemplateOverrideSheet(vm: vm, templates: templateVM.templates, existing: nil)
@@ -494,6 +523,10 @@ struct EmployeeAvailabilityOverrideSheet: View {
     let vm: OverrideViewModel
     let employees: [FfiEmployee]
     var existing: FfiEmployeeAvailabilityOverride?
+    /// When set, the sheet edits a whole date-range exception: every per-day
+    /// override row in the range (sorted by date). Mutually exclusive with
+    /// `existing` (single-day edit).
+    var existingRange: [FfiEmployeeAvailabilityOverride]? = nil
     var preselectedEmployeeId: Int64? = nil
     var preselectedStartDate: Date? = nil
     var preselectedEndDate: Date? = nil
@@ -516,7 +549,7 @@ struct EmployeeAvailabilityOverrideSheet: View {
 
     private static let softMaxDaysInRange = 84  // 12 weeks
 
-    private var isEditing: Bool { existing != nil }
+    private var isEditing: Bool { existing != nil || existingRange != nil }
 
     private static let dateFmt: DateFormatter = {
         let f = DateFormatter()
@@ -787,6 +820,25 @@ struct EmployeeAvailabilityOverrideSheet: View {
                 isDateRange = true
             }
         }
+
+        // Editing a whole date-range exception: seed the range bounds and the
+        // per-day grid buffer from every existing override row.
+        if let range = existingRange, let first = range.first, let last = range.last {
+            selectedEmployeeId = first.employeeId
+            isDateRange = true
+            date = Self.dateFmt.date(from: first.date) ?? Date()
+            endDate = Self.dateFmt.date(from: last.date) ?? date
+            for ovr in range {
+                guard let d = Self.dateFmt.date(from: ovr.date) else { continue }
+                let wd = weekday(for: d)
+                slotsByDate[ovr.date] = ovr.availability.map {
+                    AvailabilitySlot(weekday: wd, hour: $0.hour, state: $0.state)
+                }
+            }
+            notes = first.notes ?? ""
+            return
+        }
+
         guard let ovr = existing else { return }
         selectedEmployeeId = ovr.employeeId
         let parsedDate = Self.dateFmt.date(from: ovr.date) ?? Date()
@@ -805,6 +857,15 @@ struct EmployeeAvailabilityOverrideSheet: View {
     }
 
     private func deleteExisting() {
+        if let range = existingRange {
+            Task {
+                for ovr in range {
+                    await vm.deleteEmployeeOverride(id: ovr.id)
+                }
+                dismiss()
+            }
+            return
+        }
         guard let ovr = existing else { return }
         Task {
             await vm.deleteEmployeeOverride(id: ovr.id)
@@ -816,7 +877,13 @@ struct EmployeeAvailabilityOverrideSheet: View {
         guard let empId = selectedEmployeeId else { return }
 
         if isDateRange {
+            let keptDates = Set(datesInRange.map { Self.dateFmt.string(from: $0) })
             Task {
+                // When editing a range, delete original days dropped from the
+                // new span (the upsert below can't remove rows, only add/update).
+                for ovr in existingRange ?? [] where !keptDates.contains(ovr.date) {
+                    await vm.deleteEmployeeOverride(id: ovr.id)
+                }
                 for d in datesInRange {
                     let wd = weekday(for: d)
                     let key = Self.dateFmt.string(from: d)

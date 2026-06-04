@@ -57,11 +57,7 @@ struct BulkSendChecklistView: View {
                     }
                 }
                 .task { await load() }
-                .alert("Bulk Send", isPresented: .constant(error != nil)) {
-                    Button("OK") { error = nil }
-                } message: {
-                    Text(error ?? "")
-                }
+                .errorAlert($error)
                 .navigationDestination(isPresented: $showSkipList) {
                     BulkSendSkipListView(
                         skipped: skipped,

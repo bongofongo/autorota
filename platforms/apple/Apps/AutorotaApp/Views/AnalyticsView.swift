@@ -8,9 +8,10 @@ struct AnalyticsView: View {
     @Environment(ExchangeRateService.self) private var exchangeRates
     @Environment(\.accessibilityPalette) private var palette
     @AppStorage("appCurrency") private var displayCurrency = "usd"
+    @Environment(\.isMenuPushed) private var isMenuPushed
 
     var body: some View {
-        NavigationStack {
+        OptionalNavigationStack(embed: !isMenuPushed) {
             Group {
                 if vm.isLoading && vm.employeeSummaries.isEmpty {
                     ProgressView("Loading analytics…")
@@ -41,11 +42,7 @@ struct AnalyticsView: View {
                 vm.displayCurrency = displayCurrency
                 Task { await vm.load() }
             }
-            .alert("Error", isPresented: .constant(vm.error != nil)) {
-                Button("OK") { vm.error = nil }
-            } message: {
-                Text(vm.error ?? "")
-            }
+            .errorAlert($vm.error)
         }
     }
 

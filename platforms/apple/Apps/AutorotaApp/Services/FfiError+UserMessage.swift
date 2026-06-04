@@ -38,5 +38,17 @@ func userFacingMessage(_ error: Error) -> String {
     if let ffi = error as? FfiError {
         return localizeError(code: ffi.code, localeId: Locale.current.identifier)
     }
-    return error.localizedDescription
+    // Prefer an explicitly authored user-facing description.
+    if let localized = error as? LocalizedError, let desc = localized.errorDescription {
+        return desc
+    }
+    // Cocoa/URL errors carry a presentable localized description; bare enums
+    // and similar do not — their `localizedDescription` is developer gibberish
+    // like "The operation couldn’t be completed. (Module.Error error 1.)", so
+    // fall back to a clean generic message instead of showing that to users.
+    let ns = error as NSError
+    if ns.userInfo[NSLocalizedDescriptionKey] != nil {
+        return ns.localizedDescription
+    }
+    return String(localized: "Something went wrong. Please try again.")
 }

@@ -19,9 +19,10 @@ struct RotaView: View {
     @Environment(RotaUIBridge.self) private var bridge
     @Environment(EmployeeUIBridge.self) private var employeeBridge
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isMenuPushed) private var isMenuPushed
 
     var body: some View {
-        NavigationStack {
+        OptionalNavigationStack(embed: !isMenuPushed) {
             VStack(spacing: 0) {
                 if vm.isLoading {
                     Spacer()
@@ -143,11 +144,7 @@ struct RotaView: View {
                     return "\(w.weekday) \(w.startTime)–\(w.endTime) (\(roleLabel)): \(w.filled)/\(w.needed) filled"
                 }.joined(separator: "\n"))
             }
-            .alert("Error", isPresented: .constant(vm.error != nil)) {
-                Button("OK") { vm.error = nil }
-            } message: {
-                Text(vm.error ?? "")
-            }
+            .errorAlert($vm.error)
             .sheet(isPresented: $showExportSheet) {
                 ExportSheetView(
                     weekStart: vm.selectedWeekStart,
@@ -570,40 +567,46 @@ private struct ShiftCard: View {
     var isCompact: Bool = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            // Header row — capacity over shift times, right-aligned. Role is
-            // intentionally omitted from the grid card (still shown on tap in
-            // the shift editor); shift times sit beneath the capacity count.
-            HStack {
-                Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(assignments.count)/\(shift.maxEmployees)")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(assignments.count < Int(shift.minEmployees) ? .red : .secondary)
-                    Text("\(shift.startTime) – \(shift.endTime)")
+        HStack(alignment: .top, spacing: 8) {
+            // Left column — employees, left-justified and top-aligned. Vertical
+            // position is independent of the right-side time text.
+            VStack(alignment: .leading, spacing: 2) {
+                if assignments.isEmpty {
+                    Text("Unassigned")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.tertiary)
+                        .italic()
+                } else {
+                    ForEach(assignments, id: \.assignmentId) { entry in
+                        AssignmentRow(
+                            entry: entry,
+                            vm: vm,
+                            shift: shift,
+                            isEditMode: isEditMode,
+                            isLocked: isLocked,
+                            isCompact: isCompact
+                        )
+                    }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            // Assignment rows
-            if assignments.isEmpty {
-                Text("Unassigned")
+            // Right column — capacity over stacked shift times, right-aligned.
+            // Start time stays muted; end time is emboldened in the primary
+            // color. Role is intentionally omitted from the grid card (still
+            // shown on tap in the shift editor).
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("\(assignments.count)/\(shift.maxEmployees)")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(assignments.count < Int(shift.minEmployees) ? .red : .secondary)
+                Text(shift.startTime)
                     .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .italic()
-            } else {
-                ForEach(assignments, id: \.assignmentId) { entry in
-                    AssignmentRow(
-                        entry: entry,
-                        vm: vm,
-                        shift: shift,
-                        isEditMode: isEditMode,
-                        isLocked: isLocked,
-                        isCompact: isCompact
-                    )
-                }
+                    .foregroundStyle(.secondary)
+                Text(shift.endTime)
+                    .font(.caption.bold())
+                    .foregroundStyle(.primary)
             }
+            .fixedSize(horizontal: true, vertical: false)
         }
         .padding(10)
         .background(

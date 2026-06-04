@@ -6,9 +6,10 @@ struct EditLogView: View {
     @State private var vm = EditLogViewModel()
     @State private var expandedWeeks: Set<String> = [currentWeekStart()]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isMenuPushed) private var isMenuPushed
 
     var body: some View {
-        NavigationStack {
+        OptionalNavigationStack(embed: !isMenuPushed) {
             ZStack(alignment: .top) {
                 Group {
                     if vm.isLoading && vm.saves.isEmpty {

@@ -53,13 +53,23 @@ struct SettingsView: View {
     @Environment(AutorotaSyncEngine.self) private var syncEngine
     @Environment(LocaleManager.self) private var localeManager
     @Environment(LicenseService.self) private var license
+    @Environment(MenuNavigationBridge.self) private var menuNav
+    /// Drives programmatic pushes from `MenuNavigationBridge` (e.g. an "Add
+    /// employee" CTA fired while Employees lives in the overflow Menu).
+    @State private var navPath: [TabPage] = []
     private var selectedAppearance: AppAppearance {
         AppAppearance(rawValue: appearance) ?? .system
     }
 
+    private func consumePendingDestination() {
+        guard let dest = menuNav.pendingDestination else { return }
+        navPath = [dest]
+        menuNav.pendingDestination = nil
+    }
+
     var body: some View {
         @Bindable var localeManager = localeManager
-        return NavigationStack {
+        return NavigationStack(path: $navPath) {
             Form {
                 // Navigation links for pages not in the tab bar
                 if !layoutManager.hiddenPages.isEmpty {
@@ -239,9 +249,14 @@ struct SettingsView: View {
             #endif
             .navigationTitle("Menu")
             .navigationDestination(for: TabPage.self) { page in
+                // Reuse this stack — do not let the pushed page nest its own
+                // NavigationStack (iOS 26 breaks navigation when stacks nest).
                 page.destinationView
+                    .environment(\.isMenuPushed, true)
             }
         }
+        .onAppear { consumePendingDestination() }
+        .onChange(of: menuNav.pendingDestination) { _, _ in consumePendingDestination() }
     }
 }
 
