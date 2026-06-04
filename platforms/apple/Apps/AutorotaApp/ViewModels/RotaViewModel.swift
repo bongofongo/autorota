@@ -12,6 +12,35 @@ private extension Logger {
     )
 }
 
+/// Shared, locale-fixed formatters and calendar for the rota view model.
+/// `DateFormatter`/`Calendar` allocation is expensive and these are pure
+/// (fixed format + POSIX locale), so they're hoisted out of the hot render
+/// path where day headers and labels would otherwise allocate one per call.
+private enum RotaDateFmt {
+    static let iso: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+    static let monthDay: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMMM d"
+        return f
+    }()
+    static let shortMonthDay: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMM d"
+        return f
+    }()
+    static let year: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy"
+        return f
+    }()
+    static let calendar = Calendar(identifier: .iso8601)
+}
+
 enum WeekCategory {
     case past, current, future
 }
@@ -20,7 +49,9 @@ enum WeekCategory {
 @Observable
 final class RotaViewModel {
 
-    var schedule: FfiWeekSchedule?
+    var schedule: FfiWeekSchedule? {
+        didSet { rebuildDerivedCaches() }
+    }
     var isLoading = false
     var isScheduling = false
     var error: String?
@@ -44,6 +75,17 @@ final class RotaViewModel {
     // edit mode. See `conflict(employeeId:shift:)`.
     private var employeesById: [Int64: FfiEmployee] = [:]
     private var availabilityOverridesByKey: [String: FfiEmployeeAvailabilityOverride] = [:]
+
+    // Derived display caches, rebuilt once per `loadSchedule` (see
+    // `rebuildDerivedCaches`) so the grid body does dictionary lookups instead
+    // of grouping/filtering/conflict-checking on every SwiftUI render.
+    private(set) var shiftsByDay: [(weekday: String, shifts: [FfiShiftInfo])] = []
+    private var shiftsByWeekday: [String: [FfiShiftInfo]] = [:]
+    private var entriesByShift: [Int64: [FfiScheduleEntry]] = [:]
+    private var conflictByAssignmentId: [Int64: ConflictReason?] = [:]
+    /// Today's ISO date, snapshotted per load so past/today checks don't
+    /// re-format `Date()` per render.
+    private var todayISO: String = ""
 
     // Swap
     var swapSourceAssignmentId: Int64?
@@ -80,34 +122,85 @@ final class RotaViewModel {
     // MARK: - Loading
 
     func loadSchedule() async {
-        isLoading = true
+        // Only show the spinner on a genuine cold load (no schedule on screen).
+        // A reload that already has content swaps data underneath the live grid
+        // with no teardown/spinner flash — the source of the mutation/tab-switch
+        // stutter.
+        let isColdLoad = (schedule == nil)
+        if isColdLoad { isLoading = true }
         error = nil
-        do {
-            schedule = try await service.getWeekSchedule(weekStart: selectedWeekStart)
-        } catch {
-            self.error = userFacingMessage(error)
-        }
-        await refreshConflictData()
-        isLoading = false
-    }
 
-    /// Load the employees + availability overrides used to flag assignment
-    /// conflicts. Best-effort: failures leave the caches as-is (no warnings)
-    /// rather than blocking the schedule view.
-    private func refreshConflictData() async {
-        if let emps = try? await service.listEmployees() {
+        // Fetch the schedule and the conflict-detection data concurrently
+        // rather than four sequential FFI round-trips. The conflict data is
+        // best-effort (`try?`): a failure leaves that cache as-is.
+        async let scheduleResult = service.getWeekSchedule(weekStart: selectedWeekStart)
+        async let empsResult = service.listEmployees()
+        async let overridesResult = service.listAllEmployeeAvailabilityOverrides()
+        async let rolesResult = service.listRoles()
+
+        // Update the conflict-detection data first so that assigning `schedule`
+        // (which rebuilds the derived caches via `didSet`) sees fresh employees
+        // and availability overrides. Conflict data is best-effort (`try?`).
+        if let emps = try? await empsResult {
             employees = emps
             employeesById = Dictionary(uniqueKeysWithValues: emps.map { ($0.id, $0) })
         }
-        if let overrides = try? await service.listAllEmployeeAvailabilityOverrides() {
+        if let overrides = try? await overridesResult {
             availabilityOverridesByKey = Dictionary(
                 overrides.map { ("\($0.employeeId)-\($0.date)", $0) },
                 uniquingKeysWith: { first, _ in first }
             )
         }
-        if let loadedRoles = try? await service.listRoles() {
+        if let loadedRoles = try? await rolesResult {
             roles = loadedRoles
         }
+        do {
+            schedule = try await scheduleResult
+        } catch {
+            self.error = userFacingMessage(error)
+        }
+
+        if isColdLoad { isLoading = false }
+    }
+
+    /// Rebuild the grouping / lookup / conflict caches from the freshly-loaded
+    /// schedule + conflict data. Called once per `loadSchedule` so the grid
+    /// body never groups, filters, or conflict-checks during a render pass.
+    private func rebuildDerivedCaches() {
+        todayISO = RotaDateFmt.iso.string(from: Date())
+
+        guard let schedule else {
+            shiftsByDay = []
+            shiftsByWeekday = [:]
+            entriesByShift = [:]
+            conflictByAssignmentId = [:]
+            return
+        }
+
+        // Entries grouped by shift.
+        entriesByShift = Dictionary(grouping: schedule.entries, by: \.shiftId)
+
+        // Shifts grouped + sorted by weekday for display.
+        let order = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        let grouped = Dictionary(grouping: schedule.shifts, by: \.weekday)
+        var sortedByWeekday: [String: [FfiShiftInfo]] = [:]
+        for (day, shifts) in grouped {
+            sortedByWeekday[day] = shifts.sorted { $0.startTime < $1.startTime }
+        }
+        shiftsByWeekday = sortedByWeekday
+        shiftsByDay = order.compactMap { day in
+            guard let shifts = sortedByWeekday[day], !shifts.isEmpty else { return nil }
+            return (weekday: day, shifts: shifts)
+        }
+
+        // Per-assignment conflict, computed once and keyed by assignment id.
+        var conflicts: [Int64: ConflictReason?] = [:]
+        for shift in schedule.shifts {
+            for entry in entriesByShift[shift.id] ?? [] {
+                conflicts[entry.assignmentId] = conflict(employeeId: entry.employeeId, shift: shift)
+            }
+        }
+        conflictByAssignmentId = conflicts
     }
 
     // MARK: - Conflict detection
@@ -134,6 +227,12 @@ final class RotaViewModel {
             weeklyState: { weekly[$0] ?? .maybe },
             dateOverride: dateOverride
         )
+    }
+
+    /// Cached conflict for an assignment, precomputed in `rebuildDerivedCaches`.
+    /// Used by the grid's `AssignmentRow` to avoid per-render conflict checks.
+    func conflictForAssignment(_ assignmentId: Int64) -> ConflictReason? {
+        conflictByAssignmentId[assignmentId] ?? nil
     }
 
     func runSchedule() async {
@@ -390,9 +489,14 @@ final class RotaViewModel {
 
     // MARK: - Past lock
 
+    /// Today's ISO date. Uses the per-load snapshot when available, else
+    /// formats `Date()` once (covers calls before the first load completes).
+    private var currentTodayISO: String {
+        todayISO.isEmpty ? RotaDateFmt.iso.string(from: Date()) : todayISO
+    }
+
     func isShiftPast(_ shift: FfiShiftInfo) -> Bool {
-        let today = isoDateString(from: Date())
-        return shift.date < today
+        shift.date < currentTodayISO
     }
 
     func isShiftLocked(_ shift: FfiShiftInfo) -> Bool {
@@ -404,51 +508,36 @@ final class RotaViewModel {
     /// (year overflow, etc.); treat that as "stay put" and log so the silent
     /// fallback is debuggable.
     func shiftWeek(by weeks: Int) {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        fmt.locale = Locale(identifier: "en_US_POSIX")
-        guard let date = fmt.date(from: selectedWeekStart) else { return }
-        let cal = Calendar(identifier: .iso8601)
-        guard let shifted = cal.date(byAdding: .weekOfYear, value: weeks, to: date) else {
+        guard let date = RotaDateFmt.iso.date(from: selectedWeekStart) else { return }
+        guard let shifted = RotaDateFmt.calendar.date(byAdding: .weekOfYear, value: weeks, to: date) else {
             Logger.weekPicker.warning(
                 "cal.date(byAdding: .weekOfYear, value: \(weeks)) returned nil; staying on \(self.selectedWeekStart)"
             )
             return
         }
-        selectedWeekStart = fmt.string(from: shifted)
+        selectedWeekStart = RotaDateFmt.iso.string(from: shifted)
     }
 
     /// Full-month day-of-month label for a weekday in the selected week, e.g. "June 1".
     func dayOfMonthLabel(_ weekday: String) -> String {
         let iso = dateForWeekday(weekday)
-        let parseFmt = DateFormatter()
-        parseFmt.dateFormat = "yyyy-MM-dd"
-        parseFmt.locale = Locale(identifier: "en_US_POSIX")
-        guard let date = parseFmt.date(from: iso) else { return "" }
-        let displayFmt = DateFormatter()
-        displayFmt.dateFormat = "MMMM d"
-        return displayFmt.string(from: date)
+        guard let date = RotaDateFmt.iso.date(from: iso) else { return "" }
+        return RotaDateFmt.monthDay.string(from: date)
     }
 
     /// Date string for a weekday offset in the selected week (Mon=0, Tue=1, ..., Sun=6).
     func dateForWeekday(_ weekday: String) -> String {
         let offsets = ["Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6]
         guard let offset = offsets[weekday] else { return selectedWeekStart }
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        fmt.locale = Locale(identifier: "en_US_POSIX")
-        guard let monday = fmt.date(from: selectedWeekStart) else { return selectedWeekStart }
-        let cal = Calendar(identifier: .iso8601)
-        guard let target = cal.date(byAdding: .day, value: offset, to: monday) else {
+        guard let monday = RotaDateFmt.iso.date(from: selectedWeekStart) else { return selectedWeekStart }
+        guard let target = RotaDateFmt.calendar.date(byAdding: .day, value: offset, to: monday) else {
             return selectedWeekStart
         }
-        return fmt.string(from: target)
+        return RotaDateFmt.iso.string(from: target)
     }
 
     func isDayPast(_ weekday: String) -> Bool {
-        let dayDate = dateForWeekday(weekday)
-        let today = isoDateString(from: Date())
-        return dayDate < today
+        dateForWeekday(weekday) < currentTodayISO
     }
 
     func isDayLocked(_ weekday: String) -> Bool {
@@ -456,52 +545,33 @@ final class RotaViewModel {
     }
 
     func isDayToday(_ weekday: String) -> Bool {
-        dateForWeekday(weekday) == isoDateString(from: Date())
+        dateForWeekday(weekday) == currentTodayISO
     }
 
     // MARK: - Derived helpers
 
     /// Human-readable date range for the selected week, e.g. "Mar 23 – Mar 29, 2026".
     var weekDateRangeLabel: String {
-        let parseFmt = DateFormatter()
-        parseFmt.dateFormat = "yyyy-MM-dd"
-        parseFmt.locale = Locale(identifier: "en_US_POSIX")
-        guard let monday = parseFmt.date(from: selectedWeekStart) else { return selectedWeekStart }
-        let cal = Calendar(identifier: .iso8601)
-        guard let sunday = cal.date(byAdding: .day, value: 6, to: monday) else {
+        guard let monday = RotaDateFmt.iso.date(from: selectedWeekStart) else { return selectedWeekStart }
+        guard let sunday = RotaDateFmt.calendar.date(byAdding: .day, value: 6, to: monday) else {
             return selectedWeekStart
         }
-        let displayFmt = DateFormatter()
-        displayFmt.dateFormat = "MMM d"
-        let yearFmt = DateFormatter()
-        yearFmt.dateFormat = "yyyy"
-        return "\(displayFmt.string(from: monday)) – \(displayFmt.string(from: sunday)), \(yearFmt.string(from: sunday))"
+        return "\(RotaDateFmt.shortMonthDay.string(from: monday)) – \(RotaDateFmt.shortMonthDay.string(from: sunday)), \(RotaDateFmt.year.string(from: sunday))"
     }
 
     /// Concise date range for the nav-bar title, e.g. "Jun 8 – Jun 15" (no year).
     var weekDateRangeShort: String {
-        let parseFmt = DateFormatter()
-        parseFmt.dateFormat = "yyyy-MM-dd"
-        parseFmt.locale = Locale(identifier: "en_US_POSIX")
-        guard let monday = parseFmt.date(from: selectedWeekStart) else { return selectedWeekStart }
-        let cal = Calendar(identifier: .iso8601)
-        guard let sunday = cal.date(byAdding: .day, value: 6, to: monday) else {
+        guard let monday = RotaDateFmt.iso.date(from: selectedWeekStart) else { return selectedWeekStart }
+        guard let sunday = RotaDateFmt.calendar.date(byAdding: .day, value: 6, to: monday) else {
             return selectedWeekStart
         }
-        let displayFmt = DateFormatter()
-        displayFmt.dateFormat = "MMM d"
-        return "\(displayFmt.string(from: monday)) – \(displayFmt.string(from: sunday))"
+        return "\(RotaDateFmt.shortMonthDay.string(from: monday)) – \(RotaDateFmt.shortMonthDay.string(from: sunday))"
     }
 
-    /// Shifts grouped by weekday for display.
-    var shiftsByDay: [(weekday: String, shifts: [FfiShiftInfo])] {
-        guard let schedule else { return [] }
-        let order = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-        let grouped = Dictionary(grouping: schedule.shifts, by: \.weekday)
-        return order.compactMap { day in
-            guard let shifts = grouped[day], !shifts.isEmpty else { return nil }
-            return (weekday: day, shifts: shifts.sorted { $0.startTime < $1.startTime })
-        }
+    /// Shifts for a weekday, from the cache rebuilt on load (O(1) lookup used
+    /// by the grid instead of `shiftsByDay.first(where:)`).
+    func shifts(on weekday: String) -> [FfiShiftInfo] {
+        shiftsByWeekday[weekday] ?? []
     }
 
     /// All weekdays for the schedule (used by edit mode to show "Add Shift" for empty days).
@@ -509,9 +579,9 @@ final class RotaViewModel {
         ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     }
 
-    /// Assignments for a specific shift.
+    /// Assignments for a specific shift, from the per-load cache.
     func assignments(for shiftId: Int64) -> [FfiScheduleEntry] {
-        schedule?.entries.filter { $0.shiftId == shiftId } ?? []
+        entriesByShift[shiftId] ?? []
     }
 
     /// Employees not yet assigned to the given shift.
@@ -520,12 +590,4 @@ final class RotaViewModel {
         return employees.filter { !assignedIds.contains($0.id) }
     }
 
-    // MARK: - Private helpers
-
-    private func isoDateString(from date: Date) -> String {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        fmt.locale = Locale(identifier: "en_US_POSIX")
-        return fmt.string(from: date)
-    }
 }

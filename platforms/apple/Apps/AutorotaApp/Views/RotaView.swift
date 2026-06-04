@@ -407,7 +407,7 @@ private struct ScheduleGridView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 12, pinnedViews: [.sectionHeaders]) {
                 ForEach(vm.allWeekdays, id: \.self) { day in
-                    let shifts = vm.shiftsByDay.first(where: { $0.weekday == day })?.shifts ?? []
+                    let shifts = vm.shifts(on: day)
                     Section {
                         ForEach(shifts, id: \.id) { shift in
                             ShiftCard(
@@ -477,7 +477,7 @@ private struct ScheduleGridView: View {
             )
 
             // Shifts
-            let shifts = vm.shiftsByDay.first(where: { $0.weekday == day })?.shifts ?? []
+            let shifts = vm.shifts(on: day)
             if shifts.isEmpty {
                 Text("No shifts")
                     .font(.caption)
@@ -664,7 +664,7 @@ private struct AssignmentRow: View {
     private var isSwapSource: Bool { vm.isSwapSource(assignmentId: entry.assignmentId) }
     private var isSwapTarget: Bool { vm.isSwapTarget(entry: entry) }
     private var canEdit: Bool { isEditMode && !isLocked }
-    private var conflict: ConflictReason? { vm.conflict(employeeId: entry.employeeId, shift: shift) }
+    private var conflict: ConflictReason? { vm.conflictForAssignment(entry.assignmentId) }
 
     var body: some View {
         // When a swap target, wrap in a tappable button-style row
