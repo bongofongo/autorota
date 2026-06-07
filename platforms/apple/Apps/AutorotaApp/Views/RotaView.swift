@@ -75,6 +75,16 @@ struct RotaView: View {
                 }
             }
             .toolbar {
+                // Top-left: options menu — only on a scheduled week, not while
+                // editing. `.topBarLeading` is iOS-family only; macOS uses
+                // `.navigation` for the leading edge.
+                if vm.schedule != nil && !vm.isEditMode {
+                    #if os(iOS)
+                    ToolbarItem(placement: .topBarLeading) { optionsMenu }
+                    #else
+                    ToolbarItem(placement: .navigation) { optionsMenu }
+                    #endif
+                }
                 ToolbarItem(placement: .principal) {
                     HStack(spacing: 8) {
                         Button { vm.shiftWeek(by: -1) } label: {
@@ -84,8 +94,19 @@ struct RotaView: View {
 
                         Text(vm.weekDateRangeShort)
                             .font(.headline)
+                            .lineLimit(1)
+                            .padding(.bottom, 5)
+                            .overlay(alignment: .bottom) {
+                                Rectangle()
+                                    .fill(vm.weekCategory.underlineTint)
+                                    .frame(height: vm.weekCategory == .current ? 2 : 1)
+                                    .padding(.horizontal, 2)
+                            }
+                            // Fixed width keeps the chevrons anchored as the
+                            // date range string changes width week to week.
+                            .frame(width: 150)
                             .accessibilityIdentifier("rota.weekTitle")
-                        CategoryBadge(category: vm.weekCategory)
+                            .accessibilityValue(vm.weekCategory.accessibilityLabel)
 
                         Button { vm.shiftWeek(by: 1) } label: {
                             Image(systemName: "chevron.right")
@@ -93,8 +114,28 @@ struct RotaView: View {
                         .accessibilityIdentifier("rota.nextWeek")
                     }
                 }
-                ToolbarItem(placement: .primaryAction) {
-                    overflowMenu
+                // Top-right: Swap on a scheduled week, Done while editing, or a
+                // lone Generate on an empty week. Share lives in the options menu.
+                ToolbarItemGroup(placement: .primaryAction) {
+                    if vm.isEditMode {
+                        Button { vm.exitEditMode() } label: {
+                            Image(systemName: "checkmark")
+                        }
+                        .accessibilityLabel("Done editing")
+                        .accessibilityIdentifier("rota.done")
+                    } else if vm.schedule != nil {
+                        Button { Task { await vm.enterEditMode() } } label: {
+                            Image(systemName: "slider.horizontal.3")
+                        }
+                        .accessibilityLabel("Sandbox mode")
+                        .accessibilityIdentifier("rota.sandbox")
+                    } else {
+                        Button { Task { await vm.runSchedule() } } label: {
+                            Image(systemName: "wand.and.stars")
+                        }
+                        .accessibilityLabel("Generate")
+                        .accessibilityIdentifier("rota.generate")
+                    }
                 }
             }
             .onChange(of: vm.isEditMode) { _, new in
@@ -126,7 +167,7 @@ struct RotaView: View {
                 Text("How would you like to create a schedule for this week?")
             }
             .alert(
-                "Delete schedule for \(vm.weekDateRangeLabel)?",
+                "Delete week of \(vm.weekDateRangeLabel)?",
                 isPresented: $vm.showDeleteScheduleConfirmation
             ) {
                 Button("Delete", role: .destructive) {
@@ -135,6 +176,17 @@ struct RotaView: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("All shifts and assignments for this week will be permanently deleted.")
+            }
+            .alert(
+                "Regenerate schedule for \(vm.weekDateRangeLabel)?",
+                isPresented: $vm.showRegenerateConfirmation
+            ) {
+                Button("Regenerate", role: .destructive) {
+                    Task { await vm.confirmRegenerate() }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This deletes the current schedule and its assignments, then generates a new one.")
             }
             .alert("Scheduling Warnings", isPresented: .constant(!vm.warnings.isEmpty)) {
                 Button("OK") { vm.warnings = [] }
@@ -201,106 +253,59 @@ struct RotaView: View {
         }
     }
 
-    // MARK: - Toolbar menu
+    // MARK: - Options menu
 
-    /// Mirrors `EmployeeListView`'s primary-action component: an `ellipsis`
-    /// `Menu` (or a plain checkmark `Button` while editing) anchored in the
-    /// navigation toolbar. Surfaces Generate / Edit / Share / Delete on every
-    /// platform — without this the macOS Rota page has no Generate affordance.
+    /// Top-left ellipsis menu, shown only on a scheduled week (not editing).
+    /// Holds Regenerate, Share, and the destructive Delete week; Swap is
+    /// surfaced as a discrete trailing button.
     @ViewBuilder
-    private var overflowMenu: some View {
-        if vm.isEditMode {
-            Button {
-                vm.exitEditMode()
+    private var optionsMenu: some View {
+        Menu {
+            Button { showExportSheet = true } label: {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
+            Button { Task { await vm.runSchedule() } } label: {
+                Label("Regenerate", systemImage: "wand.and.stars")
+            }
+            Button(role: .destructive) {
+                vm.showDeleteScheduleConfirmation = true
             } label: {
-                Image(systemName: "checkmark")
+                Label("Delete week", systemImage: "trash")
             }
-            .accessibilityLabel("Done editing")
-        } else {
-            Menu {
-                ForEach(overflowActions) { action in
-                    Button(role: action.role) {
-                        action.action()
-                    } label: {
-                        Label(action.title, systemImage: action.systemImage)
-                    }
-                }
-            } label: {
-                Image(systemName: "ellipsis")
-            }
-            .accessibilityLabel("More actions")
+        } label: {
+            Image(systemName: "ellipsis")
         }
-    }
-
-    // MARK: - Overflow menu actions
-
-    private var overflowActions: [RotaOverflowAction] {
-        var actions: [RotaOverflowAction] = []
-
-        if vm.isEditMode {
-            // No overflow actions in edit mode — checkmark button exits
-        } else {
-            if vm.schedule != nil {
-                actions.append(RotaOverflowAction(
-                    title: "Delete schedule",
-                    systemImage: "trash",
-                    role: .destructive
-                ) {
-                    vm.showDeleteScheduleConfirmation = true
-                })
-                actions.append(RotaOverflowAction(
-                    title: "Swap staff",
-                    systemImage: "arrow.left.arrow.right"
-                ) {
-                    Task { await vm.enterEditMode() }
-                })
-                actions.append(RotaOverflowAction(
-                    title: "Share",
-                    systemImage: "square.and.arrow.up"
-                ) {
-                    showExportSheet = true
-                })
-            }
-            actions.append(RotaOverflowAction(
-                title: "Generate",
-                systemImage: "wand.and.stars"
-            ) {
-                Task { await vm.runSchedule() }
-            })
-        }
-
-        return actions
+        .accessibilityLabel("Options")
+        .accessibilityIdentifier("rota.options")
     }
 }
 
-// MARK: - Week category badge
+// MARK: - Week category palette
 
-private struct CategoryBadge: View {
-    let category: WeekCategory
+private extension Color {
+    /// Soft sage/mint shared by the "current" week underline and the "today"
+    /// marker in the schedule grid. Light and unobtrusive.
+    static let weekSage = Color(red: 0.52, green: 0.71, blue: 0.59)
+}
 
-    var body: some View {
-        Text(label)
-            .font(.caption2.bold())
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(color.opacity(0.2))
-            .foregroundStyle(color)
-            .clipShape(Capsule())
-    }
-
-    private var label: String {
-        switch category {
-        case .past: "Past"
-        case .current: "Current"
-        case .future: "Future"
+private extension WeekCategory {
+    /// Thin underline tint beneath the carousel date range, replacing the old
+    /// pill badge. Current is a soft sage/mint (light, unobtrusive); future
+    /// keeps the warm orange; past is a faint gray (matches `DayHeader`).
+    var underlineTint: Color {
+        switch self {
+        case .current: return .weekSage.opacity(0.7)
+        case .future:  return .orange.opacity(0.7)
+        case .past:    return .secondary.opacity(0.35)
         }
     }
 
-    private var color: Color {
-        switch category {
-        case .past: .secondary
-        case .current: .blue
-        case .future: .orange
+    /// Spoken category for VoiceOver, since the visible label was removed.
+    var accessibilityLabel: String {
+        switch self {
+        case .past: return "Past"
+        case .current: return "Current"
+        case .future: return "Future"
         }
     }
 }
@@ -314,11 +319,13 @@ private struct CategoryBadge: View {
 private enum ScheduleSheet: Identifiable {
     case shiftEditor(FfiShiftInfo)
     case addShift(SheetDate)
+    case addEmployee(FfiShiftInfo)
 
     var id: String {
         switch self {
         case .shiftEditor(let s): return "shift-\(s.id)"
         case .addShift(let d):    return "add-\(d.id)"
+        case .addEmployee(let s): return "addemp-\(s.id)"
         }
     }
 }
@@ -372,6 +379,8 @@ private struct ScheduleGridView: View {
                 ShiftEditorSheet(vm: vm, shift: shift)
             case .addShift(let date):
                 AddShiftSheet(vm: vm, date: date.id)
+            case .addEmployee(let shift):
+                AddEmployeePickerSheet(vm: vm, shift: shift)
             }
         }
         .alert(
@@ -416,7 +425,8 @@ private struct ScheduleGridView: View {
                                 vm: vm,
                                 isEditMode: vm.isEditMode,
                                 isLocked: vm.isShiftLocked(shift),
-                                onEdit: { requestSheet(.shiftEditor(shift)) }
+                                onEdit: { requestSheet(.shiftEditor(shift)) },
+                                onAddEmployee: { requestSheet(.addEmployee(shift)) }
                             )
                         }
                         if shifts.isEmpty {
@@ -493,6 +503,7 @@ private struct ScheduleGridView: View {
                         isEditMode: vm.isEditMode,
                         isLocked: vm.isShiftLocked(shift),
                         onEdit: { requestSheet(.shiftEditor(shift)) },
+                        onAddEmployee: { requestSheet(.addEmployee(shift)) },
                         isCompact: true
                     )
                 }
@@ -545,10 +556,10 @@ private struct DayHeader: View {
         .accessibilityLabel("Add shift on \(day)")
     }
 
-    /// Muted underline tint by time alignment: today accented, past gray,
-    /// future faint.
+    /// Muted underline tint by time alignment: today in sage (matching the
+    /// current-week carousel marker), past gray, future faint.
     private var underlineColor: Color {
-        if isToday { return .accentColor }
+        if isToday { return .weekSage.opacity(0.7) }
         if isPast { return .secondary.opacity(0.35) }
         return .secondary.opacity(0.15)
     }
@@ -562,11 +573,20 @@ private struct ShiftCard: View {
     let vm: RotaViewModel
     let isEditMode: Bool
     let isLocked: Bool
-    /// Tap-to-edit: opens the unified shift editor for this shift.
+    /// Tap-to-edit: opens the unified shift editor for this shift (normal mode).
     let onEdit: () -> Void
+    /// Sandbox-mode quick-add: opens the employee picker for this shift.
+    let onAddEmployee: () -> Void
     var isCompact: Bool = false
 
-    var body: some View {
+    @State private var showDeleteConfirm = false
+
+    /// Whether sandbox quick-edit controls are active on this card.
+    private var sandboxActive: Bool { isEditMode && !isLocked }
+
+    /// The card content (without swipe/context-menu chrome). Wrapped below so
+    /// the swipe container can reveal a delete action behind it.
+    private var card: some View {
         HStack(alignment: .top, spacing: 8) {
             // Left column — employees, left-justified and top-aligned. Vertical
             // position is independent of the right-side time text.
@@ -587,6 +607,20 @@ private struct ShiftCard: View {
                             isCompact: isCompact
                         )
                     }
+                }
+
+                // Sandbox quick-add — bottom-left, under the employee list.
+                // Bypasses the shift max (createAssignment has no capacity gate).
+                if sandboxActive {
+                    Button(action: onAddEmployee) {
+                        Label("Add", systemImage: "plus.circle")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.blue)
+                    .padding(.top, 2)
+                    .padding(.horizontal, 4)
+                    .accessibilityLabel("Add employee to shift")
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -615,14 +649,42 @@ private struct ShiftCard: View {
                 .shadow(radius: 1)
         )
         .opacity(isLocked && isEditMode ? 0.5 : 1.0)
-        .padding(.horizontal, isCompact ? 6 : 16)
-        // Tapping anywhere not occupied by an inner control (swap name tags in
-        // edit mode) opens the editor.
+        // Tapping the card opens the editor only in normal mode. In sandbox
+        // mode the card is not tappable-to-edit — quick controls handle edits.
         .contentShape(Rectangle())
-        .onTapGesture { onEdit() }
+        .onTapGesture { if !isEditMode { onEdit() } }
+    }
+
+    var body: some View {
+        Group {
+            #if os(iOS)
+            // iOS portrait: swipe a card left to reveal Delete. Landscape
+            // columns (`isCompact`) fall back to the context menu like macOS.
+            if sandboxActive && !isCompact {
+                SwipeToDeleteCard(onDelete: { showDeleteConfirm = true }) {
+                    card
+                }
+            } else {
+                card.modifier(ShiftContextDelete(enabled: sandboxActive) { showDeleteConfirm = true })
+            }
+            #else
+            card.modifier(ShiftContextDelete(enabled: sandboxActive) { showDeleteConfirm = true })
+            #endif
+        }
+        .padding(.horizontal, isCompact ? 6 : 16)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(shiftA11yLabel)
-        .accessibilityAction(named: "Edit shift") { onEdit() }
+        .accessibilityAction(named: isEditMode ? "Delete shift" : "Edit shift") {
+            if isEditMode { showDeleteConfirm = true } else { onEdit() }
+        }
+        .alert("Delete this shift?", isPresented: $showDeleteConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                Task { await vm.deleteShift(id: shift.id) }
+            }
+        } message: {
+            Text("This shift and all its assignments will be permanently deleted.")
+        }
     }
 
     private var shiftA11yLabel: String {
@@ -631,6 +693,93 @@ private struct ShiftCard: View {
         return "Shift \(shift.startTime) to \(shift.endTime), \(role), \(staffing)"
     }
 }
+
+// MARK: - Shift delete affordances
+
+/// Adds a destructive "Delete shift" context menu when `enabled`. Used on macOS
+/// and on iOS landscape columns where the swipe gesture isn't offered.
+private struct ShiftContextDelete: ViewModifier {
+    let enabled: Bool
+    let onDelete: () -> Void
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content.contextMenu {
+                Button(role: .destructive, action: onDelete) {
+                    Label("Delete shift", systemImage: "trash")
+                }
+            }
+        } else {
+            content
+        }
+    }
+}
+
+#if os(iOS)
+/// Drag-to-reveal delete for a shift card. A red Delete button sits underneath;
+/// dragging the card left reveals it. Used only in sandbox mode, iOS portrait.
+private struct SwipeToDeleteCard<Content: View>: View {
+    let onDelete: () -> Void
+    @ViewBuilder let content: Content
+
+    /// Live offset while dragging / at rest.
+    @State private var offset: CGFloat = 0
+    /// Committed resting offset (0 closed, -revealWidth open), captured as the
+    /// drag base so onChanged deltas don't compound.
+    @State private var committed: CGFloat = 0
+    /// How far the card slides to fully expose the delete button.
+    private let revealWidth: CGFloat = 84
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            // Underlay delete action, revealed as the card slides left.
+            Button {
+                close()
+                onDelete()
+            } label: {
+                Image(systemName: "trash.fill")
+                    .foregroundStyle(.white)
+                    .frame(width: revealWidth)
+                    .frame(maxHeight: .infinity)
+                    .background(Color.red, in: RoundedRectangle(cornerRadius: 8))
+            }
+            .buttonStyle(.plain)
+            .opacity(offset < -4 ? 1 : 0)
+            .accessibilityLabel("Delete shift")
+
+            content
+                .offset(x: offset)
+                .highPriorityGesture(
+                    // High `minimumDistance` so the vertical scroll isn't stolen
+                    // by an incidental horizontal twitch.
+                    DragGesture(minimumDistance: 20)
+                        .onChanged { value in
+                            // Clamp between fully open (-revealWidth) and closed
+                            // (0); `committed` is the resting base for this drag.
+                            offset = min(0, max(-revealWidth, committed + value.translation.width))
+                        }
+                        .onEnded { value in
+                            if committed + value.translation.width < -revealWidth / 2 {
+                                open()
+                            } else {
+                                close()
+                            }
+                        }
+                )
+        }
+    }
+
+    private func open() {
+        committed = -revealWidth
+        withAnimation(.snappy(duration: 0.2)) { offset = -revealWidth }
+    }
+
+    private func close() {
+        committed = 0
+        withAnimation(.snappy(duration: 0.2)) { offset = 0 }
+    }
+}
+#endif
 
 // MARK: - Conflict glyph
 
@@ -712,7 +861,10 @@ private struct AssignmentRow: View {
         let employeeName = entry.employeeName
         return HStack(spacing: 6) {
             if canEdit {
-                // Tappable name tag — initiates or cancels swap
+                // Name pill — whole container taps to initiate or cancel swap.
+                // A small swap glyph sits inside, to the right of the name. The
+                // pill carries a faint blue tint+outline that deepens when this
+                // row is the active swap source.
                 Button {
                     if isSwapSource {
                         vm.cancelSwap()
@@ -720,28 +872,44 @@ private struct AssignmentRow: View {
                         vm.selectSwapSource(assignmentId: entry.assignmentId, shiftId: entry.shiftId)
                     }
                 } label: {
-                    Text(employeeName)
-                        .font(.subheadline)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(
-                            isSwapSource
-                                ? Color.indigo.opacity(0.2)
-                                : Color.secondary.opacity(0.1),
-                            in: RoundedRectangle(cornerRadius: 5)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 5)
-                                .stroke(
-                                    isSwapSource ? Color.indigo : Color.secondary.opacity(0.3),
-                                    lineWidth: 1
-                                )
-                        )
-                        .foregroundStyle(isSwapSource ? .indigo : .primary)
+                    HStack(spacing: 4) {
+                        Text(employeeName)
+                            .font(.subheadline)
+                        Image(systemName: "arrow.left.arrow.right")
+                            .font(.caption2)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        isSwapSource
+                            ? Color.blue.opacity(0.22)
+                            : Color.blue.opacity(0.08),
+                        in: RoundedRectangle(cornerRadius: 5)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5)
+                            .stroke(
+                                isSwapSource ? Color.blue : Color.blue.opacity(0.4),
+                                lineWidth: 1
+                            )
+                    )
+                    .foregroundStyle(.blue)
                 }
                 .buttonStyle(.plain)
                 .disabled(vm.hasSwapSource && !isSwapSource)
                 .accessibilityLabel(isSwapSource ? "Cancel swap for \(employeeName)" : "Start swap for \(employeeName)")
+
+                // Delete sits outside the pill — instant remove, no confirm.
+                Button {
+                    Task { await vm.deleteAssignment(id: entry.assignmentId) }
+                } label: {
+                    Image(systemName: "minus.circle.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(.red)
+                }
+                .buttonStyle(.plain)
+                .disabled(vm.hasSwapSource)
+                .accessibilityLabel("Remove \(employeeName)")
             } else {
                 Text(employeeName)
                     .font(.subheadline)

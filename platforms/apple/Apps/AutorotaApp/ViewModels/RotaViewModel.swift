@@ -65,6 +65,10 @@ final class RotaViewModel {
     // Delete schedule confirmation
     var showDeleteScheduleConfirmation = false
 
+    // Regenerate confirmation (shown when Regenerate is tapped on a future week
+    // that already has a schedule — confirms wiping it before rebuilding).
+    var showRegenerateConfirmation = false
+
     // Edit mode
     var isEditMode = false
     var employees: [FfiEmployee] = []
@@ -242,6 +246,24 @@ final class RotaViewModel {
             showGenerateConfirmation = true
             return
         }
+        // Future week that already has a schedule: confirm before wiping it.
+        // `service.runSchedule` re-materialises and re-assigns from scratch, so
+        // this is a destructive regenerate.
+        if schedule != nil && weekCategory == .future {
+            showRegenerateConfirmation = true
+            return
+        }
+        await performSchedule()
+    }
+
+    /// Confirmed wipe-and-regenerate for a future week. `run_schedule` already
+    /// deletes the existing proposed assignments + shifts and re-materialises
+    /// from templates, so no separate delete is needed.
+    func confirmRegenerate() async {
+        await performSchedule()
+    }
+
+    private func performSchedule() async {
         isScheduling = true
         error = nil
         warnings = []
@@ -333,6 +355,7 @@ final class RotaViewModel {
         pastUnlocked = false
         showGenerateConfirmation = false
         showDeleteScheduleConfirmation = false
+        showRegenerateConfirmation = false
         cancelSwap()
     }
 

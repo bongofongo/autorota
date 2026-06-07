@@ -1189,6 +1189,9 @@
         }
       }
     },
+    "Add employee to shift" : {
+
+    },
     "Add Exception" : {
       "localizations" : {
         "ar" : {
@@ -3435,6 +3438,7 @@
       }
     },
     "Delete schedule for %@?" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -3553,6 +3557,12 @@
           }
         }
       }
+    },
+    "Delete week" : {
+
+    },
+    "Delete week of %@?" : {
+
     },
     "Deletes all local data and quits. Reopen to start onboarding from scratch." : {
 
@@ -16213,6 +16223,9 @@
         }
       }
     },
+    "Options" : {
+
+    },
     "Orange outline = exception for that day" : {
       "localizations" : {
         "ar" : {
@@ -17204,6 +17217,12 @@
         }
       }
     },
+    "Regenerate" : {
+
+    },
+    "Regenerate schedule for %@?" : {
+
+    },
     "Remove" : {
       "localizations" : {
         "ar" : {
@@ -17990,6 +18009,9 @@
           }
         }
       }
+    },
+    "Sandbox mode" : {
+
     },
     "Save" : {
       "localizations" : {
@@ -19118,6 +19140,9 @@
           }
         }
       }
+    },
+    "Share" : {
+
     },
     "Share Schedule" : {
       "localizations" : {
@@ -20560,6 +20585,9 @@
           }
         }
       }
+    },
+    "This deletes the current schedule and its assignments, then generates a new one." : {
+
     },
     "This employee will be removed from future rotas. Past and current assignments are preserved." : {
       "localizations" : {
