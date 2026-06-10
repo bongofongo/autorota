@@ -4,6 +4,7 @@
   <defs>
     <line id="tick" x1="512" y1="236.5" x2="512" y2="268.5"/>
     <rect id="gtooth" x="413" y="479" width="20" height="18" rx="5"/>
+    <circle id="mdot" cx="512" cy="252.5" r="4"/>
   </defs>
 
   <!-- icon background -->
@@ -20,7 +21,68 @@
   <circle cx="512" cy="565" r="346" fill="none" stroke="#2563EB" stroke-width="24"/>
 
   <!-- faint minute-dot track, centered on the notch band -->
-  <circle cx="512" cy="565" r="312.5" fill="none" stroke="#DEE3E9" stroke-width="8" stroke-linecap="round" stroke-dasharray="0 32.7"/>
+  <g fill="#DEE3E9">
+    <use xlink:href="#mdot" transform="rotate(0 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(6 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(12 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(18 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(24 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(30 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(36 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(42 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(48 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(54 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(60 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(66 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(72 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(78 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(84 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(90 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(96 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(102 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(108 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(114 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(120 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(126 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(132 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(138 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(144 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(150 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(156 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(162 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(168 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(174 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(180 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(186 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(192 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(198 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(204 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(210 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(216 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(222 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(228 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(234 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(240 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(246 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(252 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(258 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(264 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(270 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(276 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(282 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(288 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(294 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(300 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(306 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(312 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(318 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(324 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(330 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(336 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(342 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(348 512 565)"/>
+    <use xlink:href="#mdot" transform="rotate(354 512 565)"/>
+  </g>
 
   <!-- faint chapter ring, touching the notch inner tips -->
   <circle cx="512" cy="565" r="288" fill="none" stroke="#E9ECF0" stroke-width="5"/>

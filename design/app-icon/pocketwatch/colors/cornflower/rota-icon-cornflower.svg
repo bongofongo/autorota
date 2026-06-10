@@ -1,6 +1,6 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-  <title>rota app icon</title>
-  <desc>Minimalist open-face pocket watch: winding crown, three-band case border, faint minute track, chapter ring and hour notches seated against the inner bezel, the word rota in lowercase with the o drawn as a gear.</desc>
+  <title>rota app icon — cornflower</title>
+  <desc>Minimalist open-face pocket watch in cornflower blue (#5B8DEF): winding crown, two-ring case, faint minute track, chapter ring and hour notches, the word rota in lowercase with the o drawn as a gear.</desc>
   <defs>
     <line id="tick" x1="512" y1="236.5" x2="512" y2="268.5"/>
     <rect id="gtooth" x="413" y="479" width="20" height="18" rx="5"/>
@@ -11,14 +11,14 @@
   <rect x="22" y="22" width="980" height="980" rx="224" fill="#FFFFFF" stroke="#E3E7EC" stroke-width="3"/>
 
   <!-- winding crown -->
-  <rect x="496" y="148" width="32" height="52" rx="6" fill="#2563EB"/>
+  <rect x="496" y="148" width="32" height="52" rx="6" fill="#5B8DEF"/>
   <rect x="474" y="102" width="76" height="54" rx="16" fill="#8794A3"/>
   <path d="M497 116 V142 M512 116 V142 M527 116 V142" stroke="#5F6B7A" stroke-width="5" stroke-linecap="round" fill="none"/>
   <rect x="486" y="172" width="52" height="16" rx="8" fill="#8794A3"/>
 
   <!-- case: outer ring and main ring -->
-  <circle cx="512" cy="565" r="368" fill="#FFFFFF" stroke="#2563EB" stroke-width="10"/>
-  <circle cx="512" cy="565" r="346" fill="none" stroke="#2563EB" stroke-width="24"/>
+  <circle cx="512" cy="565" r="368" fill="#FFFFFF" stroke="#5B8DEF" stroke-width="10"/>
+  <circle cx="512" cy="565" r="346" fill="none" stroke="#5B8DEF" stroke-width="24"/>
 
   <!-- faint minute-dot track, centered on the notch band -->
   <g fill="#DEE3E9">
@@ -105,7 +105,7 @@
 
   <!-- wordmark: r o t a, with the o as a gear -->
   <g transform="translate(512 565) scale(0.98) translate(-512 -563)">
-    <g fill="none" stroke="#2563EB" stroke-width="30" stroke-linecap="round">
+    <g fill="none" stroke="#5B8DEF" stroke-width="30" stroke-linecap="round">
       <path d="M252 495 V632"/>
       <path d="M252 558 Q252 495 311 495"/>
       <circle cx="423" cy="563" r="56"/>
@@ -115,7 +115,7 @@
       <path d="M771 495 V632"/>
     </g>
     <!-- gear teeth fused onto the o -->
-    <g fill="#2563EB">
+    <g fill="#5B8DEF">
       <use xlink:href="#gtooth" transform="rotate(22.5 423 563)"/>
       <use xlink:href="#gtooth" transform="rotate(67.5 423 563)"/>
       <use xlink:href="#gtooth" transform="rotate(112.5 423 563)"/>
