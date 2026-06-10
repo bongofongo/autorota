@@ -90,6 +90,78 @@ pub fn render_json(grid: &ExportGrid, config: &ExportConfig, week_start: NaiveDa
     serde_json::to_string_pretty(&export).expect("JSON serialization should not fail")
 }
 
+// ─── Role-sectioned JSON ────────────────────────────────────
+
+#[derive(Serialize)]
+struct JsonSectionedExport {
+    metadata: Metadata,
+    sections: Vec<JsonSection>,
+}
+
+#[derive(Serialize)]
+struct JsonSection {
+    role: String,
+    columns: Vec<String>,
+    rows: Vec<JsonRow>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    totals: Option<Totals>,
+}
+
+/// Render role-sectioned grids as one JSON document with a `sections` array.
+pub fn render_json_sections(
+    sections: &[(String, ExportGrid)],
+    config: &ExportConfig,
+    week_start: NaiveDate,
+) -> String {
+    let now = chrono::Local::now();
+
+    let sections = sections
+        .iter()
+        .map(|(role, grid)| {
+            let rows = grid
+                .row_headers
+                .iter()
+                .zip(grid.cells.iter())
+                .map(|(header, cells)| JsonRow {
+                    header: header.clone(),
+                    cells: cells.clone(),
+                })
+                .collect();
+            let totals = grid.daily_totals.as_ref().map(|dt| {
+                let daily = dt
+                    .iter()
+                    .map(|d| DayTotal {
+                        hours: finite_or_zero(d.total_hours),
+                        cost: finite_or_zero(d.total_cost),
+                    })
+                    .collect();
+                Totals {
+                    daily,
+                    weekly_cost: finite_or_zero(grid.weekly_total_cost.unwrap_or(0.0)),
+                }
+            });
+            JsonSection {
+                role: role.clone(),
+                columns: grid.column_headers.clone(),
+                rows,
+                totals,
+            }
+        })
+        .collect();
+
+    let export = JsonSectionedExport {
+        metadata: Metadata {
+            week_start: week_start.format("%Y-%m-%d").to_string(),
+            layout: config.layout.to_string(),
+            profile: config.profile.to_string(),
+            generated_at: now.format("%Y-%m-%dT%H:%M:%S").to_string(),
+        },
+        sections,
+    };
+
+    serde_json::to_string_pretty(&export).expect("JSON serialization should not fail")
+}
+
 // ─── Employee schedule JSON ─────────────────────────────────
 
 #[derive(Serialize)]

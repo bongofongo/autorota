@@ -359,6 +359,21 @@ pub struct FfiExportConfig {
     /// "weekly_grid" | "per_employee" | "by_role".
     /// Only consulted when `format == "pdf"`. `None` → `weekly_grid`.
     pub pdf_template: Option<String>,
+    /// Ordered role names; when non-empty the export is split into one
+    /// stacked table/sheet per role (custom layouts). `None`/empty = single
+    /// table.
+    pub role_sections: Option<Vec<String>>,
+    /// Row-header content for "shift_by_weekday" custom layouts. `None`
+    /// keeps the legacy row label.
+    pub row_content: Option<FfiRowContent>,
+}
+
+/// Which fields a custom layout shows in the row-header column.
+#[derive(Clone, uniffi::Record)]
+pub struct FfiRowContent {
+    pub show_shift_name: bool,
+    pub show_times: bool,
+    pub show_role: bool,
 }
 
 /// Configuration for exporting a single employee's schedule.

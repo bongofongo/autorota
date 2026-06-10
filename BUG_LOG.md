@@ -2,6 +2,12 @@
 
 Concise running log of bugs encountered. Each entry is one bullet with sub-bullets. New entries appended at top. Patched entries remain `pending verification` until the user confirms.
 
+- **app-desktop (Tauri) no longer compiles: `Shift` initializer missing `role_requirements`**
+  - Date fixed: 2026-06-10 (pending verification)
+  - Where / what / repro: `cargo clippy --workspace --all-targets` fails in `crates/app-desktop/src-tauri/src/lib.rs:357` — the ad-hoc shift command builds a core `Shift` literal that was never updated when multi-role shifts added the `role_requirements` field. Pre-existing on main, surfaced while touching the export crates.
+  - Patched: yes — added `role_requirements: vec![]` (ad-hoc wildcard shift, no per-role minimums) — pending user verification
+  - Note: app-desktop still fails workspace clippy with three deeper pre-existing `tauri::command` macro errors ("implementation of `sqlx::Executor` is not general enough") that exist on a clean checkout too — toolchain/Tauri-version issue, untouched.
+
 - **Editing a date-range exception only edited the first day (single-day editor, not the range)**
   - Date fixed: 2026-06-04 (pending verification)
   - Where / what / repro: create a multi-day exception (e.g. Mon–Fri), then tap it to edit. Instead of the range editor, a single-day editor opened on the first day. A range exception has no entity of its own — it's N per-day `FfiEmployeeAvailabilityOverride` rows grouped in the UI (`OverridesTabView.EmpOverrideGroup`); edit entry points passed one day's override and the sheet's range UI was create-only (`isDateRange` toggle gated `if !isEditing`, `prefill()` loaded one day).

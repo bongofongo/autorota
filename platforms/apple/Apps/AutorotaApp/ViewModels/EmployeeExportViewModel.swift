@@ -22,10 +22,8 @@ final class EmployeeExportViewModel {
     var endDate: Date = Calendar.current.startOfDay(for: Date())
 
     var format: String = "csv"
-    var profile: String = "staff_schedule"
-    var showShiftName: Bool = true
-    var showTimes: Bool = true
-    var showRole: Bool = true
+    // Employee exports never include wage/cost data.
+    let profile = "staff_schedule"
 
     var isExporting = false
     var isLoading = false
@@ -39,10 +37,6 @@ final class EmployeeExportViewModel {
         // Read persisted defaults.
         let defaults = UserDefaults.standard
         format = defaults.string(forKey: "empExportDefaultFormat") ?? "csv"
-        profile = defaults.string(forKey: "empExportDefaultProfile") ?? "staff_schedule"
-        showShiftName = defaults.object(forKey: "empExportShowShiftName") as? Bool ?? true
-        showTimes = defaults.object(forKey: "empExportShowTimes") as? Bool ?? true
-        showRole = defaults.object(forKey: "empExportShowRole") as? Bool ?? true
     }
 
     // MARK: - Loading
@@ -96,20 +90,17 @@ final class EmployeeExportViewModel {
         // Persist defaults.
         let defaults = UserDefaults.standard
         defaults.set(format, forKey: "empExportDefaultFormat")
-        defaults.set(profile, forKey: "empExportDefaultProfile")
-        defaults.set(showShiftName, forKey: "empExportShowShiftName")
-        defaults.set(showTimes, forKey: "empExportShowTimes")
-        defaults.set(showRole, forKey: "empExportShowRole")
 
+        // Employee exports have a fixed shape: shift name + times.
         let config = FfiEmployeeExportConfig(
             employeeId: employeeId,
             startDate: exportStartDate,
             endDate: exportEndDate,
             format: format,
             profile: profile,
-            showShiftName: showShiftName,
-            showTimes: showTimes,
-            showRole: showRole,
+            showShiftName: true,
+            showTimes: true,
+            showRole: false,
             timezoneId: TimeZone.current.identifier
         )
 

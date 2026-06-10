@@ -49,8 +49,33 @@ pub fn build_grids_by_role(
     roles.sort();
     roles.dedup();
 
+    build_grids_for_roles(
+        config,
+        week_start,
+        assignments,
+        shifts,
+        employees,
+        templates,
+        &roles,
+    )
+}
+
+/// Build one `ExportGrid` per role in `roles`, preserving the caller's order.
+/// Roles with no matching shifts still produce a (header-only) grid so the
+/// user sees every section they asked for.
+#[allow(clippy::too_many_arguments)]
+pub fn build_grids_for_roles(
+    config: &ExportConfig,
+    week_start: NaiveDate,
+    assignments: &[Assignment],
+    shifts: &[Shift],
+    employees: &[Employee],
+    templates: &[ShiftTemplate],
+    roles: &[String],
+) -> Vec<(String, ExportGrid)> {
     roles
-        .into_iter()
+        .iter()
+        .cloned()
         .map(|role| {
             let role_shifts: Vec<Shift> = shifts
                 .iter()
@@ -174,6 +199,7 @@ pub fn build_grid(
             &dates,
             &column_headers,
             &config.cell_content,
+            config.row_content.as_ref(),
             is_manager,
             title,
             &tmpl_map,
@@ -224,6 +250,9 @@ fn build_employee_grid(
                                 r.shift.end_time.format("%H:%M"),
                             ));
                         }
+                        if flags.show_role && !r.shift.required_role.is_empty() {
+                            parts.push(r.shift.required_role.clone());
+                        }
                         let mut text = parts.join("\n");
                         if is_manager {
                             if let Some(wage) = r.hourly_wage {
@@ -271,12 +300,14 @@ fn build_employee_grid(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_shift_grid(
     resolved: &[ResolvedAssignment],
     all_shifts: &[Shift],
     dates: &[NaiveDate],
     column_headers: &[String],
     flags: &CellContentFlags,
+    row_content: Option<&CellContentFlags>,
     is_manager: bool,
     title: String,
     tmpl_map: &HashMap<i64, &ShiftTemplate>,
@@ -321,11 +352,33 @@ fn build_shift_grid(
                 .and_then(|tid| tmpl_map.get(&tid))
                 .map(|t| t.name.clone())
                 .unwrap_or_else(|| key.role.clone());
-            let mut label = format!("{name_line}\n{time_line}");
-            if flags.show_role && !key.role.is_empty() && name_line != key.role {
-                label.push('\n');
-                label.push_str(&key.role);
-            }
+            let label = match row_content {
+                // Custom layouts pick exactly which fields the row label shows.
+                Some(rf) => {
+                    let mut parts = Vec::new();
+                    if rf.show_shift_name {
+                        parts.push(name_line.clone());
+                    }
+                    if rf.show_times {
+                        parts.push(time_line.clone());
+                    }
+                    if rf.show_role
+                        && !key.role.is_empty()
+                        && (!rf.show_shift_name || name_line != key.role)
+                    {
+                        parts.push(key.role.clone());
+                    }
+                    parts.join("\n")
+                }
+                None => {
+                    let mut label = format!("{name_line}\n{time_line}");
+                    if flags.show_role && !key.role.is_empty() && name_line != key.role {
+                        label.push('\n');
+                        label.push_str(&key.role);
+                    }
+                    label
+                }
+            };
             slot_labels.insert(key.clone(), label);
             slot_order.push(key);
         }
@@ -756,11 +809,103 @@ mod tests {
         let grid = build_grid(&config, ws, &assignments, &shifts, &employees, &templates);
         assert_eq!(grid.cells[0][0], "Morning");
 
-        // Shift name + times in employee layout: newline-separated, shift first.
-        // Role is not rendered inside employee-layout cells.
+        // Shift name + times + role in employee layout: newline-separated.
         let config = ExportConfigBuilder::staff().show_role().build();
         let grid = build_grid(&config, ws, &assignments, &shifts, &employees, &templates);
+        assert_eq!(grid.cells[0][0], "Morning\n07:00-12:00\nBarista");
+
+        // Role off keeps the legacy two-line cell.
+        let config = ExportConfigBuilder::staff().build();
+        let grid = build_grid(&config, ws, &assignments, &shifts, &employees, &templates);
         assert_eq!(grid.cells[0][0], "Morning\n07:00-12:00");
+    }
+
+    #[test]
+    fn shift_grid_row_content_picks_label_fields() {
+        let ws = week_start();
+        let mon = ws;
+        let templates = vec![make_template(1, "Morning", (7, 0), (12, 0), "Barista")];
+        let shifts = vec![make_shift(1, Some(1), mon, (7, 0), (12, 0), "Barista")];
+        let employees = vec![make_employee(1, "Alice", "Smith")];
+        let assignments = vec![make_assignment(1, 1, 1, None)];
+
+        // Times only.
+        let config = ExportConfigBuilder::staff()
+            .layout(ExportLayout::ShiftByWeekday)
+            .row_content(CellContentFlags {
+                show_shift_name: false,
+                show_times: true,
+                show_role: false,
+            })
+            .build();
+        let grid = build_grid(&config, ws, &assignments, &shifts, &employees, &templates);
+        assert_eq!(grid.row_headers, vec!["07:00-12:00"]);
+
+        // Name + role, no times.
+        let config = ExportConfigBuilder::staff()
+            .layout(ExportLayout::ShiftByWeekday)
+            .row_content(CellContentFlags {
+                show_shift_name: true,
+                show_times: false,
+                show_role: true,
+            })
+            .build();
+        let grid = build_grid(&config, ws, &assignments, &shifts, &employees, &templates);
+        assert_eq!(grid.row_headers, vec!["Morning\nBarista"]);
+    }
+
+    #[test]
+    fn shift_grid_row_content_dedupes_name_equal_to_role() {
+        let ws = week_start();
+        let mon = ws;
+        // Ad-hoc shift: name_line falls back to the role string.
+        let templates: Vec<ShiftTemplate> = vec![];
+        let shifts = vec![make_shift(1, None, mon, (7, 0), (12, 0), "Barista")];
+        let employees = vec![make_employee(1, "Alice", "Smith")];
+        let assignments = vec![make_assignment(1, 1, 1, None)];
+
+        let config = ExportConfigBuilder::staff()
+            .layout(ExportLayout::ShiftByWeekday)
+            .row_content(CellContentFlags {
+                show_shift_name: true,
+                show_times: false,
+                show_role: true,
+            })
+            .build();
+        let grid = build_grid(&config, ws, &assignments, &shifts, &employees, &templates);
+        assert_eq!(grid.row_headers, vec!["Barista"]);
+    }
+
+    #[test]
+    fn grids_for_roles_respects_order_and_includes_empty() {
+        let ws = week_start();
+        let mon = ws;
+        let templates = vec![make_template(1, "Morning", (7, 0), (12, 0), "Barista")];
+        let shifts = vec![make_shift(1, Some(1), mon, (7, 0), (12, 0), "Barista")];
+        let employees = vec![make_employee(1, "Alice", "Smith")];
+        let assignments = vec![make_assignment(1, 1, 1, None)];
+
+        let config = staff_config(ExportLayout::ShiftByWeekday);
+        let roles = vec!["Chef".to_string(), "Barista".to_string()];
+        let sections = build_grids_for_roles(
+            &config,
+            ws,
+            &assignments,
+            &shifts,
+            &employees,
+            &templates,
+            &roles,
+        );
+
+        assert_eq!(sections.len(), 2);
+        // Caller order preserved, not alphabetical.
+        assert_eq!(sections[0].0, "Chef");
+        assert_eq!(sections[1].0, "Barista");
+        // Chef has no shifts → header-only grid.
+        assert!(sections[0].1.row_headers.is_empty());
+        assert_eq!(sections[0].1.column_headers.len(), 7);
+        // Barista keeps its assignment.
+        assert!(sections[1].1.cells[0][0].contains("Alice Smith"));
     }
 
     #[test]

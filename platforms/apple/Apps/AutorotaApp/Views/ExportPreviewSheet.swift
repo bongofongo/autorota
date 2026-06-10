@@ -24,18 +24,9 @@ struct ExportPreviewSheet: View {
 
     // Full View defaults
     @AppStorage("exportDefaultLayout") private var fullLayout: String = "employee_by_weekday"
-    @AppStorage("exportDefaultProfile") private var fullProfile: String = "staff_schedule"
-    @AppStorage("exportDefaultPdfTemplate") private var fullPdfTemplate: String = "weekly_grid"
-    @AppStorage("exportShowShiftName") private var fullShowShiftName: Bool = true
-    @AppStorage("exportShowTimes") private var fullShowTimes: Bool = true
-    @AppStorage("exportShowRole") private var fullShowRole: Bool = true
 
-    // Employee View defaults. Profile is locked to staff_schedule — employee
-    // exports never include wage/cost data.
+    // Employee exports have a fixed shape: shift name + times, never wages.
     private let empProfile = "staff_schedule"
-    @AppStorage("empExportShowShiftName") private var empShowShiftName: Bool = true
-    @AppStorage("empExportShowTimes") private var empShowTimes: Bool = true
-    @AppStorage("empExportShowRole") private var empShowRole: Bool = true
 
     @Environment(\.dismiss) private var dismiss
 
@@ -80,14 +71,9 @@ struct ExportPreviewSheet: View {
             let result: FfiExportResult
             switch scope {
             case .full:
-                let cfg = FfiExportConfig(
-                    layout: fullLayout,
-                    format: "pdf",
-                    profile: fullProfile,
-                    showShiftName: fullShowShiftName,
-                    showTimes: fullShowTimes,
-                    showRole: fullShowRole,
-                    pdfTemplate: fullPdfTemplate
+                let cfg = FullExportConfigBuilder.make(
+                    layoutPref: fullLayout,
+                    format: "pdf"
                 )
                 result = try await service.exportPreviewFull(config: cfg)
             case .employee:
@@ -97,9 +83,9 @@ struct ExportPreviewSheet: View {
                     endDate: "2099-04-26",
                     format: "pdf",
                     profile: empProfile,
-                    showShiftName: empShowShiftName,
-                    showTimes: empShowTimes,
-                    showRole: empShowRole,
+                    showShiftName: true,
+                    showTimes: true,
+                    showRole: false,
                     timezoneId: TimeZone.current.identifier
                 )
                 result = try await service.exportPreviewEmployee(config: cfg)

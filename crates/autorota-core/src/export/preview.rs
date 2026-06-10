@@ -89,6 +89,8 @@ mod tests {
                 show_role: true,
             },
             pdf_template: Some(PdfTemplate::WeeklyGrid),
+            role_sections: None,
+            row_content: None,
         }
     }
 

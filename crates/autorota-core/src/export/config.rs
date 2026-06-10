@@ -148,6 +148,12 @@ pub struct ExportConfig {
     pub cell_content: CellContentFlags,
     /// Selected PDF template (only meaningful when format == Pdf).
     pub pdf_template: Option<PdfTemplate>,
+    /// Ordered role names; when non-empty the export is split into one grid
+    /// per role (custom layouts). `None` keeps the single-table output.
+    pub role_sections: Option<Vec<String>>,
+    /// Row-header content for `ShiftByWeekday`. `None` keeps the legacy
+    /// label (template name + times, role gated on `cell_content.show_role`).
+    pub row_content: Option<CellContentFlags>,
 }
 
 /// Configuration for a single-employee schedule export.

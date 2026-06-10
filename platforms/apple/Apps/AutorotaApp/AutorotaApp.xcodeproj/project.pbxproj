@@ -40,6 +40,10 @@
 		CC0046013110000000205001 /* LicenseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0046023110000000205001 /* LicenseService.swift */; };
 		CC0047013110000000205001 /* PricingCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0047023110000000205001 /* PricingCatalog.swift */; };
 		CC0048013110000000205001 /* GatedAutorotaService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0048023110000000205001 /* GatedAutorotaService.swift */; };
+		CC0060013300000000205001 /* ExportCustomLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0060023300000000205001 /* ExportCustomLayout.swift */; };
+		CC0061013300000000205001 /* FullExportConfigBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0061023300000000205001 /* FullExportConfigBuilder.swift */; };
+		CC0062013300000000205001 /* ExportSettingsMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0062023300000000205001 /* ExportSettingsMigration.swift */; };
+		CC0063013300000000205001 /* ExportSandboxViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0063023300000000205001 /* ExportSandboxViewModel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -95,6 +99,10 @@
 		CC0046023110000000205001 /* LicenseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LicenseService.swift; sourceTree = "<group>"; };
 		CC0047023110000000205001 /* PricingCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PricingCatalog.swift; sourceTree = "<group>"; };
 		CC0048023110000000205001 /* GatedAutorotaService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatedAutorotaService.swift; sourceTree = "<group>"; };
+		CC0060023300000000205001 /* ExportCustomLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportCustomLayout.swift; sourceTree = "<group>"; };
+		CC0061023300000000205001 /* FullExportConfigBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullExportConfigBuilder.swift; sourceTree = "<group>"; };
+		CC0062023300000000205001 /* ExportSettingsMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSettingsMigration.swift; sourceTree = "<group>"; };
+		CC0063023300000000205001 /* ExportSandboxViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSandboxViewModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -176,6 +184,7 @@
 				CC0016023020000000205001 /* AvailabilityProgressViewModel.swift */,
 				CC0010022FD0000000205001 /* EditLogViewModel.swift */,
 				CC0014023000000000205001 /* EmployeeExportViewModel.swift */,
+				CC0063023300000000205001 /* ExportSandboxViewModel.swift */,
 				5B9675162F72075A00205001 /* EmployeeViewModel.swift */,
 				CC0003022F80000000205001 /* OverrideViewModel.swift */,
 				5B9675312F72075A00205001 /* RoleViewModel.swift */,
@@ -195,6 +204,9 @@
 				CC0026023100000000205001 /* BulkSendDispatcher.swift */,
 				CC0024023100000000205001 /* BulkSendSettings.swift */,
 				CC0007022FA0000000205001 /* ExchangeRateService.swift */,
+				CC0060023300000000205001 /* ExportCustomLayout.swift */,
+				CC0061023300000000205001 /* FullExportConfigBuilder.swift */,
+				CC0062023300000000205001 /* ExportSettingsMigration.swift */,
 				CC0017023030000000205001 /* FfiError+UserMessage.swift */,
 				CC0048023110000000205001 /* GatedAutorotaService.swift */,
 				CC0041023110000000205001 /* KeychainStore.swift */,
@@ -397,6 +409,10 @@
 				CC0020013060000000205001 /* PhoneNumberFormatter.swift in Sources */,
 				CC0024013100000000205001 /* BulkSendSettings.swift in Sources */,
 				CC0025013100000000205001 /* MessageBodyBuilder.swift in Sources */,
+				CC0060013300000000205001 /* ExportCustomLayout.swift in Sources */,
+				CC0061013300000000205001 /* FullExportConfigBuilder.swift in Sources */,
+				CC0062013300000000205001 /* ExportSettingsMigration.swift in Sources */,
+				CC0063013300000000205001 /* ExportSandboxViewModel.swift in Sources */,
 				CC0026013100000000205001 /* BulkSendDispatcher.swift in Sources */,
 				CC0040013110000000205001 /* Tier.swift in Sources */,
 				CC0041013110000000205001 /* KeychainStore.swift in Sources */,

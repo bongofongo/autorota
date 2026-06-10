@@ -41,6 +41,16 @@ fn csv_escape(value: &str) -> String {
     }
 }
 
+/// Render role-sectioned grids as one CSV document: a role title line, the
+/// section's grid, then a blank line between sections.
+pub fn render_csv_sections(sections: &[(String, ExportGrid)]) -> String {
+    sections
+        .iter()
+        .map(|(role, grid)| format!("{}\n{}", csv_escape(role), render_csv(grid)))
+        .collect::<Vec<_>>()
+        .join("\n\n")
+}
+
 /// Render an `ExportGrid` as an RFC 4180 CSV string.
 pub fn render_csv(grid: &ExportGrid) -> String {
     let mut lines = Vec::new();

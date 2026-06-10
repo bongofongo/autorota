@@ -25,6 +25,8 @@ fn manager_csv_config() -> ExportConfig {
             show_role: true,
         },
         pdf_template: None,
+        role_sections: None,
+        row_content: None,
     }
 }
 

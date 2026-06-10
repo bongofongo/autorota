@@ -162,6 +162,7 @@
       }
     },
     "**All Employees** generates a separate export file for every employee using this week's schedule, then shares or saves them together." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -829,6 +830,9 @@
         }
       }
     },
+    "`{first_name}`, `{last_name}`, `{name}` are substituted with the employee's name." : {
+
+    },
     "+%@" : {
       "localizations" : {
         "ar" : {
@@ -873,6 +877,7 @@
 
     },
     "About recipients" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -1078,6 +1083,9 @@
           }
         }
       }
+    },
+    "Add as Section" : {
+
     },
     "Add employee" : {
       "localizations" : {
@@ -1539,6 +1547,12 @@
         }
       }
     },
+    "All fields placed" : {
+
+    },
+    "All roles placed" : {
+
+    },
     "All shifts and assignments for this week will be permanently deleted." : {
       "localizations" : {
         "ar" : {
@@ -1703,6 +1717,7 @@
       }
     },
     "Applied when exporting per-employee schedules, whether for all employees or a single one. Wage and cost data are never included." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -1824,6 +1839,9 @@
           }
         }
       }
+    },
+    "Attaches the exported file with the message to %@." : {
+
     },
     "Autorota tried to open your local database and recover from corruption, but neither attempt succeeded. Resetting will move the corrupt file aside so the app can start fresh — your data will be preserved on disk and a future version may be able to import it." : {
 
@@ -1989,6 +2007,7 @@
       }
     },
     "By Role" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -2227,6 +2246,12 @@
           }
         }
       }
+    },
+    "Cells" : {
+
+    },
+    "Cells show employee names — put shift details in the rows." : {
+
     },
     "Changes" : {
       "localizations" : {
@@ -2551,6 +2576,9 @@
         }
       }
     },
+    "Cost can only go in the table cells." : {
+
+    },
     "Could not decode binary payload." : {
       "localizations" : {
         "ar" : {
@@ -2794,6 +2822,9 @@
         }
       }
     },
+    "Custom" : {
+
+    },
     "Custom end time" : {
       "localizations" : {
         "ar" : {
@@ -2833,6 +2864,9 @@
           }
         }
       }
+    },
+    "Custom Layout" : {
+
     },
     "Custom max staff" : {
       "localizations" : {
@@ -2993,6 +3027,9 @@
           }
         }
       }
+    },
+    "Customize the layout in the Export tab." : {
+
     },
     "Dark" : {
       "extractionState" : "manual",
@@ -3909,6 +3946,24 @@
         }
       }
     },
+    "Drag a role onto the table to split the export into one table per role." : {
+
+    },
+    "Drag at least one pill into the row headers." : {
+
+    },
+    "Drag at least one pill into the table cells." : {
+
+    },
+    "Drag pills into the row headers or the table cells. Columns are always Monday to Sunday." : {
+
+    },
+    "Drag the Employee name pill into the rows or the cells." : {
+
+    },
+    "Drop a pill here" : {
+
+    },
     "e.g. Hi {first_name}," : {
       "localizations" : {
         "ar" : {
@@ -4599,6 +4654,9 @@
           }
         }
       }
+    },
+    "Employee name" : {
+
     },
     "Employee View" : {
       "localizations" : {
@@ -5423,6 +5481,9 @@
           }
         }
       }
+    },
+    "Fields" : {
+
     },
     "First Name" : {
       "localizations" : {
@@ -9953,6 +10014,9 @@
         }
       }
     },
+    "Invalid phone number." : {
+
+    },
     "JSON" : {
       "localizations" : {
         "ar" : {
@@ -10113,7 +10177,11 @@
         }
       }
     },
+    "Layout and cell content use your Export tab settings." : {
+
+    },
     "Layout, profile, and cell content use your Export tab settings." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -12476,7 +12544,11 @@
         }
       }
     },
+    "Mail is not configured on this device." : {
+
+    },
     "Manager Report" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -12960,7 +13032,11 @@
         }
       }
     },
+    "Message" : {
+
+    },
     "Message Template" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -12999,6 +13075,9 @@
           }
         }
       }
+    },
+    "Messages is not available on this device." : {
+
     },
     "Messaging app" : {
       "localizations" : {
@@ -13374,6 +13453,18 @@
           }
         }
       }
+    },
+    "Move Down" : {
+
+    },
+    "Move to Cells" : {
+
+    },
+    "Move to Row Headers" : {
+
+    },
+    "Move Up" : {
+
     },
     "Name" : {
       "localizations" : {
@@ -14177,6 +14268,9 @@
           }
         }
       }
+    },
+    "No roles defined yet." : {
+
     },
     "No roles defined. Add roles in the Shifts tab." : {
       "localizations" : {
@@ -16184,6 +16278,9 @@
         }
       }
     },
+    "Opens a pre-filled message to %@." : {
+
+    },
     "Optional notes" : {
       "localizations" : {
         "ar" : {
@@ -16359,6 +16456,7 @@
       }
     },
     "PDF Template" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -16439,6 +16537,7 @@
       }
     },
     "Per Employee" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -16799,6 +16898,7 @@
       }
     },
     "Previews the first employee's file. The export still produces one file per employee." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -16919,6 +17019,7 @@
       }
     },
     "Profile" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -17179,6 +17280,7 @@
       }
     },
     "Recipients" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -17265,6 +17367,9 @@
       }
     },
     "Remove %@" : {
+
+    },
+    "Remove %@ section" : {
 
     },
     "Remove %@?" : {
@@ -17767,6 +17872,9 @@
         }
       }
     },
+    "Return to Tray" : {
+
+    },
     "Role" : {
       "localizations" : {
         "ar" : {
@@ -17891,6 +17999,9 @@
         }
       }
     },
+    "Role sections" : {
+
+    },
     "Roles" : {
       "localizations" : {
         "ar" : {
@@ -17971,6 +18082,12 @@
         }
       }
     },
+    "Rota for week of %@" : {
+
+    },
+    "Row headers" : {
+
+    },
     "Rows" : {
       "localizations" : {
         "ar" : {
@@ -18010,6 +18127,9 @@
           }
         }
       }
+    },
+    "Rows show employee names — put shift details in the cells." : {
+
     },
     "Sandbox mode" : {
 
@@ -18055,6 +18175,7 @@
       }
     },
     "Save & continue" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -18135,6 +18256,7 @@
       }
     },
     "Save the rota first" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -18457,7 +18579,11 @@
         }
       }
     },
+    "Send Directly" : {
+
+    },
     "Send each employee a markdown rota via their preferred channel (iMessage, WhatsApp, or Email). Skipped recipients are listed after." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -18617,6 +18743,9 @@
           }
         }
       }
+    },
+    "Send via %@" : {
+
     },
     "Sent" : {
       "localizations" : {
@@ -19306,6 +19435,7 @@
       }
     },
     "Shift Name" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -19683,6 +19813,7 @@
       }
     },
     "Staff Schedule" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -20507,6 +20638,15 @@
         }
       }
     },
+    "Text Message" : {
+
+    },
+    "The exported binary payload could not be decoded." : {
+
+    },
+    "The selected employee could not be found." : {
+
+    },
     "Theme" : {
       "localizations" : {
         "ar" : {
@@ -20588,6 +20728,9 @@
       }
     },
     "This deletes the current schedule and its assignments, then generates a new one." : {
+
+    },
+    "This device can't send attachments via Messages." : {
 
     },
     "This employee will be removed from future rotas. Past and current assignments are preserved." : {
@@ -20717,6 +20860,7 @@
       }
     },
     "This rota has unsaved changes. The version that gets sent should match the saved snapshot." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -22228,6 +22372,7 @@
       }
     },
     "Used by Bulk Send. `{first_name}`, `{last_name}`, `{name}` are substituted per recipient." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -22674,6 +22819,7 @@
       }
     },
     "Weekly Grid" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -22879,6 +23025,9 @@
           }
         }
       }
+    },
+    "WhatsApp can only deliver the text message. Pick the Text format to send via WhatsApp." : {
+
     },
     "Wipes database, license, and onboarding state, then quits. App preferences (theme, currency, language) are kept." : {
 

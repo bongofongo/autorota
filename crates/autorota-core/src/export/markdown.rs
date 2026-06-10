@@ -1,5 +1,15 @@
 use super::grid::ExportGrid;
 
+/// Render role-sectioned grids as one Markdown document: a `##` heading per
+/// role followed by that section's table.
+pub fn render_markdown_sections(sections: &[(String, ExportGrid)]) -> String {
+    sections
+        .iter()
+        .map(|(role, grid)| format!("## {role}\n\n{}", render_markdown(grid)))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 /// Render an `ExportGrid` as a GitHub-flavored Markdown table.
 ///
 /// Column widths are computed from the widest cell (including header) so the

@@ -43,6 +43,8 @@ struct AutorotaAppApp: App {
         }
         _dbInitOutcome = State(initialValue: initOutcome)
 
+        ExportSettingsMigration.run()
+
         try? Tips.configure([
             .displayFrequency(.immediate),
             .datastoreLocation(.applicationDefault),

@@ -104,27 +104,59 @@ pub(crate) fn render_week_export(
     templates: &[ShiftTemplate],
     config: &ExportConfig,
 ) -> Result<ExportResult, ExportError> {
-    match config.format {
-        ExportFormat::Ics => Err(ExportError::Pdf(
-            "ICS export is not supported at the rota level; export per-employee instead"
-                .to_string(),
-        )),
-        ExportFormat::Csv | ExportFormat::Json | ExportFormat::Markdown => {
-            let export_grid = grid::build_grid(
+    // Custom layouts can split the export into ordered per-role sections.
+    let section_roles = config
+        .role_sections
+        .as_deref()
+        .filter(|roles| !roles.is_empty());
+    let build_sections =
+        |roles: &[String]| -> Result<Vec<(String, grid::ExportGrid)>, ExportError> {
+            let sections = grid::build_grids_for_roles(
                 config,
                 week_start,
                 assignments,
                 shifts,
                 employees,
                 templates,
+                roles,
             );
-            check_grid_bounds(&export_grid)?;
+            for (_, g) in sections.iter() {
+                check_grid_bounds(g)?;
+            }
+            Ok(sections)
+        };
 
-            let data = match config.format {
-                ExportFormat::Csv => csv::render_csv(&export_grid),
-                ExportFormat::Json => json::render_json(&export_grid, config, week_start),
-                ExportFormat::Markdown => markdown::render_markdown(&export_grid),
-                _ => unreachable!(),
+    match config.format {
+        ExportFormat::Ics => Err(ExportError::Pdf(
+            "ICS export is not supported at the rota level; export per-employee instead"
+                .to_string(),
+        )),
+        ExportFormat::Csv | ExportFormat::Json | ExportFormat::Markdown => {
+            let data = if let Some(roles) = section_roles {
+                let sections = build_sections(roles)?;
+                match config.format {
+                    ExportFormat::Csv => csv::render_csv_sections(&sections),
+                    ExportFormat::Json => json::render_json_sections(&sections, config, week_start),
+                    ExportFormat::Markdown => markdown::render_markdown_sections(&sections),
+                    _ => unreachable!(),
+                }
+            } else {
+                let export_grid = grid::build_grid(
+                    config,
+                    week_start,
+                    assignments,
+                    shifts,
+                    employees,
+                    templates,
+                );
+                check_grid_bounds(&export_grid)?;
+
+                match config.format {
+                    ExportFormat::Csv => csv::render_csv(&export_grid),
+                    ExportFormat::Json => json::render_json(&export_grid, config, week_start),
+                    ExportFormat::Markdown => markdown::render_markdown(&export_grid),
+                    _ => unreachable!(),
+                }
             };
             let (ext, mime) = match config.format {
                 ExportFormat::Csv => ("csv", "text/csv"),
@@ -145,36 +177,44 @@ pub(crate) fn render_week_export(
             })
         }
         ExportFormat::Xlsx => {
-            let main_grid = grid::build_grid(
-                config,
-                week_start,
-                assignments,
-                shifts,
-                employees,
-                templates,
-            );
-            check_grid_bounds(&main_grid)?;
-            let mut by_role_cfg = config.clone();
-            by_role_cfg.layout = config::ExportLayout::ShiftByWeekday;
-            let role_sections = grid::build_grids_by_role(
-                &by_role_cfg,
-                week_start,
-                assignments,
-                shifts,
-                employees,
-                templates,
-            );
-            for (_, g) in role_sections.iter() {
-                check_grid_bounds(g)?;
-            }
+            let bytes = if let Some(roles) = section_roles {
+                // Custom layout with role sections: one sheet per role.
+                let sections = build_sections(roles)?;
+                let sheets: Vec<(String, &grid::ExportGrid)> =
+                    sections.iter().map(|(role, g)| (role.clone(), g)).collect();
+                xlsx::render_workbook(&sheets).map_err(ExportError::Pdf)?
+            } else {
+                let main_grid = grid::build_grid(
+                    config,
+                    week_start,
+                    assignments,
+                    shifts,
+                    employees,
+                    templates,
+                );
+                check_grid_bounds(&main_grid)?;
+                let mut by_role_cfg = config.clone();
+                by_role_cfg.layout = config::ExportLayout::ShiftByWeekday;
+                let role_sections = grid::build_grids_by_role(
+                    &by_role_cfg,
+                    week_start,
+                    assignments,
+                    shifts,
+                    employees,
+                    templates,
+                );
+                for (_, g) in role_sections.iter() {
+                    check_grid_bounds(g)?;
+                }
 
-            let mut sheets: Vec<(String, &grid::ExportGrid)> =
-                vec![("Schedule".to_string(), &main_grid)];
-            for (role, g) in role_sections.iter() {
-                sheets.push((format!("By Role: {role}"), g));
-            }
+                let mut sheets: Vec<(String, &grid::ExportGrid)> =
+                    vec![("Schedule".to_string(), &main_grid)];
+                for (role, g) in role_sections.iter() {
+                    sheets.push((format!("By Role: {role}"), g));
+                }
 
-            let bytes = xlsx::render_workbook(&sheets).map_err(ExportError::Pdf)?;
+                xlsx::render_workbook(&sheets).map_err(ExportError::Pdf)?
+            };
             let filename = format!(
                 "rota-{}-{}-{}.xlsx",
                 week_start.format("%Y-%m-%d"),
@@ -189,6 +229,21 @@ pub(crate) fn render_week_export(
             })
         }
         ExportFormat::Pdf => {
+            if let Some(roles) = section_roles {
+                // Custom layout with role sections: stacked tables, honoring
+                // the config's layout (unlike the legacy ByRole template,
+                // which forces shift-by-weekday).
+                let sections = build_sections(roles)?;
+                let bytes =
+                    pdf::by_role::render(&sections, week_start).map_err(ExportError::Pdf)?;
+                let filename = format!("rota-{}-custom.pdf", week_start.format("%Y-%m-%d"));
+                return Ok(ExportResult {
+                    data: base64::engine::general_purpose::STANDARD.encode(&bytes),
+                    filename,
+                    mime_type: "application/pdf".to_string(),
+                });
+            }
+
             let template = config.pdf_template.unwrap_or(PdfTemplate::WeeklyGrid);
             let bytes = match template {
                 PdfTemplate::WeeklyGrid => {
@@ -521,6 +576,187 @@ mod ics_export_tests {
         let result =
             render_employee_export("Bob", 1, d0, d0, &[], &shifts, &[], &ics_config()).unwrap();
         assert_eq!(result.data.matches("BEGIN:VEVENT").count(), 0);
+    }
+}
+
+#[cfg(test)]
+mod role_section_tests {
+    use super::*;
+    use crate::export::config::{ExportFormat, ExportLayout};
+    use crate::testutil::{
+        AssignmentBuilder, EmployeeBuilder, ExportConfigBuilder, ShiftBuilder,
+        ShiftTemplateBuilder, week_start,
+    };
+
+    fn fixture() -> (
+        Vec<Assignment>,
+        Vec<Shift>,
+        Vec<Employee>,
+        Vec<ShiftTemplate>,
+    ) {
+        let ws = week_start();
+        let templates = vec![
+            ShiftTemplateBuilder::new("Morning")
+                .id(1)
+                .times_hm((7, 0), (12, 0))
+                .role("Barista")
+                .build(),
+            ShiftTemplateBuilder::new("Dinner")
+                .id(2)
+                .times_hm((17, 0), (22, 0))
+                .role("Chef")
+                .build(),
+        ];
+        let shifts = vec![
+            ShiftBuilder::new()
+                .id(1)
+                .date(ws)
+                .times_hm((7, 0), (12, 0))
+                .role("Barista")
+                .template(1)
+                .build(),
+            ShiftBuilder::new()
+                .id(2)
+                .date(ws)
+                .times_hm((17, 0), (22, 0))
+                .role("Chef")
+                .template(2)
+                .build(),
+        ];
+        let employees = vec![
+            EmployeeBuilder::new("Alice")
+                .id(1)
+                .last_name("Smith")
+                .build(),
+            EmployeeBuilder::new("Bob").id(2).last_name("Jones").build(),
+        ];
+        let assignments = vec![
+            AssignmentBuilder::new(1, 1).id(1).confirmed().build(),
+            AssignmentBuilder::new(2, 2).id(2).confirmed().build(),
+        ];
+        (assignments, shifts, employees, templates)
+    }
+
+    fn sectioned_config(format: ExportFormat) -> config::ExportConfig {
+        ExportConfigBuilder::staff()
+            .layout(ExportLayout::ShiftByWeekday)
+            .format(format)
+            .role_sections(&["Chef", "Barista"])
+            .build()
+    }
+
+    #[test]
+    fn csv_sections_emit_role_titles_in_order() {
+        let (assignments, shifts, employees, templates) = fixture();
+        let result = render_week_export(
+            week_start(),
+            &assignments,
+            &shifts,
+            &employees,
+            &templates,
+            &sectioned_config(ExportFormat::Csv),
+        )
+        .unwrap();
+        let chef = result.data.find("Chef").unwrap();
+        let barista = result.data.find("Barista").unwrap();
+        assert!(chef < barista, "sections must keep caller order");
+        assert!(result.data.contains("Bob Jones"));
+        assert!(result.data.contains("Alice Smith"));
+    }
+
+    #[test]
+    fn markdown_sections_have_headings() {
+        let (assignments, shifts, employees, templates) = fixture();
+        let result = render_week_export(
+            week_start(),
+            &assignments,
+            &shifts,
+            &employees,
+            &templates,
+            &sectioned_config(ExportFormat::Markdown),
+        )
+        .unwrap();
+        assert!(result.data.contains("## Chef"));
+        assert!(result.data.contains("## Barista"));
+    }
+
+    #[test]
+    fn json_sections_structure() {
+        let (assignments, shifts, employees, templates) = fixture();
+        let result = render_week_export(
+            week_start(),
+            &assignments,
+            &shifts,
+            &employees,
+            &templates,
+            &sectioned_config(ExportFormat::Json),
+        )
+        .unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&result.data).unwrap();
+        let sections = parsed["sections"].as_array().unwrap();
+        assert_eq!(sections.len(), 2);
+        assert_eq!(sections[0]["role"], "Chef");
+        assert_eq!(sections[1]["role"], "Barista");
+    }
+
+    #[test]
+    fn pdf_sections_render_nonempty() {
+        let (assignments, shifts, employees, templates) = fixture();
+        let result = render_week_export(
+            week_start(),
+            &assignments,
+            &shifts,
+            &employees,
+            &templates,
+            &sectioned_config(ExportFormat::Pdf),
+        )
+        .unwrap();
+        assert!(result.filename.ends_with("-custom.pdf"));
+        assert!(!result.data.is_empty());
+    }
+
+    #[test]
+    fn xlsx_sections_one_sheet_per_role() {
+        let (assignments, shifts, employees, templates) = fixture();
+        let result = render_week_export(
+            week_start(),
+            &assignments,
+            &shifts,
+            &employees,
+            &templates,
+            &sectioned_config(ExportFormat::Xlsx),
+        )
+        .unwrap();
+        assert!(!result.data.is_empty());
+    }
+
+    #[test]
+    fn empty_role_sections_keeps_single_table() {
+        let (assignments, shifts, employees, templates) = fixture();
+        let mut config = ExportConfigBuilder::staff()
+            .format(ExportFormat::Csv)
+            .build();
+        config.role_sections = Some(vec![]);
+        let with_empty = render_week_export(
+            week_start(),
+            &assignments,
+            &shifts,
+            &employees,
+            &templates,
+            &config,
+        )
+        .unwrap();
+        config.role_sections = None;
+        let without = render_week_export(
+            week_start(),
+            &assignments,
+            &shifts,
+            &employees,
+            &templates,
+            &config,
+        )
+        .unwrap();
+        assert_eq!(with_empty.data, without.data);
     }
 }
 

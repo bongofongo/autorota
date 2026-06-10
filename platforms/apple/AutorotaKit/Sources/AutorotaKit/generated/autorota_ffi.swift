@@ -1955,6 +1955,17 @@ public struct FfiExportConfig {
      * Only consulted when `format == "pdf"`. `None` → `weekly_grid`.
      */
     public var pdfTemplate: String?
+    /**
+     * Ordered role names; when non-empty the export is split into one
+     * stacked table/sheet per role (custom layouts). `None`/empty = single
+     * table.
+     */
+    public var roleSections: [String]?
+    /**
+     * Row-header content for "shift_by_weekday" custom layouts. `None`
+     * keeps the legacy row label.
+     */
+    public var rowContent: FfiRowContent?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -1971,7 +1982,16 @@ public struct FfiExportConfig {
         /**
          * "weekly_grid" | "per_employee" | "by_role".
          * Only consulted when `format == "pdf"`. `None` → `weekly_grid`.
-         */pdfTemplate: String?) {
+         */pdfTemplate: String?, 
+        /**
+         * Ordered role names; when non-empty the export is split into one
+         * stacked table/sheet per role (custom layouts). `None`/empty = single
+         * table.
+         */roleSections: [String]?, 
+        /**
+         * Row-header content for "shift_by_weekday" custom layouts. `None`
+         * keeps the legacy row label.
+         */rowContent: FfiRowContent?) {
         self.layout = layout
         self.format = format
         self.profile = profile
@@ -1979,6 +1999,8 @@ public struct FfiExportConfig {
         self.showTimes = showTimes
         self.showRole = showRole
         self.pdfTemplate = pdfTemplate
+        self.roleSections = roleSections
+        self.rowContent = rowContent
     }
 }
 
@@ -2007,6 +2029,12 @@ extension FfiExportConfig: Equatable, Hashable {
         if lhs.pdfTemplate != rhs.pdfTemplate {
             return false
         }
+        if lhs.roleSections != rhs.roleSections {
+            return false
+        }
+        if lhs.rowContent != rhs.rowContent {
+            return false
+        }
         return true
     }
 
@@ -2018,6 +2046,8 @@ extension FfiExportConfig: Equatable, Hashable {
         hasher.combine(showTimes)
         hasher.combine(showRole)
         hasher.combine(pdfTemplate)
+        hasher.combine(roleSections)
+        hasher.combine(rowContent)
     }
 }
 
@@ -2035,7 +2065,9 @@ public struct FfiConverterTypeFfiExportConfig: FfiConverterRustBuffer {
                 showShiftName: FfiConverterBool.read(from: &buf), 
                 showTimes: FfiConverterBool.read(from: &buf), 
                 showRole: FfiConverterBool.read(from: &buf), 
-                pdfTemplate: FfiConverterOptionString.read(from: &buf)
+                pdfTemplate: FfiConverterOptionString.read(from: &buf), 
+                roleSections: FfiConverterOptionSequenceString.read(from: &buf), 
+                rowContent: FfiConverterOptionTypeFfiRowContent.read(from: &buf)
         )
     }
 
@@ -2047,6 +2079,8 @@ public struct FfiConverterTypeFfiExportConfig: FfiConverterRustBuffer {
         FfiConverterBool.write(value.showTimes, into: &buf)
         FfiConverterBool.write(value.showRole, into: &buf)
         FfiConverterOptionString.write(value.pdfTemplate, into: &buf)
+        FfiConverterOptionSequenceString.write(value.roleSections, into: &buf)
+        FfiConverterOptionTypeFfiRowContent.write(value.rowContent, into: &buf)
     }
 }
 
@@ -2877,6 +2911,83 @@ public func FfiConverterTypeFfiRota_lift(_ buf: RustBuffer) throws -> FfiRota {
 #endif
 public func FfiConverterTypeFfiRota_lower(_ value: FfiRota) -> RustBuffer {
     return FfiConverterTypeFfiRota.lower(value)
+}
+
+
+/**
+ * Which fields a custom layout shows in the row-header column.
+ */
+public struct FfiRowContent {
+    public var showShiftName: Bool
+    public var showTimes: Bool
+    public var showRole: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(showShiftName: Bool, showTimes: Bool, showRole: Bool) {
+        self.showShiftName = showShiftName
+        self.showTimes = showTimes
+        self.showRole = showRole
+    }
+}
+
+
+
+extension FfiRowContent: Equatable, Hashable {
+    public static func ==(lhs: FfiRowContent, rhs: FfiRowContent) -> Bool {
+        if lhs.showShiftName != rhs.showShiftName {
+            return false
+        }
+        if lhs.showTimes != rhs.showTimes {
+            return false
+        }
+        if lhs.showRole != rhs.showRole {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(showShiftName)
+        hasher.combine(showTimes)
+        hasher.combine(showRole)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFfiRowContent: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiRowContent {
+        return
+            try FfiRowContent(
+                showShiftName: FfiConverterBool.read(from: &buf), 
+                showTimes: FfiConverterBool.read(from: &buf), 
+                showRole: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FfiRowContent, into buf: inout [UInt8]) {
+        FfiConverterBool.write(value.showShiftName, into: &buf)
+        FfiConverterBool.write(value.showTimes, into: &buf)
+        FfiConverterBool.write(value.showRole, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiRowContent_lift(_ buf: RustBuffer) throws -> FfiRowContent {
+    return try FfiConverterTypeFfiRowContent.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiRowContent_lower(_ value: FfiRowContent) -> RustBuffer {
+    return FfiConverterTypeFfiRowContent.lower(value)
 }
 
 
@@ -4733,6 +4844,30 @@ fileprivate struct FfiConverterOptionTypeFfiRota: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeFfiRowContent: FfiConverterRustBuffer {
+    typealias SwiftType = FfiRowContent?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeFfiRowContent.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeFfiRowContent.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeFfiSaveDetail: FfiConverterRustBuffer {
     typealias SwiftType = FfiSaveDetail?
 
@@ -4797,6 +4932,30 @@ fileprivate struct FfiConverterOptionTypeFfiWeekSchedule: FfiConverterRustBuffer
         switch try readInt(&buf) as Int8 {
         case 0: return nil
         case 1: return try FfiConverterTypeFfiWeekSchedule.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionSequenceString: FfiConverterRustBuffer {
+    typealias SwiftType = [String]?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterSequenceString.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterSequenceString.read(from: &buf)
         default: throw UniffiInternalError.unexpectedOptionalTag
         }
     }

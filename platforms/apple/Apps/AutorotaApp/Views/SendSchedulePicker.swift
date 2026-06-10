@@ -18,12 +18,8 @@ struct SendSchedulePicker: View {
     @State private var startDate: Date = Self.currentWeekStart()
     @State private var endDate: Date = Self.currentWeekStart().addingTimeInterval(6 * 24 * 3600)
 
-    // Employee View defaults from Export settings tab. Profile is locked
-    // to staff_schedule — employee exports never include wage/cost data.
+    // Employee exports have a fixed shape: shift name + times, never wages.
     private let profile = "staff_schedule"
-    @AppStorage("empExportShowShiftName") private var showShiftName: Bool = true
-    @AppStorage("empExportShowTimes") private var showTimes: Bool = true
-    @AppStorage("empExportShowRole") private var showRole: Bool = true
 
     @State private var isWorking = false
     @State private var error: String?
@@ -132,9 +128,9 @@ struct SendSchedulePicker: View {
             endDate: fmt.string(from: end),
             format: "pdf", // ignored by bundle
             profile: profile,
-            showShiftName: showShiftName,
-            showTimes: showTimes,
-            showRole: showRole,
+            showShiftName: true,
+            showTimes: true,
+            showRole: false,
             timezoneId: TimeZone.current.identifier
         )
 

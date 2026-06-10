@@ -939,6 +939,12 @@ fn parse_export_config(config: FfiExportConfig) -> Result<ExportConfig, FfiError
             show_role: config.show_role,
         },
         pdf_template,
+        role_sections: config.role_sections.filter(|r| !r.is_empty()),
+        row_content: config.row_content.map(|rc| CellContentFlags {
+            show_shift_name: rc.show_shift_name,
+            show_times: rc.show_times,
+            show_role: rc.show_role,
+        }),
     })
 }
 

@@ -364,6 +364,7 @@ async fn create_ad_hoc_shift(
         required_role,
         min_employees: 1,
         max_employees: 1,
+        role_requirements: vec![],
     };
 
     queries::insert_shift(&pool, &shift)

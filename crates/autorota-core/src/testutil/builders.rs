@@ -688,6 +688,8 @@ impl ExportConfigBuilder {
                     show_role: false,
                 },
                 pdf_template: None,
+                role_sections: None,
+                row_content: None,
             },
         }
     }
@@ -705,6 +707,8 @@ impl ExportConfigBuilder {
                     show_role: false,
                 },
                 pdf_template: None,
+                role_sections: None,
+                row_content: None,
             },
         }
     }
@@ -746,6 +750,16 @@ impl ExportConfigBuilder {
 
     pub fn cell_content(mut self, flags: CellContentFlags) -> Self {
         self.inner.cell_content = flags;
+        self
+    }
+
+    pub fn role_sections(mut self, roles: &[&str]) -> Self {
+        self.inner.role_sections = Some(roles.iter().map(|r| r.to_string()).collect());
+        self
+    }
+
+    pub fn row_content(mut self, flags: CellContentFlags) -> Self {
+        self.inner.row_content = Some(flags);
         self
     }
 
