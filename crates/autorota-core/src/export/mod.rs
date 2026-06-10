@@ -382,16 +382,25 @@ pub(crate) fn render_employee_export(
         ExportFormat::Ics => {
             let template_by_id: std::collections::HashMap<i64, &str> =
                 templates.iter().map(|t| (t.id, t.name.as_str())).collect();
+            let shift_by_id: std::collections::HashMap<i64, &crate::models::shift::Shift> =
+                scoped_shifts.iter().map(|s| (s.id, s)).collect();
 
+            // Only emit shifts this employee is actually assigned to — mirror the
+            // grid path, which keys off assignments. Iterating `scoped_shifts`
+            // directly would export every shift in the range to every employee.
             let mut entries: Vec<(crate::models::shift::Shift, String)> = Vec::new();
-            for s in &scoped_shifts {
+            for a in assignments {
+                let Some(s) = shift_by_id.get(&a.shift_id) else {
+                    continue;
+                };
                 let label = s
                     .template_id
                     .and_then(|id| template_by_id.get(&id).copied())
                     .unwrap_or("Shift")
                     .to_string();
-                entries.push((s.clone(), label));
+                entries.push(((*s).clone(), label));
             }
+            entries.sort_by_key(|(s, _)| (s.date, s.start_time));
 
             let data = ics::render_employee_calendar(
                 employee_id,
@@ -425,6 +434,93 @@ pub(crate) fn render_employee_export(
                 mime_type: "application/pdf".to_string(),
             })
         }
+    }
+}
+
+#[cfg(test)]
+mod ics_export_tests {
+    use super::*;
+    use crate::models::assignment::{Assignment, AssignmentStatus};
+    use crate::models::shift::Shift;
+    use chrono::{NaiveDate, NaiveTime};
+
+    fn shift(id: i64, date: NaiveDate) -> Shift {
+        Shift {
+            id,
+            template_id: None,
+            rota_id: 1,
+            date,
+            start_time: NaiveTime::from_hms_opt(9, 0, 0).unwrap(),
+            end_time: NaiveTime::from_hms_opt(17, 0, 0).unwrap(),
+            required_role: String::new(),
+            min_employees: 1,
+            max_employees: 1,
+            role_requirements: vec![],
+        }
+    }
+
+    fn assignment(shift_id: i64, employee_id: i64) -> Assignment {
+        Assignment {
+            id: shift_id,
+            rota_id: 1,
+            shift_id,
+            employee_id,
+            status: AssignmentStatus::Confirmed,
+            employee_name: None,
+            hourly_wage: None,
+        }
+    }
+
+    fn ics_config() -> EmployeeExportConfig {
+        EmployeeExportConfig {
+            employee_id: 1,
+            format: ExportFormat::Ics,
+            profile: config::ExportProfile::StaffSchedule,
+            cell_content: config::CellContentFlags {
+                show_shift_name: true,
+                show_times: true,
+                show_role: false,
+            },
+            timezone_id: None,
+        }
+    }
+
+    // Regression: ICS export must only emit the employee's assigned shifts, not
+    // every shift in the date range. Previously it iterated all scoped shifts.
+    #[test]
+    fn ics_only_exports_assigned_shifts() {
+        let d0 = NaiveDate::from_ymd_opt(2026, 4, 20).unwrap();
+        let d1 = NaiveDate::from_ymd_opt(2026, 4, 21).unwrap();
+        let d2 = NaiveDate::from_ymd_opt(2026, 4, 22).unwrap();
+        let shifts = vec![shift(10, d0), shift(11, d1), shift(12, d2)];
+        // Employee 1 is assigned to shift 10 only.
+        let assignments = vec![assignment(10, 1)];
+
+        let result = render_employee_export(
+            "Alice",
+            1,
+            d0,
+            d2,
+            &assignments,
+            &shifts,
+            &[],
+            &ics_config(),
+        )
+        .unwrap();
+
+        assert_eq!(result.data.matches("BEGIN:VEVENT").count(), 1);
+        assert!(result.data.contains("UID:1-10@autorota.local"));
+        assert!(!result.data.contains("1-11@autorota.local"));
+        assert!(!result.data.contains("1-12@autorota.local"));
+    }
+
+    #[test]
+    fn ics_with_no_assignments_emits_no_events() {
+        let d0 = NaiveDate::from_ymd_opt(2026, 4, 20).unwrap();
+        let shifts = vec![shift(10, d0)];
+        let result =
+            render_employee_export("Bob", 1, d0, d0, &[], &shifts, &[], &ics_config()).unwrap();
+        assert_eq!(result.data.matches("BEGIN:VEVENT").count(), 0);
     }
 }
 

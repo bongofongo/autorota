@@ -135,4 +135,20 @@ mod tests {
             .unwrap();
         assert!(r.data.lines().count() > 2);
     }
+
+    // Regression: employee ICS preview must only contain that employee's
+    // assigned shifts, not one event per day of the week. Employee 1 in the
+    // sample week is assigned on 4 days (Mon/Wed/Thu/Fri), so exactly 4 events.
+    #[test]
+    fn employee_ics_preview_only_has_assigned_events() {
+        let r = generate_preview_employee(emp_cfg(ExportFormat::Ics, ExportProfile::StaffSchedule))
+            .unwrap();
+        assert_eq!(r.mime_type, "text/calendar");
+        assert_eq!(
+            r.data.matches("BEGIN:VEVENT").count(),
+            4,
+            "expected 4 assigned events for employee 1, got:\n{}",
+            r.data
+        );
+    }
 }
