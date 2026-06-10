@@ -53,6 +53,13 @@ final class RotaViewModel {
     var warnings: [FfiShortfallWarning] = []
 
     var selectedWeekStart: String = currentWeekStart()
+    /// Direction of the most recent week step (-1 toward the past, +1 toward
+    /// the future); drives the edge the week-slide transition pushes from.
+    private(set) var lastWeekStepDirection = 1
+    /// Bumped by swipe-driven week changes so RotaView can fire a haptic tick.
+    /// Lives here (not in view state) because the grid view's identity is
+    /// reset on each week step, which would swallow a view-local trigger.
+    var swipeFeedbackTick = 0
 
     // Generate confirmation (shown when Generate is tapped on a past/current week with no schedule)
     var showGenerateConfirmation = false
@@ -526,6 +533,7 @@ final class RotaViewModel {
     /// (year overflow, etc.); treat that as "stay put" and log so the silent
     /// fallback is debuggable.
     func shiftWeek(by weeks: Int) {
+        lastWeekStepDirection = weeks < 0 ? -1 : 1
         guard let date = RotaDateFmt.iso.date(from: selectedWeekStart) else { return }
         guard let shifted = RotaDateFmt.calendar.date(byAdding: .weekOfYear, value: weeks, to: date) else {
             Logger.weekPicker.warning(

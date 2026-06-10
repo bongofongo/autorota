@@ -21,39 +21,71 @@ struct RotaView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.isMenuPushed) private var isMenuPushed
 
+    /// Slide for week steps: the incoming week pushes in from the side it
+    /// lives on (future from trailing, past from leading). Crossfade under
+    /// Reduce Motion.
+    private var weekTransition: AnyTransition {
+        if reduceMotion { return .opacity }
+        return .push(from: vm.lastWeekStepDirection >= 0 ? .trailing : .leading)
+    }
+
+    /// Animated week step shared by the toolbar chevrons and the empty-week
+    /// swipe. `fromSwipe` gates the haptic tick to gesture-driven changes.
+    private func stepWeek(_ delta: Int, fromSwipe: Bool = true) {
+        withAnimation(.smooth(duration: 0.3)) {
+            vm.shiftWeek(by: delta)
+        }
+        if fromSwipe { vm.swipeFeedbackTick += 1 }
+    }
+
     var body: some View {
         OptionalNavigationStack(embed: !isMenuPushed) {
             VStack(spacing: 0) {
-                if vm.isLoading {
-                    Spacer()
-                    ProgressView("Loading schedule…")
-                    Spacer()
-                } else if let schedule = vm.schedule {
-                    ScheduleGridView(vm: vm, schedule: schedule)
-                } else if employeeCount == 0 {
-                    Spacer()
-                    ContentUnavailableView {
-                        Label("empty.rota.title", systemImage: "person.crop.circle.badge.exclamationmark")
-                    } description: {
-                        Text("empty.rota.body")
-                    } actions: {
-                        Button {
-                            employeeBridge.requestNewEmployeeSheet = true
-                        } label: {
-                            Label("empty.rota.action", systemImage: "person.badge.plus")
+                Group {
+                    if vm.isLoading {
+                        VStack {
+                            Spacer()
+                            ProgressView("Loading schedule…")
+                            Spacer()
                         }
-                        .buttonStyle(.borderedProminent)
+                    } else if let schedule = vm.schedule {
+                        ScheduleGridView(vm: vm, schedule: schedule)
+                    } else if employeeCount == 0 {
+                        VStack {
+                            Spacer()
+                            ContentUnavailableView {
+                                Label("empty.rota.title", systemImage: "person.crop.circle.badge.exclamationmark")
+                            } description: {
+                                Text("empty.rota.body")
+                            } actions: {
+                                Button {
+                                    employeeBridge.requestNewEmployeeSheet = true
+                                } label: {
+                                    Label("empty.rota.action", systemImage: "person.badge.plus")
+                                }
+                                .buttonStyle(.borderedProminent)
+                            }
+                            Spacer()
+                        }
+                    } else {
+                        VStack {
+                            Spacer()
+                            ContentUnavailableView(
+                                "No Schedule",
+                                systemImage: "calendar.badge.plus",
+                                description: Text("Tap Generate to create a schedule for this week.")
+                            )
+                            Spacer()
+                        }
+                        .frame(maxWidth: .infinity)
+                        .contentShape(Rectangle())
+                        .weekSwipe(enabled: true) { stepWeek($0) }
                     }
-                    Spacer()
-                } else {
-                    Spacer()
-                    ContentUnavailableView(
-                        "No Schedule",
-                        systemImage: "calendar.badge.plus",
-                        description: Text("Tap Generate to create a schedule for this week.")
-                    )
-                    Spacer()
                 }
+                // Re-identify the content per week so a step slides the old
+                // week out and the new one in (see `weekTransition`).
+                .id(vm.selectedWeekStart)
+                .transition(weekTransition)
             }
             .safeAreaInset(edge: .top, spacing: 0) {
                 rotaTopTip
@@ -62,6 +94,7 @@ struct RotaView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
+            .sensoryFeedback(.selection, trigger: vm.swipeFeedbackTick)
             .onChange(of: vm.selectedWeekStart) { _, _ in
                 // Cancel any in-flight reload from a prior week step so a slow
                 // load can't clobber a fresh one.
@@ -87,7 +120,7 @@ struct RotaView: View {
                 }
                 ToolbarItem(placement: .principal) {
                     HStack(spacing: 8) {
-                        Button { vm.shiftWeek(by: -1) } label: {
+                        Button { stepWeek(-1, fromSwipe: false) } label: {
                             Image(systemName: "chevron.left")
                         }
                         .accessibilityIdentifier("rota.prevWeek")
@@ -108,7 +141,7 @@ struct RotaView: View {
                             .accessibilityIdentifier("rota.weekTitle")
                             .accessibilityValue(vm.weekCategory.accessibilityLabel)
 
-                        Button { vm.shiftWeek(by: 1) } label: {
+                        Button { stepWeek(1, fromSwipe: false) } label: {
                             Image(systemName: "chevron.right")
                         }
                         .accessibilityIdentifier("rota.nextWeek")
@@ -360,6 +393,34 @@ private struct ScheduleGridView: View {
     @State private var pendingSheet: ScheduleSheet?
     @State private var showUnlockPastConfirmation = false
 
+    #if os(iOS)
+    /// How far past a horizontal edge the user must pull (then lift) for the
+    /// iPhone landscape grid to step the week. Kept low so the pull at a
+    /// terminal day (Mon/Sun) commits without a long drag.
+    private static let weekPullThreshold: CGFloat = 16
+
+    /// Signed horizontal overscroll: negative = pulled past the leading edge,
+    /// positive = pulled past the trailing edge, 0 = within bounds.
+    private static func horizontalOverscroll(_ geo: ScrollGeometry) -> CGFloat {
+        let minX = -geo.contentInsets.leading
+        let maxX = max(minX, geo.contentSize.width - geo.containerSize.width
+                             + geo.contentInsets.trailing)
+        let x = geo.contentOffset.x
+        if x < minX { return x - minX }
+        if x > maxX { return x - maxX }
+        return 0
+    }
+    #endif
+
+    /// Step the week from a swipe gesture — same effect as the toolbar
+    /// chevrons, plus the slide animation and a haptic tick.
+    private func stepWeek(_ delta: Int) {
+        withAnimation(.smooth(duration: 0.3)) {
+            vm.shiftWeek(by: delta)
+        }
+        vm.swipeFeedbackTick += 1
+    }
+
     /// Present a sheet, first prompting for confirmation if this is the first
     /// edit on a locked past week. Confirming unlocks edits for the visit.
     private func requestSheet(_ sheet: ScheduleSheet) {
@@ -374,7 +435,7 @@ private struct ScheduleGridView: View {
     var body: some View {
         GeometryReader { geo in
             if geo.size.width > geo.size.height {
-                landscapeContent(availableWidth: geo.size.width)
+                landscapeContent(availableSize: geo.size)
             } else {
                 portraitContent
             }
@@ -469,36 +530,93 @@ private struct ScheduleGridView: View {
             }
             .padding(.vertical, 8)
         }
+        .contentShape(Rectangle())
+        .weekSwipe(enabled: !vm.isEditMode) { stepWeek($0) }
     }
 
     // MARK: Landscape layout (weekly columns)
 
-    private func landscapeContent(availableWidth: CGFloat) -> some View {
-        // iPhone columns get extra width (with horizontal scroll) so names and
-        // times breathe; iPad/macOS fit all seven on screen.
-        #if os(iOS)
-        let columnMinWidth: CGFloat = UIDevice.current.userInterfaceIdiom == .phone ? 162 : 150
-        #else
-        let columnMinWidth: CGFloat = 150
-        #endif
+    /// The seven weekday columns, shared by every landscape variant.
+    private func weekColumns(columnWidth: CGFloat, spacing: CGFloat, padding: CGFloat) -> some View {
+        HStack(alignment: .top, spacing: spacing) {
+            ForEach(vm.allWeekdays, id: \.self) { day in
+                dayColumn(day: day, width: columnWidth)
+            }
+        }
+        .padding(.horizontal, padding)
+        .padding(.vertical, 8)
+    }
+
+    @ViewBuilder
+    private func landscapeContent(availableSize: CGSize) -> some View {
         let columnSpacing: CGFloat = 8
         let outerPadding: CGFloat = 8
         let count = CGFloat(max(vm.allWeekdays.count, 1))
         let totalSpacing = (count - 1) * columnSpacing + outerPadding * 2
-        let columnWidth = max(columnMinWidth, (availableWidth - totalSpacing) / count)
+        let fittedWidth = (availableSize.width - totalSpacing) / count
 
-        return ScrollView(.vertical) {
+        #if os(iOS)
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            // iPhone: columns get extra width (with horizontal scroll) so
+            // names and times breathe; pull past either edge to step the week.
+            phoneLandscape(
+                columnWidth: max(162, fittedWidth),
+                spacing: columnSpacing,
+                padding: outerPadding,
+                minHeight: availableSize.height - 16
+            )
+        } else {
+            // iPad: the whole week always fits one screen, so there is no
+            // horizontal scroll — a swipe anywhere steps the week directly.
+            ScrollView(.vertical) {
+                weekColumns(columnWidth: fittedWidth, spacing: columnSpacing, padding: outerPadding)
+            }
+            .contentShape(Rectangle())
+            .weekSwipe(enabled: !vm.isEditMode) { stepWeek($0) }
+        }
+        #else
+        // macOS: unchanged scrolling fallback for narrow windows.
+        ScrollView(.vertical) {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .top, spacing: columnSpacing) {
-                    ForEach(vm.allWeekdays, id: \.self) { day in
-                        dayColumn(day: day, width: columnWidth)
-                    }
+                weekColumns(
+                    columnWidth: max(150, fittedWidth),
+                    spacing: columnSpacing,
+                    padding: outerPadding
+                )
+            }
+        }
+        #endif
+    }
+
+    #if os(iOS)
+    private func phoneLandscape(
+        columnWidth: CGFloat,
+        spacing: CGFloat,
+        padding: CGFloat,
+        minHeight: CGFloat
+    ) -> some View {
+        ScrollView(.vertical) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                weekColumns(columnWidth: columnWidth, spacing: spacing, padding: padding)
+                    // Fill the viewport so the blank space below short columns
+                    // still pans (and overscrolls) horizontally.
+                    .frame(minHeight: minHeight, alignment: .top)
+            }
+            .onScrollPhaseChange { oldPhase, _, context in
+                // Fire exactly once per finger lift: only on the transition
+                // out of .interacting. Bounce-back and fling-induced
+                // overscroll can't re-trigger.
+                guard !vm.isEditMode, oldPhase == .interacting else { return }
+                let over = Self.horizontalOverscroll(context.geometry)
+                if over <= -Self.weekPullThreshold {
+                    stepWeek(-1)
+                } else if over >= Self.weekPullThreshold {
+                    stepWeek(1)
                 }
-                .padding(.horizontal, outerPadding)
-                .padding(.vertical, 8)
             }
         }
     }
+    #endif
 
     @ViewBuilder
     private func dayColumn(day: String, width: CGFloat) -> some View {
@@ -879,6 +997,56 @@ private struct SwipeToDeleteCard<Content: View>: View {
     }
 }
 #endif
+
+// MARK: - Week swipe
+
+#if os(iOS)
+/// Horizontal-dominant drag that steps the visible week, mirroring the toolbar
+/// chevrons. Attached with `simultaneousGesture` so it never steals vertical
+/// scrolling or pinned-header interactions from the grid.
+private struct WeekSwipeGesture: ViewModifier {
+    let isEnabled: Bool
+    let onStep: (Int) -> Void
+    @Environment(\.layoutDirection) private var layoutDirection
+
+    /// High enough that an incidental horizontal twitch during a vertical
+    /// scroll never registers (same rationale as SwipeToDeleteCard).
+    private static let minimumDistance: CGFloat = 25
+    private static let triggerDistance: CGFloat = 60
+    private static let dominanceRatio: CGFloat = 1.5
+
+    func body(content: Content) -> some View {
+        content.simultaneousGesture(
+            DragGesture(minimumDistance: Self.minimumDistance)
+                .onEnded { value in
+                    guard isEnabled else { return }
+                    let w = value.translation.width
+                    let h = value.translation.height
+                    guard abs(w) >= Self.triggerDistance,
+                          abs(w) > abs(h) * Self.dominanceRatio else { return }
+                    // Content dragged left → next week; flip in RTL so "toward
+                    // the future" matches the reading direction.
+                    var step = w < 0 ? 1 : -1
+                    if layoutDirection == .rightToLeft { step = -step }
+                    onStep(step)
+                }
+        )
+    }
+}
+#endif
+
+extension View {
+    /// Swipe-to-change-week, iOS-family only; no-op elsewhere so call sites
+    /// stay free of platform conditionals.
+    @ViewBuilder
+    fileprivate func weekSwipe(enabled: Bool, onStep: @escaping (Int) -> Void) -> some View {
+        #if os(iOS)
+        modifier(WeekSwipeGesture(isEnabled: enabled, onStep: onStep))
+        #else
+        self
+        #endif
+    }
+}
 
 // MARK: - Conflict glyph
 
