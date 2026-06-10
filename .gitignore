@@ -26,3 +26,6 @@ crates/autorota-core/migrations/test.db
 crates/autorota-core/migrations/test.db-journal
 crates/autorota-core/migrations/test.db-wal
 crates/autorota-core/migrations/test.db-shm
+
+# Finder metadata
+.DS_Store
