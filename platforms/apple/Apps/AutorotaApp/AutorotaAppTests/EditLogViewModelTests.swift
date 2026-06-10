@@ -54,8 +54,8 @@ struct EditLogViewModelTests {
 
     // MARK: - Grouping
 
-    @Test("savesByWeek groups and sorts by week descending")
-    func savesByWeekGroupsCorrectly() async {
+    @Test("groupedSaves groups by week and sorts descending")
+    func groupedByWeek() async {
         let mock = makeMock()
         mock.stubbedSaves = [
             makeSave(id: 1, weekStart: "2026-03-30"),
@@ -64,12 +64,53 @@ struct EditLogViewModelTests {
         ]
         let vm = EditLogViewModel(service: mock)
         await vm.loadSaves()
+        vm.grouping = .week
 
-        let weeks = vm.savesByWeek
-        #expect(weeks.count == 2)
-        #expect(weeks[0].weekStart == "2026-04-06")
-        #expect(weeks[1].weekStart == "2026-03-30")
-        #expect(weeks[1].saves.count == 2)
+        let groups = vm.groupedSaves
+        #expect(groups.count == 2)
+        #expect(groups[0].key == "2026-04-06")
+        #expect(groups[0].title == "Week of 2026-04-06")
+        #expect(groups[1].key == "2026-03-30")
+        #expect(groups[1].saves.count == 2)
+    }
+
+    @Test("groupedSaves groups by month with month-name titles")
+    func groupedByMonth() async {
+        let mock = makeMock()
+        mock.stubbedSaves = [
+            makeSave(id: 1, weekStart: "2026-03-30"),
+            makeSave(id: 2, weekStart: "2026-04-06"),
+            makeSave(id: 3, weekStart: "2026-04-13"),
+        ]
+        let vm = EditLogViewModel(service: mock)
+        await vm.loadSaves()
+        vm.grouping = .month
+
+        let groups = vm.groupedSaves
+        #expect(groups.count == 2)
+        #expect(groups[0].key == "2026-04")
+        #expect(groups[0].title == "April 2026")
+        #expect(groups[0].saves.count == 2)
+        #expect(groups[1].key == "2026-03")
+        #expect(groups[1].title == "March 2026")
+    }
+
+    @Test("groupedSaves groups by year")
+    func groupedByYear() async {
+        let mock = makeMock()
+        mock.stubbedSaves = [
+            makeSave(id: 1, weekStart: "2025-12-29"),
+            makeSave(id: 2, weekStart: "2026-04-06"),
+        ]
+        let vm = EditLogViewModel(service: mock)
+        await vm.loadSaves()
+        vm.grouping = .year
+
+        let groups = vm.groupedSaves
+        #expect(groups.count == 2)
+        #expect(groups[0].key == "2026")
+        #expect(groups[0].title == "2026")
+        #expect(groups[1].key == "2025")
     }
 
     // MARK: - Expand/Collapse

@@ -178,11 +178,69 @@ final class EditLogViewModel {
         }
     }
 
-    /// Saves grouped by week_start for display.
-    var savesByWeek: [(weekStart: String, saves: [FfiSave])] {
-        let grouped = Dictionary(grouping: saves, by: \.weekStart)
+    // MARK: - Grouping
+
+    /// Granularity the Edit Log timeline is grouped by. Default is `.week`.
+    enum LogGrouping: String, CaseIterable, Identifiable {
+        case week, month, year
+        var id: String { rawValue }
+        var label: String { rawValue.capitalized }
+    }
+
+    /// Currently selected grouping granularity.
+    var grouping: LogGrouping = .week
+
+    /// A single collapsible group of saves in the timeline.
+    struct SaveGroup: Identifiable {
+        /// Stable key: `weekStart` | `"YYYY-MM"` | `"YYYY"`. Sorts descending.
+        let key: String
+        /// Display title: "Week of …" | "June 2026" | "2026".
+        let title: String
+        let saves: [FfiSave]
+        var id: String { key }
+    }
+
+    /// Saves grouped by the selected granularity, newest group first. Saves
+    /// inside each group keep service order (restored-first, then newest).
+    var groupedSaves: [SaveGroup] {
+        let grouped = Dictionary(grouping: saves, by: { Self.groupKey(for: $0.weekStart, grouping: grouping) })
         return grouped
             .sorted { $0.key > $1.key }
-            .map { (weekStart: $0.key, saves: $0.value) }
+            .map { SaveGroup(key: $0.key, title: Self.groupTitle(for: $0.key, grouping: grouping), saves: $0.value) }
+    }
+
+    /// Group key for a `weekStart` ("YYYY-MM-DD") under a grouping.
+    static func groupKey(for weekStart: String, grouping: LogGrouping) -> String {
+        switch grouping {
+        case .week: return weekStart
+        case .month: return String(weekStart.prefix(7))
+        case .year: return String(weekStart.prefix(4))
+        }
+    }
+
+    /// Human-readable title for a group key under a grouping.
+    static func groupTitle(for key: String, grouping: LogGrouping) -> String {
+        switch grouping {
+        case .week: return "Week of \(key)"
+        case .year: return key
+        case .month: return monthTitle(from: key)
+        }
+    }
+
+    /// "2026-06" → "June 2026". Falls back to the raw key on parse failure.
+    private static let monthKeyFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+    private static let monthDisplayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMMM yyyy"
+        return f
+    }()
+    private static func monthTitle(from key: String) -> String {
+        guard let date = monthKeyFormatter.date(from: key) else { return key }
+        return monthDisplayFormatter.string(from: date)
     }
 }

@@ -4,12 +4,13 @@ import TipKit
 
 struct EditLogView: View {
     @State private var vm = EditLogViewModel()
-    @State private var expandedWeeks: Set<String> = [currentWeekStart()]
+    @State private var expandedGroups: Set<String> = [currentWeekStart()]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.isMenuPushed) private var isMenuPushed
 
     var body: some View {
-        OptionalNavigationStack(embed: !isMenuPushed) {
+        @Bindable var vm = vm
+        return OptionalNavigationStack(embed: !isMenuPushed) {
             ZStack(alignment: .top) {
                 Group {
                     if vm.isLoading && vm.saves.isEmpty {
@@ -28,7 +29,20 @@ struct EditLogView: View {
                             description: Text("Saves will appear here as you edit schedules.")
                         )
                     } else {
-                        savesList
+                        VStack(spacing: 0) {
+                            Picker("Group by", selection: $vm.grouping) {
+                                ForEach(EditLogViewModel.LogGrouping.allCases) { g in
+                                    Text(g.label).tag(g)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .padding(.horizontal)
+                            .padding(.top, 8)
+                            savesList
+                        }
+                        .onChange(of: vm.grouping) {
+                            expandedGroups = defaultExpandedGroups()
+                        }
                     }
                 }
 
@@ -55,14 +69,23 @@ struct EditLogView: View {
 
     private var savesList: some View {
         List {
-            ForEach(vm.savesByWeek, id: \.weekStart) { weekGroup in
-                DisclosureGroup(isExpanded: weekBinding(weekGroup.weekStart)) {
-                    ForEach(weekGroup.saves, id: \.id) { save in
+            ForEach(vm.groupedSaves) { group in
+                DisclosureGroup(isExpanded: groupBinding(group.key)) {
+                    ForEach(group.saves, id: \.id) { save in
                         SaveEntryView(save: save, vm: vm)
                     }
                 } label: {
-                    Text("Week of \(weekGroup.weekStart)")
-                        .font(.headline)
+                    HStack {
+                        Text(group.title)
+                            .font(.headline)
+                        // Edit count only at week granularity (per design).
+                        if vm.grouping == .week {
+                            Spacer()
+                            Text("\(group.saves.count) edit\(group.saves.count == 1 ? "" : "s")")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
         }
@@ -75,11 +98,16 @@ struct EditLogView: View {
         .refreshable { await vm.loadSaves() }
     }
 
-    private func weekBinding(_ key: String) -> Binding<Bool> {
+    /// Default expansion: open the group containing the current week.
+    private func defaultExpandedGroups() -> Set<String> {
+        [EditLogViewModel.groupKey(for: currentWeekStart(), grouping: vm.grouping)]
+    }
+
+    private func groupBinding(_ key: String) -> Binding<Bool> {
         Binding(
-            get: { expandedWeeks.contains(key) },
+            get: { expandedGroups.contains(key) },
             set: { isOn in
-                if isOn { expandedWeeks.insert(key) } else { expandedWeeks.remove(key) }
+                if isOn { expandedGroups.insert(key) } else { expandedGroups.remove(key) }
             }
         )
     }
