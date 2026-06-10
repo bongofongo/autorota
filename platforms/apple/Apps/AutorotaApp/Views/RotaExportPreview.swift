@@ -82,7 +82,7 @@ struct RotaExportPreview: View {
             } else {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-        case "csv":
+        case "csv", "text":
             MonospacedTextPreview(text: result.data)
         case "json":
             MonospacedTextPreview(text: prettyJson(result.data))

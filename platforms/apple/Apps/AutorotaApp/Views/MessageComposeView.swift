@@ -7,16 +7,29 @@ import MessageUI
 /// the row as Sent / Cancelled / Failed without polling.
 struct MessageComposeView: UIViewControllerRepresentable {
 
+    struct Attachment {
+        let data: Data
+        let typeIdentifier: String
+        let filename: String
+    }
+
     let recipient: String
     let body: String
+    var attachments: [Attachment] = []
     let onResult: (MessageComposeResult) -> Void
 
     static var canSend: Bool { MFMessageComposeViewController.canSendText() }
+    static var canSendAttachments: Bool { MFMessageComposeViewController.canSendAttachments() }
 
     func makeUIViewController(context: Context) -> MFMessageComposeViewController {
         let vc = MFMessageComposeViewController()
         vc.recipients = [recipient]
         vc.body = body
+        if MFMessageComposeViewController.canSendAttachments() {
+            for a in attachments {
+                vc.addAttachmentData(a.data, typeIdentifier: a.typeIdentifier, filename: a.filename)
+            }
+        }
         vc.messageComposeDelegate = context.coordinator
         return vc
     }

@@ -12,9 +12,16 @@ import AppKit
 /// the row.
 struct MailComposeView: UIViewControllerRepresentable {
 
+    struct Attachment {
+        let data: Data
+        let mimeType: String
+        let fileName: String
+    }
+
     let recipient: String
     let subject: String
     let body: String
+    var attachments: [Attachment] = []
     let onResult: (MFMailComposeResult, Error?) -> Void
 
     static var canSend: Bool { MFMailComposeViewController.canSendMail() }
@@ -24,6 +31,9 @@ struct MailComposeView: UIViewControllerRepresentable {
         vc.setToRecipients([recipient])
         vc.setSubject(subject)
         vc.setMessageBody(body, isHTML: false)
+        for a in attachments {
+            vc.addAttachmentData(a.data, mimeType: a.mimeType, fileName: a.fileName)
+        }
         vc.mailComposeDelegate = context.coordinator
         return vc
     }
@@ -56,11 +66,12 @@ struct MailComposeView: UIViewControllerRepresentable {
 /// the request off to `NSSharingService` (Mail) and assume success — there's
 /// no completion callback for the underlying drafted message either way.
 enum MacMailDispatcher {
-    static func compose(recipient: String, subject: String, body: String) -> Bool {
+    static func compose(recipient: String, subject: String, body: String, attachments: [URL] = []) -> Bool {
+        let items: [Any] = [body] + attachments
         let service = NSSharingService(named: .composeEmail)
         service?.recipients = [recipient]
         service?.subject = subject
-        guard let svc = service, svc.canPerform(withItems: [body]) else {
+        guard let svc = service, svc.canPerform(withItems: items) else {
             // Fallback: open mailto: in the user's default handler.
             var comps = URLComponents(string: "mailto:\(recipient)")
             comps?.queryItems = [
@@ -73,7 +84,7 @@ enum MacMailDispatcher {
             }
             return false
         }
-        svc.perform(withItems: [body])
+        svc.perform(withItems: items)
         return true
     }
 }

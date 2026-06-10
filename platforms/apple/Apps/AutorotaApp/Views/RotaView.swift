@@ -241,9 +241,7 @@ struct RotaView: View {
             .sheet(isPresented: $showExportSheet) {
                 ExportSheetView(
                     weekStart: vm.selectedWeekStart,
-                    service: vm.service,
-                    hasUnsavedEdits: vm.isDirty,
-                    onSaveBeforeBulkSend: { await vm.autoSave() }
+                    service: vm.service
                 )
             }
             .task {

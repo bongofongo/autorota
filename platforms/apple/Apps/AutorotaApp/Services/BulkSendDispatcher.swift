@@ -96,7 +96,15 @@ enum BulkSendDispatcher {
         if !hasShifts {
             return .skip(.noShifts)
         }
+        return resolveContact(employee: employee, platform: platform)
+    }
 
+    /// Channel resolution without the zero-shift gate. Used by the share
+    /// sheet's direct-send button, where sending an empty rota is allowed.
+    static func resolveContact(
+        employee: FfiEmployee,
+        platform: BulkSendPlatform = .current
+    ) -> BulkSendResolution {
         let preferred = employee.preferredContact ?? ""
         let phone = employee.phone?.trimmingCharacters(in: .whitespaces)
         let email = employee.email?.trimmingCharacters(in: .whitespaces)

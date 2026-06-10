@@ -1,23 +1,16 @@
 import SwiftUI
 import AutorotaKit
-#if os(macOS)
 import UniformTypeIdentifiers
-#endif
 
 /// Share pull-up shown from the Rota tab. Layout / profile / cell content
 /// come from the Export (settings) tab; here the user picks:
-///   1. Scope — full rota vs. per-employee
-///   2. Per-employee sub-scope — all employees vs. one employee
-///   3. Format — pdf / xlsx / csv / markdown / json (and ics for per-employee)
+///   1. Scope — full rota vs. one employee
+///   2. Format — pdf / xlsx / csv / markdown / json (+ ics / text for employee)
+///   3. Preview (inline with the format row), Export, or direct send via the
+///      employee's preferred contact channel (iMessage / WhatsApp / Email).
 struct ExportSheetView: View {
     let weekStart: String
     let service: AutorotaServiceProtocol
-    /// Set by `RotaView` when the rota has dirty edits. Used to gate Bulk
-    /// Send so the audit trail captures the version that was distributed.
-    var hasUnsavedEdits: Bool = false
-    /// Persists the in-memory rota as a Save snapshot. Bulk Send invokes
-    /// this when the user taps "Save & continue" on the unsaved-edits alert.
-    var onSaveBeforeBulkSend: (() async -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
 
     // MARK: - Settings (from Export tab)
@@ -37,12 +30,11 @@ struct ExportSheetView: View {
     @AppStorage("empExportShowTimes") private var empShowTimes: Bool = true
     @AppStorage("empExportShowRole") private var empShowRole: Bool = true
 
-    // Bulk Send message-body template
-    @AppStorage(BulkSendSettings.weekHeaderKey)   private var bulkWeekHeader: Bool = true
-    @AppStorage(BulkSendSettings.shiftLineKey)    private var bulkShiftLine: Bool = true
-    @AppStorage(BulkSendSettings.customPrefixKey) private var bulkCustomPrefix: String = ""
-    @AppStorage(BulkSendSettings.customSuffixKey) private var bulkCustomSuffix: String = ""
-    @State private var showBulkTemplate: Bool = false
+    // Text-message body template (shared with the future bulk-send feature)
+    @AppStorage(BulkSendSettings.weekHeaderKey)   private var msgWeekHeader: Bool = true
+    @AppStorage(BulkSendSettings.shiftLineKey)    private var msgShiftLine: Bool = true
+    @AppStorage(BulkSendSettings.customPrefixKey) private var msgCustomPrefix: String = ""
+    @AppStorage(BulkSendSettings.customSuffixKey) private var msgCustomSuffix: String = ""
 
     // MARK: - Scope state
 
@@ -57,19 +49,7 @@ struct ExportSheetView: View {
         }
     }
 
-    enum PerEmployeeScope: String, CaseIterable, Identifiable {
-        case all, individual
-        var id: String { rawValue }
-        var label: String {
-            switch self {
-            case .all: String(localized: "All Employees")
-            case .individual: String(localized: "One Employee")
-            }
-        }
-    }
-
     @State private var scope: Scope = .fullRota
-    @State private var perEmpScope: PerEmployeeScope = .all
     @State private var selectedEmployeeId: Int64?
     @State private var format: String = "pdf"
 
@@ -77,21 +57,24 @@ struct ExportSheetView: View {
 
     @State private var employees: [FfiEmployee] = []
     @State private var loadingEmployees = false
+    @State private var weekSchedule: FfiWeekSchedule?
     @State private var isExporting = false
     @State private var error: String?
     @State private var exportURLs: [URL] = []
     @State private var showShareSheet = false
     @State private var tempDir: URL?
-    @State private var showRecipientsInfo = false
-
-    // Bulk Send state
-    @State private var showBulkSend = false
-    @State private var showUnsavedEditsAlert = false
-    @State private var savingBeforeBulkSend = false
 
     // Preview state
     @State private var isPreviewing = false
     @State private var previewPayload: PreviewPayload?
+
+    // Direct-send state. Tracks which channel is mid-send so only that row
+    // shows a spinner while all rows are disabled.
+    @State private var sendingChannel: BulkSendChannel?
+    #if os(iOS)
+    @State private var messagePayload: MessagePayload?
+    @State private var mailPayload: MailPayload?
+    #endif
 
     private struct PreviewPayload: Identifiable {
         let id = UUID()
@@ -100,6 +83,23 @@ struct ExportSheetView: View {
         let result: FfiExportResult
         let footnote: String?
     }
+
+    #if os(iOS)
+    private struct MessagePayload: Identifiable {
+        let id = UUID()
+        let recipient: String
+        let body: String
+        let attachment: MessageComposeView.Attachment?
+    }
+
+    private struct MailPayload: Identifiable {
+        let id = UUID()
+        let recipient: String
+        let subject: String
+        let body: String
+        let attachment: MailComposeView.Attachment?
+    }
+    #endif
 
     var body: some View {
         NavigationStack {
@@ -127,113 +127,95 @@ struct ExportSheetView: View {
 
                 if scope == .perEmployee {
                     Section {
-                        Picker("Recipients", selection: $perEmpScope) {
-                            ForEach(PerEmployeeScope.allCases) { s in Text(s.label).tag(s) }
-                        }
-                        .pickerStyle(.segmented)
-
-                        if perEmpScope == .individual {
-                            employeeRow
-                        }
+                        employeeRow
                     } header: {
-                        HStack {
-                            Text("Recipients")
-                            Spacer()
-                            Button {
-                                showRecipientsInfo = true
-                            } label: {
-                                Image(systemName: "info.circle")
-                            }
-                            .buttonStyle(.borderless)
-                            .accessibilityLabel("About recipients")
-                            .popover(isPresented: $showRecipientsInfo, arrowEdge: .top) {
-                                Text("**All Employees** generates a separate export file for every employee using this week's schedule, then shares or saves them together.")
-                                    .font(.footnote)
-                                    .multilineTextAlignment(.leading)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .padding()
-                                    .frame(width: 280)
-                                    .presentationCompactAdaptation(.popover)
-                            }
-                        }
+                        Text("Employee")
                     }
                 }
 
                 Section {
-                    Picker("Format", selection: $format) {
-                        ForEach(availableFormats) { f in
-                            Text(f.label).tag(f.id)
+                    HStack {
+                        Picker("Format", selection: $format) {
+                            ForEach(availableFormats) { f in
+                                Text(f.label).tag(f.id)
+                            }
                         }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .fixedSize()
+                        .accessibilityLabel("Format")
+
+                        Spacer()
+
+                        Button {
+                            Task { await runPreview() }
+                        } label: {
+                            HStack(spacing: 6) {
+                                if isPreviewing {
+                                    ProgressView().controlSize(.small)
+                                } else {
+                                    Image(systemName: "eye")
+                                }
+                                Text("Preview")
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.capsule)
+                        .disabled(isPreviewing || isExporting || !canExport)
                     }
-                    .pickerStyle(.menu)
                 } header: {
                     Text("Format")
                 } footer: {
-                    Text("Layout, profile, and cell content use your Export tab settings.")
+                    if format != "text" {
+                        Text("Layout, profile, and cell content use your Export tab settings.")
+                    }
                 }
 
-                Section {
-                    Button {
-                        Task { await runPreview() }
-                    } label: {
-                        HStack {
-                            if isPreviewing {
-                                ProgressView().controlSize(.small)
+                if scope == .perEmployee && format == "text" {
+                    Section {
+                        Toggle("Week header", isOn: $msgWeekHeader)
+                        Toggle("Per-shift lines", isOn: $msgShiftLine)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Prefix").font(.caption).foregroundStyle(.secondary)
+                            TextField("e.g. Hi {first_name},", text: $msgCustomPrefix, axis: .vertical)
+                                .lineLimit(1...3)
+                                #if canImport(UIKit)
+                                .textInputAutocapitalization(.sentences)
+                                #endif
+                        }
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Suffix").font(.caption).foregroundStyle(.secondary)
+                            TextField("e.g. Let me know if any clashes.", text: $msgCustomSuffix, axis: .vertical)
+                                .lineLimit(1...3)
+                                #if canImport(UIKit)
+                                .textInputAutocapitalization(.sentences)
+                                #endif
+                        }
+                    } header: {
+                        Text("Message")
+                    } footer: {
+                        Text("`{first_name}`, `{last_name}`, `{name}` are substituted with the employee's name.")
+                    }
+                }
+
+                if scope == .perEmployee, let employee = selectedEmployee {
+                    let channels = directChannels(for: employee)
+                    if !channels.isEmpty {
+                        Section {
+                            ForEach(Array(channels.enumerated()), id: \.offset) { _, channel in
+                                directSendButton(employee: employee, channel: channel)
+                            }
+                        } header: {
+                            Text("Send Directly")
+                        } footer: {
+                            if channels.contains(where: { whatsAppFileBlocked($0) }) {
+                                Text("WhatsApp can only deliver the text message. Pick the Text format to send via WhatsApp.")
+                            } else if format == "text" {
+                                Text("Opens a pre-filled message to \(employee.displayName).")
                             } else {
-                                Image(systemName: "eye")
-                            }
-                            Text("Preview")
-                        }
-                    }
-                    .disabled(isPreviewing || isExporting || !canExport)
-                } footer: {
-                    if scope == .perEmployee && perEmpScope == .all {
-                        Text("Previews the first employee's file. The export still produces one file per employee.")
-                    }
-                }
-
-                if scope == .perEmployee && perEmpScope == .all {
-                    Section {
-                        Button {
-                            startBulkSend()
-                        } label: {
-                            HStack {
-                                Image(systemName: "paperplane.fill")
-                                Text("Bulk Send")
+                                Text("Attaches the exported file with the message to \(employee.displayName).")
                             }
                         }
-                        .disabled(isExporting || isPreviewing || employees.isEmpty)
-                    } footer: {
-                        Text("Send each employee a markdown rota via their preferred channel (iMessage, WhatsApp, or Email). Skipped recipients are listed after.")
-                    }
-                }
-
-                if scope == .perEmployee {
-                    Section {
-                        DisclosureGroup(isExpanded: $showBulkTemplate) {
-                            Toggle("Week header", isOn: $bulkWeekHeader)
-                            Toggle("Per-shift lines", isOn: $bulkShiftLine)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Prefix").font(.caption).foregroundStyle(.secondary)
-                                TextField("e.g. Hi {first_name},", text: $bulkCustomPrefix, axis: .vertical)
-                                    .lineLimit(1...3)
-                                    #if canImport(UIKit)
-                                    .textInputAutocapitalization(.sentences)
-                                    #endif
-                            }
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Suffix").font(.caption).foregroundStyle(.secondary)
-                                TextField("e.g. Let me know if any clashes.", text: $bulkCustomSuffix, axis: .vertical)
-                                    .lineLimit(1...3)
-                                    #if canImport(UIKit)
-                                    .textInputAutocapitalization(.sentences)
-                                    #endif
-                            }
-                        } label: {
-                            Label("Message Template", systemImage: "text.alignleft")
-                        }
-                    } footer: {
-                        Text("Used by Bulk Send. `{first_name}`, `{last_name}`, `{name}` are substituted per recipient.")
                     }
                 }
             }
@@ -267,6 +249,23 @@ struct ExportSheetView: View {
                     ShareSheet(activityItems: exportURLs)
                 }
             }
+            .sheet(item: $messagePayload) { payload in
+                MessageComposeView(
+                    recipient: payload.recipient,
+                    body: payload.body,
+                    attachments: payload.attachment.map { [$0] } ?? [],
+                    onResult: { _ in }
+                )
+            }
+            .sheet(item: $mailPayload) { payload in
+                MailComposeView(
+                    recipient: payload.recipient,
+                    subject: payload.subject,
+                    body: payload.body,
+                    attachments: payload.attachment.map { [$0] } ?? [],
+                    onResult: { _, _ in }
+                )
+            }
             #endif
             .sheet(item: $previewPayload) { payload in
                 RotaExportPreview(
@@ -275,20 +274,6 @@ struct ExportSheetView: View {
                     result: payload.result,
                     footnote: payload.footnote
                 )
-            }
-            .sheet(isPresented: $showBulkSend) {
-                BulkSendChecklistView(weekStart: weekStart, service: service)
-            }
-            .alert(
-                "Save the rota first",
-                isPresented: $showUnsavedEditsAlert
-            ) {
-                Button("Save & continue") {
-                    Task { await saveThenBulkSend() }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This rota has unsaved changes. The version that gets sent should match the saved snapshot.")
             }
         }
         .task { await loadEmployeesIfNeeded() }
@@ -321,6 +306,11 @@ struct ExportSheetView: View {
         }
     }
 
+    private var selectedEmployee: FfiEmployee? {
+        guard let id = selectedEmployeeId else { return nil }
+        return employees.first(where: { $0.id == id })
+    }
+
     // MARK: - Format catalogue
 
     private struct FormatOpt: Identifiable {
@@ -338,6 +328,7 @@ struct ExportSheetView: View {
         ]
         if scope == .perEmployee {
             list.append(.init(id: "ics", label: String(localized: "ICS Calendar")))
+            list.append(.init(id: "text", label: String(localized: "Text Message")))
         }
         return list
     }
@@ -353,13 +344,8 @@ struct ExportSheetView: View {
     private var canExport: Bool {
         if isExporting { return false }
         switch scope {
-        case .fullRota:
-            return true
-        case .perEmployee:
-            switch perEmpScope {
-            case .all: return !employees.isEmpty
-            case .individual: return selectedEmployeeId != nil
-            }
+        case .fullRota: return true
+        case .perEmployee: return selectedEmployeeId != nil
         }
     }
 
@@ -379,6 +365,12 @@ struct ExportSheetView: View {
         loadingEmployees = false
     }
 
+    private func loadWeekScheduleIfNeeded() async throws {
+        if weekSchedule == nil {
+            weekSchedule = try await service.getWeekSchedule(weekStart: weekStart)
+        }
+    }
+
     // MARK: - Export dispatch
 
     private func run() async {
@@ -395,13 +387,9 @@ struct ExportSheetView: View {
             case .fullRota:
                 urls = [try await exportFullRota(into: dir)]
             case .perEmployee:
-                switch perEmpScope {
-                case .all:
-                    urls = try await exportAllEmployees(into: dir)
-                case .individual:
-                    guard let id = selectedEmployeeId else { return }
-                    urls = [try await exportOneEmployee(id: id, into: dir)]
-                }
+                guard let id = selectedEmployeeId else { return }
+                let result = try await employeeExportResult(id: id)
+                urls = [try writeResult(result, into: dir)]
             }
 
             exportURLs = urls
@@ -439,26 +427,14 @@ struct ExportSheetView: View {
                     footnote: nil
                 )
             case .perEmployee:
-                let id: Int64?
-                let footnote: String?
-                switch perEmpScope {
-                case .all:
-                    id = employees.first?.id
-                    footnote = id == nil ? nil : "Showing first employee. Export produces one file per employee."
-                case .individual:
-                    id = selectedEmployeeId
-                    footnote = nil
-                }
-                guard let employeeId = id else { return }
-                let result = try await service.exportEmployeeSchedule(
-                    config: employeeConfig(id: employeeId)
-                )
-                let name = employees.first(where: { $0.id == employeeId })?.displayName ?? "Employee"
+                guard let id = selectedEmployeeId else { return }
+                let result = try await employeeExportResult(id: id)
+                let name = employees.first(where: { $0.id == id })?.displayName ?? "Employee"
                 previewPayload = PreviewPayload(
                     title: "Preview · \(name)",
                     format: format,
                     result: result,
-                    footnote: footnote
+                    footnote: nil
                 )
             }
         } catch {
@@ -497,6 +473,40 @@ struct ExportSheetView: View {
         )
     }
 
+    /// Export result for one employee. The "text" format is rendered locally
+    /// from the message template; everything else goes through the FFI.
+    private func employeeExportResult(id: Int64) async throws -> FfiExportResult {
+        if format == "text" {
+            try await loadWeekScheduleIfNeeded()
+            guard let employee = employees.first(where: { $0.id == id }) else {
+                throw ExportSheetError.employeeNotFound
+            }
+            let body = MessageBodyBuilder.build(
+                employee: employee,
+                weekStart: weekStart,
+                schedule: weekSchedule
+            )
+            return FfiExportResult(
+                data: body,
+                filename: textFilename(for: employee),
+                mimeType: "text/plain"
+            )
+        }
+        return try await service.exportEmployeeSchedule(config: employeeConfig(id: id))
+    }
+
+    private func textFilename(for employee: FfiEmployee) -> String {
+        let slug = employee.displayName
+            .lowercased()
+            .map { $0.isLetter || $0.isNumber ? $0 : "-" }
+            .reduce(into: "") { acc, c in
+                if c == "-" && acc.hasSuffix("-") { return }
+                acc.append(c)
+            }
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+        return "rota-\(slug.isEmpty ? "employee" : slug)-\(weekStart).txt"
+    }
+
     private func exportFullRota(into dir: URL) async throws -> URL {
         let result = try await service.exportWeekSchedule(
             weekStart: weekStart,
@@ -505,18 +515,185 @@ struct ExportSheetView: View {
         return try writeResult(result, into: dir)
     }
 
-    private func exportOneEmployee(id: Int64, into dir: URL) async throws -> URL {
-        let result = try await service.exportEmployeeSchedule(config: employeeConfig(id: id))
-        return try writeResult(result, into: dir)
+    // MARK: - Direct send
+
+    /// Contact channels for the selected employee: the preferred channel
+    /// first, plus email when an address is saved and the preferred channel
+    /// isn't already email. Empty when no usable contact info is saved (the
+    /// section is hidden entirely).
+    private func directChannels(for employee: FfiEmployee) -> [BulkSendChannel] {
+        var channels: [BulkSendChannel] = []
+        if case let .ready(channel) = BulkSendDispatcher.resolveContact(employee: employee) {
+            channels.append(channel)
+        }
+        let email = employee.email?.trimmingCharacters(in: .whitespaces) ?? ""
+        let hasEmailChannel = channels.contains { if case .email = $0 { true } else { false } }
+        if !email.isEmpty && !hasEmailChannel {
+            channels.append(.email(address: email))
+        }
+        return channels
     }
 
-    private func exportAllEmployees(into dir: URL) async throws -> [URL] {
-        var urls: [URL] = []
-        for e in employees {
-            let result = try await service.exportEmployeeSchedule(config: employeeConfig(id: e.id))
-            urls.append(try writeResult(result, into: dir))
+    private func directSendButton(employee: FfiEmployee, channel: BulkSendChannel) -> some View {
+        Button {
+            Task { await sendDirectly(to: employee, via: channel) }
+        } label: {
+            HStack {
+                if sendingChannel == channel {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Image(systemName: channel.icon)
+                }
+                Text("Send via \(channel.label)")
+                Spacer()
+                Text(destinationLabel(for: channel))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
         }
-        return urls
+        .disabled(!canExport || isExporting || isPreviewing || sendingChannel != nil || whatsAppFileBlocked(channel))
+    }
+
+    /// WhatsApp's URL scheme carries text only — file formats can't be
+    /// attached, so the direct-send button is disabled for them.
+    private func whatsAppFileBlocked(_ channel: BulkSendChannel) -> Bool {
+        if case .whatsApp = channel { return format != "text" }
+        return false
+    }
+
+    private func destinationLabel(for channel: BulkSendChannel) -> String {
+        switch channel {
+        case .iMessage(let phone), .whatsApp(let phone): phone
+        case .email(let address): address
+        }
+    }
+
+    private func sendDirectly(to employee: FfiEmployee, via channel: BulkSendChannel) async {
+        sendingChannel = channel
+        error = nil
+        defer { sendingChannel = nil }
+
+        do {
+            try await loadWeekScheduleIfNeeded()
+            let body = MessageBodyBuilder.build(
+                employee: employee,
+                weekStart: weekStart,
+                schedule: weekSchedule
+            )
+
+            switch channel {
+            case .iMessage(let phone):
+                #if os(iOS)
+                guard MessageComposeView.canSend else {
+                    throw ExportSheetError.messagesUnavailable
+                }
+                if format == "text" {
+                    messagePayload = MessagePayload(recipient: phone, body: body, attachment: nil)
+                } else {
+                    guard MessageComposeView.canSendAttachments else {
+                        throw ExportSheetError.attachmentsUnavailable
+                    }
+                    let result = try await employeeExportResult(id: employee.id)
+                    messagePayload = MessagePayload(
+                        recipient: phone,
+                        body: body,
+                        attachment: MessageComposeView.Attachment(
+                            data: try payloadData(result),
+                            typeIdentifier: typeIdentifier(for: result.filename),
+                            filename: result.filename
+                        )
+                    )
+                }
+                #endif
+
+            case .whatsApp(let phone):
+                openWhatsApp(phone: phone, body: body)
+
+            case .email(let address):
+                let attachmentResult = format == "text"
+                    ? nil
+                    : try await employeeExportResult(id: employee.id)
+                #if os(iOS)
+                guard MailComposeView.canSend else {
+                    throw ExportSheetError.mailUnavailable
+                }
+                mailPayload = MailPayload(
+                    recipient: address,
+                    subject: emailSubject(),
+                    body: body,
+                    attachment: try attachmentResult.map {
+                        MailComposeView.Attachment(
+                            data: try payloadData($0),
+                            mimeType: $0.mimeType,
+                            fileName: $0.filename
+                        )
+                    }
+                )
+                #else
+                var urls: [URL] = []
+                if let result = attachmentResult {
+                    let dir = try makeTempDir()
+                    tempDir = dir
+                    urls = [try writeResult(result, into: dir)]
+                }
+                if !MacMailDispatcher.compose(
+                    recipient: address,
+                    subject: emailSubject(),
+                    body: body,
+                    attachments: urls
+                ) {
+                    throw ExportSheetError.mailUnavailable
+                }
+                #endif
+            }
+        } catch {
+            self.error = userFacingMessage(error)
+        }
+    }
+
+    private func openWhatsApp(phone: String, body: String) {
+        let digits = phone.filter { $0.isNumber }
+        var comps = URLComponents(string: "https://wa.me/\(digits)")
+        comps?.queryItems = [URLQueryItem(name: "text", value: body)]
+        guard let url = comps?.url else {
+            error = String(localized: "Invalid phone number.")
+            return
+        }
+        #if canImport(UIKit)
+        UIApplication.shared.open(url)
+        #elseif canImport(AppKit)
+        NSWorkspace.shared.open(url)
+        #endif
+    }
+
+    private func emailSubject() -> String {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        let pretty: String
+        if let date = fmt.date(from: weekStart) {
+            let out = DateFormatter()
+            out.dateFormat = "d MMM yyyy"
+            pretty = out.string(from: date)
+        } else {
+            pretty = weekStart
+        }
+        return String(localized: "Rota for week of \(pretty)")
+    }
+
+    private func payloadData(_ result: FfiExportResult) throws -> Data {
+        if isBinary(format: format) {
+            guard let data = Data(base64Encoded: result.data) else {
+                throw ExportSheetError.invalidBinaryPayload
+            }
+            return data
+        }
+        return Data(result.data.utf8)
+    }
+
+    private func typeIdentifier(for filename: String) -> String {
+        let ext = (filename as NSString).pathExtension
+        return UTType(filenameExtension: ext)?.identifier ?? UTType.data.identifier
     }
 
     // MARK: - File I/O
@@ -563,25 +740,6 @@ struct ExportSheetView: View {
         exportURLs = []
     }
 
-    // MARK: - Bulk Send
-
-    private func startBulkSend() {
-        if hasUnsavedEdits {
-            showUnsavedEditsAlert = true
-        } else {
-            showBulkSend = true
-        }
-    }
-
-    private func saveThenBulkSend() async {
-        savingBeforeBulkSend = true
-        defer { savingBeforeBulkSend = false }
-        if let save = onSaveBeforeBulkSend {
-            await save()
-        }
-        showBulkSend = true
-    }
-
     #if os(macOS)
     private func saveOnMac(urls: [URL]) throws {
         if urls.count == 1, let only = urls.first {
@@ -623,6 +781,8 @@ struct ExportSheetView: View {
             return [UTType(filenameExtension: "md") ?? .plainText]
         case "ics":
             return [UTType(filenameExtension: "ics") ?? .calendarEvent]
+        case "text":
+            return [.plainText]
         default: return []
         }
     }
@@ -631,11 +791,23 @@ struct ExportSheetView: View {
 
 private enum ExportSheetError: LocalizedError {
     case invalidBinaryPayload
+    case employeeNotFound
+    case messagesUnavailable
+    case attachmentsUnavailable
+    case mailUnavailable
 
     var errorDescription: String? {
         switch self {
         case .invalidBinaryPayload:
-            return "The exported binary payload could not be decoded."
+            return String(localized: "The exported binary payload could not be decoded.")
+        case .employeeNotFound:
+            return String(localized: "The selected employee could not be found.")
+        case .messagesUnavailable:
+            return String(localized: "Messages is not available on this device.")
+        case .attachmentsUnavailable:
+            return String(localized: "This device can't send attachments via Messages.")
+        case .mailUnavailable:
+            return String(localized: "Mail is not configured on this device.")
         }
     }
 }
