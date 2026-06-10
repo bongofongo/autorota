@@ -23,11 +23,6 @@ private enum RotaDateFmt {
         f.locale = Locale(identifier: "en_US_POSIX")
         return f
     }()
-    static let monthDay: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "MMMM d"
-        return f
-    }()
     static let shortMonthDay: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "MMM d"
@@ -541,11 +536,11 @@ final class RotaViewModel {
         selectedWeekStart = RotaDateFmt.iso.string(from: shifted)
     }
 
-    /// Full-month day-of-month label for a weekday in the selected week, e.g. "June 1".
+    /// Abbreviated day-of-month label for a weekday in the selected week, e.g. "Jun 1".
     func dayOfMonthLabel(_ weekday: String) -> String {
         let iso = dateForWeekday(weekday)
         guard let date = RotaDateFmt.iso.date(from: iso) else { return "" }
-        return RotaDateFmt.monthDay.string(from: date)
+        return RotaDateFmt.shortMonthDay.string(from: date)
     }
 
     /// Date string for a weekday offset in the selected week (Mon=0, Tue=1, ..., Sun=6).

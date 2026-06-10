@@ -454,7 +454,13 @@ private struct ScheduleGridView: View {
     // MARK: Landscape layout (weekly columns)
 
     private func landscapeContent(availableWidth: CGFloat) -> some View {
+        // iPhone columns get extra width (with horizontal scroll) so names and
+        // times breathe; iPad/macOS fit all seven on screen.
+        #if os(iOS)
+        let columnMinWidth: CGFloat = UIDevice.current.userInterfaceIdiom == .phone ? 162 : 150
+        #else
         let columnMinWidth: CGFloat = 150
+        #endif
         let columnSpacing: CGFloat = 8
         let outerPadding: CGFloat = 8
         let count = CGFloat(max(vm.allWeekdays.count, 1))
@@ -477,13 +483,15 @@ private struct ScheduleGridView: View {
     @ViewBuilder
     private func dayColumn(day: String, width: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Column header — tap to add a shift on this day
+            // Column header — plain label in landscape; the add affordance is
+            // the plus button at the bottom of the column instead.
             DayHeader(
                 day: day,
                 dateLabel: vm.dayOfMonthLabel(day),
                 isToday: vm.isDayToday(day),
                 isPast: vm.isDayPast(day),
-                onAddShift: { requestSheet(.addShift(SheetDate(vm.dateForWeekday(day)))) }
+                onAddShift: {},
+                showsPlus: false
             )
 
             // Shifts
@@ -509,6 +517,19 @@ private struct ScheduleGridView: View {
                 }
             }
 
+            // Add-shift affordance at the foot of the column, after the shifts.
+            Button(action: { requestSheet(.addShift(SheetDate(vm.dateForWeekday(day)))) }) {
+                Image(systemName: "plus")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 6)
+            .accessibilityLabel("Add shift on \(day)")
+
             Spacer(minLength: 0)
         }
         .frame(width: width, alignment: .top)
@@ -527,33 +548,47 @@ private struct DayHeader: View {
     let isToday: Bool
     let isPast: Bool
     let onAddShift: () -> Void
+    /// Landscape columns hide the inline plus (the add affordance lives at the
+    /// bottom of each column instead) and render a non-interactive header.
+    var showsPlus: Bool = true
 
     var body: some View {
-        Button(action: onAddShift) {
-            HStack(spacing: 8) {
-                Text("\(day) · \(dateLabel)")
-                    .font(.headline)
-                    .foregroundStyle(isPast ? .secondary : .primary)
-                Spacer()
+        if showsPlus {
+            Button(action: onAddShift) {
+                headerContent
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .background(.background)
+            .accessibilityLabel("Add shift on \(day)")
+        } else {
+            headerContent
+                .background(.background)
+        }
+    }
+
+    private var headerContent: some View {
+        HStack(spacing: 8) {
+            Text("\(day) · \(dateLabel)")
+                .font(.headline)
+                .foregroundStyle(isPast ? .secondary : .primary)
+            Spacer()
+            if showsPlus {
                 Image(systemName: "plus")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
-            .padding(.horizontal)
-            .padding(.top, 6)
-            .padding(.bottom, 5)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(underlineColor)
-                    .frame(height: isToday ? 2 : 1)
-                    .padding(.horizontal, 12)
-            }
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .background(.background)
-        .accessibilityLabel("Add shift on \(day)")
+        .padding(.horizontal)
+        .padding(.top, 6)
+        .padding(.bottom, 5)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(underlineColor)
+                .frame(height: isToday ? 2 : 1)
+                .padding(.horizontal, 12)
+        }
     }
 
     /// Muted underline tint by time alignment: today in sage (matching the
@@ -587,60 +622,20 @@ private struct ShiftCard: View {
     /// The card content (without swipe/context-menu chrome). Wrapped below so
     /// the swipe container can reveal a delete action behind it.
     private var card: some View {
-        HStack(alignment: .top, spacing: 8) {
-            // Left column — employees, left-justified and top-aligned. Vertical
-            // position is independent of the right-side time text.
-            VStack(alignment: .leading, spacing: 2) {
-                if assignments.isEmpty {
-                    Text("Unassigned")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .italic()
-                } else {
-                    ForEach(assignments, id: \.assignmentId) { entry in
-                        AssignmentRow(
-                            entry: entry,
-                            vm: vm,
-                            shift: shift,
-                            isEditMode: isEditMode,
-                            isLocked: isLocked,
-                            isCompact: isCompact
-                        )
-                    }
+        Group {
+            if isCompact {
+                // Landscape columns: employees on top, capacity + times in a
+                // single row along the bottom of the card.
+                VStack(alignment: .leading, spacing: 6) {
+                    employeeColumn
+                    bottomDetailsRow
                 }
-
-                // Sandbox quick-add — bottom-left, under the employee list.
-                // Bypasses the shift max (createAssignment has no capacity gate).
-                if sandboxActive {
-                    Button(action: onAddEmployee) {
-                        Label("Add", systemImage: "plus.circle")
-                            .font(.caption)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.blue)
-                    .padding(.top, 2)
-                    .padding(.horizontal, 4)
-                    .accessibilityLabel("Add employee to shift")
+            } else {
+                HStack(alignment: .top, spacing: 8) {
+                    employeeColumn
+                    trailingDetailsColumn
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            // Right column — capacity over stacked shift times, right-aligned.
-            // Start time stays muted; end time is emboldened in the primary
-            // color. Role is intentionally omitted from the grid card (still
-            // shown on tap in the shift editor).
-            VStack(alignment: .trailing, spacing: 2) {
-                Text("\(assignments.count)/\(shift.maxEmployees)")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(assignments.count < Int(shift.minEmployees) ? .red : .secondary)
-                Text(shift.startTime)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(shift.endTime)
-                    .font(.caption.bold())
-                    .foregroundStyle(.primary)
-            }
-            .fixedSize(horizontal: true, vertical: false)
         }
         .padding(10)
         .background(
@@ -653,6 +648,90 @@ private struct ShiftCard: View {
         // mode the card is not tappable-to-edit — quick controls handle edits.
         .contentShape(Rectangle())
         .onTapGesture { if !isEditMode { onEdit() } }
+    }
+
+    // Employees, left-justified and top-aligned.
+    private var employeeColumn: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            if assignments.isEmpty {
+                Text("Unassigned")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .italic()
+            } else {
+                ForEach(assignments, id: \.assignmentId) { entry in
+                    AssignmentRow(
+                        entry: entry,
+                        vm: vm,
+                        shift: shift,
+                        isEditMode: isEditMode,
+                        isLocked: isLocked,
+                        isCompact: isCompact
+                    )
+                }
+            }
+
+            // Sandbox quick-add — bottom-left, under the employee list.
+            // Bypasses the shift max (createAssignment has no capacity gate).
+            if sandboxActive {
+                Button(action: onAddEmployee) {
+                    Label("Add", systemImage: "plus.circle")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.blue)
+                .padding(.top, 2)
+                .padding(.horizontal, 4)
+                .accessibilityLabel("Add employee to shift")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var capacityText: some View {
+        Text("\(assignments.count)/\(shift.maxEmployees)")
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(assignments.count < Int(shift.minEmployees) ? .red : .secondary)
+    }
+
+    private var startTimeText: some View {
+        Text(shift.startTime)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+
+    private var endTimeText: some View {
+        Text(shift.endTime)
+            .font(.caption.bold())
+            .foregroundStyle(.primary)
+    }
+
+    // Portrait: capacity over stacked shift times, right-aligned. Start time
+    // stays muted; end time is emboldened in the primary color. Role is
+    // intentionally omitted from the grid card (still shown on tap in the
+    // shift editor).
+    private var trailingDetailsColumn: some View {
+        VStack(alignment: .trailing, spacing: 2) {
+            capacityText
+            startTimeText
+            endTimeText
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    // Landscape: capacity bottom-left with start → end times centered along
+    // the bottom of the card.
+    private var bottomDetailsRow: some View {
+        ZStack {
+            HStack {
+                capacityText
+                Spacer(minLength: 0)
+            }
+            HStack(spacing: 6) {
+                startTimeText
+                endTimeText
+            }
+        }
     }
 
     var body: some View {
@@ -836,6 +915,8 @@ private struct AssignmentRow: View {
                 Text(entry.employeeName)
                     .font(.subheadline.bold())
                     .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
                 Spacer()
                 #if os(iOS)
                 if !isCompact {
@@ -875,6 +956,8 @@ private struct AssignmentRow: View {
                     HStack(spacing: 4) {
                         Text(employeeName)
                             .font(.subheadline)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                         Image(systemName: "arrow.left.arrow.right")
                             .font(.caption2)
                     }
@@ -913,6 +996,8 @@ private struct AssignmentRow: View {
             } else {
                 Text(employeeName)
                     .font(.subheadline)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
                     .accessibilityLabel("Assigned: \(employeeName)")
             }
 
