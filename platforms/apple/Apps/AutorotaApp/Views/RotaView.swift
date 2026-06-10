@@ -115,7 +115,8 @@ struct RotaView: View {
                     }
                 }
                 // Top-right: Swap on a scheduled week, Done while editing, or a
-                // lone Generate on an empty week. Share lives in the options menu.
+                // lone Generate on an empty week. Share lives in the options
+                // menu on iPhone/macOS; iPad surfaces it as a discrete button.
                 ToolbarItemGroup(placement: .primaryAction) {
                     if vm.isEditMode {
                         Button { vm.exitEditMode() } label: {
@@ -124,6 +125,13 @@ struct RotaView: View {
                         .accessibilityLabel("Done editing")
                         .accessibilityIdentifier("rota.done")
                     } else if vm.schedule != nil {
+                        if isPad {
+                            Button { showExportSheet = true } label: {
+                                Image(systemName: "square.and.arrow.up")
+                            }
+                            .accessibilityLabel("Share")
+                            .accessibilityIdentifier("rota.share")
+                        }
                         Button { Task { await vm.enterEditMode() } } label: {
                             Image(systemName: "slider.horizontal.3")
                         }
@@ -255,14 +263,26 @@ struct RotaView: View {
 
     // MARK: - Options menu
 
+    /// Whether we're on iPad, where Share moves out of the options menu into
+    /// a discrete trailing toolbar button.
+    private var isPad: Bool {
+        #if os(iOS)
+        UIDevice.current.userInterfaceIdiom == .pad
+        #else
+        false
+        #endif
+    }
+
     /// Top-left ellipsis menu, shown only on a scheduled week (not editing).
-    /// Holds Regenerate, Share, and the destructive Delete week; Swap is
-    /// surfaced as a discrete trailing button.
+    /// Holds Regenerate, Share (iPhone/macOS only), and the destructive
+    /// Delete week; Swap is surfaced as a discrete trailing button.
     @ViewBuilder
     private var optionsMenu: some View {
         Menu {
-            Button { showExportSheet = true } label: {
-                Label("Share", systemImage: "square.and.arrow.up")
+            if !isPad {
+                Button { showExportSheet = true } label: {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
             }
             Button { Task { await vm.runSchedule() } } label: {
                 Label("Regenerate", systemImage: "wand.and.stars")
