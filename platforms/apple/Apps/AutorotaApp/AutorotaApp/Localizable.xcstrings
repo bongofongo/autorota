@@ -561,6 +561,16 @@
         }
       }
     },
+    "%lld edit%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld edit%2$@"
+          }
+        }
+      }
+    },
     "%lld of %lld" : {
       "localizations" : {
         "ar" : {
@@ -1897,9 +1907,6 @@
           }
         }
       }
-    },
-    "Bar Edge" : {
-
     },
     "Bulk Send" : {
       "localizations" : {
@@ -5457,9 +5464,6 @@
         }
       }
     },
-    "Floating Rail" : {
-
-    },
     "Force expired" : {
       "localizations" : {
         "ar" : {
@@ -5950,6 +5954,9 @@
           }
         }
       }
+    },
+    "Group by" : {
+
     },
     "Head to the Employees tab to add your first team member, then create shifts and generate your rota." : {
       "extractionState" : "stale",
@@ -9826,9 +9833,6 @@
         }
       }
     },
-    "In landscape the navigation rail anchors to this edge of the screen. Portrait shows a floating bar at the bottom regardless." : {
-
-    },
     "Increase %@" : {
       "localizations" : {
         "ar" : {
@@ -10148,9 +10152,6 @@
           }
         }
       }
-    },
-    "Leading" : {
-
     },
     "license.banner.read_only.body" : {
       "localizations" : {
@@ -21921,9 +21922,6 @@
           }
         }
       }
-    },
-    "Trailing" : {
-
     },
     "Tritanopia" : {
       "extractionState" : "manual",
