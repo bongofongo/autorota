@@ -65,23 +65,34 @@ struct SettingsView: View {
     /// wide screens instead of stretching edge-to-edge.
     private let maxTileWidth: CGFloat = 150
 
-    /// 2 columns in portrait (2x2), 4 in landscape (single row of four). iPhone
-    /// landscape reports a compact vertical size class; iPad/macOS stay at 2.
+    /// Width available to the tile grid's list row, measured at runtime. Drives
+    /// the single-row spread on wide layouts (iPad/macOS).
+    @State private var availableGridWidth: CGFloat = 0
+
+    /// 4 columns in iPhone landscape (compact vertical size class), otherwise 2 —
+    /// unless the row is wide enough to fit every overflow page at full tile
+    /// width, in which case the grid spreads into a single row.
     private var tileColumnCount: Int {
         #if os(iOS)
-        vSizeClass == .compact ? 4 : 2
-        #else
-        2
+        if vSizeClass == .compact { return 4 }
         #endif
+        let n = layoutManager.hiddenPages.count
+        if n > 2 && availableGridWidth >= gridWidth(forColumns: n) { return n }
+        return 2
     }
 
     private var tileColumns: [GridItem] {
         Array(repeating: GridItem(.flexible(), spacing: Spacing.sm), count: tileColumnCount)
     }
 
+    /// Total grid width when every cell of an `n`-column row is at its max.
+    private func gridWidth(forColumns n: Int) -> CGFloat {
+        CGFloat(n) * maxTileWidth + CGFloat(n - 1) * Spacing.sm
+    }
+
     /// Total grid width when every cell is at its max — used to cap then center.
     private var maxGridWidth: CGFloat {
-        CGFloat(tileColumnCount) * maxTileWidth + CGFloat(tileColumnCount - 1) * Spacing.sm
+        gridWidth(forColumns: tileColumnCount)
     }
 
     var body: some View {
@@ -102,6 +113,9 @@ struct SettingsView: View {
                         }
                         .frame(maxWidth: maxGridWidth)   // cap total width…
                         .frame(maxWidth: .infinity)       // …then center in the row
+                        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
+                            availableGridWidth = $0
+                        }
                         .padding(.vertical, Spacing.xs)
                         .listRowInsets(EdgeInsets(top: Spacing.sm, leading: Spacing.md, bottom: Spacing.sm, trailing: Spacing.md))
                         .listRowBackground(Color.clear)
