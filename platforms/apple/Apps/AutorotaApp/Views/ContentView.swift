@@ -13,9 +13,6 @@ struct ContentView: View {
     /// Cleared as soon as it is consumed below so a manual replay from
     /// settings still shows the slides.
     @AppStorage("pendingOnboardingTierOnly") private var pendingOnboardingTierOnly = false
-    #if os(iOS)
-    @AppStorage("tabBarEdge") private var tabBarEdgeRaw: String = TabBarEdge.trailing.rawValue
-    #endif
     @State private var showOnboarding = false
     @State private var onboardingStartPage = 0
     @Environment(LicenseService.self) private var license
@@ -27,10 +24,6 @@ struct ContentView: View {
     #if os(iOS)
     private var isPad: Bool {
         UIDevice.current.userInterfaceIdiom == .pad
-    }
-
-    private var tabBarEdge: TabBarEdge {
-        TabBarEdge(rawValue: tabBarEdgeRaw) ?? .trailing
     }
     #endif
 
@@ -146,34 +139,26 @@ struct ContentView: View {
     #if os(iOS)
     /// iPad layout: render pages directly via a ZStack-based switcher (no
     /// `TabView`, so iPadOS 26's floating top tab bar never appears) and
-    /// overlay a floating glass rail (landscape) or bottom bar (portrait).
+    /// overlay a floating glass bottom bar matching the iPhone tab bar.
     /// Slide Over presents a compact h-size class — fall back to the system
-    /// `TabView` there since the rail would crowd the narrow window.
+    /// `TabView` there since the overlay would crowd the narrow window.
     @ViewBuilder
     private var iPadAdaptiveTabView: some View {
         if horizontalSizeClass == .compact {
             systemTabView
         } else {
-            GeometryReader { geo in
-                let isLandscape = geo.size.width > geo.size.height
-                let alignment: Alignment = isLandscape ? tabBarEdge.alignment : .bottom
-                let hideEdge: Edge = isLandscape ? (tabBarEdge == .leading ? .leading : .trailing) : .bottom
-                ZStack(alignment: alignment) {
-                    iPadPagesContainer
-                    if !bridge.isEditMode {
-                        FloatingTabBar(
-                            pages: layoutManager.tabBarPages,
-                            selection: $selection,
-                            axis: isLandscape ? .vertical : .horizontal
-                        )
-                        .padding(16)
-                        .transition(.move(edge: hideEdge).combined(with: .opacity))
-                    }
+            ZStack(alignment: .bottom) {
+                iPadPagesContainer
+                if !bridge.isEditMode {
+                    FloatingTabBar(
+                        pages: layoutManager.tabBarPages,
+                        selection: $selection
+                    )
+                    .padding(16)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
-                .frame(width: geo.size.width, height: geo.size.height)
-                .animation(.snappy(duration: 0.25), value: isLandscape)
-                .animation(.smooth(duration: 0.35), value: bridge.isEditMode)
             }
+            .animation(.smooth(duration: 0.35), value: bridge.isEditMode)
         }
     }
 

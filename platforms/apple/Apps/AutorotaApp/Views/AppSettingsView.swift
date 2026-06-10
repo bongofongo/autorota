@@ -8,9 +8,6 @@ struct AppSettingsView: View {
     @AppStorage("appAppearance") private var appearance: String = AppAppearance.system.rawValue
     @AppStorage("colorBlindnessMode") private var colorBlindnessMode: String = ColorBlindnessMode.none.rawValue
     @AppStorage("appCurrency") private var currency: String = AppCurrency.usd.rawValue
-    #if os(iOS)
-    @AppStorage("tabBarEdge") private var tabBarEdgeRaw: String = TabBarEdge.trailing.rawValue
-    #endif
     @Environment(TabLayoutManager.self) private var layoutManager
     @Environment(LocaleManager.self) private var localeManager
 
@@ -75,22 +72,6 @@ struct AppSettingsView: View {
             #if !os(macOS)
             Section {
                 DisclosureGroup("Tab Bar Layout") {
-                    #if os(iOS)
-                    if UIDevice.current.userInterfaceIdiom == .pad {
-                        Section {
-                            Picker("Bar Edge", selection: $tabBarEdgeRaw) {
-                                ForEach(TabBarEdge.allCases) { edge in
-                                    Text(edge.label).tag(edge.rawValue)
-                                }
-                            }
-                            .pickerStyle(.segmented)
-                        } header: {
-                            Text("Floating Rail")
-                        } footer: {
-                            Text("In landscape the navigation rail anchors to this edge of the screen. Portrait shows a floating bar at the bottom regardless.")
-                        }
-                    }
-                    #endif
                     Section {
                         ForEach(layoutManager.configurableTabBarPages) { page in
                             HStack {
