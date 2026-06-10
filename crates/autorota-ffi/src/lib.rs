@@ -2044,28 +2044,21 @@ pub fn diff_rota(rota_id: i64) -> Result<Vec<FfiShiftDiff>, FfiError> {
 pub fn list_saves(rota_id: Option<i64>) -> Result<Vec<FfiSave>, FfiError> {
     let pool = pool()?;
     let result: Result<Vec<FfiSave>, sqlx::Error> = rt().block_on(async move {
+        // `list_saves` returns lightweight metadata (no snapshot blob) and the
+        // INNER JOIN already supplies `week_start` and drops orphaned saves.
         let saves = queries::list_saves(pool, rota_id).await?;
-        let mut ffi_saves = Vec::new();
-        for s in saves {
-            let week_start: Option<String> =
-                sqlx::query_scalar("SELECT week_start FROM rotas WHERE id = ?")
-                    .bind(s.rota_id)
-                    .fetch_optional(pool)
-                    .await?;
-            // Skip saves whose rota has been deleted (orphaned records).
-            let Some(week_start) = week_start else {
-                continue;
-            };
-            ffi_saves.push(FfiSave {
+        let ffi_saves: Vec<FfiSave> = saves
+            .into_iter()
+            .map(|s| FfiSave {
                 id: s.id,
                 rota_id: s.rota_id,
                 saved_at: s.saved_at,
                 summary: s.summary,
                 tags: s.tags,
-                week_start,
+                week_start: s.week_start,
                 restored_at: s.restored_at,
-            });
-        }
+            })
+            .collect();
         Ok(ffi_saves)
     });
     result.map_err(Into::into)

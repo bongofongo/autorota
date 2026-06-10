@@ -11,7 +11,7 @@ use crate::models::role::Role;
 use crate::models::rota::Rota;
 use crate::models::save::{
     ChangeDetail, RestoreResult, Save, SaveAssignmentSnapshot,
-    SaveEmployeeAvailabilityOverrideSnapshot, SaveShiftSnapshot, SaveSnapshot, ShiftDiff,
+    SaveEmployeeAvailabilityOverrideSnapshot, SaveMeta, SaveShiftSnapshot, SaveSnapshot, ShiftDiff,
     diff_snapshots,
 };
 use crate::models::shift::{RoleRequirement, Shift, ShiftTemplate};
@@ -1629,30 +1629,39 @@ fn generate_save_summary(total_shifts: usize, unique_employees: usize, total_hou
 }
 
 /// List saves, optionally filtered by rota_id. Ordered by saved_at DESC.
-pub async fn list_saves(pool: &SqlitePool, rota_id: Option<i64>) -> Result<Vec<Save>, sqlx::Error> {
-    let rows: Vec<(i64, i64, String, String, String, Option<String>)> = match rota_id {
-        Some(rid) => {
-            sqlx::query_as(
-                "SELECT id, rota_id, saved_at, summary, snapshot_json, restored_at
-             FROM saves WHERE rota_id = ?
-             ORDER BY COALESCE(restored_at, saved_at) DESC",
-            )
-            .bind(rid)
-            .fetch_all(pool)
-            .await?
-        }
-        None => {
-            sqlx::query_as(
-                "SELECT id, rota_id, saved_at, summary, snapshot_json, restored_at
-             FROM saves
-             ORDER BY COALESCE(restored_at, saved_at) DESC",
-            )
-            .fetch_all(pool)
-            .await?
-        }
-    };
+/// List save metadata, newest-first. Returns [`SaveMeta`] (no snapshot blob) so
+/// the Edit Log stays fast regardless of save count. The INNER JOIN on `rotas`
+/// supplies `week_start` and naturally excludes orphaned saves whose rota was
+/// deleted. When `rota_id` is `None`, lists across all rotas.
+pub async fn list_saves(
+    pool: &SqlitePool,
+    rota_id: Option<i64>,
+) -> Result<Vec<SaveMeta>, sqlx::Error> {
+    let rows: Vec<(i64, i64, String, String, String, Option<String>)> = sqlx::query_as(
+        "SELECT s.id, s.rota_id, r.week_start, s.saved_at, s.summary, s.restored_at
+         FROM saves s
+         JOIN rotas r ON r.id = s.rota_id
+         WHERE (?1 IS NULL OR s.rota_id = ?1)
+         ORDER BY COALESCE(s.restored_at, s.saved_at) DESC",
+    )
+    .bind(rota_id)
+    .fetch_all(pool)
+    .await?;
 
-    let mut saves: Vec<Save> = rows.into_iter().map(save_from_row).collect();
+    let mut saves: Vec<SaveMeta> = rows
+        .into_iter()
+        .map(
+            |(id, rota_id, week_start, saved_at, summary, restored_at)| SaveMeta {
+                id,
+                rota_id,
+                week_start,
+                saved_at,
+                summary,
+                tags: Vec::new(),
+                restored_at,
+            },
+        )
+        .collect();
     let ids: Vec<i64> = saves.iter().map(|s| s.id).collect();
     let tags_by_save = load_tags_for_saves(pool, &ids).await?;
     for save in &mut saves {

@@ -21,7 +21,7 @@ Cafe managers define shifts. Employees declare availability. The scheduler assig
 
 ## Architecture
 
-Cargo workspace: `autorota-core` (models, scheduler, db, export), `autorota-ffi` (UniFFI bindings for Swift/Kotlin), `uniffi-bindgen` (bindgen binary), `app-desktop` (Tauri v2). Apple platform under `platforms/apple/` with `AutorotaKit` (SPM package wrapping the XCFramework) and `AutorotaApp` (Xcode project, iOS/iPadOS/macOS). Database: SQLite with 23 auto-applied migrations.
+Cargo workspace: `autorota-core` (models, scheduler, db, export), `autorota-ffi` (UniFFI bindings for Swift/Kotlin), `uniffi-bindgen` (bindgen binary), `app-desktop` (Tauri v2). Apple platform under `platforms/apple/` with `AutorotaKit` (SPM package wrapping the XCFramework) and `AutorotaApp` (Xcode project, iOS/iPadOS/macOS). Database: SQLite with 26 auto-applied migrations.
 
 Scheduling algorithm: two-pass greedy — apply manual overrides first, then assign remaining shifts hardest-to-fill-first using availability quality, hour budget, fairness scoring, and deterministic hash-based tiebreaking.
 

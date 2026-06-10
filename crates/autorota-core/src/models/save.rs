@@ -16,6 +16,23 @@ pub struct Save {
     pub restored_at: Option<String>,
 }
 
+/// Lightweight save metadata for list views. Deliberately omits `snapshot_json`
+/// (the heavy per-save JSON blob) so the Edit Log can list thousands of saves
+/// without loading every snapshot into memory. `week_start` is denormalised in
+/// via a JOIN on `rotas`. Use [`Save`] / `get_save` when the snapshot is needed
+/// (detail, diff, restore).
+#[derive(Debug, Clone)]
+pub struct SaveMeta {
+    pub id: i64,
+    pub rota_id: i64,
+    pub week_start: String,
+    pub saved_at: String,
+    pub summary: String,
+    /// User-assigned tags for this save, ordered by insertion.
+    pub tags: Vec<String>,
+    pub restored_at: Option<String>,
+}
+
 // ── Tag validation ──────────────────────────────────────────────────────────
 
 /// Max characters in a single tag.
