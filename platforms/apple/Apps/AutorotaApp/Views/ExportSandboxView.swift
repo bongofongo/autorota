@@ -1,29 +1,28 @@
 import SwiftUI
 import AutorotaKit
 
-/// Drag-and-drop sandbox for the "Custom" export layout: a live template
-/// table, two side-by-side drop zones (row headers | cells) where placed
-/// pills stack in a column, a tray of consumable field pills, and role pills
-/// that place into an export-order box on tap — top-to-bottom order is the
+/// Tap-to-place sandbox for the "Custom" export layout: a live template
+/// table, two side-by-side buckets (row headers | cells) where placed pills
+/// stack in a column, a tray of consumable field pills, and tap-only role
+/// pills that place into an export-order box — top-to-bottom order is the
 /// section order in the export.
+///
+/// No drag gestures: tap a field pill to select it, then tap a highlighted
+/// bucket (or the tray) to place it.
 struct ExportSandboxView: View {
     @Bindable var viewModel: ExportSandboxViewModel
-
-    @State private var rowsZoneTargeted = false
-    @State private var cellsZoneTargeted = false
-    @State private var roleZoneTargeted = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
             if let guidance = viewModel.guidanceText {
-                Label(guidance, systemImage: "hand.draw")
+                Label(guidance, systemImage: "hand.tap")
                     .font(.caption)
                     .foregroundStyle(.orange)
             }
 
             MockExportTableView(viewModel: viewModel)
 
-            dropZones
+            buckets
             fieldTray
             roleTray
         }
@@ -31,44 +30,42 @@ struct ExportSandboxView: View {
         .task { await viewModel.loadRoles() }
     }
 
-    // MARK: - Drop zones
+    // MARK: - Buckets
 
-    /// Side-by-side drop targets mirroring the table: row headers on the
+    /// Side-by-side tap targets mirroring the table: row headers on the
     /// left, cells on the right. Placed pills stack in a column inside each.
-    private var dropZones: some View {
+    private var buckets: some View {
         HStack(alignment: .top, spacing: Spacing.sm) {
-            dropZone(
+            bucket(
                 title: String(localized: "Row headers"),
                 systemImage: "list.bullet",
                 fields: viewModel.layout.rows,
-                zone: .rows,
-                targeted: $rowsZoneTargeted
+                zone: .rows
             )
-            dropZone(
+            bucket(
                 title: String(localized: "Cells"),
                 systemImage: "tablecells",
                 fields: viewModel.layout.cells,
-                zone: .cells,
-                targeted: $cellsZoneTargeted
+                zone: .cells
             )
         }
     }
 
-    private func dropZone(
+    private func bucket(
         title: String,
         systemImage: String,
         fields: [ExportField],
-        zone: ExportSandboxViewModel.Zone,
-        targeted: Binding<Bool>
+        zone: ExportSandboxViewModel.Zone
     ) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.xs) {
+        let active = viewModel.canPlaceSelected(in: zone)
+        return VStack(alignment: .leading, spacing: Spacing.xs) {
             Label(title, systemImage: systemImage)
                 .font(.caption)
-                .foregroundStyle(.secondary)
-            if fields.isEmpty {
-                Text("Drop a pill here")
+                .foregroundStyle(active ? Color.accentColor : Color.secondary)
+            if fields.isEmpty || active {
+                Text(active ? "Tap to place here" : "Tap a pill below, then tap here")
                     .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(active ? Color.accentColor : Color(.tertiaryLabel))
             }
             ForEach(fields) { field in
                 pill(for: field)
@@ -78,32 +75,33 @@ struct ExportSandboxView: View {
         .frame(maxWidth: .infinity, minHeight: 110, alignment: .topLeading)
         .background(
             RoundedRectangle(cornerRadius: SurfaceRadius.small, style: .continuous)
-                .fill(targeted.wrappedValue
-                    ? Color.accentColor.opacity(0.15)
+                .fill(active
+                    ? Color.accentColor.opacity(0.12)
                     : Color.secondary.opacity(0.05))
         )
         .overlay(
             RoundedRectangle(cornerRadius: SurfaceRadius.small, style: .continuous)
                 .strokeBorder(
-                    targeted.wrappedValue ? Color.accentColor : Color.secondary.opacity(0.35),
-                    style: StrokeStyle(lineWidth: 1, dash: [5, 4])
+                    active ? Color.accentColor : Color.secondary.opacity(0.35),
+                    style: StrokeStyle(lineWidth: active ? 1.5 : 1, dash: [5, 4])
                 )
         )
         .contentShape(Rectangle())
-        .dropDestination(for: ExportPillPayload.self) { items, _ in
-            guard let item = items.first, case .field(let field) = item.kind else { return false }
-            return viewModel.drop(field, in: zone)
-        } isTargeted: { targeted.wrappedValue = $0 }
+        .onTapGesture { viewModel.placeSelected(in: zone) }
+        .accessibilityAddTraits(active ? .isButton : [])
+        .accessibilityHint(active ? Text("Places the selected pill here") : Text(""))
+        .animation(.easeInOut(duration: 0.15), value: active)
     }
 
     // MARK: - Trays
 
     private var fieldTray: some View {
-        VStack(alignment: .leading, spacing: Spacing.xs) {
-            Text("Fields")
+        let active = viewModel.canPlaceSelected(in: .tray)
+        return VStack(alignment: .leading, spacing: Spacing.xs) {
+            Text(active ? "Fields — tap to return here" : "Fields")
                 .font(.caption)
-                .foregroundStyle(.secondary)
-            if viewModel.trayFields.isEmpty {
+                .foregroundStyle(active ? Color.accentColor : Color.secondary)
+            if viewModel.trayFields.isEmpty && !active {
                 Text("All fields placed")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
@@ -116,12 +114,9 @@ struct ExportSandboxView: View {
             }
         }
         .contentShape(Rectangle())
-        // Dragging a pill back to the tray un-places it.
-        .dropDestination(for: ExportPillPayload.self) { items, _ in
-            guard let item = items.first, case .field(let field) = item.kind else { return false }
-            viewModel.returnToTray(field)
-            return true
-        }
+        // Tapping the tray returns the selected placed pill.
+        .onTapGesture { viewModel.placeSelected(in: .tray) }
+        .animation(.easeInOut(duration: 0.15), value: active)
     }
 
     private var roleTray: some View {
@@ -129,7 +124,7 @@ struct ExportSandboxView: View {
             Text("Role sections")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Text("Tap or drag a role into the order box to split the export into one table per role, top to bottom.")
+            Text("Tap a role to split the export into one table per role, top to bottom. Tap a placed role to remove it.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
             if let error = viewModel.rolesError {
@@ -152,8 +147,7 @@ struct ExportSandboxView: View {
         }
     }
 
-    /// Unplaced role pills: one tap (or a drag into the order box) places
-    /// the role as a section.
+    /// Unplaced role pills: one tap places the role as a section.
     private var availableRoleColumn: some View {
         VStack(alignment: .leading, spacing: Spacing.xs) {
             if viewModel.trayRoles.isEmpty {
@@ -172,7 +166,6 @@ struct ExportSandboxView: View {
                     )
                 }
                 .buttonStyle(.borderless)
-                .draggable(ExportPillPayload.role(role))
                 .accessibilityLabel(Text(role.name))
                 .accessibilityHint(Text("Adds a section for this role"))
             }
@@ -180,15 +173,15 @@ struct ExportSandboxView: View {
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
-    /// Placed role sections in export order, top to bottom. Drop target for
-    /// role pills; reorder/remove via each pill's menu.
+    /// Placed role sections in export order, top to bottom. Tap a pill to
+    /// remove it; order is the order roles were added.
     private var roleOrderZone: some View {
         VStack(alignment: .leading, spacing: Spacing.xs) {
             Label(String(localized: "Export order"), systemImage: "arrow.up.arrow.down")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             if viewModel.layout.sections.isEmpty {
-                Text("Drop a role here")
+                Text("Tap a role to add it")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
@@ -200,39 +193,21 @@ struct ExportSandboxView: View {
         .frame(maxWidth: .infinity, minHeight: 110, alignment: .topLeading)
         .background(
             RoundedRectangle(cornerRadius: SurfaceRadius.small, style: .continuous)
-                .fill(roleZoneTargeted
-                    ? Color.purple.opacity(0.15)
-                    : Color.secondary.opacity(0.05))
+                .fill(Color.secondary.opacity(0.05))
         )
         .overlay(
             RoundedRectangle(cornerRadius: SurfaceRadius.small, style: .continuous)
                 .strokeBorder(
-                    roleZoneTargeted ? Color.purple : Color.secondary.opacity(0.35),
+                    Color.secondary.opacity(0.35),
                     style: StrokeStyle(lineWidth: 1, dash: [5, 4])
                 )
         )
-        .contentShape(Rectangle())
-        .dropDestination(for: ExportPillPayload.self) { items, _ in
-            guard let item = items.first, case .role(let id, let name) = item.kind else { return false }
-            viewModel.addSection(FfiRole(id: id, name: name))
-            return true
-        } isTargeted: { roleZoneTargeted = $0 }
     }
 
     private func placedRolePill(_ section: ExportRoleSection, index: Int) -> some View {
         let count = viewModel.layout.sections.count
-        return Menu {
-            Button("Move Up") {
-                viewModel.moveSections(from: IndexSet(integer: index), to: index - 1)
-            }
-            .disabled(index == 0)
-            Button("Move Down") {
-                viewModel.moveSections(from: IndexSet(integer: index), to: index + 2)
-            }
-            .disabled(index == count - 1)
-            Button("Remove", role: .destructive) {
-                viewModel.removeSection(id: section.id)
-            }
+        return Button {
+            viewModel.removeSection(id: section.id)
         } label: {
             ExportPillView(
                 label: "\(index + 1). \(section.name)",
@@ -242,29 +217,27 @@ struct ExportSandboxView: View {
         }
         .buttonStyle(.borderless)
         .accessibilityLabel(Text("\(section.name), position \(index + 1) of \(count)"))
+        .accessibilityHint(Text("Removes this role section"))
     }
 
     // MARK: - Pieces
 
-    /// A field pill: draggable, and tappable for a menu fallback so the
-    /// sandbox stays usable without drag gestures. A tap `Menu` (not
-    /// `contextMenu`) because Form rows merge multiple context menus into
-    /// the row's first one.
+    /// A field pill: tap to select, then tap a bucket to place it.
     private func pill(for field: ExportField) -> some View {
-        Menu {
-            if viewModel.canDrop(field, in: .rows) {
-                Button("Move to Row Headers") { viewModel.drop(field, in: .rows) }
-            }
-            if viewModel.canDrop(field, in: .cells) {
-                Button("Move to Cells") { viewModel.drop(field, in: .cells) }
-            }
-            Button("Return to Tray") { viewModel.returnToTray(field) }
+        Button {
+            viewModel.toggleSelection(field)
         } label: {
-            ExportPillView(label: field.label, systemImage: field.systemImage)
+            ExportPillView(
+                label: field.label,
+                systemImage: field.systemImage,
+                selected: viewModel.selectedField == field
+            )
         }
         .buttonStyle(.borderless)
-        .draggable(ExportPillPayload.field(field))
         .accessibilityLabel(Text(field.label))
+        .accessibilityHint(Text(viewModel.selectedField == field
+            ? "Selected. Tap a destination to place it."
+            : "Selects this field"))
     }
 
     private func flowRow<Content: View>(@ViewBuilder content: () -> Content) -> some View {

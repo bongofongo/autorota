@@ -1,32 +1,14 @@
 import SwiftUI
-import UniformTypeIdentifiers
 import AutorotaKit
 
-/// Drag payload for the export sandbox: either a field pill or a role pill.
-struct ExportPillPayload: Codable, Transferable, Hashable {
-    enum Kind: Codable, Hashable {
-        case field(ExportField)
-        case role(id: Int64, name: String)
-    }
-
-    let kind: Kind
-
-    static var transferRepresentation: some TransferRepresentation {
-        // Plain JSON keeps the payload in-app draggable without declaring a
-        // custom exported UTType in the (generated) Info.plist.
-        CodableRepresentation(contentType: .json)
-    }
-
-    static func field(_ field: ExportField) -> Self { .init(kind: .field(field)) }
-    static func role(_ role: FfiRole) -> Self { .init(kind: .role(id: role.id, name: role.name)) }
-}
-
-/// Capsule chip for a draggable sandbox pill.
+/// Capsule chip for a sandbox pill. `selected` renders the awaiting-a-bucket
+/// state in the tap-to-place flow.
 struct ExportPillView: View {
     let label: String
     var systemImage: String? = nil
     var tint: Color = .accentColor
     var compact = false
+    var selected = false
 
     var body: some View {
         HStack(spacing: Spacing.xs) {
@@ -41,8 +23,8 @@ struct ExportPillView: View {
         }
         .padding(.horizontal, compact ? Spacing.sm : Spacing.md)
         .padding(.vertical, compact ? 3 : 6)
-        .background(Capsule().fill(tint.opacity(0.15)))
-        .overlay(Capsule().strokeBorder(tint.opacity(0.4), lineWidth: 1))
+        .background(Capsule().fill(tint.opacity(selected ? 0.35 : 0.15)))
+        .overlay(Capsule().strokeBorder(tint.opacity(selected ? 1 : 0.4), lineWidth: selected ? 1.5 : 1))
         .foregroundStyle(tint)
     }
 }

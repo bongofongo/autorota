@@ -18,6 +18,9 @@ final class ExportSandboxViewModel {
     var rolesLoaded = false
     var rolesError: String?
 
+    /// Field pill awaiting a destination tap (tap pill → tap bucket).
+    var selectedField: ExportField?
+
     /// Set briefly after a rejected drop so the UI can explain why.
     var rejectionMessage: String?
 
@@ -117,6 +120,30 @@ final class ExportSandboxViewModel {
 
     func returnToTray(_ field: ExportField) {
         drop(field, in: .tray)
+    }
+
+    // MARK: - Tap-to-place selection
+
+    func toggleSelection(_ field: ExportField) {
+        selectedField = selectedField == field ? nil : field
+        rejectionMessage = nil
+    }
+
+    /// True when the selected pill could land in `zone` — drives the bucket
+    /// highlight. The pill's current zone is excluded (placing is a no-op).
+    func canPlaceSelected(in zone: Zone) -> Bool {
+        guard let field = selectedField, self.zone(of: field) != zone else { return false }
+        return canDrop(field, in: zone)
+    }
+
+    /// Places the selected pill on a bucket tap. An invalid bucket sets the
+    /// rejection message via `drop`; tapping the pill's own zone is ignored.
+    @discardableResult
+    func placeSelected(in zone: Zone) -> Bool {
+        guard let field = selectedField, self.zone(of: field) != zone else { return false }
+        let placed = drop(field, in: zone)
+        if placed { selectedField = nil }
+        return placed
     }
 
     // MARK: - Role sections

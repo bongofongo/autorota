@@ -1,7 +1,7 @@
 import Foundation
 import AutorotaKit
 
-/// A draggable field pill in the custom export sandbox.
+/// A field pill in the custom export sandbox (tap to select, tap to place).
 enum ExportField: String, Codable, CaseIterable, Identifiable {
     case shiftName
     case time
@@ -75,11 +75,11 @@ enum CustomLayoutError: Error, Equatable {
     var guidance: String {
         switch self {
         case .employeeUnplaced:
-            return String(localized: "Drag the Employee name pill into the rows or the cells.")
+            return String(localized: "Tap the Employee name pill, then tap the rows or the cells.")
         case .cellsEmpty:
-            return String(localized: "Drag at least one pill into the table cells.")
+            return String(localized: "Place at least one pill in the table cells.")
         case .rowsEmpty:
-            return String(localized: "Drag at least one pill into the row headers.")
+            return String(localized: "Place at least one pill in the row headers.")
         }
     }
 }

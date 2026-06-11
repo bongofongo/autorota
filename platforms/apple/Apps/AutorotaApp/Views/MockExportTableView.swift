@@ -29,9 +29,9 @@ enum SandboxSampleData {
 }
 
 /// The sandbox's template table: locked Mon–Sun column headers, a row-header
-/// drop zone, and a cell-area drop zone, rendering live sample data from the
-/// current pill placement. Role sections live in the sandbox's export-order
-/// box, not here.
+/// area and a cell area that double as tap targets for the selected field
+/// pill, rendering live sample data from the current pill placement. Role
+/// sections live in the sandbox's export-order box, not here.
 struct MockExportTableView: View {
     @Bindable var viewModel: ExportSandboxViewModel
 
@@ -43,17 +43,10 @@ struct MockExportTableView: View {
     private let ellipsisColumnWidth: CGFloat = 28
     private let columnSpacing: CGFloat = 1
 
-    @State private var rowsTargeted = false
-    @State private var cellsTargeted = false
     @State private var availableWidth: CGFloat = 0
 
     var body: some View {
         table
-            // Role pills dropped anywhere on the table still become a section
-            // (shown in the export-order box, not as banners here).
-            .dropDestination(for: ExportPillPayload.self) { items, _ in
-                handleRoleDrop(items)
-            }
             .onGeometryChange(for: CGFloat.self) { proxy in
                 proxy.size.width
             } action: { availableWidth = $0 }
@@ -86,7 +79,8 @@ struct MockExportTableView: View {
         .clipShape(RoundedRectangle(cornerRadius: SurfaceRadius.small, style: .continuous))
     }
 
-    /// Left column: corner label + sample row labels. Drop zone for row pills.
+    /// Left column: corner label + sample row labels. Tap target for the
+    /// selected field pill.
     private var rowHeaderColumn: some View {
         VStack(spacing: 1) {
             Text("Rows")
@@ -102,16 +96,15 @@ struct MockExportTableView: View {
                     .lineLimit(3)
                     .minimumScaleFactor(0.8)
                     .frame(width: rowHeaderWidth, height: rowHeight)
-                    .background(zoneFill(targeted: rowsTargeted))
+                    .background(zoneFill(active: viewModel.canPlaceSelected(in: .rows)))
             }
         }
         .contentShape(Rectangle())
-        .dropDestination(for: ExportPillPayload.self) { items, _ in
-            handleFieldDrop(items, zone: .rows)
-        } isTargeted: { rowsTargeted = $0 }
+        .onTapGesture { viewModel.placeSelected(in: .rows) }
     }
 
-    /// Weekday header (locked) + sample cells. Drop zone for cell pills.
+    /// Weekday header (locked) + sample cells. Tap target for the selected
+    /// field pill.
     private var cellArea: some View {
         VStack(spacing: columnSpacing) {
             HStack(spacing: columnSpacing) {
@@ -145,7 +138,7 @@ struct MockExportTableView: View {
                             .minimumScaleFactor(0.7)
                             .frame(maxWidth: .infinity)
                             .frame(height: rowHeight)
-                            .background(zoneFill(targeted: cellsTargeted))
+                            .background(zoneFill(active: viewModel.canPlaceSelected(in: .cells)))
                     }
                     if showsEllipsisColumn {
                         ellipsisCell
@@ -154,9 +147,7 @@ struct MockExportTableView: View {
             }
         }
         .contentShape(Rectangle())
-        .dropDestination(for: ExportPillPayload.self) { items, _ in
-            handleFieldDrop(items, zone: .cells)
-        } isTargeted: { cellsTargeted = $0 }
+        .onTapGesture { viewModel.placeSelected(in: .cells) }
     }
 
     /// Stand-in column for weekdays that don't fit at `minCellWidth`.
@@ -176,7 +167,7 @@ struct MockExportTableView: View {
             .font(.caption2)
             .foregroundStyle(.tertiary)
             .frame(width: ellipsisColumnWidth, height: rowHeight)
-            .background(zoneFill(targeted: cellsTargeted))
+            .background(zoneFill(active: viewModel.canPlaceSelected(in: .cells)))
             .accessibilityHidden(true)
     }
 
@@ -184,27 +175,8 @@ struct MockExportTableView: View {
         Color.secondary.opacity(0.12)
     }
 
-    private func zoneFill(targeted: Bool) -> some ShapeStyle {
-        targeted ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.05)
-    }
-
-    // MARK: - Drop handling
-
-    private func handleFieldDrop(_ items: [ExportPillPayload], zone: ExportSandboxViewModel.Zone) -> Bool {
-        guard let item = items.first else { return false }
-        switch item.kind {
-        case .field(let field):
-            return viewModel.drop(field, in: zone)
-        case .role(let id, let name):
-            viewModel.addSection(FfiRole(id: id, name: name))
-            return true
-        }
-    }
-
-    private func handleRoleDrop(_ items: [ExportPillPayload]) -> Bool {
-        guard let item = items.first, case .role(let id, let name) = item.kind else { return false }
-        viewModel.addSection(FfiRole(id: id, name: name))
-        return true
+    private func zoneFill(active: Bool) -> some ShapeStyle {
+        active ? Color.accentColor.opacity(0.18) : Color.secondary.opacity(0.05)
     }
 
     // MARK: - Live sample content
