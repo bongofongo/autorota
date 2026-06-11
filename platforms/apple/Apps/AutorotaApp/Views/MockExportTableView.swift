@@ -109,19 +109,12 @@ struct MockExportTableView: View {
         VStack(spacing: columnSpacing) {
             HStack(spacing: columnSpacing) {
                 ForEach(0..<visibleDayCount, id: \.self) { day in
-                    HStack(spacing: 2) {
-                        Text(weekdayLetters[day])
-                            .font(.caption2)
-                            .fontWeight(.semibold)
-                        if day == 0 {
-                            Image(systemName: "lock.fill")
-                                .font(.system(size: 7))
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 26)
-                    .background(headerFill)
+                    Text(weekdayLetters[day])
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 26)
+                        .background(headerFill)
                 }
                 if showsEllipsisColumn {
                     ellipsisHeader
