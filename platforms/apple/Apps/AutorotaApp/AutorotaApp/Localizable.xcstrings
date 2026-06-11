@@ -2472,9 +2472,6 @@
         }
       }
     },
-    "Columns are always Monday to Sunday." : {
-
-    },
     "Contact" : {
       "localizations" : {
         "ar" : {
@@ -3046,9 +3043,6 @@
           }
         }
       }
-    },
-    "Customize the layout in the Export tab." : {
-
     },
     "Dark" : {
       "extractionState" : "manual",
@@ -4127,6 +4121,9 @@
           }
         }
       }
+    },
+    "Edit Custom Layout" : {
+
     },
     "Edit Employee" : {
       "localizations" : {
@@ -20549,6 +20546,9 @@
     "Tap a pill below, then tap here" : {
 
     },
+    "Tap a pill, then tap the row headers or the table cells to place it. Changes are saved automatically." : {
+
+    },
     "Tap a pill, then tap the row headers or the table cells to place it. Columns are always Monday to Sunday." : {
 
     },
@@ -20556,6 +20556,9 @@
 
     },
     "Tap a role to split the export into one table per role, top to bottom. Tap a placed role to remove it." : {
+
+    },
+    "Tap a template to preview it. Columns are always Monday to Sunday." : {
 
     },
     "Tap Generate to create a schedule for this week." : {

@@ -11,12 +11,19 @@ struct CarouselAvailabilityView: View {
     let weekLabel: String
     let weekStartString: String
 
-    @State private var selectedIndex: Int = 0
+    @State private var selectedEmployeeId: Int64?
     @State private var showEmployeePicker = false
+    /// Done employees explicitly chosen from the picker for editing.
+    @State private var extraIncludedIds: Set<Int64> = []
+
+    /// Employees shown in the carousel: everyone not done, plus done
+    /// employees explicitly opened from the picker.
+    private var activeEmployees: [FfiEmployee] {
+        employees.filter { !progressVM.isDone($0.id) || extraIncludedIds.contains($0.id) }
+    }
 
     private var currentEmployee: FfiEmployee? {
-        guard employees.indices.contains(selectedIndex) else { return nil }
-        return employees[selectedIndex]
+        activeEmployees.first { $0.id == selectedEmployeeId } ?? activeEmployees.first
     }
 
     var body: some View {
@@ -31,17 +38,17 @@ struct CarouselAvailabilityView: View {
                     .padding(.top, 8)
                     .padding(.bottom, 4)
 
-                if progressVM.allDone(employees: employees) {
+                if activeEmployees.isEmpty {
                     AllAvailabilitiesSetView()
                 } else {
                     // Availability grid for current employee
-                    TabView(selection: $selectedIndex) {
-                        ForEach(Array(employees.enumerated()), id: \.element.id) { index, employee in
+                    TabView(selection: $selectedEmployeeId) {
+                        ForEach(activeEmployees, id: \.id) { employee in
                             AvailabilityPage(
                                 employee: employee,
                                 weekStartString: weekStartString
                             )
-                            .tag(index)
+                            .tag(Optional(employee.id))
                         }
                     }
                     #if os(iOS)
@@ -50,26 +57,31 @@ struct CarouselAvailabilityView: View {
                 }
 
             }
+            .onAppear {
+                if selectedEmployeeId == nil {
+                    selectedEmployeeId = activeEmployees.first?.id
+                }
+            }
             .safeAreaInset(edge: .bottom) {
-                if let employee = currentEmployee {
-                    VStack(spacing: 0) {
-                        Divider()
-                        ZStack {
-                            // Centered: employee name
-                            Button {
-                                showEmployeePicker = true
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Text(employee.displayName)
-                                        .font(.headline)
-                                        .lineLimit(1)
-                                    Image(systemName: "chevron.up.chevron.down")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
+                VStack(spacing: 0) {
+                    Divider()
+                    ZStack {
+                        // Centered: employee name (or picker access when carousel is empty)
+                        Button {
+                            showEmployeePicker = true
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(currentEmployee?.displayName ?? String(localized: "Employees"))
+                                    .font(.headline)
+                                    .lineLimit(1)
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
                             }
+                        }
 
-                            // Trailing: done checkmark
+                        // Trailing: done checkmark
+                        if let employee = currentEmployee {
                             HStack {
                                 Spacer()
                                 Button {
@@ -82,18 +94,23 @@ struct CarouselAvailabilityView: View {
                                 .accessibilityLabel(progressVM.isDone(employee.id) ? "Mark \(employee.displayName) not done" : "Mark \(employee.displayName) done")
                             }
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
                     }
-                    .background(.bar)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
                 }
+                .background(.bar)
             }
             .sheet(isPresented: $showEmployeePicker) {
                 AvailabilityEmployeePickerSheet(
                     employees: employees,
                     progressVM: progressVM,
-                    selectedIndex: selectedIndex,
-                    selection: $selectedIndex
+                    selectedEmployeeId: currentEmployee?.id,
+                    onSelect: { id in
+                        if progressVM.isDone(id) {
+                            extraIncludedIds.insert(id)
+                        }
+                        selectedEmployeeId = id
+                    }
                 )
                 .presentationDetents([.medium])
             }
@@ -105,11 +122,19 @@ struct CarouselAvailabilityView: View {
     private func toggleDone(employee: FfiEmployee) async {
         if progressVM.isDone(employee.id) {
             await progressVM.markUndone(employeeId: employee.id, weekStart: weekStartString)
+            // Now not-done, so it stays in the carousel naturally.
+            extraIncludedIds.remove(employee.id)
         } else {
+            let active = activeEmployees
+            let currentIdx = active.firstIndex { $0.id == employee.id } ?? 0
             await progressVM.markDone(employeeId: employee.id, weekStart: weekStartString)
-            // Auto-advance to next not-done employee
-            if let nextIdx = progressVM.nextNotDoneIndex(employees: employees, after: selectedIndex) {
-                withAnimation { selectedIndex = nextIdx }
+            // Auto-advance to next not-done employee, falling back to any
+            // remaining explicitly-included one.
+            let next = progressVM.nextNotDoneIndex(employees: active, after: currentIdx).map { active[$0] }
+                ?? active.first { $0.id != employee.id && extraIncludedIds.contains($0.id) }
+            withAnimation {
+                extraIncludedIds.remove(employee.id)
+                selectedEmployeeId = next?.id
             }
         }
     }
@@ -220,35 +245,35 @@ private struct AvailabilityPage: View {
 private struct AvailabilityEmployeePickerSheet: View {
     let employees: [FfiEmployee]
     let progressVM: AvailabilityProgressViewModel
-    let selectedIndex: Int
-    @Binding var selection: Int
+    let selectedEmployeeId: Int64?
+    let onSelect: (Int64) -> Void
     @Environment(\.dismiss) private var dismiss
 
     @State private var notDoneExpanded = true
     @State private var doneExpanded = false
 
-    private var notDoneEmployees: [(index: Int, employee: FfiEmployee)] {
-        employees.enumerated().filter { !progressVM.isDone($0.element.id) }.map { (index: $0.offset, employee: $0.element) }
+    private var notDoneEmployees: [FfiEmployee] {
+        employees.filter { !progressVM.isDone($0.id) }
     }
 
-    private var doneEmployees: [(index: Int, employee: FfiEmployee)] {
-        employees.enumerated().filter { progressVM.isDone($0.element.id) }.map { (index: $0.offset, employee: $0.element) }
+    private var doneEmployees: [FfiEmployee] {
+        employees.filter { progressVM.isDone($0.id) }
     }
 
     var body: some View {
         NavigationStack {
             List {
                 DisclosureGroup("Not Done (\(notDoneEmployees.count))", isExpanded: $notDoneExpanded) {
-                    ForEach(notDoneEmployees, id: \.employee.id) { item in
+                    ForEach(notDoneEmployees, id: \.id) { employee in
                         Button {
-                            selection = item.index
+                            onSelect(employee.id)
                             dismiss()
                         } label: {
                             HStack {
-                                Text(item.employee.displayName)
+                                Text(employee.displayName)
                                     .foregroundStyle(.primary)
                                 Spacer()
-                                if item.index == selectedIndex {
+                                if employee.id == selectedEmployeeId {
                                     Image(systemName: "chevron.right")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
@@ -259,18 +284,18 @@ private struct AvailabilityEmployeePickerSheet: View {
                 }
 
                 DisclosureGroup("Done (\(doneEmployees.count))", isExpanded: $doneExpanded) {
-                    ForEach(doneEmployees, id: \.employee.id) { item in
+                    ForEach(doneEmployees, id: \.id) { employee in
                         Button {
-                            selection = item.index
+                            onSelect(employee.id)
                             dismiss()
                         } label: {
                             HStack {
-                                Text(item.employee.displayName)
+                                Text(employee.displayName)
                                     .foregroundStyle(.primary)
                                 Spacer()
                                 Image(systemName: "checkmark")
                                     .foregroundStyle(.green)
-                                if item.index == selectedIndex {
+                                if employee.id == selectedEmployeeId {
                                     Image(systemName: "chevron.right")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
