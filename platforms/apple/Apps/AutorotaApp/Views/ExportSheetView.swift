@@ -112,12 +112,16 @@ struct ExportSheetView: View {
                             Text("Custom").tag(FullExportConfigBuilder.customLayoutPref)
                         }
                         .pickerStyle(.segmented)
+
+                        if fullLayout == FullExportConfigBuilder.customLayoutPref {
+                            NavigationLink {
+                                ExportSandboxEditorView(service: service)
+                            } label: {
+                                Label("Edit Custom Layout", systemImage: "slider.horizontal.3")
+                            }
+                        }
                     } header: {
                         Text("Layout")
-                    } footer: {
-                        if fullLayout == FullExportConfigBuilder.customLayoutPref {
-                            Text("Customize the layout in the Export tab.")
-                        }
                     }
                 }
 

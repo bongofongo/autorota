@@ -21,6 +21,9 @@ struct ExportPreviewSheet: View {
 
     let scope: Scope
     let service: AutorotaServiceProtocol
+    /// Renders this layout instead of the saved default, so the templates
+    /// list can preview a layout without selecting it first.
+    var layoutOverride: String? = nil
 
     // Full View defaults
     @AppStorage("exportDefaultLayout") private var fullLayout: String = "employee_by_weekday"
@@ -72,7 +75,7 @@ struct ExportPreviewSheet: View {
             switch scope {
             case .full:
                 let cfg = FullExportConfigBuilder.make(
-                    layoutPref: fullLayout,
+                    layoutPref: layoutOverride ?? fullLayout,
                     format: "pdf"
                 )
                 result = try await service.exportPreviewFull(config: cfg)

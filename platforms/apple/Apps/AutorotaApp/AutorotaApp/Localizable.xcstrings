@@ -2472,6 +2472,9 @@
         }
       }
     },
+    "Columns are always Monday to Sunday." : {
+
+    },
     "Contact" : {
       "localizations" : {
         "ar" : {
@@ -3964,9 +3967,6 @@
           }
         }
       }
-    },
-    "Drag pills into the row headers or the table cells. Columns are always Monday to Sunday." : {
-
     },
     "e.g. Hi {first_name}," : {
       "localizations" : {
@@ -16242,6 +16242,12 @@
     "One person who holds several required roles covers each of them." : {
 
     },
+    "One row per employee. Cells show their shifts and times." : {
+
+    },
+    "One row per shift. Cells show who is working it." : {
+
+    },
     "Opened" : {
       "localizations" : {
         "ar" : {
@@ -19657,6 +19663,9 @@
         }
       }
     },
+    "Shows a sample PDF of this template" : {
+
+    },
     "Skip" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -20540,6 +20549,9 @@
     "Tap a pill below, then tap here" : {
 
     },
+    "Tap a pill, then tap the row headers or the table cells to place it. Columns are always Monday to Sunday." : {
+
+    },
     "Tap a role to add it" : {
 
     },
@@ -20671,6 +20683,12 @@
           }
         }
       }
+    },
+    "Template" : {
+
+    },
+    "Templates" : {
+
     },
     "Text Message" : {
 
