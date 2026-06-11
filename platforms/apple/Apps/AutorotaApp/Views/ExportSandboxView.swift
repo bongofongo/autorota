@@ -58,14 +58,28 @@ struct ExportSandboxView: View {
         zone: ExportSandboxViewModel.Zone
     ) -> some View {
         let active = viewModel.canPlaceSelected(in: zone)
+        // Hoisted out of the view chain: the inlined ternaries made this
+        // expression too complex for the type checker.
+        let titleColor: Color = active ? Color.accentColor : Color.secondary
+        #if os(macOS)
+        let tertiaryLabel = Color(nsColor: .tertiaryLabelColor)
+        #else
+        let tertiaryLabel = Color(uiColor: .tertiaryLabel)
+        #endif
+        let hintColor: Color = active ? Color.accentColor : tertiaryLabel
+        let fillColor: Color = active
+            ? Color.accentColor.opacity(0.12)
+            : Color.secondary.opacity(0.05)
+        let borderColor: Color = active ? Color.accentColor : Color.secondary.opacity(0.35)
+        let borderStyle = StrokeStyle(lineWidth: active ? 1.5 : 1, dash: [5, 4])
         return VStack(alignment: .leading, spacing: Spacing.xs) {
             Label(title, systemImage: systemImage)
                 .font(.caption)
-                .foregroundStyle(active ? Color.accentColor : Color.secondary)
+                .foregroundStyle(titleColor)
             if fields.isEmpty || active {
                 Text(active ? "Tap to place here" : "Tap a pill below, then tap here")
                     .font(.caption2)
-                    .foregroundStyle(active ? Color.accentColor : Color(.tertiaryLabel))
+                    .foregroundStyle(hintColor)
             }
             ForEach(fields) { field in
                 pill(for: field)
@@ -75,16 +89,11 @@ struct ExportSandboxView: View {
         .frame(maxWidth: .infinity, minHeight: 110, alignment: .topLeading)
         .background(
             RoundedRectangle(cornerRadius: SurfaceRadius.small, style: .continuous)
-                .fill(active
-                    ? Color.accentColor.opacity(0.12)
-                    : Color.secondary.opacity(0.05))
+                .fill(fillColor)
         )
         .overlay(
             RoundedRectangle(cornerRadius: SurfaceRadius.small, style: .continuous)
-                .strokeBorder(
-                    active ? Color.accentColor : Color.secondary.opacity(0.35),
-                    style: StrokeStyle(lineWidth: active ? 1.5 : 1, dash: [5, 4])
-                )
+                .strokeBorder(borderColor, style: borderStyle)
         )
         .contentShape(Rectangle())
         .onTapGesture { viewModel.placeSelected(in: zone) }
