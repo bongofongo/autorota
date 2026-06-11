@@ -2,11 +2,12 @@
 
 ## v1.0 — Polish & Ship (iOS/iPadOS)
 
-- [ ] Rename "rota" (new user-facing name for the schedule concept)
-- [ ] 1024px app icons (finalize from `design/app-icon` drafts)
-- [ ] Export retuning (CSV/JSON/PDF layouts, profiles, templates)
-- [ ] Availability carousel rework
+- [a] Rename "rota" (new user-facing name for the schedule concept)
+- [a] 1024px app icons (finalize from `design/app-icon` drafts)
+- [a] Export retuning (CSV/JSON/PDF layouts, profiles, templates)
+- [a] Availability carousel rework
 - [ ] Finish iPadOS and iOS touchups
+- [ ] Wizard and intro tooltips work
 
 ## v1.5 — Multi-Business & Employee App
 

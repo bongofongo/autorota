@@ -99,3 +99,8 @@ Concise running log of bugs encountered. Each entry is one bullet with sub-bulle
   - Where / what / repro: `make swift-build-check-macos` failed on `ExportSandboxView.swift:61` with "the compiler is unable to type-check this expression in reasonable time" — reproducible on clean `main`, so pre-existing, found while verifying the data-bundle feature. Root cause: `bucket(...)`'s view chain inlined several ternaries, and one of them used `Color(.tertiaryLabel)` — valid on iOS (`UIColor.tertiaryLabel`) but nonexistent on macOS (`NSColor` is `.tertiaryLabelColor`), so the macOS type checker burned out searching overloads before reporting the real error.
   - Patched: yes — pending user verification
   - Fix: hoisted the ternary colors/stroke into typed `let`s and made the tertiary label color platform-conditional (`Color(nsColor: .tertiaryLabelColor)` / `Color(uiColor: .tertiaryLabel)`). All three build checks (macOS/iOS/iPad) now pass.
+
+- **App icon change alert shows dark/tinted icon variant instead of light art**
+  - Date investigated: 2026-06-10
+  - Where / what / repro: Settings → App Icon: switching icons pops the system confirmation alert with the dark/tinted variant of the icon instead of the default light art (in dark mode / tinted home screen).
+  - Patched: no — won't fix. The alert is presented by SpringBoard and shows whichever appearance variant the system selects; no API forces the light variant in the alert alone. Stripping dark/tinted variants from the iconsets would fix the alert but lose dark-mode home-screen icons — user chose to keep all variants. Note: `AppIconLatte` intentionally reuses the sunrise (Jazz) dark/tinted PNGs as its dark/tinted art — not a cross-wire bug; no latte-specific dark/tinted art exists.
