@@ -34,36 +34,46 @@ struct EmployeeListView: View {
                     }
                 } else {
                     List {
-                        ForEach(vm.employees, id: \.id) { employee in
-                            NavigationLink {
-                                EmployeeDetailView(employee: employee, viewModel: vm)
+                        Section {
+                            Button {
+                                showingAvailability = true
                             } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(employee.displayName).font(.headline)
-                                    if !employee.roles.isEmpty {
-                                        HStack(spacing: 4) {
-                                            ForEach(employee.roles, id: \.self) { RoleTag(name: $0) }
+                                Label("Weekly availability", systemImage: "calendar.badge.clock")
+                            }
+                        }
+
+                        Section {
+                            ForEach(vm.employees, id: \.id) { employee in
+                                NavigationLink {
+                                    EmployeeDetailView(employee: employee, viewModel: vm)
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(employee.displayName).font(.headline)
+                                        if !employee.roles.isEmpty {
+                                            HStack(spacing: 4) {
+                                                ForEach(employee.roles, id: \.self) { RoleTag(name: $0) }
+                                            }
                                         }
                                     }
                                 }
-                            }
-                            .contextMenu {
-                                Button {
-                                    sendScheduleTarget = employee
-                                } label: {
-                                    Label("Send schedule…", systemImage: "paperplane")
+                                .contextMenu {
+                                    Button {
+                                        sendScheduleTarget = employee
+                                    } label: {
+                                        Label("Send schedule…", systemImage: "paperplane")
+                                    }
                                 }
-                            }
-                            #if os(iOS)
-                            .swipeActions(edge: .leading) {
-                                Button {
-                                    sendScheduleTarget = employee
-                                } label: {
-                                    Label("Send", systemImage: "paperplane")
+                                #if os(iOS)
+                                .swipeActions(edge: .leading) {
+                                    Button {
+                                        sendScheduleTarget = employee
+                                    } label: {
+                                        Label("Send", systemImage: "paperplane")
+                                    }
+                                    .tint(.blue)
                                 }
-                                .tint(.blue)
+                                #endif
                             }
-                            #endif
                         }
                     }
                 }
@@ -76,24 +86,17 @@ struct EmployeeListView: View {
             .navigationTitle("Employees")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Button {
-                            showingAddSheet = true
-                        } label: {
-                            Label("Add employee", systemImage: "person.badge.plus")
-                        }
-                        Button {
-                            showingAvailability = true
-                        } label: {
-                            Label("Weekly availability", systemImage: "calendar.badge.clock")
-                        }
-                        Button {
-                            showingImport = true
-                        } label: {
-                            Label("Import employees…", systemImage: "square.and.arrow.down")
-                        }
+                    Button {
+                        showingImport = true
                     } label: {
-                        Image(systemName: "ellipsis")
+                        Label("Import employees…", systemImage: "square.and.arrow.down")
+                    }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showingAddSheet = true
+                    } label: {
+                        Label("Add employee", systemImage: "person.badge.plus")
                     }
                 }
             }
