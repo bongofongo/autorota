@@ -1,5 +1,8 @@
 import SwiftUI
 import AutorotaKit
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// Preferences page pushed from the Menu landing: appearance, language, currency,
 /// accessibility, and (iOS) tab-bar layout. Lifted out of the old monolithic
@@ -22,6 +25,14 @@ struct AppSettingsView: View {
                 }
                 .pickerStyle(.segmented)
             }
+
+            #if !os(macOS)
+            Section {
+                AppIconPicker()
+            } header: {
+                Text("App Icon")
+            }
+            #endif
 
             Section {
                 Picker("settings.language.title", selection: $localeManager.selectedIdentifier) {
@@ -124,6 +135,98 @@ struct AppSettingsView: View {
         .navigationTitle("Settings")
     }
 }
+
+#if !os(macOS)
+/// Selectable home-screen icon designs. Each case maps to an alternate icon
+/// set in the asset catalog (`nil` = the primary `AppIcon`).
+enum AppIconOption: String, CaseIterable, Identifiable {
+    case azure
+    case jazz
+    case latte
+
+    var id: String { rawValue }
+
+    var alternateIconName: String? {
+        switch self {
+        case .azure: nil
+        case .jazz: "AppIconJazz"
+        case .latte: "AppIconLatte"
+        }
+    }
+
+    var previewImageName: String {
+        switch self {
+        case .azure: "AppIconPreviewDefault"
+        case .jazz: "AppIconPreviewJazz"
+        case .latte: "AppIconPreviewLatte"
+        }
+    }
+
+    var label: LocalizedStringKey {
+        switch self {
+        case .azure: "Default"
+        case .jazz: "Jazz"
+        case .latte: "Latte"
+        }
+    }
+
+    static var current: AppIconOption {
+        let name = UIApplication.shared.alternateIconName
+        return allCases.first { $0.alternateIconName == name } ?? .azure
+    }
+}
+
+struct AppIconPicker: View {
+    @State private var selection: AppIconOption = .current
+
+    var body: some View {
+        HStack(spacing: 24) {
+            ForEach(AppIconOption.allCases) { option in
+                Button {
+                    select(option)
+                } label: {
+                    VStack(spacing: 6) {
+                        Image(option.previewImageName)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 64, height: 64)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .strokeBorder(
+                                        selection == option ? Color.accentColor : Color.primary.opacity(0.1),
+                                        lineWidth: selection == option ? 3 : 1
+                                    )
+                            )
+                        Text(option.label)
+                            .font(.caption)
+                            .foregroundStyle(selection == option ? Color.accentColor : .secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(option.label))
+                .accessibilityAddTraits(selection == option ? .isSelected : [])
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 4)
+    }
+
+    private func select(_ option: AppIconOption) {
+        guard option != selection else { return }
+        let previous = selection
+        selection = option
+        // The system confirmation alert is unavoidable: it is shown on a
+        // private window by SpringBoard and none of the known suppression
+        // tricks work on current iOS.
+        UIApplication.shared.setAlternateIconName(option.alternateIconName) { error in
+            if error != nil {
+                Task { @MainActor in selection = previous }
+            }
+        }
+    }
+}
+#endif
 
 struct AccessibilityPaletteSwatches: View {
     let palette: AccessibilityPalette

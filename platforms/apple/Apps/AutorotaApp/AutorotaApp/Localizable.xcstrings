@@ -482,6 +482,16 @@
         }
       }
     },
+    "%@, position %lld of %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, position %2$lld of %3$lld"
+          }
+        }
+      }
+    },
     "%@/wk" : {
       "localizations" : {
         "ar" : {
@@ -873,6 +883,9 @@
         }
       }
     },
+    "⋯" : {
+
+    },
     "About" : {
 
     },
@@ -1083,9 +1096,6 @@
           }
         }
       }
-    },
-    "Add as Section" : {
-
     },
     "Add employee" : {
       "localizations" : {
@@ -1378,6 +1388,9 @@
           }
         }
       }
+    },
+    "Adds a section for this role" : {
+
     },
     "Adjusts availability, status, and chart colors so they remain distinguishable for the selected type of color vision." : {
       "localizations" : {
@@ -1674,6 +1687,9 @@
       }
     },
     "Any staff with availability can be assigned." : {
+
+    },
+    "App Icon" : {
 
     },
     "Appearance" : {
@@ -3321,6 +3337,9 @@
         }
       }
     },
+    "Default" : {
+
+    },
     "Delete" : {
       "localizations" : {
         "ar" : {
@@ -3946,22 +3965,7 @@
         }
       }
     },
-    "Drag a role onto the table to split the export into one table per role." : {
-
-    },
-    "Drag at least one pill into the row headers." : {
-
-    },
-    "Drag at least one pill into the table cells." : {
-
-    },
     "Drag pills into the row headers or the table cells. Columns are always Monday to Sunday." : {
-
-    },
-    "Drag the Employee name pill into the rows or the cells." : {
-
-    },
-    "Drop a pill here" : {
 
     },
     "e.g. Hi {first_name}," : {
@@ -5402,6 +5406,9 @@
         }
       }
     },
+    "Export order" : {
+
+    },
     "Export Settings" : {
       "localizations" : {
         "ar" : {
@@ -5483,6 +5490,9 @@
       }
     },
     "Fields" : {
+
+    },
+    "Fields — tap to return here" : {
 
     },
     "First Name" : {
@@ -10017,6 +10027,9 @@
     "Invalid phone number." : {
 
     },
+    "Jazz" : {
+
+    },
     "JSON" : {
       "localizations" : {
         "ar" : {
@@ -10136,6 +10149,9 @@
           }
         }
       }
+    },
+    "Latte" : {
+
     },
     "Layout" : {
       "localizations" : {
@@ -13454,18 +13470,6 @@
         }
       }
     },
-    "Move Down" : {
-
-    },
-    "Move to Cells" : {
-
-    },
-    "Move to Row Headers" : {
-
-    },
-    "Move Up" : {
-
-    },
     "Name" : {
       "localizations" : {
         "ar" : {
@@ -16697,6 +16701,15 @@
         }
       }
     },
+    "Place at least one pill in the row headers." : {
+
+    },
+    "Place at least one pill in the table cells." : {
+
+    },
+    "Places the selected pill here" : {
+
+    },
     "Preferred" : {
       "localizations" : {
         "ar" : {
@@ -17326,6 +17339,9 @@
     "Regenerate schedule for %@?" : {
 
     },
+    "Remaining weekdays" : {
+
+    },
     "Remove" : {
       "localizations" : {
         "ar" : {
@@ -17367,9 +17383,6 @@
       }
     },
     "Remove %@" : {
-
-    },
-    "Remove %@ section" : {
 
     },
     "Remove %@?" : {
@@ -17532,6 +17545,9 @@
           }
         }
       }
+    },
+    "Removes this role section" : {
+
     },
     "Rename" : {
       "localizations" : {
@@ -17871,9 +17887,6 @@
           }
         }
       }
-    },
-    "Return to Tray" : {
-
     },
     "Role" : {
       "localizations" : {
@@ -18538,6 +18551,12 @@
           }
         }
       }
+    },
+    "Selected. Tap a destination to place it." : {
+
+    },
+    "Selects this field" : {
+
     },
     "Send" : {
       "localizations" : {
@@ -20518,6 +20537,15 @@
         }
       }
     },
+    "Tap a pill below, then tap here" : {
+
+    },
+    "Tap a role to add it" : {
+
+    },
+    "Tap a role to split the export into one table per role, top to bottom. Tap a placed role to remove it." : {
+
+    },
     "Tap Generate to create a schedule for this week." : {
       "localizations" : {
         "ar" : {
@@ -20557,6 +20585,12 @@
           }
         }
       }
+    },
+    "Tap the Employee name pill, then tap the rows or the cells." : {
+
+    },
+    "Tap to place here" : {
+
     },
     "Tapping a row opens a draft. iMessage and Mail auto-mark when you tap Send. WhatsApp opens a draft you'll need to send manually." : {
       "localizations" : {

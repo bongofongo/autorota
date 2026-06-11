@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "rota-icon-azure.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
