@@ -29,3 +29,6 @@ crates/autorota-core/migrations/test.db-shm
 
 # Finder metadata
 .DS_Store
+
+# Icon brainstorming scratch space (release-icons/ is the canonical set)
+design/app-icon-ideas/
