@@ -11,7 +11,7 @@ final class ShiftTemplateViewModel {
     var hasLoaded = false
     var error: String?
 
-    private let service: AutorotaServiceProtocol
+    let service: AutorotaServiceProtocol
 
     init(service: AutorotaServiceProtocol = GatedAutorotaService()) {
         self.service = service

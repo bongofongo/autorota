@@ -89,6 +89,11 @@ protocol AutorotaServiceProtocol: Sendable {
     func parseRosterFile(bytes: Data, formatHint: String, strategy: String) async throws -> FfiParsedRoster
     func applyRosterImport(rows: [FfiParsedEmployeeRow]) async throws -> FfiImportSummary
 
+    // Data Bundle Exchange
+    func exportDataBundle(sections: FfiBundleSections) async throws -> FfiExportResult
+    func inspectDataBundle(bytes: Data) async throws -> FfiBundleInfo
+    func importDataBundle(bytes: Data) async throws -> FfiBundleImportSummary
+
     // Availability Progress
     func listAvailabilityProgress(weekStart: String) async throws -> [FfiAvailabilityProgress]
     func setAvailabilityProgress(employeeId: Int64, weekStart: String, done: Bool) async throws

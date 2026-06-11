@@ -1732,6 +1732,9 @@
         }
       }
     },
+    "Applied" : {
+
+    },
     "Applied when exporting per-employee schedules, whether for all employees or a single one. Wage and cost data are never included." : {
       "extractionState" : "stale",
       "localizations" : {
@@ -1901,6 +1904,9 @@
           }
         }
       }
+    },
+    "Availability exceptions only" : {
+
     },
     "Availability for %@" : {
       "localizations" : {
@@ -2348,6 +2354,9 @@
           }
         }
       }
+    },
+    "Choose a JSON data file exported from Autorota." : {
+
     },
     "Choose File…" : {
       "localizations" : {
@@ -4739,6 +4748,9 @@
         }
       }
     },
+    "Employees only" : {
+
+    },
     "empty.employees.action" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5061,6 +5073,9 @@
         }
       }
     },
+    "Entries matching an existing name will be updated; new entries will be added. Nothing is deleted." : {
+
+    },
     "Error" : {
       "localizations" : {
         "ar" : {
@@ -5155,6 +5170,9 @@
 
     },
     "Everyone is already assigned to this shift." : {
+
+    },
+    "Everything on this page" : {
 
     },
     "Exceptions" : {
@@ -5320,6 +5338,9 @@
           }
         }
       }
+    },
+    "Export as JSON" : {
+
     },
     "Export Defaults" : {
       "extractionState" : "stale",
@@ -9700,6 +9721,12 @@
         }
       }
     },
+    "Import" : {
+
+    },
+    "Import & export data" : {
+
+    },
     "Import %lld" : {
       "localizations" : {
         "ar" : {
@@ -9739,6 +9766,9 @@
           }
         }
       }
+    },
+    "Import Data" : {
+
     },
     "Import Employees" : {
       "localizations" : {
@@ -9860,6 +9890,9 @@
           }
         }
       }
+    },
+    "Import from file…" : {
+
     },
     "Imported" : {
       "localizations" : {
@@ -18058,6 +18091,9 @@
         }
       }
     },
+    "Roles only" : {
+
+    },
     "Rota" : {
       "localizations" : {
         "ar" : {
@@ -19416,6 +19452,9 @@
         }
       }
     },
+    "Shift changes only" : {
+
+    },
     "Shift name" : {
       "localizations" : {
         "ar" : {
@@ -19536,6 +19575,9 @@
           }
         }
       }
+    },
+    "Shifts only" : {
+
     },
     "Show Role" : {
       "extractionState" : "stale",
@@ -20913,6 +20955,9 @@
           }
         }
       }
+    },
+    "This file contains" : {
+
     },
     "This rota has unsaved changes. The version that gets sent should match the saved snapshot." : {
       "extractionState" : "stale",

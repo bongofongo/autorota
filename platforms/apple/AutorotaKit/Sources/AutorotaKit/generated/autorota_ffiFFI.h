@@ -382,6 +382,11 @@ RustBuffer uniffi_autorota_ffi_fn_func_diff_save_vs_previous(int64_t save_id, Ru
 RustBuffer uniffi_autorota_ffi_fn_func_diff_saves_detailed(int64_t old_save_id, int64_t new_save_id, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_EXPORT_DATA_BUNDLE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_EXPORT_DATA_BUNDLE
+RustBuffer uniffi_autorota_ffi_fn_func_export_data_bundle(RustBuffer sections, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_EXPORT_EMPLOYEE_BUNDLE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_EXPORT_EMPLOYEE_BUNDLE
 RustBuffer uniffi_autorota_ffi_fn_func_export_employee_bundle(RustBuffer config, RustCallStatus *_Nonnull out_status
@@ -463,9 +468,19 @@ RustBuffer uniffi_autorota_ffi_fn_func_get_sync_metadata(RustBuffer key, RustCal
 RustBuffer uniffi_autorota_ffi_fn_func_get_week_schedule(RustBuffer week_start, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_IMPORT_DATA_BUNDLE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_IMPORT_DATA_BUNDLE
+RustBuffer uniffi_autorota_ffi_fn_func_import_data_bundle(RustBuffer bytes, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_INIT_DB
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_INIT_DB
 void uniffi_autorota_ffi_fn_func_init_db(RustBuffer db_path, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_INSPECT_DATA_BUNDLE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_INSPECT_DATA_BUNDLE
+RustBuffer uniffi_autorota_ffi_fn_func_inspect_data_bundle(RustBuffer bytes, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_LIST_ALL_EMPLOYEE_AVAILABILITY_OVERRIDES
@@ -1074,6 +1089,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_diff_saves_detailed(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_EXPORT_DATA_BUNDLE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_EXPORT_DATA_BUNDLE
+uint16_t uniffi_autorota_ffi_checksum_func_export_data_bundle(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_EXPORT_EMPLOYEE_BUNDLE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_EXPORT_EMPLOYEE_BUNDLE
 uint16_t uniffi_autorota_ffi_checksum_func_export_employee_bundle(void
@@ -1170,9 +1191,21 @@ uint16_t uniffi_autorota_ffi_checksum_func_get_week_schedule(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_IMPORT_DATA_BUNDLE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_IMPORT_DATA_BUNDLE
+uint16_t uniffi_autorota_ffi_checksum_func_import_data_bundle(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_INIT_DB
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_INIT_DB
 uint16_t uniffi_autorota_ffi_checksum_func_init_db(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_INSPECT_DATA_BUNDLE
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_INSPECT_DATA_BUNDLE
+uint16_t uniffi_autorota_ffi_checksum_func_inspect_data_bundle(void
     
 );
 #endif

@@ -966,6 +966,317 @@ public func FfiConverterTypeFfiBaseSnapshot_lower(_ value: FfiBaseSnapshot) -> R
 
 
 /**
+ * What a bundle import actually did, plus warnings for skipped records.
+ */
+public struct FfiBundleImportSummary {
+    public var rolesAdded: UInt32
+    public var employeesAdded: UInt32
+    public var employeesUpdated: UInt32
+    public var employeeExceptionsApplied: UInt32
+    public var shiftTemplatesAdded: UInt32
+    public var shiftTemplatesUpdated: UInt32
+    public var shiftExceptionsApplied: UInt32
+    public var warnings: [String]
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(rolesAdded: UInt32, employeesAdded: UInt32, employeesUpdated: UInt32, employeeExceptionsApplied: UInt32, shiftTemplatesAdded: UInt32, shiftTemplatesUpdated: UInt32, shiftExceptionsApplied: UInt32, warnings: [String]) {
+        self.rolesAdded = rolesAdded
+        self.employeesAdded = employeesAdded
+        self.employeesUpdated = employeesUpdated
+        self.employeeExceptionsApplied = employeeExceptionsApplied
+        self.shiftTemplatesAdded = shiftTemplatesAdded
+        self.shiftTemplatesUpdated = shiftTemplatesUpdated
+        self.shiftExceptionsApplied = shiftExceptionsApplied
+        self.warnings = warnings
+    }
+}
+
+
+
+extension FfiBundleImportSummary: Equatable, Hashable {
+    public static func ==(lhs: FfiBundleImportSummary, rhs: FfiBundleImportSummary) -> Bool {
+        if lhs.rolesAdded != rhs.rolesAdded {
+            return false
+        }
+        if lhs.employeesAdded != rhs.employeesAdded {
+            return false
+        }
+        if lhs.employeesUpdated != rhs.employeesUpdated {
+            return false
+        }
+        if lhs.employeeExceptionsApplied != rhs.employeeExceptionsApplied {
+            return false
+        }
+        if lhs.shiftTemplatesAdded != rhs.shiftTemplatesAdded {
+            return false
+        }
+        if lhs.shiftTemplatesUpdated != rhs.shiftTemplatesUpdated {
+            return false
+        }
+        if lhs.shiftExceptionsApplied != rhs.shiftExceptionsApplied {
+            return false
+        }
+        if lhs.warnings != rhs.warnings {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(rolesAdded)
+        hasher.combine(employeesAdded)
+        hasher.combine(employeesUpdated)
+        hasher.combine(employeeExceptionsApplied)
+        hasher.combine(shiftTemplatesAdded)
+        hasher.combine(shiftTemplatesUpdated)
+        hasher.combine(shiftExceptionsApplied)
+        hasher.combine(warnings)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFfiBundleImportSummary: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiBundleImportSummary {
+        return
+            try FfiBundleImportSummary(
+                rolesAdded: FfiConverterUInt32.read(from: &buf), 
+                employeesAdded: FfiConverterUInt32.read(from: &buf), 
+                employeesUpdated: FfiConverterUInt32.read(from: &buf), 
+                employeeExceptionsApplied: FfiConverterUInt32.read(from: &buf), 
+                shiftTemplatesAdded: FfiConverterUInt32.read(from: &buf), 
+                shiftTemplatesUpdated: FfiConverterUInt32.read(from: &buf), 
+                shiftExceptionsApplied: FfiConverterUInt32.read(from: &buf), 
+                warnings: FfiConverterSequenceString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FfiBundleImportSummary, into buf: inout [UInt8]) {
+        FfiConverterUInt32.write(value.rolesAdded, into: &buf)
+        FfiConverterUInt32.write(value.employeesAdded, into: &buf)
+        FfiConverterUInt32.write(value.employeesUpdated, into: &buf)
+        FfiConverterUInt32.write(value.employeeExceptionsApplied, into: &buf)
+        FfiConverterUInt32.write(value.shiftTemplatesAdded, into: &buf)
+        FfiConverterUInt32.write(value.shiftTemplatesUpdated, into: &buf)
+        FfiConverterUInt32.write(value.shiftExceptionsApplied, into: &buf)
+        FfiConverterSequenceString.write(value.warnings, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiBundleImportSummary_lift(_ buf: RustBuffer) throws -> FfiBundleImportSummary {
+    return try FfiConverterTypeFfiBundleImportSummary.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiBundleImportSummary_lower(_ value: FfiBundleImportSummary) -> RustBuffer {
+    return FfiConverterTypeFfiBundleImportSummary.lower(value)
+}
+
+
+/**
+ * Per-section record counts for a parsed bundle (shown before importing).
+ */
+public struct FfiBundleInfo {
+    public var version: UInt32
+    public var roles: UInt32
+    public var employees: UInt32
+    public var employeeExceptions: UInt32
+    public var shiftTemplates: UInt32
+    public var shiftExceptions: UInt32
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(version: UInt32, roles: UInt32, employees: UInt32, employeeExceptions: UInt32, shiftTemplates: UInt32, shiftExceptions: UInt32) {
+        self.version = version
+        self.roles = roles
+        self.employees = employees
+        self.employeeExceptions = employeeExceptions
+        self.shiftTemplates = shiftTemplates
+        self.shiftExceptions = shiftExceptions
+    }
+}
+
+
+
+extension FfiBundleInfo: Equatable, Hashable {
+    public static func ==(lhs: FfiBundleInfo, rhs: FfiBundleInfo) -> Bool {
+        if lhs.version != rhs.version {
+            return false
+        }
+        if lhs.roles != rhs.roles {
+            return false
+        }
+        if lhs.employees != rhs.employees {
+            return false
+        }
+        if lhs.employeeExceptions != rhs.employeeExceptions {
+            return false
+        }
+        if lhs.shiftTemplates != rhs.shiftTemplates {
+            return false
+        }
+        if lhs.shiftExceptions != rhs.shiftExceptions {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(version)
+        hasher.combine(roles)
+        hasher.combine(employees)
+        hasher.combine(employeeExceptions)
+        hasher.combine(shiftTemplates)
+        hasher.combine(shiftExceptions)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFfiBundleInfo: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiBundleInfo {
+        return
+            try FfiBundleInfo(
+                version: FfiConverterUInt32.read(from: &buf), 
+                roles: FfiConverterUInt32.read(from: &buf), 
+                employees: FfiConverterUInt32.read(from: &buf), 
+                employeeExceptions: FfiConverterUInt32.read(from: &buf), 
+                shiftTemplates: FfiConverterUInt32.read(from: &buf), 
+                shiftExceptions: FfiConverterUInt32.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FfiBundleInfo, into buf: inout [UInt8]) {
+        FfiConverterUInt32.write(value.version, into: &buf)
+        FfiConverterUInt32.write(value.roles, into: &buf)
+        FfiConverterUInt32.write(value.employees, into: &buf)
+        FfiConverterUInt32.write(value.employeeExceptions, into: &buf)
+        FfiConverterUInt32.write(value.shiftTemplates, into: &buf)
+        FfiConverterUInt32.write(value.shiftExceptions, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiBundleInfo_lift(_ buf: RustBuffer) throws -> FfiBundleInfo {
+    return try FfiConverterTypeFfiBundleInfo.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiBundleInfo_lower(_ value: FfiBundleInfo) -> RustBuffer {
+    return FfiConverterTypeFfiBundleInfo.lower(value)
+}
+
+
+/**
+ * Which sections to include in a data bundle export.
+ */
+public struct FfiBundleSections {
+    public var roles: Bool
+    public var employees: Bool
+    public var employeeExceptions: Bool
+    public var shiftTemplates: Bool
+    public var shiftExceptions: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(roles: Bool, employees: Bool, employeeExceptions: Bool, shiftTemplates: Bool, shiftExceptions: Bool) {
+        self.roles = roles
+        self.employees = employees
+        self.employeeExceptions = employeeExceptions
+        self.shiftTemplates = shiftTemplates
+        self.shiftExceptions = shiftExceptions
+    }
+}
+
+
+
+extension FfiBundleSections: Equatable, Hashable {
+    public static func ==(lhs: FfiBundleSections, rhs: FfiBundleSections) -> Bool {
+        if lhs.roles != rhs.roles {
+            return false
+        }
+        if lhs.employees != rhs.employees {
+            return false
+        }
+        if lhs.employeeExceptions != rhs.employeeExceptions {
+            return false
+        }
+        if lhs.shiftTemplates != rhs.shiftTemplates {
+            return false
+        }
+        if lhs.shiftExceptions != rhs.shiftExceptions {
+            return false
+        }
+        return true
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(roles)
+        hasher.combine(employees)
+        hasher.combine(employeeExceptions)
+        hasher.combine(shiftTemplates)
+        hasher.combine(shiftExceptions)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeFfiBundleSections: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiBundleSections {
+        return
+            try FfiBundleSections(
+                roles: FfiConverterBool.read(from: &buf), 
+                employees: FfiConverterBool.read(from: &buf), 
+                employeeExceptions: FfiConverterBool.read(from: &buf), 
+                shiftTemplates: FfiConverterBool.read(from: &buf), 
+                shiftExceptions: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: FfiBundleSections, into buf: inout [UInt8]) {
+        FfiConverterBool.write(value.roles, into: &buf)
+        FfiConverterBool.write(value.employees, into: &buf)
+        FfiConverterBool.write(value.employeeExceptions, into: &buf)
+        FfiConverterBool.write(value.shiftTemplates, into: &buf)
+        FfiConverterBool.write(value.shiftExceptions, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiBundleSections_lift(_ buf: RustBuffer) throws -> FfiBundleSections {
+    return try FfiConverterTypeFfiBundleSections.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeFfiBundleSections_lower(_ value: FfiBundleSections) -> RustBuffer {
+    return FfiConverterTypeFfiBundleSections.lower(value)
+}
+
+
+/**
  * One detailed change attached to a shift on a specific date.
  *
  * Flattened shape so uniffi records cross the FFI cleanly across all
@@ -5792,6 +6103,16 @@ public func diffSavesDetailed(oldSaveId: Int64, newSaveId: Int64)throws  -> [Ffi
 })
 }
 /**
+ * Export the selected sections as a JSON data bundle.
+ */
+public func exportDataBundle(sections: FfiBundleSections)throws  -> FfiExportResult {
+    return try  FfiConverterTypeFfiExportResult.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_export_data_bundle(
+        FfiConverterTypeFfiBundleSections.lower(sections),$0
+    )
+})
+}
+/**
  * Emit the four-format personal bundle (PDF, ICS, Markdown, XLSX) for one
  * employee's schedule over a date range. The caller-supplied `format` field
  * on `config` is ignored — each output uses its own format.
@@ -5924,6 +6245,16 @@ public func getWeekSchedule(weekStart: String)throws  -> FfiWeekSchedule? {
 })
 }
 /**
+ * Apply every section present in the bundle (upsert by name; never deletes).
+ */
+public func importDataBundle(bytes: Data)throws  -> FfiBundleImportSummary {
+    return try  FfiConverterTypeFfiBundleImportSummary.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_import_data_bundle(
+        FfiConverterData.lower(bytes),$0
+    )
+})
+}
+/**
  * Initialise the SQLite connection pool.
  * `db_path` is the filesystem path to the .db file (not a URL).
  * Must be called once before any other function.
@@ -5933,6 +6264,16 @@ public func initDb(dbPath: String)throws  {try rustCallWithError(FfiConverterTyp
         FfiConverterString.lower(dbPath),$0
     )
 }
+}
+/**
+ * Parse a bundle and report per-section counts without touching the database.
+ */
+public func inspectDataBundle(bytes: Data)throws  -> FfiBundleInfo {
+    return try  FfiConverterTypeFfiBundleInfo.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_inspect_data_bundle(
+        FfiConverterData.lower(bytes),$0
+    )
+})
 }
 public func listAllEmployeeAvailabilityOverrides()throws  -> [FfiEmployeeAvailabilityOverride] {
     return try  FfiConverterSequenceTypeFfiEmployeeAvailabilityOverride.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
@@ -6293,6 +6634,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_autorota_ffi_checksum_func_diff_saves_detailed() != 34253) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_autorota_ffi_checksum_func_export_data_bundle() != 10330) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_autorota_ffi_checksum_func_export_employee_bundle() != 49963) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -6341,7 +6685,13 @@ private var initializationResult: InitializationResult = {
     if (uniffi_autorota_ffi_checksum_func_get_week_schedule() != 63555) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_autorota_ffi_checksum_func_import_data_bundle() != 25787) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_autorota_ffi_checksum_func_init_db() != 56955) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_inspect_data_bundle() != 29788) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_list_all_employee_availability_overrides() != 51272) {

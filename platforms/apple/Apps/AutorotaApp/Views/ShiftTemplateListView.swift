@@ -169,6 +169,19 @@ struct ShiftTemplateListView: View {
                 }
             }
             .navigationTitle("Shifts")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    DataBundleToolbarMenu(
+                        exportOptions: DataBundleExportOption.shiftPageOptions,
+                        service: vm.service
+                    ) {
+                        Task {
+                            await vm.load()
+                            await roleVM.load()
+                        }
+                    }
+                }
+            }
             .sheet(isPresented: $showingAddTemplateSheet) {
                 ShiftTemplateEditSheet(viewModel: vm, roles: roleVM.roles)
             }

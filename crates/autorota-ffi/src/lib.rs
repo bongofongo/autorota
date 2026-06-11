@@ -1168,6 +1168,7 @@ pub fn export_employee_bundle(
 
 // ── Roster Import ────────────────────────────────────────────────────────────
 
+use autorota_core::exchange;
 use autorota_core::import::{self, MergeStrategy, ParsedEmployeeRow, ParsedRoster};
 
 fn row_to_ffi(r: ParsedEmployeeRow) -> FfiParsedEmployeeRow {
@@ -1282,6 +1283,75 @@ pub fn apply_roster_import(rows: Vec<FfiParsedEmployeeRow>) -> Result<FfiImportS
         inserted: summary.inserted,
         updated: summary.updated,
         skipped: summary.skipped,
+    })
+}
+
+// ── Data Bundle Exchange ─────────────────────────────────────────────────────
+
+fn exchange_err_to_ffi(e: exchange::ExchangeError) -> FfiError {
+    match e {
+        exchange::ExchangeError::Db(db) => FfiError::Db {
+            code: ErrorCode::DbGeneric,
+            msg: db.to_string(),
+        },
+        other => FfiError::InvalidArgument {
+            code: ErrorCode::InvalidImport,
+            msg: other.to_string(),
+        },
+    }
+}
+
+/// Export the selected sections as a JSON data bundle.
+#[uniffi::export]
+pub fn export_data_bundle(sections: FfiBundleSections) -> Result<FfiExportResult, FfiError> {
+    let pool = pool()?;
+    let core_sections = exchange::BundleSections {
+        roles: sections.roles,
+        employees: sections.employees,
+        employee_exceptions: sections.employee_exceptions,
+        shift_templates: sections.shift_templates,
+        shift_exceptions: sections.shift_exceptions,
+    };
+    let result = rt()
+        .block_on(exchange::export_data_bundle(pool, core_sections))
+        .map_err(exchange_err_to_ffi)?;
+    Ok(FfiExportResult {
+        data: result.data,
+        filename: result.filename,
+        mime_type: result.mime_type,
+    })
+}
+
+/// Parse a bundle and report per-section counts without touching the database.
+#[uniffi::export]
+pub fn inspect_data_bundle(bytes: Vec<u8>) -> Result<FfiBundleInfo, FfiError> {
+    let info = exchange::inspect_data_bundle(&bytes).map_err(exchange_err_to_ffi)?;
+    Ok(FfiBundleInfo {
+        version: info.version,
+        roles: info.roles,
+        employees: info.employees,
+        employee_exceptions: info.employee_exceptions,
+        shift_templates: info.shift_templates,
+        shift_exceptions: info.shift_exceptions,
+    })
+}
+
+/// Apply every section present in the bundle (upsert by name; never deletes).
+#[uniffi::export]
+pub fn import_data_bundle(bytes: Vec<u8>) -> Result<FfiBundleImportSummary, FfiError> {
+    let pool = pool()?;
+    let summary = rt()
+        .block_on(exchange::import_data_bundle(pool, &bytes))
+        .map_err(exchange_err_to_ffi)?;
+    Ok(FfiBundleImportSummary {
+        roles_added: summary.roles_added,
+        employees_added: summary.employees_added,
+        employees_updated: summary.employees_updated,
+        employee_exceptions_applied: summary.employee_exceptions_applied,
+        shift_templates_added: summary.shift_templates_added,
+        shift_templates_updated: summary.shift_templates_updated,
+        shift_exceptions_applied: summary.shift_exceptions_applied,
+        warnings: summary.warnings,
     })
 }
 

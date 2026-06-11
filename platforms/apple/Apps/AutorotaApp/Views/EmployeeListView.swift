@@ -86,6 +86,14 @@ struct EmployeeListView: View {
             .navigationTitle("Employees")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
+                    DataBundleToolbarMenu(
+                        exportOptions: DataBundleExportOption.employeePageOptions,
+                        service: vm.service
+                    ) {
+                        Task { await vm.load() }
+                    }
+                }
+                ToolbarItem(placement: .primaryAction) {
                     Button {
                         showingImport = true
                     } label: {

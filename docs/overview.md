@@ -73,6 +73,14 @@ autorota/
   `ExportGrid`; `csv.rs` and `json.rs` serialize it; `pdf/` (`mod`,
   `weekly`, `by_role`, `employee`, `employee_schedule`, `theme`) renders
   via pdf crate.
+- `exchange/` — data-bundle exchange. Versioned JSON `DataBundle` with
+  optional sections (roles, employees incl. weekly availability,
+  employee availability exceptions, shift templates incl. role
+  requirements, shift template exceptions). `export_data_bundle` writes
+  any subset; `inspect_data_bundle` returns per-section counts for the
+  import-confirmation UI; `import_data_bundle` upserts by name (never
+  deletes), auto-creates referenced roles, and warns on unmatched
+  exception references.
 - `testutil/` — `assertions.rs`, `builders.rs`, `db.rs` test helpers
   shared by integration tests.
 
@@ -160,6 +168,7 @@ compiled `autorota-ffi` dylib.
 | Per-employee shift history | `EmployeeShiftHistoryView`, `ShiftHistoryViewModel` |
 | Analytics (totals, costs, charts) | `AnalyticsView`, `AnalyticsViewModel` |
 | Export CSV / JSON / PDF (staff vs manager profiles; employee-by-weekday vs shift-by-weekday; weekly, by-role, per-employee PDFs) | `ExportTabView`, `ExportSheetView`, `EmployeeExportViewModel`, `autorota-core/export/*` |
+| Data bundle export/import (Employees & Shifts pages; whole page or single category — roles, employees, availability exceptions, shifts, shift changes) | `DataBundleTransferView` (`DataBundleToolbarMenu`, `DataBundleImportView`), `autorota-core/exchange/*` |
 | iCloud sync (private database, per-field merge, first-launch prompt) | `AutorotaSyncEngine`, `SyncConflictResolver`, `SyncRecordMapper`, `SyncPromptView` |
 | Onboarding | `OnboardingView` |
 | Configurable tab bar + Menu overflow | `TabPage`, `TabLayoutManager`, `SettingsView` |

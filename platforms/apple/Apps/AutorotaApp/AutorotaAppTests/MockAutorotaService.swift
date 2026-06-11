@@ -427,6 +427,34 @@ final class MockAutorotaService: AutorotaServiceProtocol, @unchecked Sendable {
         return stubbedImportSummary
     }
 
+    // MARK: - Data Bundle Exchange
+
+    var stubbedBundleInfo = FfiBundleInfo(
+        version: 1, roles: 0, employees: 0, employeeExceptions: 0,
+        shiftTemplates: 0, shiftExceptions: 0
+    )
+    var stubbedBundleImportSummary = FfiBundleImportSummary(
+        rolesAdded: 0, employeesAdded: 0, employeesUpdated: 0,
+        employeeExceptionsApplied: 0, shiftTemplatesAdded: 0,
+        shiftTemplatesUpdated: 0, shiftExceptionsApplied: 0, warnings: []
+    )
+
+    func exportDataBundle(sections: FfiBundleSections) async throws -> FfiExportResult {
+        callLog.append("exportDataBundle")
+        if let e = errorToThrow { throw e }
+        return stubbedExportResult
+    }
+    func inspectDataBundle(bytes: Data) async throws -> FfiBundleInfo {
+        callLog.append("inspectDataBundle:\(bytes.count)")
+        if let e = errorToThrow { throw e }
+        return stubbedBundleInfo
+    }
+    func importDataBundle(bytes: Data) async throws -> FfiBundleImportSummary {
+        callLog.append("importDataBundle:\(bytes.count)")
+        if let e = errorToThrow { throw e }
+        return stubbedBundleImportSummary
+    }
+
     // MARK: - Availability Progress
 
     var stubbedAvailabilityProgress: [FfiAvailabilityProgress] = []

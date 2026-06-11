@@ -211,6 +211,17 @@ struct GatedAutorotaService: AutorotaServiceProtocol {
         try check(); return try await inner.applyRosterImport(rows: rows)
     }
 
+    // MARK: - Data Bundle Exchange
+    func exportDataBundle(sections: FfiBundleSections) async throws -> FfiExportResult {
+        try await inner.exportDataBundle(sections: sections)
+    }
+    func inspectDataBundle(bytes: Data) async throws -> FfiBundleInfo {
+        try await inner.inspectDataBundle(bytes: bytes)
+    }
+    func importDataBundle(bytes: Data) async throws -> FfiBundleImportSummary {
+        try check(); return try await inner.importDataBundle(bytes: bytes)
+    }
+
     // MARK: - Availability Progress
     func listAvailabilityProgress(weekStart: String) async throws -> [FfiAvailabilityProgress] {
         try await inner.listAvailabilityProgress(weekStart: weekStart)

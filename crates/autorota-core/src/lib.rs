@@ -1,4 +1,5 @@
 pub mod db;
+pub mod exchange;
 pub mod export;
 pub mod i18n;
 pub mod import;

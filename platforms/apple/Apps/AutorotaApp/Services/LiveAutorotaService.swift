@@ -294,6 +294,20 @@ struct LiveAutorotaService: AutorotaServiceProtocol {
         return result
     }
 
+    // Data Bundle Exchange
+    func exportDataBundle(sections: FfiBundleSections) async throws -> FfiExportResult {
+        try await exportDataBundleAsync(sections: sections)
+    }
+    func inspectDataBundle(bytes: Data) async throws -> FfiBundleInfo {
+        try await inspectDataBundleAsync(bytes: bytes)
+    }
+    func importDataBundle(bytes: Data) async throws -> FfiBundleImportSummary {
+        let result = try await importDataBundleAsync(bytes: bytes)
+        // A bundle can touch any of the reference-data tables.
+        notify([.role, .employee, .shiftTemplate, .employeeAvailabilityOverride, .shiftTemplateOverride])
+        return result
+    }
+
     // Availability Progress
     func listAvailabilityProgress(weekStart: String) async throws -> [FfiAvailabilityProgress] { try await listAvailabilityProgressAsync(weekStart: weekStart) }
     func setAvailabilityProgress(employeeId: Int64, weekStart: String, done: Bool) async throws { try await setAvailabilityProgressAsync(employeeId: employeeId, weekStart: weekStart, done: done) }

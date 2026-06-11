@@ -459,6 +459,26 @@ public func applyRosterImportAsync(rows: [FfiParsedEmployeeRow]) async throws ->
     }.value
 }
 
+// MARK: - Data Bundle Exchange
+
+public func exportDataBundleAsync(sections: FfiBundleSections) async throws -> FfiExportResult {
+    try await Task.detached(priority: .userInitiated) {
+        try exportDataBundle(sections: sections)
+    }.value
+}
+
+public func inspectDataBundleAsync(bytes: Data) async throws -> FfiBundleInfo {
+    try await Task.detached(priority: .userInitiated) {
+        try inspectDataBundle(bytes: bytes)
+    }.value
+}
+
+public func importDataBundleAsync(bytes: Data) async throws -> FfiBundleImportSummary {
+    try await Task.detached(priority: .userInitiated) {
+        try importDataBundle(bytes: bytes)
+    }.value
+}
+
 // MARK: - Sync
 
 public func getPendingSyncRecordsAsync(tableName: String) async throws -> [FfiSyncRecord] {

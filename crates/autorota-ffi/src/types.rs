@@ -501,3 +501,39 @@ pub struct FfiImportSummary {
     pub updated: u32,
     pub skipped: u32,
 }
+
+// ── Data Bundle Exchange ─────────────────────────────────────────────────────
+
+/// Which sections to include in a data bundle export.
+#[derive(Clone, uniffi::Record)]
+pub struct FfiBundleSections {
+    pub roles: bool,
+    pub employees: bool,
+    pub employee_exceptions: bool,
+    pub shift_templates: bool,
+    pub shift_exceptions: bool,
+}
+
+/// Per-section record counts for a parsed bundle (shown before importing).
+#[derive(Clone, uniffi::Record)]
+pub struct FfiBundleInfo {
+    pub version: u32,
+    pub roles: u32,
+    pub employees: u32,
+    pub employee_exceptions: u32,
+    pub shift_templates: u32,
+    pub shift_exceptions: u32,
+}
+
+/// What a bundle import actually did, plus warnings for skipped records.
+#[derive(Clone, uniffi::Record)]
+pub struct FfiBundleImportSummary {
+    pub roles_added: u32,
+    pub employees_added: u32,
+    pub employees_updated: u32,
+    pub employee_exceptions_applied: u32,
+    pub shift_templates_added: u32,
+    pub shift_templates_updated: u32,
+    pub shift_exceptions_applied: u32,
+    pub warnings: Vec<String>,
+}
