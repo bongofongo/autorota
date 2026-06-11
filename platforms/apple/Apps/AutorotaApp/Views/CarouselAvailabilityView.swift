@@ -123,12 +123,12 @@ private struct AvailabilityPage: View {
 
     @State private var overrideVM = OverrideViewModel()
     @State private var slots: [AvailabilitySlot] = []
-    private let visibleRange: (start: Int, end: Int)
+    @State private var visibleRange: (start: Int, end: Int)
 
     init(employee: FfiEmployee, weekStartString: String) {
         self.employee = employee
         self.weekStartString = weekStartString
-        self.visibleRange = AvailabilityGridView.inferredVisibleRange(from: employee.defaultAvailability)
+        self._visibleRange = State(initialValue: AvailabilityGridView.inferredVisibleRange(from: employee.defaultAvailability))
     }
 
     private var weekDays: [(weekday: String, date: Date, iso: String)] {
@@ -185,6 +185,9 @@ private struct AvailabilityPage: View {
                     onChange: { newSlots in
                         slots = newSlots
                         Task { await persistEdits(newSlots) }
+                    },
+                    onVisibleRangeChange: { start, end in
+                        visibleRange = (start, end)
                     },
                     outlinedWeekdays: outlinedWeekdays,
                     weekdaySubheaders: weekdaySubheaders

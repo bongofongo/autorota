@@ -348,8 +348,7 @@ struct EmployeeEditSheet: View {
                             showRangePicker: true,
                             onChange: { defaultAvailabilitySlots = $0 },
                             onVisibleRangeChange: { start, end in
-                                defaultVisibleStart = start
-                                defaultVisibleEnd = end
+                                applyDefaultRangeChange(start: start, end: end)
                             },
                             onSelectionModeChange: { selectionModeActive = $0 }
                         )
@@ -501,6 +500,25 @@ struct EmployeeEditSheet: View {
         let range = AvailabilityGridView.inferredVisibleRange(from: e.defaultAvailability)
         defaultVisibleStart = range.start
         defaultVisibleEnd = range.end
+    }
+
+    /// Updates the default-availability visible range. Hours that just became visible
+    /// and are explicit "No" on all 7 days are artifacts of a previous save's
+    /// out-of-range fill — clear them back to Maybe, otherwise `inferredVisibleRange`
+    /// would snap the range back on the next open.
+    private func applyDefaultRangeChange(start: Int, end: Int) {
+        let oldStart = defaultVisibleStart
+        let oldEnd = defaultVisibleEnd
+        defaultVisibleStart = start
+        defaultVisibleEnd = end
+        for hour in 0...23 {
+            guard AvailabilityGridView.hourIsInRange(hour, start: start, end: end),
+                  !AvailabilityGridView.hourIsInRange(hour, start: oldStart, end: oldEnd) else { continue }
+            let row = defaultAvailabilitySlots.filter { Int($0.hour) == hour }
+            if row.count == 7, row.allSatisfy({ $0.state == "No" }) {
+                defaultAvailabilitySlots.removeAll { Int($0.hour) == hour }
+            }
+        }
     }
 
     private func save() {
