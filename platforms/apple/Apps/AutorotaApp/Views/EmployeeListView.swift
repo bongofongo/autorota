@@ -90,7 +90,7 @@ struct EmployeeListView: View {
                         exportOptions: DataBundleExportOption.employeePageOptions,
                         service: vm.service
                     ) {
-                        Task { await vm.load() }
+                        Task { await vm.reload() }
                     }
                 }
                 ToolbarItem(placement: .primaryAction) {
@@ -121,7 +121,7 @@ struct EmployeeListView: View {
             }
             .sheet(isPresented: $showingImport) {
                 RosterImportView(service: vm.service) {
-                    Task { await vm.load() }
+                    Task { await vm.reload() }
                 }
             }
             #if os(iOS)
@@ -136,13 +136,25 @@ struct EmployeeListView: View {
             #endif
             .errorAlert($vm.error)
             .task {
-                await vm.load()
+                await vm.loadIfNeeded()
                 consumePendingNewEmployeeRequest()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .autorotaDataChanged)) { note in
+                if affectsEmployees(note) {
+                    Task { await vm.reload() }
+                }
             }
             .onChange(of: employeeBridge.requestNewEmployeeSheet) { _, _ in
                 consumePendingNewEmployeeRequest()
             }
         }
+    }
+
+    /// Reload only when a change touches employees (or roles, which render as
+    /// `RoleTag`s). A `nil` payload is a legacy/full post — reload to be safe.
+    private func affectsEmployees(_ note: Notification) -> Bool {
+        guard let change = note.autorotaDataChange else { return true }
+        return change.tables.contains(.employee) || change.tables.contains(.role)
     }
 
     private func consumePendingNewEmployeeRequest() {

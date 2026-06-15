@@ -75,7 +75,7 @@ struct WeeklyAvailabilityView: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .task { await vm.load() }
+            .task { await vm.reload() }
             .task { await progressVM.load(weekStart: weekStartString) }
             .onGeometryChange(for: Bool.self) { proxy in
                 proxy.size.width > proxy.size.height

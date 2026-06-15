@@ -337,7 +337,7 @@ struct OverridesTabView: View {
             .errorAlert($vm.error)
             .task {
                 await vm.loadAll()
-                await employeeVM.load()
+                await employeeVM.reload()
                 await templateVM.load()
             }
             .sheet(isPresented: $showingEmpSheet, onDismiss: { Task { await vm.loadAll() } }) {

@@ -2,6 +2,12 @@
 
 Concise running log of bugs encountered. Each entry is one bullet with sub-bullets. New entries appended at top. Patched entries remain `pending verification` until the user confirms.
 
+- **Flicker when switching to the Employees tab (iPhone)**
+  - Date fixed: 2026-06-14 (pending verification)
+  - Where / what / repro: iPhone uses the system `TabView` (`ContentView.swift`). Switching Rota → Employees showed an intermittent flicker. `EmployeeListView`'s `.task { await vm.load() }` re-fired on each tab appearance, and `EmployeeViewModel.load()` unconditionally reassigned `employees = [...]`, rebuilding the `List`. The "sometimes" nature was a race between the tab-switch animation and the async FFI reload landing mid-animation. iPad was unaffected (ZStack keep-alive switcher never re-fires `.task`).
+  - Patched: yes — pending user verification
+  - Fix: `EmployeeViewModel` now splits load into `loadIfNeeded()` (cold load once, guarded by `hasLoaded`, spinner only when `employees.isEmpty`) and `reload(showSpinner:)` which reassigns `employees` only when `latest != employees` (`FfiEmployee` is `Equatable`) — so no-op refreshes no longer churn the List. `EmployeeListView.task` calls `loadIfNeeded()` and adds an `.autorotaDataChanged` observer (`affectsEmployees(_:)` filters `.employee`/`.role`, `nil` payload → reload) to close the staleness gap created by no longer reloading on every appearance — previously the view had no such observer (unlike `RotaView`). Mutators and in-view callbacks (export menu, roster import) now call `reload()`. Secondary `EmployeeViewModel` users (`OverridesTabView`, `WeeklyAvailabilityView`) switched their `.task` cold load to `reload()` to preserve refresh-on-appear without churn. The observer closure was extracted to a helper to avoid a SwiftUI body type-check timeout. `make swift-build-check-macos` and `-ios` pass (0 errors).
+
 - **app-desktop (Tauri) no longer compiles: `Shift` initializer missing `role_requirements`**
   - Date fixed: 2026-06-10 (pending verification)
   - Where / what / repro: `cargo clippy --workspace --all-targets` fails in `crates/app-desktop/src-tauri/src/lib.rs:357` — the ad-hoc shift command builds a core `Shift` literal that was never updated when multi-role shifts added the `role_requirements` field. Pre-existing on main, surfaced while touching the export crates.
