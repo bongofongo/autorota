@@ -32,3 +32,5 @@ crates/autorota-core/migrations/test.db-shm
 
 # Icon brainstorming scratch space (release-icons/ is the canonical set)
 design/app-icon-ideas/
+
+docs/sessions/*
