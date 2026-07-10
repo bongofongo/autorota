@@ -110,7 +110,9 @@ struct DemoBanner: View {
             }
         } label: {
             Image(systemName: "ellipsis.circle")
-                .font(.body)
+                .font(.title3)
+                .frame(width: 32, height: 32)
+                .contentShape(Rectangle())
         }
         .accessibilityIdentifier("demo.banner.menu")
     }
