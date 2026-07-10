@@ -593,6 +593,11 @@ int8_t uniffi_autorota_ffi_fn_func_rota_has_saves(int64_t rota_id, RustCallStatu
 RustBuffer uniffi_autorota_ffi_fn_func_run_schedule(RustBuffer week_start, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_SEED_DEMO_DB
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_SEED_DEMO_DB
+void uniffi_autorota_ffi_fn_func_seed_demo_db(RustBuffer week_start, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_SEED_PERF_CORPUS
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_SEED_PERF_CORPUS
 void uniffi_autorota_ffi_fn_func_seed_perf_corpus(uint32_t employees, uint64_t seed, RustCallStatus *_Nonnull out_status
@@ -611,6 +616,11 @@ void uniffi_autorota_ffi_fn_func_set_sync_metadata(RustBuffer key, RustBuffer va
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_SWAP_ASSIGNMENTS
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_SWAP_ASSIGNMENTS
 void uniffi_autorota_ffi_fn_func_swap_assignments(int64_t id_a, int64_t id_b, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_SWITCH_DB
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_SWITCH_DB
+void uniffi_autorota_ffi_fn_func_switch_db(RustBuffer db_path, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_UPDATE_ASSIGNMENT_STATUS
@@ -1335,6 +1345,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_run_schedule(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_SEED_DEMO_DB
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_SEED_DEMO_DB
+uint16_t uniffi_autorota_ffi_checksum_func_seed_demo_db(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_SEED_PERF_CORPUS
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_SEED_PERF_CORPUS
 uint16_t uniffi_autorota_ffi_checksum_func_seed_perf_corpus(void
@@ -1356,6 +1372,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_set_sync_metadata(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_SWAP_ASSIGNMENTS
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_SWAP_ASSIGNMENTS
 uint16_t uniffi_autorota_ffi_checksum_func_swap_assignments(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_SWITCH_DB
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_SWITCH_DB
+uint16_t uniffi_autorota_ffi_checksum_func_switch_db(void
     
 );
 #endif

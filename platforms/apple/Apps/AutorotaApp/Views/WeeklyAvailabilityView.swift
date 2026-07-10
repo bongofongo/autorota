@@ -132,7 +132,6 @@ private struct AvailabilityCard: View {
 
     @State private var overrideVM = OverrideViewModel()
     @State private var slots: [AvailabilitySlot] = []
-    @State private var selectionMode = false
     private let visibleRange: (start: Int, end: Int)
 
     init(employee: FfiEmployee, vm: EmployeeViewModel, progressVM: AvailabilityProgressViewModel, weekStartString: String) {
@@ -185,19 +184,6 @@ private struct AvailabilityCard: View {
                     }
                 }
                 Spacer()
-                // Selection mode toggle
-                Button {
-                    selectionMode.toggle()
-                } label: {
-                    Image(systemName: "rectangle.dashed")
-                        .font(.body)
-                        .foregroundStyle(selectionMode ? .white : .secondary)
-                        .frame(width: 36, height: 36)
-                        .background(selectionMode ? Color.blue : Color.clear, in: RoundedRectangle(cornerRadius: 6))
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(selectionMode ? "Exit selection mode" : "Enter selection mode")
                 // Done checkmark
                 Button {
                     Task {
@@ -226,8 +212,6 @@ private struct AvailabilityCard: View {
                     slots = newSlots
                     Task { await persistEdits(newSlots) }
                 },
-                showSelectionToggle: false,
-                externalSelectionMode: $selectionMode,
                 outlinedWeekdays: outlinedWeekdays,
                 weekdaySubheaders: weekdaySubheaders
             )

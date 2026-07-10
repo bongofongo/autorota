@@ -34,6 +34,26 @@ public func autorotaInitDb(at path: String) throws {
     try initDb(dbPath: path)
 }
 
+/// Resolved file URL for the throwaway demo-mode database. Lives beside the
+/// production DB; demo mode deletes and reseeds it on every entry.
+public func autorotaDemoDBURL() throws -> URL {
+    try autorotaAppSupportDirectory().appendingPathComponent("demo.sqlite")
+}
+
+/// Swap the process-wide Rust pool to a different database file at runtime.
+/// The target is created and migrated if missing; the previous pool is closed
+/// after the swap. Used by demo mode to enter and leave the demo database.
+public func autorotaSwitchDb(to path: String) throws {
+    try switchDb(dbPath: path)
+}
+
+/// Seed the current database with the planet-crew demo dataset. `weekStart`
+/// is the Monday (yyyy-MM-dd) the guided tour centres on. Expects a freshly
+/// created (empty) database.
+public func autorotaSeedDemoDb(weekStart: String) throws {
+    try seedDemoDb(weekStart: weekStart)
+}
+
 /// Quarantine a corrupted database file by renaming it `db.corrupt-<unix-ts>.sqlite`
 /// in the same directory. Returns the new path on success. The caller is
 /// expected to re-attempt `autorotaInitDb()` afterwards (which will recreate

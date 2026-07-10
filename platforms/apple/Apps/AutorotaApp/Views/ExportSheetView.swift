@@ -394,6 +394,10 @@ struct ExportSheetView: View {
 
             exportURLs = urls
 
+            // Exports are reads, so no `.autorotaDataChanged` fires — the
+            // demo tour's export step listens for this signal instead.
+            NotificationCenter.default.post(name: .autorotaExportCompleted, object: nil)
+
             #if os(iOS)
             showShareSheet = true
             #else

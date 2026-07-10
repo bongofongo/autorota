@@ -16,6 +16,7 @@ struct ContentView: View {
     @State private var showOnboarding = false
     @State private var onboardingStartPage = 0
     @Environment(LicenseService.self) private var license
+    @Environment(DemoModeController.self) private var demo
     #if os(iOS)
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -29,21 +30,34 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if license.state.isReadOnly {
+            if demo.isActive {
+                DemoBanner()
+            } else if license.state.isReadOnly {
                 ReadOnlyBanner()
             }
             tabView
         }
         .onAppear {
-            if !hasCompletedOnboarding || license.state == .unset {
+            if (!hasCompletedOnboarding || license.state == .unset) && !demo.isActive {
                 onboardingStartPage = pendingOnboardingTierOnly ? Int.max : 0
                 pendingOnboardingTierOnly = false
                 showOnboarding = true
             }
         }
         .onChange(of: hasCompletedOnboarding) { _, completed in
-            if !completed {
+            if !completed && !demo.isActive {
                 onboardingStartPage = 0
+                showOnboarding = true
+            }
+        }
+        .onChange(of: demo.isActive) { wasActive, active in
+            // Entering demo from the tier picker dismisses onboarding;
+            // leaving it with no license routes straight back to the
+            // tier picker (skipping the marketing slides).
+            if active {
+                showOnboarding = false
+            } else if wasActive && license.state == .unset {
+                onboardingStartPage = Int.max
                 showOnboarding = true
             }
         }

@@ -6443,6 +6443,18 @@ public func runSchedule(weekStart: String)throws  -> FfiScheduleResult {
 })
 }
 /**
+ * Populate the current database with the planet-crew demo dataset used by
+ * the guided demo. `week_start` must be the Monday (YYYY-MM-DD) the tour
+ * centres on; date-specific exceptions are seeded relative to it. Expects an
+ * empty database — demo mode always seeds a freshly created file.
+ */
+public func seedDemoDb(weekStart: String)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_seed_demo_db(
+        FfiConverterString.lower(weekStart),$0
+    )
+}
+}
+/**
  * Populate the database with a deterministic synthetic corpus for performance
  * testing. Only linked when the `perf-helpers` feature is enabled — release
  * builds do not include this symbol so the corpus generator never ships.
@@ -6477,6 +6489,20 @@ public func swapAssignments(idA: Int64, idB: Int64)throws  {try rustCallWithErro
     uniffi_autorota_ffi_fn_func_swap_assignments(
         FfiConverterInt64.lower(idA),
         FfiConverterInt64.lower(idB),$0
+    )
+}
+}
+/**
+ * Swap the process-wide pool to a different database file at runtime.
+ * Connects (creating + migrating if needed) before taking the write lock, so
+ * a connection failure leaves the current database untouched. The previous
+ * pool is closed after the swap; in-flight clones finish safely.
+ *
+ * Used by demo mode to enter (real → throwaway demo DB) and exit (→ real).
+ */
+public func switchDb(dbPath: String)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_switch_db(
+        FfiConverterString.lower(dbPath),$0
     )
 }
 }
@@ -6757,6 +6783,9 @@ private var initializationResult: InitializationResult = {
     if (uniffi_autorota_ffi_checksum_func_run_schedule() != 48877) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_autorota_ffi_checksum_func_seed_demo_db() != 44664) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_autorota_ffi_checksum_func_seed_perf_corpus() != 51979) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -6767,6 +6796,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_swap_assignments() != 10327) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_switch_db() != 55258) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_update_assignment_status() != 34587) {

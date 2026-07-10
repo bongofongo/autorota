@@ -48,6 +48,7 @@ struct SettingsView: View {
     @Environment(TabLayoutManager.self) private var layoutManager
     @Environment(AutorotaSyncEngine.self) private var syncEngine
     @Environment(MenuNavigationBridge.self) private var menuNav
+    @Environment(DemoModeController.self) private var demo
     /// Drives programmatic pushes from `MenuNavigationBridge` (e.g. an "Add
     /// employee" CTA fired while Employees lives in the overflow Menu).
     @State private var navPath: [TabPage] = []
@@ -137,6 +138,14 @@ struct SettingsView: View {
                         SubscriptionView()
                     } label: {
                         Label("Subscription", systemImage: "creditcard")
+                    }
+                    if !demo.isActive {
+                        Button {
+                            demo.enterDemo()
+                        } label: {
+                            Label("demo.settings.row", systemImage: "play.circle")
+                        }
+                        .accessibilityIdentifier("demo.settings.row")
                     }
                 }
                 .tint(.primary)

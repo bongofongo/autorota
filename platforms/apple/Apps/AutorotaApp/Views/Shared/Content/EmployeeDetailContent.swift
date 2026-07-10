@@ -50,6 +50,11 @@ struct EmployeeDetailContent: View {
     @State private var customEndDate: Date = Date()
 
     @State private var availabilityWeekOffset: Int = 1
+    /// In-place grid editing (pencil button on the Availability section).
+    /// Distinct from the toolbar Edit sheet: edits the displayed week only,
+    /// live-saving each change as `manual` per-date overrides.
+    @State private var isEditingGrid = false
+    @State private var gridEditSlots: [AvailabilitySlot] = []
 
     static let weekdayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     private static let weekRangeFmt: DateFormatter = {
@@ -201,6 +206,21 @@ struct EmployeeDetailContent: View {
 
     private var todayStartOfDay: Date {
         Calendar(identifier: .iso8601).startOfDay(for: Date())
+    }
+
+    /// Live-save an inline grid edit: diff the displayed week against defaults
+    /// and existing overrides, persist as `manual` per-date overrides, then
+    /// reload so exception outlines and the Exceptions list stay in sync.
+    private func persistGridEdits(_ newSlots: [AvailabilitySlot]) async {
+        await AvailabilityWeekMath.persistWeekEdits(
+            newSlots: newSlots,
+            days: weekDays(offset: availabilityWeekOffset),
+            overrideByIso: overrideByDate,
+            defaultAvailability: employee.defaultAvailability,
+            employeeId: employee.id,
+            overrideVM: overrideVM
+        )
+        await overrideVM.loadForEmployee(id: employee.id)
     }
 
     private func actualWeekLabel(days: [(weekday: String, date: Date, iso: String)]) -> String {
@@ -435,15 +455,31 @@ struct EmployeeDetailContent: View {
                     .accessibilityLabel("Next week")
                 }
 
-                AvailabilityGridView(
-                    slots: merged,
-                    isEditable: false,
-                    visibleHourStart: range.start,
-                    visibleHourEnd: range.end,
-                    outlinedWeekdays: outlined,
-                    readOnlyWeekdays: readOnly,
-                    weekdaySubheaders: subheaders
-                )
+                if isEditingGrid {
+                    AvailabilityGridView(
+                        slots: gridEditSlots,
+                        isEditable: true,
+                        visibleHourStart: range.start,
+                        visibleHourEnd: range.end,
+                        onChange: { newSlots in
+                            gridEditSlots = newSlots
+                            Task { await persistGridEdits(newSlots) }
+                        },
+                        outlinedWeekdays: outlined,
+                        readOnlyWeekdays: readOnly,
+                        weekdaySubheaders: subheaders
+                    )
+                } else {
+                    AvailabilityGridView(
+                        slots: merged,
+                        isEditable: false,
+                        visibleHourStart: range.start,
+                        visibleHourEnd: range.end,
+                        outlinedWeekdays: outlined,
+                        readOnlyWeekdays: readOnly,
+                        weekdaySubheaders: subheaders
+                    )
+                }
 
                 if !outlined.isEmpty {
                     HStack(spacing: 6) {
@@ -453,7 +489,29 @@ struct EmployeeDetailContent: View {
                     }
                 }
             } header: {
-                Text("Availability")
+                HStack {
+                    Text("Availability")
+                    Spacer()
+                    Button {
+                        if !isEditingGrid {
+                            gridEditSlots = mergedActualSlots(for: weekDays(offset: availabilityWeekOffset))
+                        }
+                        withAnimation { isEditingGrid.toggle() }
+                    } label: {
+                        Image(systemName: isEditingGrid ? "checkmark.circle.fill" : "pencil.circle")
+                            .font(.body)
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(isEditingGrid ? "Done editing availability" : "Edit availability grid")
+                    .accessibilityIdentifier("employee.availability.editGrid")
+                }
+            }
+            .onChange(of: availabilityWeekOffset) { _, newOffset in
+                // Week switched mid-edit: reseed the buffer from the newly
+                // displayed week (previous week's edits are already saved).
+                if isEditingGrid {
+                    gridEditSlots = mergedActualSlots(for: weekDays(offset: newOffset))
+                }
             }
 
             Section("Analytics") {

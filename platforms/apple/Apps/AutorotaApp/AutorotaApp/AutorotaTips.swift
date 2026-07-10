@@ -153,7 +153,7 @@ struct AvailabilityDragTip: Tip {
         Text("tip.availability.drag.message")
     }
     var image: Image? {
-        Image(systemName: "rectangle.dashed")
+        Image(systemName: "hand.draw")
     }
     var rules: [Rule] {
         #Rule(Self.cycleDismissed) { $0.donations.count > 0 }

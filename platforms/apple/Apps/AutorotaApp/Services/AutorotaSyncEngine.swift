@@ -90,6 +90,10 @@ final class AutorotaSyncEngine: @unchecked Sendable {
         }
     }
 
+    /// Whether the engine is currently started. Demo mode consults this
+    /// before pausing so it only restarts sync on exit if it was running.
+    var isRunning: Bool { engine != nil }
+
     /// Tear down the engine and remove its observer so the instance can be
     /// re-`start()`ed cleanly (or released).
     func stop() {

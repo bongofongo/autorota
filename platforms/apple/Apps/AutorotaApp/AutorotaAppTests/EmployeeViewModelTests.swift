@@ -20,7 +20,7 @@ struct EmployeeViewModelTests {
         mock.stubbedEmployees = [makeEmployee(id: 1), makeEmployee(id: 2, first: "Bob")]
         let vm = EmployeeViewModel(service: mock)
 
-        await vm.load()
+        await vm.reload()
 
         #expect(vm.employees.count == 2)
         #expect(vm.isLoading == false)
@@ -33,7 +33,7 @@ struct EmployeeViewModelTests {
         mock.errorToThrow = NSError(domain: "test", code: 1, userInfo: [NSLocalizedDescriptionKey: "fail"])
         let vm = EmployeeViewModel(service: mock)
 
-        await vm.load()
+        await vm.reload()
 
         #expect(vm.error == "fail")
         #expect(vm.employees.isEmpty)

@@ -97,7 +97,6 @@ struct EmployeeEditSheet: View {
     @State private var defaultVisibleStart = 6
     @State private var defaultVisibleEnd = 22
 
-    @State private var selectionModeActive = false
 
     private var isEditing: Bool { existing != nil }
 
@@ -349,8 +348,7 @@ struct EmployeeEditSheet: View {
                             onChange: { defaultAvailabilitySlots = $0 },
                             onVisibleRangeChange: { start, end in
                                 applyDefaultRangeChange(start: start, end: end)
-                            },
-                            onSelectionModeChange: { selectionModeActive = $0 }
+                            }
                         )
                     case .actual:
                         let days = sheetWeekDays(offset: actualWeekOffset)
@@ -399,7 +397,6 @@ struct EmployeeEditSheet: View {
                             visibleHourStart: defaultVisibleStart,
                             visibleHourEnd: defaultVisibleEnd,
                             onChange: { applyActualEdit(newSlots: $0) },
-                            onSelectionModeChange: { selectionModeActive = $0 },
                             onReset: {
                                 for d in days {
                                     let wd = d.weekday
@@ -425,7 +422,6 @@ struct EmployeeEditSheet: View {
                     }
                 }
             }
-            .scrollDisabled(selectionModeActive)
             .dismissesKeyboardOnTap()
             .appFormGroupedStyle()
             .navigationTitle(isEditing ? "Edit Employee" : "New Employee")

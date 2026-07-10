@@ -537,7 +537,6 @@ struct EmployeeAvailabilityOverrideSheet: View {
     @State private var date = Date()
     @State private var slots: [AvailabilitySlot] = []
     @State private var notes = ""
-    @State private var selectionModeActive = false
 
     // Date range state (create-only)
     @State private var isDateRange = false
@@ -680,7 +679,6 @@ struct EmployeeAvailabilityOverrideSheet: View {
                     }
                 }
             }
-            .scrollDisabled(selectionModeActive)
             #if os(macOS)
             .formStyle(.grouped)
             #endif
@@ -731,8 +729,7 @@ struct EmployeeAvailabilityOverrideSheet: View {
                 visibleHourStart: 6,
                 visibleHourEnd: 22,
                 limitToWeekdays: [weekdayForDate],
-                onChange: { slots = $0 },
-                onSelectionModeChange: { selectionModeActive = $0 }
+                onChange: { slots = $0 }
             )
         }
     }
@@ -801,8 +798,7 @@ struct EmployeeAvailabilityOverrideSheet: View {
                 visibleHourStart: 6,
                 visibleHourEnd: 22,
                 limitToWeekdays: [currentWeekday],
-                onChange: { setCurrentSlots($0) },
-                onSelectionModeChange: { selectionModeActive = $0 }
+                onChange: { setCurrentSlots($0) }
             )
         } header: {
             Text("Availability for \(currentWeekday)")

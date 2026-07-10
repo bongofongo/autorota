@@ -224,7 +224,7 @@ final class MockAutorotaService: AutorotaServiceProtocol, @unchecked Sendable {
     func listEmployeeAvailabilityOverrides(employeeId: Int64) async throws -> [FfiEmployeeAvailabilityOverride] {
         callLog.append("listEmployeeAvailabilityOverrides:\(employeeId)")
         if let e = errorToThrow { throw e }
-        return []
+        return stubbedAvailabilityOverrides.filter { $0.employeeId == employeeId }
     }
 
     func listAllEmployeeAvailabilityOverrides() async throws -> [FfiEmployeeAvailabilityOverride] {

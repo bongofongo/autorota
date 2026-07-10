@@ -9,7 +9,7 @@ struct GatedAutorotaServiceTests {
     @Test
     func mutationsThrowWhenExpired() async throws {
         let mock = MockAutorotaService()
-        let gate = LicenseGate.shared
+        let gate = LicenseGate()
         gate.update(state: .expired(previousTier: .localManager))
         let gated = GatedAutorotaService(inner: mock, gate: gate)
 
@@ -28,7 +28,7 @@ struct GatedAutorotaServiceTests {
     @Test
     func mutationsSucceedWhenInTrial() async throws {
         let mock = MockAutorotaService()
-        let gate = LicenseGate.shared
+        let gate = LicenseGate()
         gate.update(state: .trial(startedAt: Date(), daysRemaining: 7))
         let gated = GatedAutorotaService(inner: mock, gate: gate)
 
@@ -41,7 +41,7 @@ struct GatedAutorotaServiceTests {
     func readsPassThroughEvenWhenExpired() async throws {
         let mock = MockAutorotaService()
         mock.stubbedRoles = []
-        let gate = LicenseGate.shared
+        let gate = LicenseGate()
         gate.update(state: .expired(previousTier: .localManager))
         let gated = GatedAutorotaService(inner: mock, gate: gate)
 

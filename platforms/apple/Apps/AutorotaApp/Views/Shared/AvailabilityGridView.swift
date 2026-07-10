@@ -4,7 +4,9 @@ import TipKit
 
 /// A 7-column × 24-row grid showing availability state per weekday/hour.
 /// When `isEditable` is true, tapping a cell cycles through No → Maybe → Yes.
-/// Supports rectangle drag-selection for bulk toggling.
+/// Holding briefly then dragging draws a rectangle selection (lasso); on
+/// release it persists — tap inside to bulk-cycle, tap outside to clear.
+/// Quick swipes fail the hold, so enclosing scroll views keep scrolling.
 struct AvailabilityGridView: View {
 
     let slots: [AvailabilitySlot]
@@ -16,13 +18,7 @@ struct AvailabilityGridView: View {
     var limitToWeekdays: [String]? = nil
     var onChange: (([AvailabilitySlot]) -> Void)?
     var onVisibleRangeChange: ((Int, Int) -> Void)?
-    var onSelectionModeChange: ((Bool) -> Void)?
     var onReset: (() -> Void)?
-    /// When false, the selection-mode toggle is hidden from the built-in toolbar
-    /// (the caller is expected to drive selection mode externally via `externalSelectionMode`).
-    var showSelectionToggle: Bool = true
-    /// Optional external binding to drive selection mode from outside the grid.
-    var externalSelectionMode: Binding<Bool>? = nil
     /// Weekdays whose columns should be outlined (e.g. days with an override on the current week).
     var outlinedWeekdays: Set<String> = []
     /// Color used for the outline around `outlinedWeekdays` columns.
@@ -53,13 +49,19 @@ struct AvailabilityGridView: View {
     private let cycleTip = AvailabilityCycleTip()
     private let dragTip = AvailabilityDragTip()
 
-    // Selection state
-    @State private var _isSelectionModeActive = false
-    private var isSelectionModeActive: Bool {
-        get { externalSelectionMode?.wrappedValue ?? _isSelectionModeActive }
-    }
+    // Selection state. There is no explicit selection *mode* — holding
+    // briefly then dragging draws a lasso; the resulting selection persists
+    // until the user taps inside (apply) or outside (clear).
     @State private var dragAnchorCell: (col: Int, row: Int)?
     @State private var dragCurrentCell: (col: Int, row: Int)?
+    /// True from the moment the hold arms the lasso until the finger lifts.
+    /// Drives the haptic tick that tells the user dragging now selects.
+    @State private var lassoArmed = false
+    /// True once the armed finger has actually moved (new lasso in progress).
+    /// A press that arms but never drags leaves the prior selection intact.
+    @State private var lassoDidDrag = false
+
+    private var hasSelection: Bool { selectionRect != nil }
 
     // Build a lookup for fast access
     private var lookup: [String: String] {
@@ -84,7 +86,9 @@ struct AvailabilityGridView: View {
     var body: some View {
         VStack(spacing: 8) {
             if isEditable {
-                toolbarRow
+                if onReset != nil || showRangePicker {
+                    toolbarRow
+                }
                 TipView(dragTip)
                 TipView(cycleTip)
             }
@@ -95,30 +99,60 @@ struct AvailabilityGridView: View {
                     gridContent(cellWidth: cellWidth)
 
                     // Selection highlight overlay
-                    if isSelectionModeActive, let rect = selectionRect {
+                    if let rect = selectionRect {
                         selectionHighlight(rect: rect, cellWidth: cellWidth)
                             .allowsHitTesting(false)
                     }
 
-                    // Gesture capture layer (only in selection mode)
-                    if isSelectionModeActive {
+                    // Unified touch layer: tap cycles a cell (or applies /
+                    // clears an active selection); hold-then-drag lassos.
+                    // A quick swipe fails the hold, so the enclosing scroll
+                    // view keeps working over the grid.
+                    if isEditable {
                         Color.clear
                             .contentShape(Rectangle())
+                            .onTapGesture { location in
+                                handleTap(at: location, cellWidth: cellWidth)
+                            }
                             .gesture(
-                                DragGesture(minimumDistance: 3, coordinateSpace: .named("availGrid"))
+                                // `maximumDistance` makes the hold fail as soon
+                                // as the finger drifts — a swipe that starts
+                                // moving immediately never arms the lasso and
+                                // scrolls the page instead.
+                                LongPressGesture(minimumDuration: 0.2, maximumDistance: 8)
+                                    .sequenced(before: DragGesture(minimumDistance: 4, coordinateSpace: .named("availGrid")))
                                     .onChanged { value in
-                                        if dragAnchorCell == nil {
-                                            dragAnchorCell = cellAt(point: value.startLocation, cellWidth: cellWidth)
+                                        switch value {
+                                        case .first(true):
+                                            // Hold succeeded — arm the lasso.
+                                            // The existing selection is NOT
+                                            // cleared here: a stationary press
+                                            // that never drags must leave it
+                                            // intact so tap-inside still applies.
+                                            lassoArmed = true
+                                        case .second(true, let drag?):
+                                            // First real movement starts the new
+                                            // lasso, replacing any old selection.
+                                            if !lassoDidDrag {
+                                                lassoDidDrag = true
+                                                dragAnchorCell = cellAt(point: drag.startLocation, cellWidth: cellWidth)
+                                            }
+                                            dragCurrentCell = cellAt(point: drag.location, cellWidth: cellWidth)
+                                        default:
+                                            break
                                         }
-                                        dragCurrentCell = cellAt(point: value.location, cellWidth: cellWidth)
                                     }
                                     .onEnded { _ in
-                                        // Selection stays — user taps inside to toggle or outside to clear
+                                        // Selection stays — tap inside applies,
+                                        // tap outside clears.
+                                        if lassoDidDrag {
+                                            Task { await AvailabilityDragTip.cycleDismissed.donate() }
+                                        }
+                                        lassoArmed = false
+                                        lassoDidDrag = false
                                     }
                             )
-                            .onTapGesture { location in
-                                handleTapInSelectionMode(at: location, cellWidth: cellWidth)
-                            }
+                            .sensoryFeedback(.impact(weight: .light), trigger: lassoArmed) { _, armed in armed }
                     }
                 }
                 .coordinateSpace(name: "availGrid")
@@ -166,13 +200,13 @@ struct AvailabilityGridView: View {
                             let dayReadOnly = readOnlyWeekdays.contains(day)
                             CellView(
                                 state: state,
-                                isEditable: isEditable && inRange && !isSelectionModeActive && !dayReadOnly,
+                                isEditable: isEditable && inRange && !dayReadOnly,
                                 isDimmed: !inRange || dayReadOnly,
                                 cellWidth: cellWidth,
                                 weekday: day,
                                 hour: hour
                             ) {
-                                if isEditable && inRange && !isSelectionModeActive && !dayReadOnly {
+                                if isEditable && inRange && !dayReadOnly {
                                     toggle(weekday: day, hour: hour)
                                 }
                             }
@@ -208,7 +242,7 @@ struct AvailabilityGridView: View {
         }
     }
 
-    // MARK: - Toolbar with selection toggle and range picker
+    // MARK: - Toolbar with reset and range picker
 
     private var toolbarRow: some View {
         HStack {
@@ -223,18 +257,6 @@ struct AvailabilityGridView: View {
                 rangePickerContent
             }
             Spacer()
-            if showSelectionToggle {
-                Button {
-                    toggleSelectionMode()
-                } label: {
-                    Image(systemName: "rectangle.dashed")
-                        .foregroundStyle(isSelectionModeActive ? .white : .secondary)
-                        .padding(6)
-                        .background(isSelectionModeActive ? Color.blue : Color.clear, in: RoundedRectangle(cornerRadius: 6))
-                }
-                .buttonStyle(.borderless)
-                .accessibilityLabel(isSelectionModeActive ? "Exit selection mode" : "Enter selection mode")
-            }
         }
     }
 
@@ -312,36 +334,63 @@ struct AvailabilityGridView: View {
 
     // MARK: - Coordinate mapping
 
+    /// Nearest cell, clamped into the grid. Used while dragging so a lasso
+    /// that wanders past the edge still tracks the boundary cell.
     private func cellAt(point: CGPoint, cellWidth: CGFloat) -> (col: Int, row: Int)? {
-        let verticalPadding: CGFloat = 4
-        let adjustedX = point.x - Self.hourLabelWidth - Self.spacing
-        let adjustedY = point.y - verticalPadding - effectiveHeaderHeight - Self.spacing
-
-        let col = Int(adjustedX / (cellWidth + Self.spacing))
-        let row = Int(adjustedY / (Self.rowHeight + Self.spacing))
-
+        let (col, row) = rawCell(at: point, cellWidth: cellWidth)
         let clampedCol = max(0, min(displayedWeekdays.count - 1, col))
         let clampedRow = max(0, min(displayedHours.count - 1, row))
         return (clampedCol, clampedRow)
     }
 
-    // MARK: - Selection tap handling
+    /// The cell actually under `point`, or nil when the point falls on the
+    /// header row / hour-label column / outside the grid. Used for taps so a
+    /// header tap can't cycle a boundary cell.
+    private func strictCellAt(point: CGPoint, cellWidth: CGFloat) -> (col: Int, row: Int)? {
+        let (col, row) = rawCell(at: point, cellWidth: cellWidth)
+        guard (0..<displayedWeekdays.count).contains(col),
+              (0..<displayedHours.count).contains(row) else { return nil }
+        return (col, row)
+    }
 
-    private func handleTapInSelectionMode(at location: CGPoint, cellWidth: CGFloat) {
-        guard let tapped = cellAt(point: location, cellWidth: cellWidth),
-              let rect = selectionRect else {
-            // No selection — start fresh or ignore
+    private func rawCell(at point: CGPoint, cellWidth: CGFloat) -> (col: Int, row: Int) {
+        let verticalPadding: CGFloat = 4
+        let adjustedX = point.x - Self.hourLabelWidth - Self.spacing
+        let adjustedY = point.y - verticalPadding - effectiveHeaderHeight - Self.spacing
+        // floor() so slightly-negative offsets (header / label gutter) map to
+        // -1 and fail the strict bounds check instead of truncating to 0.
+        let col = Int(floor(adjustedX / (cellWidth + Self.spacing)))
+        let row = Int(floor(adjustedY / (Self.rowHeight + Self.spacing)))
+        return (col, row)
+    }
+
+    // MARK: - Tap handling
+
+    /// Single entry point for taps on the touch layer: with an active
+    /// selection, a tap inside applies the majority cycle and a tap outside
+    /// clears it; with no selection, a tap cycles the cell under the finger.
+    private func handleTap(at location: CGPoint, cellWidth: CGFloat) {
+        let tapped = strictCellAt(point: location, cellWidth: cellWidth)
+
+        if let rect = selectionRect {
+            if let tapped,
+               tapped.col >= rect.minCol && tapped.col <= rect.maxCol &&
+               tapped.row >= rect.minRow && tapped.row <= rect.maxRow {
+                toggleSelectedCells(rect: rect)
+            } else {
+                dragAnchorCell = nil
+                dragCurrentCell = nil
+            }
             return
         }
 
-        if tapped.col >= rect.minCol && tapped.col <= rect.maxCol &&
-           tapped.row >= rect.minRow && tapped.row <= rect.maxRow {
-            toggleSelectedCells(rect: rect)
-        } else {
-            // Tap outside — clear selection
-            dragAnchorCell = nil
-            dragCurrentCell = nil
-        }
+        guard let tapped else { return }
+        let day = displayedWeekdays[tapped.col]
+        let hour = displayedHours[tapped.row]
+        guard Self.hourIsInRange(hour, start: visibleHourStart, end: visibleHourEnd),
+              !readOnlyWeekdays.contains(day) else { return }
+        toggle(weekday: day, hour: hour)
+        Task { await AvailabilityDragTip.cycleDismissed.donate() }
     }
 
     private func toggleSelectedCells(rect: (minCol: Int, maxCol: Int, minRow: Int, maxRow: Int)) {
@@ -354,6 +403,7 @@ struct AvailabilityGridView: View {
             guard Self.hourIsInRange(hour, start: visibleHourStart, end: visibleHourEnd) else { continue }
             for col in rect.minCol...rect.maxCol {
                 let day = displayedWeekdays[col]
+                guard !readOnlyWeekdays.contains(day) else { continue }
                 let key = "\(day):\(hour)"
                 let state = lookup[key] ?? "Maybe"
                 stateCounts[state, default: 0] += 1
@@ -394,20 +444,6 @@ struct AvailabilityGridView: View {
             updated.append(AvailabilitySlot(weekday: weekday, hour: UInt8(hour), state: "Yes"))
         }
         onChange?(updated)
-    }
-
-    private func toggleSelectionMode() {
-        let newValue = !isSelectionModeActive
-        if let binding = externalSelectionMode {
-            binding.wrappedValue = newValue
-        } else {
-            _isSelectionModeActive = newValue
-        }
-        if !newValue {
-            dragAnchorCell = nil
-            dragCurrentCell = nil
-        }
-        onSelectionModeChange?(newValue)
     }
 
     private func cycled(_ state: String) -> String {

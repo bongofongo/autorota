@@ -3636,6 +3636,325 @@
     "Deletes all local data and quits. Reopen to start onboarding from scratch." : {
 
     },
+    "demo.banner.chip" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DEMO"
+          }
+        }
+      }
+    },
+    "demo.banner.complete.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep exploring, or exit the demo from the menu."
+          }
+        }
+      }
+    },
+    "demo.banner.complete.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tour complete"
+          }
+        }
+      }
+    },
+    "demo.banner.next" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next"
+          }
+        }
+      }
+    },
+    "demo.banner.progress.a11y %lld %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld of %2$lld steps complete"
+          }
+        }
+      }
+    },
+    "demo.checklist.done" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        }
+      }
+    },
+    "demo.checklist.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demo Tour"
+          }
+        }
+      }
+    },
+    "demo.completion.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Availability, exceptions, scheduling, tweaks, and a shareable PDF — that's the whole weekly workflow. Ready to run your own team?"
+          }
+        }
+      }
+    },
+    "demo.completion.choose_plan" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose Your Plan"
+          }
+        }
+      }
+    },
+    "demo.completion.keep_exploring" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep Exploring"
+          }
+        }
+      }
+    },
+    "demo.completion.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You've built a rota!"
+          }
+        }
+      }
+    },
+    "demo.cta.try_first" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try the Demo First"
+          }
+        }
+      }
+    },
+    "demo.error.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Demo Error"
+          }
+        }
+      }
+    },
+    "demo.menu.exit" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exit Demo"
+          }
+        }
+      }
+    },
+    "demo.menu.restart" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restart Tour"
+          }
+        }
+      }
+    },
+    "demo.menu.skip_step" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skip This Step"
+          }
+        }
+      }
+    },
+    "demo.settings.row" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Try the Demo"
+          }
+        }
+      }
+    },
+    "demo.step.alterRota.instruction" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter edit mode and swap, move, or remove an assignment."
+          }
+        }
+      }
+    },
+    "demo.step.alterRota.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Make it yours"
+          }
+        }
+      }
+    },
+    "demo.step.createException.instruction" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Exceptions from the Menu tab, then add an employee exception for Marcus “Mars” Reid on a day next week."
+          }
+        }
+      }
+    },
+    "demo.step.createException.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Give Mars a day off"
+          }
+        }
+      }
+    },
+    "demo.step.exportPDF.instruction" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap share on the Rota tab and export the week as a PDF."
+          }
+        }
+      }
+    },
+    "demo.step.exportPDF.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share the schedule"
+          }
+        }
+      }
+    },
+    "demo.step.generateRota.instruction" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On the Rota tab, switch to next week and tap the wand to auto-fill the schedule."
+          }
+        }
+      }
+    },
+    "demo.step.generateRota.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generate the rota"
+          }
+        }
+      }
+    },
+    "demo.step.meetCrew.instruction" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open the Employees tab — twelve staff named for planets, moons, and dwarf planets, two roles, a mix of full- and part-time."
+          }
+        }
+      }
+    },
+    "demo.step.meetCrew.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Meet the crew"
+          }
+        }
+      }
+    },
+    "demo.step.setAvailability.instruction" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open May “Mercury” Herrera in Employees and fill in her availability for next week."
+          }
+        }
+      }
+    },
+    "demo.step.setAvailability.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set Mercury's availability"
+          }
+        }
+      }
+    },
     "Details" : {
       "localizations" : {
         "ar" : {
@@ -3890,6 +4209,17 @@
         }
       }
     },
+    "Done editing availability" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done editing availability"
+          }
+        }
+      }
+    },
     "Double-tap to cycle availability" : {
       "localizations" : {
         "ar" : {
@@ -4127,6 +4457,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "編輯"
+          }
+        }
+      }
+    },
+    "Edit availability grid" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit availability grid"
           }
         }
       }
@@ -5034,6 +5375,7 @@
       }
     },
     "Enter selection mode" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -5216,6 +5558,7 @@
       }
     },
     "Exit selection mode" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -21355,7 +21698,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drag across multiple cells to set an entire range at once."
+            "value" : "Press and hold, then drag to select a block. Tap the selection to cycle it, tap elsewhere to dismiss."
           }
         },
         "es" : {
@@ -21402,7 +21745,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drag for bulk edits"
+            "value" : "Hold & drag to bulk edit"
           }
         },
         "es" : {

@@ -44,6 +44,7 @@
 		CC0061013300000000205001 /* FullExportConfigBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0061023300000000205001 /* FullExportConfigBuilder.swift */; };
 		CC0062013300000000205001 /* ExportSettingsMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0062023300000000205001 /* ExportSettingsMigration.swift */; };
 		CC0063013300000000205001 /* ExportSandboxViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0063023300000000205001 /* ExportSandboxViewModel.swift */; };
+		CC00DD013110000000205001 /* DemoModeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00DD023110000000205001 /* DemoModeController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -103,6 +104,7 @@
 		CC0061023300000000205001 /* FullExportConfigBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullExportConfigBuilder.swift; sourceTree = "<group>"; };
 		CC0062023300000000205001 /* ExportSettingsMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSettingsMigration.swift; sourceTree = "<group>"; };
 		CC0063023300000000205001 /* ExportSandboxViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSandboxViewModel.swift; sourceTree = "<group>"; };
+		CC00DD023110000000205001 /* DemoModeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoModeController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -207,6 +209,7 @@
 				CC0060023300000000205001 /* ExportCustomLayout.swift */,
 				CC0061023300000000205001 /* FullExportConfigBuilder.swift */,
 				CC0062023300000000205001 /* ExportSettingsMigration.swift */,
+				CC00DD023110000000205001 /* DemoModeController.swift */,
 				CC0017023030000000205001 /* FfiError+UserMessage.swift */,
 				CC0048023110000000205001 /* GatedAutorotaService.swift */,
 				CC0041023110000000205001 /* KeychainStore.swift */,
@@ -417,6 +420,7 @@
 				CC0040013110000000205001 /* Tier.swift in Sources */,
 				CC0041013110000000205001 /* KeychainStore.swift in Sources */,
 				CC0042013110000000205001 /* LicenseGate.swift in Sources */,
+				CC00DD013110000000205001 /* DemoModeController.swift in Sources */,
 				CC0043013110000000205001 /* LicenseBackend.swift in Sources */,
 				CC0044013110000000205001 /* MockLicenseBackend.swift in Sources */,
 				CC0045013110000000205001 /* LiveLicenseBackend.swift in Sources */,

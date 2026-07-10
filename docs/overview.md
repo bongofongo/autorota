@@ -171,6 +171,7 @@ compiled `autorota-ffi` dylib.
 | Data bundle export/import (Employees & Shifts pages; whole page or single category — roles, employees, availability exceptions, shifts, shift changes) | `DataBundleTransferView` (`DataBundleToolbarMenu`, `DataBundleImportView`), `autorota-core/exchange/*` |
 | iCloud sync (private database, per-field merge, first-launch prompt) | `AutorotaSyncEngine`, `SyncConflictResolver`, `SyncRecordMapper`, `SyncPromptView` |
 | Onboarding | `OnboardingView` |
+| Demo mode (guided pre-purchase tour on a throwaway seeded DB; planet-crew sample data) | `DemoModeController`, `DemoBanner`, `autorota-core/demo.rs`, `switch_db`/`seed_demo_db` FFI |
 | Configurable tab bar + Menu overflow | `TabPage`, `TabLayoutManager`, `SettingsView` |
 | Rota-page overflow menu (Delete / Edit / Share / Generate) | `RotaOverflowPopover`, spec in `docs/specs/rota-overflow-menu.md` |
 

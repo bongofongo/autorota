@@ -3,6 +3,7 @@ import SwiftUI
 struct TierPickView: View {
     @Binding var isPresented: Bool
     @Environment(LicenseService.self) private var license
+    @Environment(DemoModeController.self) private var demo
     @State private var infoTier: Tier?
     @State private var isWorking: WorkingAction?
     @State private var errorMessage: String?
@@ -17,6 +18,7 @@ struct TierPickView: View {
         ScrollView {
             VStack(spacing: 20) {
                 header
+                demoRow
                 tierCard(.localManager)
                 tierCard(.employee)
                 tierCard(.saas)
@@ -64,6 +66,27 @@ struct TierPickView: View {
                 .foregroundStyle(.secondary)
         }
         .padding(.bottom, 8)
+    }
+
+    /// Pre-purchase escape hatch: run the guided demo against a throwaway
+    /// sample business before committing to a plan.
+    private var demoRow: some View {
+        Button {
+            isPresented = false
+            demo.enterDemo()
+        } label: {
+            HStack {
+                Image(systemName: "play.circle.fill")
+                Text("demo.cta.try_first")
+                    .font(.body.weight(.semibold))
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.large)
+        .tint(.accentColor)
+        .disabled(isWorking != nil)
+        .accessibilityIdentifier("demo.cta.tryFirst")
     }
 
     @ViewBuilder
