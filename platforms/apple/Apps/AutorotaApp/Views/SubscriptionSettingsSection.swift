@@ -60,18 +60,21 @@ struct SubscriptionSettingsSection: View {
             .disabled(isWorking != nil)
             .tint(.primary)
 
-            #if os(iOS)
-            if case .purchased = license.state,
-               let url = URL(string: "itms-apps://apps.apple.com/account/subscriptions") {
-                Link(destination: url) {
-                    Label("license.cta.manage_subscription", systemImage: "creditcard")
-                }
-                .tint(.primary)
-            }
-            #endif
+            // Manage-subscription link hidden while Local Manager is the only
+            // (one-time purchase) tier — nothing to manage in App Store.
+            // Re-enable alongside the Employee/Cloud subscription tiers:
+            // #if os(iOS)
+            // if case .purchased = license.state,
+            //    let url = URL(string: "itms-apps://apps.apple.com/account/subscriptions") {
+            //     Link(destination: url) {
+            //         Label("license.cta.manage_subscription", systemImage: "creditcard")
+            //     }
+            //     .tint(.primary)
+            // }
+            // #endif
 
-            futureTierRow(.employee)
-            futureTierRow(.saas)
+            // Employee + Cloud (Multi-Site) tiers hidden for now.
+            // Re-enable: futureTierRow(.employee); futureTierRow(.saas)
 
             #if DEBUG
             debugMenu

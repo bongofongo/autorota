@@ -20,8 +20,8 @@ struct TierPickView: View {
                 header
                 demoRow
                 tierCard(.localManager)
-                tierCard(.employee)
-                tierCard(.saas)
+                // Employee + Cloud (Multi-Site) tiers hidden for now.
+                // Re-enable: tierCard(.employee); tierCard(.saas)
                 restoreRow
                 offlineEscapeRow
                 if license.state.allowsMutation {

@@ -137,7 +137,7 @@ struct SettingsView: View {
                     NavigationLink {
                         SubscriptionView()
                     } label: {
-                        Label("Subscription", systemImage: "creditcard")
+                        Label("License", systemImage: "creditcard")
                     }
                     if !demo.isActive {
                         Button {

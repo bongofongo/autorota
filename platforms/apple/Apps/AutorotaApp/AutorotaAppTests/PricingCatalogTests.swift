@@ -7,25 +7,25 @@ struct PricingCatalogTests {
     @Test
     func gbpForUnitedKingdom() {
         let locale = Locale(identifier: "en_GB")
-        #expect(PricingCatalog.displayPrice(for: .localManager, locale: locale) == "£15.99")
+        #expect(PricingCatalog.displayPrice(for: .localManager, locale: locale) == "£3.99")
     }
 
     @Test
     func usdAsFallback() {
         let locale = Locale(identifier: "en_US")
-        #expect(PricingCatalog.displayPrice(for: .localManager, locale: locale) == "$19.99")
+        #expect(PricingCatalog.displayPrice(for: .localManager, locale: locale) == "$3.99")
     }
 
     @Test
-    func eurForGermany() {
+    func usdForGermany() {
         let locale = Locale(identifier: "de_DE")
-        #expect(PricingCatalog.displayPrice(for: .localManager, locale: locale) == "€17.99")
+        #expect(PricingCatalog.displayPrice(for: .localManager, locale: locale) == "$3.99")
     }
 
     @Test
     func unknownRegionFallsBackToUSD() {
         let locale = Locale(identifier: "en_NZ")
-        #expect(PricingCatalog.displayPrice(for: .localManager, locale: locale) == "$19.99")
+        #expect(PricingCatalog.displayPrice(for: .localManager, locale: locale) == "$3.99")
     }
 
     @Test

@@ -11419,43 +11419,43 @@
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "الاشتراك والترخيص"
+            "value" : "الترخيص"
           }
         },
         "bn" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "সাবস্ক্রিপশন ও লাইসেন্স"
+            "value" : "লাইসেন্স"
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Subscription & License"
+            "value" : "License"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Suscripción y licencia"
+            "value" : "Licencia"
           }
         },
         "hi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "सदस्यता और लाइसेंस"
+            "value" : "लाइसेंस"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "订阅与许可"
+            "value" : "许可"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "訂閱與授權"
+            "value" : "授權"
           }
         }
       }

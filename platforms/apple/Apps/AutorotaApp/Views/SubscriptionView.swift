@@ -10,6 +10,6 @@ struct SubscriptionView: View {
         #if os(macOS)
         .formStyle(.grouped)
         #endif
-        .navigationTitle("Subscription")
+        .navigationTitle("License")
     }
 }
