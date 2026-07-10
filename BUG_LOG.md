@@ -2,6 +2,12 @@
 
 Concise running log of bugs encountered. Each entry is one bullet with sub-bullets. New entries appended at top. Patched entries remain `pending verification` until the user confirms.
 
+- **Loading spinner flashes on tab-switch to Rota when the week has no rota**
+  - Date fixed: 2026-07-02 (pending verification)
+  - Where / what / repro: switch from another tab onto Rota on a week with no generated rota (the "No Schedule" / prerequisite empty state). A "Loading schedule…" spinner flashes for a split second before the empty state renders, causing a stutter. Absent when the week has an active rota. `RotaView.task` re-fires `loadSchedule()` on every tab reappearance (iPhone system `TabView`); the cold-load spinner gate was `schedule == nil`. On a no-rota week `schedule` stays nil across reloads, so every reappear counted as a cold load → `isLoading = true` → the `ProgressView` teardown/rebuild flash. Same class as the Shifts-tab empty-state flicker (below) and the earlier RotaView content-case fix — the `schedule == nil` heuristic covered has-content but not confirmed-empty.
+  - Patched: yes — pending user verification
+  - Fix: `RotaViewModel` gains a `hasLoaded` flag set true after the first `loadSchedule` completes (success or failure). Cold-load spinner now gates on `!hasLoaded` instead of `schedule == nil`, so only the very first load shows the spinner; all later reloads (tab reappear, week step, mutations) swap data underneath the live content with no spinner flash, whether or not the week has a rota. `make swift-build-check-ios` passes (0 errors).
+
 - **Flicker when switching to the Employees tab (iPhone)**
   - Date fixed: 2026-06-14 (pending verification)
   - Where / what / repro: iPhone uses the system `TabView` (`ContentView.swift`). Switching Rota → Employees showed an intermittent flicker. `EmployeeListView`'s `.task { await vm.load() }` re-fired on each tab appearance, and `EmployeeViewModel.load()` unconditionally reassigned `employees = [...]`, rebuilding the `List`. The "sometimes" nature was a race between the tab-switch animation and the async FFI reload landing mid-animation. iPad was unaffected (ZStack keep-alive switcher never re-fires `.task`).

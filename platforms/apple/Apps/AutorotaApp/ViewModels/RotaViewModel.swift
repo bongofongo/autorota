@@ -48,6 +48,12 @@ final class RotaViewModel {
         didSet { rebuildDerivedCaches() }
     }
     var isLoading = false
+    /// True once the first `loadSchedule` has completed (success or failure).
+    /// The spinner gates on this rather than `schedule == nil`, so a week with
+    /// no rota — where `schedule` stays nil across reloads — doesn't flash the
+    /// "Loading schedule…" spinner every time the tab reappears. Only the very
+    /// first cold load shows it.
+    private var hasLoaded = false
     var isScheduling = false
     var error: String?
     var warnings: [FfiShortfallWarning] = []
@@ -128,11 +134,13 @@ final class RotaViewModel {
     // MARK: - Loading
 
     func loadSchedule() async {
-        // Only show the spinner on a genuine cold load (no schedule on screen).
-        // A reload that already has content swaps data underneath the live grid
-        // with no teardown/spinner flash — the source of the mutation/tab-switch
-        // stutter.
-        let isColdLoad = (schedule == nil)
+        // Only show the spinner on the first-ever load. Reloads (tab reappear,
+        // week step, mutations) swap data underneath the live content with no
+        // teardown/spinner flash — the source of the tab-switch stutter. Gating
+        // on `!hasLoaded` rather than `schedule == nil` also covers weeks with
+        // no rota, where `schedule` stays nil and would otherwise flash the
+        // spinner on every reappear.
+        let isColdLoad = !hasLoaded
         if isColdLoad { isLoading = true }
         error = nil
 
@@ -166,6 +174,7 @@ final class RotaViewModel {
             self.error = userFacingMessage(error)
         }
 
+        hasLoaded = true
         if isColdLoad { isLoading = false }
     }
 
