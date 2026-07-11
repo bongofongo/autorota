@@ -12,6 +12,8 @@ struct ExportSheetView: View {
     let weekStart: String
     let service: AutorotaServiceProtocol
     @Environment(\.dismiss) private var dismiss
+    @Environment(DemoModeController.self) private var demo
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     // MARK: - Settings (from Export tab)
 
@@ -232,7 +234,19 @@ struct ExportSheetView: View {
                         .disabled(isExporting)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    if isExporting {
+                    if demo.isActive {
+                        // Demo never exports anything — the confirm action
+                        // just wraps up the tour. The step completes after
+                        // this sheet has fully dismissed (RotaView's
+                        // onDismiss), so the completion card presents
+                        // without racing the dismissal transition.
+                        Button("demo.export.finish") {
+                            demo.requestExportStepFinish()
+                            cleanup()
+                            dismiss()
+                        }
+                        .accessibilityIdentifier("demo.export.finish")
+                    } else if isExporting {
                         ProgressView()
                     } else {
                         Button("Export") {
@@ -282,6 +296,24 @@ struct ExportSheetView: View {
             clampFormat()
         }
         #if os(iOS)
+        // The export sheet covers the root spotlight overlay, so the demo
+        // tour's "customize the layout" tooltip mounts here instead.
+        .overlay {
+            ZStack {
+                if let spot = demo.currentSpotlight, spot.target == .exportCustomize {
+                    TutorialSpotlightOverlay(
+                        spotlight: spot,
+                        targetFrame: nil,
+                        onSkip: { demo.skipCurrentSubStep() }
+                    )
+                    .transition(TutorialFade.transition(isFirstOfSet: false))
+                }
+            }
+            .animation(
+                reduceMotion ? nil : .default,
+                value: demo.currentSpotlight
+            )
+        }
         .presentationDetents([.medium, .large])
         #endif
         #if os(macOS)

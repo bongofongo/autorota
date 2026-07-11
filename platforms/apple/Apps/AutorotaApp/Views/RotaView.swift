@@ -1,6 +1,5 @@
 import SwiftUI
 import AutorotaKit
-import TipKit
 
 struct RotaView: View {
 
@@ -14,10 +13,9 @@ struct RotaView: View {
     /// be cancelled when the user rapidly steps through weeks. Without this,
     /// a slow load for week N could overwrite a fresh load for week N+1.
     @State private var weekChangeTask: Task<Void, Never>?
-    private let twoPassTip = RotaTwoPassTip()
-    private let shareTip = RotaShareTip()
     @Environment(RotaUIBridge.self) private var bridge
     @Environment(EmployeeUIBridge.self) private var employeeBridge
+    @Environment(DemoModeController.self) private var demo
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.isMenuPushed) private var isMenuPushed
 
@@ -87,15 +85,22 @@ struct RotaView: View {
                 .id(vm.selectedWeekStart)
                 .transition(weekTransition)
             }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                rotaTopTip
-            }
             .navigationTitle("")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .sensoryFeedback(.selection, trigger: vm.swipeFeedbackTick)
-            .onChange(of: vm.selectedWeekStart) { _, _ in
+            .onAppear {
+                demo.noteTutorialEvent(.weekChanged(isTourWeek: vm.selectedWeekStart == demo.tourWeek))
+            }
+            .onChange(of: showExportSheet) { _, shown in
+                if shown { demo.noteTutorialEvent(.shareSheetOpened) }
+            }
+            .onChange(of: vm.hasSwapSource) { _, selecting in
+                if selecting { demo.noteTutorialEvent(.swapSourceSelected) }
+            }
+            .onChange(of: vm.selectedWeekStart) { _, newWeek in
+                demo.noteTutorialEvent(.weekChanged(isTourWeek: newWeek == demo.tourWeek))
                 // Cancel any in-flight reload from a prior week step so a slow
                 // load can't clobber a fresh one.
                 weekChangeTask?.cancel()
@@ -119,67 +124,17 @@ struct RotaView: View {
                     #endif
                 }
                 ToolbarItem(placement: .principal) {
-                    HStack(spacing: 8) {
-                        Button { stepWeek(-1, fromSwipe: false) } label: {
-                            Image(systemName: "chevron.left")
-                        }
-                        .accessibilityIdentifier("rota.prevWeek")
-
-                        Text(vm.weekDateRangeShort)
-                            .font(.headline)
-                            .lineLimit(1)
-                            .padding(.bottom, 5)
-                            .overlay(alignment: .bottom) {
-                                Rectangle()
-                                    .fill(vm.weekCategory.underlineTint)
-                                    .frame(height: vm.weekCategory == .current ? 2 : 1)
-                                    .padding(.horizontal, 2)
-                            }
-                            // Fixed width keeps the chevrons anchored as the
-                            // date range string changes width week to week.
-                            .frame(width: 150)
-                            .accessibilityIdentifier("rota.weekTitle")
-                            .accessibilityValue(vm.weekCategory.accessibilityLabel)
-
-                        Button { stepWeek(1, fromSwipe: false) } label: {
-                            Image(systemName: "chevron.right")
-                        }
-                        .accessibilityIdentifier("rota.nextWeek")
-                    }
+                    weekNavigationTitle
                 }
                 // Top-right: Swap on a scheduled week, Done while editing, or a
                 // lone Generate on an empty week. Share lives in the options
                 // menu on iPhone/macOS; iPad surfaces it as a discrete button.
                 ToolbarItemGroup(placement: .primaryAction) {
-                    if vm.isEditMode {
-                        Button { vm.exitEditMode() } label: {
-                            Image(systemName: "checkmark")
-                        }
-                        .accessibilityLabel("Done editing")
-                        .accessibilityIdentifier("rota.done")
-                    } else if vm.schedule != nil {
-                        if isPad {
-                            Button { showExportSheet = true } label: {
-                                Image(systemName: "square.and.arrow.up")
-                            }
-                            .accessibilityLabel("Share")
-                            .accessibilityIdentifier("rota.share")
-                        }
-                        Button { Task { await vm.enterEditMode() } } label: {
-                            Image(systemName: "slider.horizontal.3")
-                        }
-                        .accessibilityLabel("Sandbox mode")
-                        .accessibilityIdentifier("rota.sandbox")
-                    } else {
-                        Button { Task { await vm.runSchedule() } } label: {
-                            Image(systemName: "wand.and.stars")
-                        }
-                        .accessibilityLabel("Generate")
-                        .accessibilityIdentifier("rota.generate")
-                    }
+                    primaryActionButtons
                 }
             }
             .onChange(of: vm.isEditMode) { _, new in
+                demo.noteTutorialEvent(new ? .sandboxEntered : .sandboxExited)
                 if reduceMotion {
                     bridge.isEditMode = new
                 } else {
@@ -238,7 +193,11 @@ struct RotaView: View {
                 }.joined(separator: "\n"))
             }
             .errorAlert($vm.error)
-            .sheet(isPresented: $showExportSheet) {
+            .sheet(isPresented: $showExportSheet, onDismiss: {
+                // Demo "Finish Demo" defers step completion to here so the
+                // completion card presents only after this sheet is gone.
+                demo.consumeExportStepFinish()
+            }) {
                 ExportSheetView(
                     weekStart: vm.selectedWeekStart,
                     service: vm.service
@@ -271,24 +230,73 @@ struct RotaView: View {
         }
     }
 
-    // MARK: - Top-of-page tip
+    // MARK: - Toolbar content
 
-    /// `safeAreaInset(edge: .top)` content. Reserves the tip's space without
-    /// reflowing siblings — an inline TipView in the body cascaded into a
-    /// sidebar reflow on macOS `.sidebarAdaptable` (same regression fixed for
-    /// `EmployeeListView`).
-    @ViewBuilder
-    private var rotaTopTip: some View {
-        if !vm.isLoading {
-            if vm.schedule != nil {
-                TipView(shareTip)
-                    .padding(.horizontal)
-                    .padding(.top, 4)
-            } else if employeeCount != 0 {
-                TipView(twoPassTip)
-                    .padding(.horizontal)
-                    .padding(.top, 8)
+    /// Principal toolbar item: prev/next week chevrons around the range label.
+    private var weekNavigationTitle: some View {
+        HStack(spacing: 8) {
+            Button { stepWeek(-1, fromSwipe: false) } label: {
+                Image(systemName: "chevron.left")
             }
+            .accessibilityIdentifier("rota.prevWeek")
+
+            Text(vm.weekDateRangeShort)
+                .font(.headline)
+                .lineLimit(1)
+                .padding(.bottom, 5)
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(vm.weekCategory.underlineTint)
+                        .frame(height: vm.weekCategory == .current ? 2 : 1)
+                        .padding(.horizontal, 2)
+                }
+                // Fixed width keeps the chevrons anchored as the
+                // date range string changes width week to week.
+                .frame(width: 150)
+                .accessibilityIdentifier("rota.weekTitle")
+                .accessibilityValue(vm.weekCategory.accessibilityLabel)
+
+            Button { stepWeek(1, fromSwipe: false) } label: {
+                Image(systemName: "chevron.right")
+            }
+            .accessibilityIdentifier("rota.nextWeek")
+            .tutorialTarget(.nextWeekChevron)
+        }
+    }
+
+    /// Top-right buttons: Done while editing, Share (iPad) + Sandbox on a
+    /// scheduled week, or a lone Generate on an empty week.
+    @ViewBuilder
+    private var primaryActionButtons: some View {
+        if vm.isEditMode {
+            Button { vm.exitEditMode() } label: {
+                Image(systemName: "checkmark")
+            }
+            .accessibilityLabel("Done editing")
+            .accessibilityIdentifier("rota.done")
+            .tutorialTarget(.doneButton)
+        } else if vm.schedule != nil {
+            if isPad {
+                Button { showExportSheet = true } label: {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .accessibilityLabel("Share")
+                .accessibilityIdentifier("rota.share")
+                .tutorialTarget(.shareEntry)
+            }
+            Button { Task { await vm.enterEditMode() } } label: {
+                Image(systemName: "slider.horizontal.3")
+            }
+            .accessibilityLabel("Sandbox mode")
+            .accessibilityIdentifier("rota.sandbox")
+            .tutorialTarget(.sandboxButton)
+        } else {
+            Button { Task { await vm.runSchedule() } } label: {
+                Image(systemName: "wand.and.stars")
+            }
+            .accessibilityLabel("Generate")
+            .accessibilityIdentifier("rota.generate")
+            .tutorialTarget(.generateButton)
         }
     }
 
@@ -328,6 +336,23 @@ struct RotaView: View {
         }
         .accessibilityLabel("Options")
         .accessibilityIdentifier("rota.options")
+        // Share lives inside this menu on iPhone/macOS, so the export
+        // tour step points here; iPad tags its discrete Share button.
+        .modifier(ShareEntryTutorialTag(enabled: !isPad))
+    }
+}
+
+/// Conditionally registers the demo tour's share-entry target.
+private struct ShareEntryTutorialTag: ViewModifier {
+    let enabled: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if enabled {
+            content.tutorialTarget(.shareEntry)
+        } else {
+            content
+        }
     }
 }
 
@@ -419,6 +444,15 @@ private struct ScheduleGridView: View {
         vm.swipeFeedbackTick += 1
     }
 
+    /// First shift of the week in weekday order — the card the demo tour's
+    /// "alter an assignment" spotlight points at.
+    private var firstShiftId: Int64? {
+        for day in vm.allWeekdays {
+            if let shift = vm.shifts(on: day).first { return shift.id }
+        }
+        return nil
+    }
+
     /// Present a sheet, first prompting for confirmation if this is the first
     /// edit on a locked past week. Confirming unlocks edits for the visit.
     private func requestSheet(_ sheet: ScheduleSheet) {
@@ -507,6 +541,7 @@ private struct ScheduleGridView: View {
                                 onEdit: { requestSheet(.shiftEditor(shift)) },
                                 onAddEmployee: { requestSheet(.addEmployee(shift)) }
                             )
+                            .modifier(FirstShiftTutorialTag(isFirst: shift.id == firstShiftId))
                         }
                         if shifts.isEmpty {
                             Text("No shifts")
@@ -650,6 +685,7 @@ private struct ScheduleGridView: View {
                         onAddEmployee: { requestSheet(.addEmployee(shift)) },
                         isCompact: true
                     )
+                    .modifier(FirstShiftTutorialTag(isFirst: shift.id == firstShiftId))
                 }
             }
 
@@ -669,6 +705,21 @@ private struct ScheduleGridView: View {
             Spacer(minLength: 0)
         }
         .frame(width: width, alignment: .top)
+    }
+}
+
+/// Registers the week's first shift card as the demo tour's "alter an
+/// assignment" spotlight target.
+private struct FirstShiftTutorialTag: ViewModifier {
+    let isFirst: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isFirst {
+            content.tutorialTarget(.shiftCard)
+        } else {
+            content
+        }
     }
 }
 

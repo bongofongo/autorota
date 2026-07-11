@@ -1,6 +1,5 @@
 import SwiftUI
 import AutorotaKit
-import TipKit
 
 struct EmployeeEditSheet: View {
 
@@ -15,8 +14,8 @@ struct EmployeeEditSheet: View {
 
     @State private var roleVM = RoleViewModel()
     @State private var overrideVM = OverrideViewModel()
-    private let employeeRolesTip = EmployeeRolesTip()
-    private let availabilityModeTip = AvailabilityModeTip()
+    /// Sticky lasso mode is on in one of the grids — pauses Form scrolling.
+    @State private var gridLassoActive = false
     @State private var firstName = ""
     @State private var lastName = ""
     @State private var nickname = ""
@@ -196,7 +195,6 @@ struct EmployeeEditSheet: View {
                     DatePicker("Start date", selection: $startDate, displayedComponents: .date)
                 }
                 Section("Roles") {
-                    TipView(employeeRolesTip)
                     if roleVM.roles.isEmpty {
                         Text("No roles defined. Add roles in the Shifts tab.")
                             .foregroundStyle(.secondary)
@@ -329,7 +327,6 @@ struct EmployeeEditSheet: View {
                 }
 
                 Section("Availability") {
-                    TipView(availabilityModeTip)
                     Picker("Mode", selection: $availabilityMode) {
                         ForEach(AvailMode.allCases) { m in
                             Text(m.rawValue).tag(m)
@@ -348,7 +345,8 @@ struct EmployeeEditSheet: View {
                             onChange: { defaultAvailabilitySlots = $0 },
                             onVisibleRangeChange: { start, end in
                                 applyDefaultRangeChange(start: start, end: end)
-                            }
+                            },
+                            onLassoModeChange: { gridLassoActive = $0 }
                         )
                     case .actual:
                         let days = sheetWeekDays(offset: actualWeekOffset)
@@ -397,6 +395,7 @@ struct EmployeeEditSheet: View {
                             visibleHourStart: defaultVisibleStart,
                             visibleHourEnd: defaultVisibleEnd,
                             onChange: { applyActualEdit(newSlots: $0) },
+                            onLassoModeChange: { gridLassoActive = $0 },
                             onReset: {
                                 for d in days {
                                     let wd = d.weekday
@@ -424,6 +423,12 @@ struct EmployeeEditSheet: View {
             }
             .dismissesKeyboardOnTap()
             .appFormGroupedStyle()
+            .scrollDisabled(gridLassoActive)
+            .onChange(of: availabilityMode) { _, _ in
+                // Switching grids unmounts the toggled one; never leave
+                // scrolling stuck off.
+                gridLassoActive = false
+            }
             .navigationTitle(isEditing ? "Edit Employee" : "New Employee")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

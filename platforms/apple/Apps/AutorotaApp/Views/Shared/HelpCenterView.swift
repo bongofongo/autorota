@@ -1,5 +1,4 @@
 import SwiftUI
-import TipKit
 
 /// Help hub pushed from the Menu landing: the full guide plus ways to learn about
 /// or get help with the app.
@@ -18,14 +17,6 @@ struct HelpCenterView: View {
                 } label: {
                     Label("Help & Guide", systemImage: "book")
                 }
-                Button {
-                    try? Tips.resetDatastore()
-                } label: {
-                    Label("Replay Tooltips", systemImage: "arrow.counterclockwise.circle")
-                }
-                .tint(.primary)
-            } footer: {
-                Text("Re-show the in-app tips you've already dismissed.")
             }
 
             Section("About") {

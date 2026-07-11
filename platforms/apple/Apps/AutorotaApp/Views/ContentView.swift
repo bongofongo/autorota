@@ -17,6 +17,8 @@ struct ContentView: View {
     @State private var onboardingStartPage = 0
     @Environment(LicenseService.self) private var license
     @Environment(DemoModeController.self) private var demo
+    @Environment(TutorialSpotlightModel.self) private var spotlightModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     #if os(iOS)
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -60,7 +62,33 @@ struct ContentView: View {
                 onboardingStartPage = Int.max
                 showOnboarding = true
             }
+            // Spotlight frames are only tracked mid-demo; seed the tour
+            // with the tab the user is already on.
+            spotlightModel.isTracking = active
+            if active {
+                demo.noteTutorialEvent(.tabSelected(activeTabPage))
+            } else {
+                spotlightModel.reset()
+            }
         }
+        #if os(iOS)
+        .overlay {
+            // ZStack + transition so guidance eases in after the page
+            // settles and drops out quickly (the id remounts per sub-step,
+            // so each new tooltip entry gets the full delay + fade).
+            ZStack {
+                if let spot = demo.currentSpotlight {
+                    TutorialSpotlightHost(spotlight: spot)
+                        .id(spot.instructionKey)
+                        .transition(TutorialFade.transition(isFirstOfSet: spot.index == 1))
+                }
+            }
+            .animation(
+                reduceMotion ? nil : .default,
+                value: demo.currentSpotlight
+            )
+        }
+        #endif
         .onChange(of: employeeBridge.requestNewEmployeeSheet) { _, requested in
             if requested {
                 // If Employees lives in the overflow Menu (iOS/iPad), TabView
@@ -84,6 +112,10 @@ struct ContentView: View {
             OnboardingView(isPresented: $showOnboarding, startPage: onboardingStartPage)
                 .environment(employeeBridge)
                 .interactiveDismissDisabled()
+                // Explicit opaque backdrop: a cover presented near another
+                // sheet's dismissal can otherwise render with a clear
+                // background, floating the tier picker over the app.
+                .presentationBackground(Color(uiColor: .systemBackground))
         }
         #else
         .sheet(isPresented: $showOnboarding) {
@@ -144,10 +176,19 @@ struct ContentView: View {
     /// Leaving the Rota page exits its swap/edit mode — same effect as the
     /// checkmark. Setting the shared flag drives `RotaView.exitEditMode()`.
     private func handleSelectionChange(_ new: TabSelection) {
-        if case .page(let p) = new { lastPage = p }
+        if case .page(let p) = new {
+            lastPage = p
+            demo.noteTutorialEvent(.tabSelected(p))
+        }
         if new != .page(.rota) && bridge.isEditMode {
             bridge.isEditMode = false
         }
+    }
+
+    /// The page currently on screen, regardless of platform layout.
+    private var activeTabPage: TabPage {
+        if case .page(let p) = selection { return p }
+        return lastPage
     }
 
     #if os(iOS)
@@ -185,8 +226,8 @@ struct ContentView: View {
         ZStack {
             ForEach(layoutManager.tabBarPages) { page in
                 page.destinationView
-                    .opacity(activePage == page ? 1 : 0)
-                    .allowsHitTesting(activePage == page)
+                    .opacity(activeTabPage == page ? 1 : 0)
+                    .allowsHitTesting(activeTabPage == page)
             }
         }
         .environment(layoutManager)
@@ -198,12 +239,75 @@ struct ContentView: View {
         }
     }
 
-    private var activePage: TabPage {
-        if case .page(let p) = selection { return p }
-        return lastPage
-    }
     #endif
 }
+
+#if os(iOS)
+/// Resolves the active spotlight target to an on-screen frame and mounts
+/// the overlay. Guidance only renders in the right context: page-bound
+/// targets need their tab current AND a registered frame. Tab-switch
+/// prompts are never highlighted (the system tab bar can't be located
+/// reliably) — they float as a hole-less tooltip and the user finds the
+/// tab themselves.
+private struct TutorialSpotlightHost: View {
+    let spotlight: DemoSpotlight
+
+    @Environment(TutorialSpotlightModel.self) private var model
+    @Environment(DemoModeController.self) private var demo
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// How the active target resolves on screen.
+    private enum Resolution {
+        /// Dim the screen with a spotlight hole at this frame.
+        case hole(CGRect)
+        /// No locatable frame, but guidance is still possible — float the
+        /// tooltip without a hole.
+        case floating
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            let resolution = resolve(geo: geo)
+            // ZStack + transition: guidance breathes in when the user
+            // reaches the target's context and gets out of the way fast
+            // when they leave it.
+            ZStack {
+                if let resolution {
+                    TutorialSpotlightOverlay(
+                        spotlight: spotlight,
+                        targetFrame: {
+                            if case .hole(let frame) = resolution { return frame }
+                            return nil
+                        }(),
+                        onSkip: { demo.skipCurrentSubStep() }
+                    )
+                    .transition(TutorialFade.transition(isFirstOfSet: spotlight.index == 1))
+                }
+            }
+            .animation(
+                reduceMotion ? nil : .default,
+                value: resolution == nil
+            )
+        }
+    }
+
+    /// nil = show nothing (wrong page / target off screen).
+    private func resolve(geo: GeometryProxy) -> Resolution? {
+        // Page-bound targets: only on their own tab, and only when the
+        // target view has registered a frame (it's actually on screen) —
+        // except pure prompts, which float without ever having a frame.
+        if let required = spotlight.target.requiredTab {
+            guard demo.currentTab == required else { return nil }
+            if let frame = model.frames[spotlight.target] {
+                return .hole(frame)
+            }
+            return spotlight.target.floatsWithoutFrame ? .floating : nil
+        }
+        // Tab-switch prompts: floating tooltip only, no highlight.
+        return .floating
+    }
+}
+#endif
 
 enum TabSelection: Hashable {
     case page(TabPage)

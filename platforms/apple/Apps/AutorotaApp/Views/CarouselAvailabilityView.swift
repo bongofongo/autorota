@@ -149,6 +149,8 @@ private struct AvailabilityPage: View {
     @State private var overrideVM = OverrideViewModel()
     @State private var slots: [AvailabilitySlot] = []
     @State private var visibleRange: (start: Int, end: Int)
+    /// Sticky lasso toggle is on — pauses this card's scroll view.
+    @State private var lassoActive = false
 
     init(employee: FfiEmployee, weekStartString: String) {
         self.employee = employee
@@ -214,6 +216,7 @@ private struct AvailabilityPage: View {
                     onVisibleRangeChange: { start, end in
                         visibleRange = (start, end)
                     },
+                    onLassoModeChange: { lassoActive = $0 },
                     outlinedWeekdays: outlinedWeekdays,
                     weekdaySubheaders: weekdaySubheaders
                 )
@@ -221,6 +224,7 @@ private struct AvailabilityPage: View {
             }
             .padding(.vertical, 8)
         }
+        .scrollDisabled(lassoActive)
         .task {
             await overrideVM.loadForEmployee(id: employee.id)
             slots = mergedSlots()

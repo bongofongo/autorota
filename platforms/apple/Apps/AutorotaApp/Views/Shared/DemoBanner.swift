@@ -9,6 +9,11 @@ struct DemoBanner: View {
     @Environment(DemoModeController.self) private var demo
     @State private var showChecklist = false
     @State private var showCompletion = false
+    /// Set by the completion card's "Choose Your Plan": exit the demo only
+    /// AFTER the sheet has fully dismissed. Exiting during the dismissal
+    /// makes ContentView present the onboarding cover mid-transition, which
+    /// renders the tier picker without its opaque backdrop.
+    @State private var exitAfterCompletionDismiss = false
 
     var body: some View {
         HStack(spacing: 10) {
@@ -31,14 +36,32 @@ struct DemoBanner: View {
 
             Spacer(minLength: 8)
 
-            progressDots
-
-            if demo.currentStep?.isManualAdvance == true {
-                Button("demo.banner.next") {
-                    demo.advanceManualStep()
+            if demo.isComplete {
+                // Finished state: a checkmark marks the tour done and
+                // reopens the completion card; tapping the banner itself
+                // still opens the objectives checklist.
+                Button {
+                    showCompletion = true
+                } label: {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(.green)
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Demo finished")
+                .accessibilityIdentifier("demo.banner.finished")
+            } else {
+                progressDots
+
+                if demo.currentStep?.isManualAdvance == true {
+                    Button("demo.banner.next") {
+                        demo.advanceManualStep()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
             }
 
             menu
@@ -53,8 +76,13 @@ struct DemoBanner: View {
         .sheet(isPresented: $showChecklist) {
             DemoChecklistSheet()
         }
-        .sheet(isPresented: $showCompletion) {
-            DemoCompletionCard()
+        .sheet(isPresented: $showCompletion, onDismiss: {
+            if exitAfterCompletionDismiss {
+                exitAfterCompletionDismiss = false
+                demo.exitDemo()
+            }
+        }) {
+            DemoCompletionCard(onChoosePlan: { exitAfterCompletionDismiss = true })
         }
         .onChange(of: demo.isComplete) { _, complete in
             if complete { showCompletion = true }
@@ -171,10 +199,11 @@ private struct DemoChecklistSheet: View {
 }
 
 /// Congratulations card shown when the tour finishes. "Choose your plan"
-/// exits the demo; ContentView then re-presents onboarding at the tier
-/// picker for unlicensed users.
+/// flags the exit and dismisses; the banner exits the demo in the sheet's
+/// onDismiss (after the transition), and ContentView then re-presents
+/// onboarding at the tier picker for unlicensed users.
 private struct DemoCompletionCard: View {
-    @Environment(DemoModeController.self) private var demo
+    let onChoosePlan: () -> Void
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -196,8 +225,8 @@ private struct DemoCompletionCard: View {
 
             VStack(spacing: 10) {
                 Button {
+                    onChoosePlan()
                     dismiss()
-                    demo.exitDemo()
                 } label: {
                     Text("demo.completion.choose_plan")
                         .frame(maxWidth: .infinity)

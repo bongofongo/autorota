@@ -77,6 +77,22 @@ struct DemoModeControllerTests {
         DemoModeController(environment: env.environment(), service: mock)
     }
 
+    /// Skip steps until `id` is current (bounded so a regression can't hang).
+    private func skip(_ controller: DemoModeController, to id: DemoStep.ID) {
+        for _ in 0..<DemoStep.ID.allCases.count {
+            if controller.currentStep?.id == id || controller.currentStep == nil { break }
+            controller.skipCurrentStep()
+        }
+    }
+
+    /// Skip every remaining step.
+    private func skipAll(_ controller: DemoModeController) {
+        for _ in 0..<DemoStep.ID.allCases.count {
+            if controller.currentStep == nil { break }
+            controller.skipCurrentStep()
+        }
+    }
+
     // MARK: - Enter / exit ordering
 
     @Test func enterPausesSyncBeforeSwitchingAndSeeds() {
@@ -166,7 +182,7 @@ struct DemoModeControllerTests {
         #expect(controller.completedCount == 1)
     }
 
-    @Test func availabilityStepCompletesWhenMercuryGainsOverride() async {
+    @Test func availabilityStepWaitsForLassoSubStepsBeforeCompleting() async {
         let env = EnvRecorder()
         let mock = seededMock()
         let controller = makeController(env: env, mock: mock)
@@ -178,11 +194,54 @@ struct DemoModeControllerTests {
         await controller.evaluateCurrentStep(changedTables: [.role])
         #expect(controller.currentStep?.id == .setAvailability)
 
-        // Mercury (id 1) gets a manual per-date override.
+        // Mercury (id 1) gets a manual per-date override — but the guided
+        // sequence hasn't reached the lasso teaching yet, so the step must
+        // NOT complete.
+        mock.stubbedAvailabilityOverrides.append(
+            makeOverride(id: 200, employeeId: 1, source: "manual")
+        )
+        controller.noteTutorialEvent(.cellCycled)
+        await controller.evaluateCurrentStep(changedTables: [.employeeAvailabilityOverride])
+        #expect(controller.currentStep?.id == .setAvailability)
+        #expect(controller.currentSpotlight?.instructionKey
+                == "demo.sub.setAvailability.toggleLassoOn")
+
+        // Finishing the lasso sub-steps and closing the grid editor lets
+        // the step complete.
+        controller.noteTutorialEvent(.lassoDrawn)
+        controller.noteTutorialEvent(.lassoApplied)
+        await controller.evaluateCurrentStep(changedTables: [.employeeAvailabilityOverride])
+        #expect(controller.currentStep?.id == .setAvailability) // checkmark still pending
+
+        controller.noteTutorialEvent(.gridEditEnded)
+        for _ in 0..<50 where controller.currentStep?.id == .setAvailability {
+            await Task.yield()
+        }
+        #expect(controller.currentStep?.id == .createException)
+    }
+
+    @Test func skippingRemainingSubStepsCompletesSatisfiedAvailabilityStep() async {
+        let env = EnvRecorder()
+        let mock = seededMock()
+        let controller = makeController(env: env, mock: mock)
+        controller.enterDemo()
+        await controller.captureSeededBaseline()
+        controller.advanceManualStep()
+
+        // Predicate already satisfied; the last data change has passed.
         mock.stubbedAvailabilityOverrides.append(
             makeOverride(id: 200, employeeId: 1, source: "manual")
         )
         await controller.evaluateCurrentStep(changedTables: [.employeeAvailabilityOverride])
+        #expect(controller.currentStep?.id == .setAvailability)
+
+        // Skipping through the rest of the sequence must still complete the
+        // step (deadlock guard re-checks the predicate asynchronously).
+        let subCount = DemoModeController.subSteps(for: .setAvailability).count
+        for _ in 0..<subCount { controller.skipCurrentSubStep() }
+        for _ in 0..<50 where controller.currentStep?.id == .setAvailability {
+            await Task.yield()
+        }
         #expect(controller.currentStep?.id == .createException)
     }
 
@@ -211,6 +270,58 @@ struct DemoModeControllerTests {
             makeOverride(id: 301, employeeId: 4, source: "exception")
         )
         await controller.evaluateCurrentStep(changedTables: [.employeeAvailabilityOverride])
+        #expect(controller.currentStep?.id == .createShift)
+    }
+
+    @Test func shiftTipsWaitUntilEmployeeDetailCloses() {
+        let env = EnvRecorder()
+        let controller = makeController(env: env, mock: seededMock())
+        controller.enterDemo()
+        controller.advanceManualStep()
+        // The exception step typically completes while Mars's detail page
+        // is still on screen.
+        controller.noteTutorialEvent(.employeeDetailOpened(nickname: "Mars"))
+        skip(controller, to: .createShift)
+
+        #expect(controller.currentStep?.id == .createShift)
+        #expect(controller.currentSpotlight == nil)
+
+        // Backing out to the Employees list releases the shift tips.
+        controller.noteTutorialEvent(.employeeDetailClosed)
+        #expect(controller.currentSpotlight?.target == .shiftsTab)
+    }
+
+    @Test func createShiftStepGuidesThroughPlusAndStaffing() async {
+        let env = EnvRecorder()
+        let mock = seededMock()
+        mock.stubbedShiftTemplates = []
+        let controller = makeController(env: env, mock: mock)
+        controller.enterDemo()
+        await controller.captureSeededBaseline()
+        controller.advanceManualStep()
+        skip(controller, to: .createShift)
+
+        #expect(controller.currentSpotlight?.target == .shiftsTab)
+
+        controller.noteTutorialEvent(.tabSelected(.templates))
+        #expect(controller.currentSpotlight?.target == .shiftPurposeHint)
+        #expect(controller.currentSpotlight?.isInfo == true)
+
+        // The purpose card is info-only — Next (skip) moves on.
+        controller.skipCurrentSubStep()
+        #expect(controller.currentSpotlight?.target == .addShiftButton)
+        #expect(controller.currentSpotlight?.isInfo == false)
+
+        controller.noteTutorialEvent(.addShiftSheetOpened)
+        #expect(controller.currentSpotlight?.target == .shiftRoleStaffingHint)
+
+        // Saving a template that wasn't in the seed completes the step.
+        mock.stubbedShiftTemplates.append(FfiShiftTemplate(
+            id: 1, name: "Close", weekdays: ["Fri"], startTime: "17:00",
+            endTime: "22:00", requiredRole: "", minEmployees: 1,
+            maxEmployees: 2, roleRequirements: [], deleted: false
+        ))
+        await controller.evaluateCurrentStep(changedTables: [.shiftTemplate])
         #expect(controller.currentStep?.id == .generateRota)
     }
 
@@ -221,8 +332,7 @@ struct DemoModeControllerTests {
         controller.enterDemo()
         await controller.captureSeededBaseline()
         controller.advanceManualStep()
-        controller.skipCurrentStep()
-        controller.skipCurrentStep() // -> generateRota
+        skip(controller, to: .generateRota)
 
         // No schedule yet.
         await controller.evaluateCurrentStep(changedTables: [.rota, .assignment])
@@ -247,9 +357,7 @@ struct DemoModeControllerTests {
         let controller = makeController(env: env, mock: seededMock())
         controller.enterDemo()
         controller.advanceManualStep()
-        controller.skipCurrentStep()
-        controller.skipCurrentStep()
-        controller.skipCurrentStep() // -> alterRota
+        skip(controller, to: .alterRota)
 
         await controller.evaluateCurrentStep(changedTables: [.save])
         #expect(controller.currentStep?.id == .alterRota)
@@ -263,9 +371,7 @@ struct DemoModeControllerTests {
         let controller = makeController(env: env, mock: seededMock())
         controller.enterDemo()
         controller.advanceManualStep()
-        controller.skipCurrentStep()
-        controller.skipCurrentStep()
-        controller.skipCurrentStep() // -> alterRota (event-based step)
+        skip(controller, to: .alterRota)
 
         await controller.evaluateCurrentStep(changedTables: nil)
         #expect(controller.currentStep?.id == .alterRota)
@@ -277,7 +383,7 @@ struct DemoModeControllerTests {
         controller.enterDemo()
 
         controller.advanceManualStep()
-        for _ in 0..<5 { controller.skipCurrentStep() }
+        skipAll(controller)
 
         #expect(controller.isComplete)
         #expect(controller.currentStep == nil)
@@ -288,7 +394,7 @@ struct DemoModeControllerTests {
         let controller = makeController(env: env, mock: seededMock())
         controller.enterDemo()
         controller.advanceManualStep()
-        for _ in 0..<5 { controller.skipCurrentStep() }
+        skipAll(controller)
         #expect(controller.isComplete)
 
         controller.restartTour()
@@ -296,6 +402,226 @@ struct DemoModeControllerTests {
         #expect(!controller.isComplete)
         #expect(controller.currentStep?.id == .meetCrew)
         #expect(controller.completedCount == 0)
+    }
+
+    // MARK: - Guided sub-steps
+
+    @Test func meetCrewSpotlightsEmployeesTabAndAutoCompletes() {
+        let env = EnvRecorder()
+        let controller = makeController(env: env, mock: seededMock())
+        controller.enterDemo()
+
+        #expect(controller.currentSpotlight?.target == .employeesTab)
+        #expect(controller.currentSpotlight?.instructionKey
+                == "demo.sub.meetCrew.openEmployeesTab")
+
+        // Reaching the Employees tab completes the step — no banner Next.
+        controller.noteTutorialEvent(.tabSelected(.employees))
+        #expect(controller.currentStep?.id == .setAvailability)
+        // Exposed for the spotlight host's page gating.
+        #expect(controller.currentTab == .employees)
+    }
+
+    @Test func setAvailabilitySubStepsWalkTheGridFlow() {
+        let env = EnvRecorder()
+        let controller = makeController(env: env, mock: seededMock())
+        controller.enterDemo()
+        controller.noteTutorialEvent(.tabSelected(.employees)) // -> setAvailability
+
+        // Already on the Employees tab, so the first sub-step is skipped.
+        #expect(controller.currentSpotlight?.target == .mercuryRow)
+
+        controller.noteTutorialEvent(.employeeDetailOpened(nickname: "Venus"))
+        #expect(controller.currentSpotlight?.target == .mercuryRow)
+
+        controller.noteTutorialEvent(.employeeDetailOpened(nickname: "Mercury"))
+        #expect(controller.currentSpotlight?.target == .availabilityPencil)
+
+        controller.noteTutorialEvent(.gridEditStarted)
+        #expect(controller.currentSpotlight?.instructionKey
+                == "demo.sub.setAvailability.cycleCell")
+
+        controller.noteTutorialEvent(.cellCycled)
+        #expect(controller.currentSpotlight?.instructionKey
+                == "demo.sub.setAvailability.toggleLassoOn")
+        #expect(controller.currentSpotlight?.target == .lassoToggle)
+
+        controller.noteTutorialEvent(.lassoToggledOn)
+        #expect(controller.currentSpotlight?.instructionKey
+                == "demo.sub.setAvailability.lassoBlock")
+
+        controller.noteTutorialEvent(.lassoDrawn)
+        #expect(controller.currentSpotlight?.instructionKey
+                == "demo.sub.setAvailability.bulkApply")
+
+        controller.noteTutorialEvent(.lassoApplied)
+        #expect(controller.currentSpotlight?.instructionKey
+                == "demo.sub.setAvailability.toggleLassoOff")
+        #expect(controller.currentSpotlight?.target == .lassoToggle)
+
+        controller.noteTutorialEvent(.lassoToggledOff)
+        #expect(controller.currentSpotlight?.instructionKey
+                == "demo.sub.setAvailability.tapAvailabilityDone")
+        #expect(controller.currentSpotlight?.target == .availabilityPencil)
+
+        controller.noteTutorialEvent(.gridEditEnded)
+        #expect(controller.currentSpotlight == nil)
+    }
+
+    @Test func outOfOrderEventJumpsPastIntermediateSubSteps() {
+        let env = EnvRecorder()
+        let controller = makeController(env: env, mock: seededMock())
+        controller.enterDemo()
+        controller.advanceManualStep() // -> setAvailability, sub 0
+
+        // The user found the pencil on their own — jump straight past the
+        // navigation sub-steps.
+        controller.noteTutorialEvent(.gridEditStarted)
+        #expect(controller.currentSpotlight?.instructionKey
+                == "demo.sub.setAvailability.cycleCell")
+    }
+
+    @Test func skipCurrentSubStepAdvancesOne() {
+        let env = EnvRecorder()
+        let controller = makeController(env: env, mock: seededMock())
+        controller.enterDemo()
+        controller.advanceManualStep() // -> setAvailability
+
+        #expect(controller.currentSpotlight?.target == .employeesTab)
+        controller.skipCurrentSubStep()
+        #expect(controller.currentSpotlight?.target == .mercuryRow)
+    }
+
+    @Test func generateRotaNormalizesAgainstContext() {
+        let env = EnvRecorder()
+        let controller = makeController(env: env, mock: seededMock())
+        controller.enterDemo()
+        controller.noteTutorialEvent(.tabSelected(.rota))
+        controller.noteTutorialEvent(.weekChanged(isTourWeek: true))
+        controller.advanceManualStep()
+        skip(controller, to: .generateRota)
+
+        // Already on the Rota tab viewing the tour week — point straight
+        // at the Generate wand.
+        #expect(controller.currentSpotlight?.target == .generateButton)
+    }
+
+    @Test func alterRotaCompletesOnDoneAfterSandboxEdit() async {
+        let env = EnvRecorder()
+        let controller = makeController(env: env, mock: seededMock())
+        controller.enterDemo()
+        controller.advanceManualStep()
+        skip(controller, to: .alterRota)
+
+        #expect(controller.currentSpotlight?.target == .sandboxButton)
+
+        controller.noteTutorialEvent(.sandboxEntered)
+        #expect(controller.currentSpotlight?.target == .shiftCard)
+
+        // First swap tap: guidance drops to the floating "tap another
+        // employee" hint while the app awaits the confirming tap.
+        controller.noteTutorialEvent(.swapSourceSelected)
+        #expect(controller.currentSpotlight?.target == .swapSecondTap)
+
+        // Assignment mutation inside sandbox points at Done instead of
+        // completing the step.
+        await controller.evaluateCurrentStep(changedTables: [.assignment])
+        #expect(controller.currentStep?.id == .alterRota)
+        #expect(controller.currentSpotlight?.target == .doneButton)
+
+        controller.noteTutorialEvent(.sandboxExited)
+        #expect(controller.currentStep?.id == .exportPDF)
+    }
+
+    @Test func exceptionStepGuidesThroughMarsToAddException() {
+        let env = EnvRecorder()
+        let controller = makeController(env: env, mock: seededMock())
+        controller.enterDemo()
+        controller.noteTutorialEvent(.tabSelected(.employees)) // -> setAvailability
+        controller.skipCurrentStep() // -> createException
+
+        // Already on Employees, so guidance starts at Mars's row.
+        #expect(controller.currentSpotlight?.target == .marsRow)
+
+        controller.noteTutorialEvent(.employeeDetailOpened(nickname: "Mars"))
+        #expect(controller.currentSpotlight?.target == .exceptionsScrollHint)
+
+        // The Add Exception row scrolling into view advances past the hint.
+        controller.noteTutorialEvent(.exceptionsSectionVisible(nickname: "Mars"))
+        #expect(controller.currentSpotlight?.target == .addExceptionButton)
+
+        // Opening the exception sheet exhausts the guidance; saving the
+        // range completes the step via the data predicate.
+        controller.noteTutorialEvent(.exceptionSheetOpened)
+        #expect(controller.currentSpotlight == nil)
+        #expect(controller.currentStep?.id == .createException)
+    }
+
+    @Test func exportStepGuidesToShareEntry() {
+        let env = EnvRecorder()
+        let controller = makeController(env: env, mock: seededMock())
+        controller.enterDemo()
+        controller.advanceManualStep()
+        skip(controller, to: .exportPDF)
+
+        #expect(controller.currentStep?.id == .exportPDF)
+        #expect(controller.currentSpotlight?.target == .rotaTab)
+
+        controller.noteTutorialEvent(.tabSelected(.rota))
+        #expect(controller.currentSpotlight?.target == .shareEntry)
+
+        // Opening the share/export sheet moves guidance to the in-sheet
+        // customize-layout tip.
+        controller.noteTutorialEvent(.shareSheetOpened)
+        #expect(controller.currentSpotlight?.target == .exportCustomize)
+        #expect(controller.currentStep?.id == .exportPDF)
+
+        // "Finish Demo" defers completion until the sheet has dismissed.
+        controller.requestExportStepFinish()
+        #expect(controller.currentStep?.id == .exportPDF)
+
+        controller.consumeExportStepFinish()
+        #expect(controller.currentStep == nil)
+        #expect(controller.isComplete)
+    }
+
+    @Test func consumeExportFinishWithoutRequestIsNoOp() {
+        let env = EnvRecorder()
+        let controller = makeController(env: env, mock: seededMock())
+        controller.enterDemo()
+        controller.advanceManualStep()
+        skip(controller, to: .exportPDF)
+
+        controller.consumeExportStepFinish()
+        #expect(controller.currentStep?.id == .exportPDF)
+        #expect(!controller.isComplete)
+    }
+
+    @Test func restartTourResetsSubSteps() {
+        let env = EnvRecorder()
+        let controller = makeController(env: env, mock: seededMock())
+        controller.enterDemo()
+        controller.noteTutorialEvent(.tabSelected(.employees))
+        controller.advanceManualStep()
+        controller.skipCurrentSubStep()
+
+        controller.restartTour()
+
+        // Back on meetCrew; the Employees tab is already current, so its
+        // lone sub-step is pre-satisfied.
+        #expect(controller.currentStep?.id == .meetCrew)
+        #expect(controller.currentSpotlight == nil)
+    }
+
+    @Test func eventsIgnoredWhenDemoInactive() {
+        let env = EnvRecorder()
+        let controller = makeController(env: env, mock: seededMock())
+
+        controller.noteTutorialEvent(.tabSelected(.employees))
+        controller.noteTutorialEvent(.gridEditStarted)
+
+        #expect(controller.currentSpotlight == nil)
+        #expect(!controller.isActive)
     }
 
     // MARK: - Gate

@@ -1,7 +1,6 @@
 import AutorotaKit
 import CloudKit
 import SwiftUI
-import TipKit
 
 /// Result of the App's two-pass database init. `failed` short-circuits the
 /// scene to show `DatabaseRecoveryView`; `recovered` lets the app boot
@@ -49,10 +48,6 @@ struct AutorotaAppApp: App {
         // above, so a stale demo file is just dead weight (or a crash relic).
         DemoModeController.removeDemoDatabaseFiles()
 
-        try? Tips.configure([
-            .displayFrequency(.immediate),
-            .datastoreLocation(.applicationDefault),
-        ])
         // Seam for swapping Mock ↔ Live without rebuilding env wiring.
         let backend: LicenseBackend = LiveLicenseBackend()
         _licenseService = State(initialValue: LicenseService(backend: backend))
@@ -98,7 +93,8 @@ struct AutorotaAppApp: App {
     @State private var localeManager = LocaleManager()
     @State private var licenseService: LicenseService
     @State private var demoController: DemoModeController
-    @State private var showSyncPrompt = false
+    @State private var spotlightModel = TutorialSpotlightModel()
+    @State private var syncPrompt = SyncPromptCoordinator()
     @State private var syncCheckComplete = false
     @State private var dbInitOutcome: DBInitOutcome
 
@@ -124,34 +120,13 @@ struct AutorotaAppApp: App {
                     }
                 }
             }
-            .sheet(isPresented: $showSyncPrompt) {
-                SyncPromptView(
-                    onAccept: {
-                        showSyncPrompt = false
-                        // User opted into existing iCloud data — slide deck
-                        // is moot. Mark onboarding done and route the next
-                        // OnboardingView render straight to TierPickView.
-                        UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
-                        UserDefaults.standard.set(true, forKey: "pendingOnboardingTierOnly")
-                        Task { await syncEngine.start() }
-                        do {
-                            try setSyncMetadata(key: "sync_initialized", value: "true")
-                        } catch {}
-                    },
-                    onDecline: {
-                        showSyncPrompt = false
-                        do {
-                            try setSyncMetadata(key: "sync_disabled", value: "true")
-                        } catch {}
-                    }
-                )
-                .interactiveDismissDisabled()
-            }
             .environment(exchangeRateService)
             .environment(syncEngine)
             .environment(localeManager)
             .environment(licenseService)
             .environment(demoController)
+            .environment(spotlightModel)
+            .environment(syncPrompt)
             .environment(\.locale, localeManager.effectiveLocale)
             .environment(\.accessibilityPalette, selectedPalette)
             .task {
@@ -211,6 +186,13 @@ struct AutorotaAppApp: App {
 
             if disabled != nil {
                 syncCheckComplete = true
+                // The user chose "start fresh", but the iCloud data still
+                // exists — keep the plan page's start-from-iCloud escape
+                // hatch alive (row only, no popup).
+                if await checkCloudZone() == .exists {
+                    wireSyncPromptActions()
+                    syncPrompt.markCloudDataAvailable()
+                }
                 return
             }
 
@@ -220,10 +202,13 @@ struct AutorotaAppApp: App {
 
             switch zoneState {
             case .exists where localCount == 0:
-                // Show the prompt; defer `sync_initialized` until the user
+                // Existing iCloud data: hand the decision to the tier-pick
+                // page (the only place the prompt may appear — never over
+                // a demo run). Defer `sync_initialized` until the user
                 // chooses, otherwise a decline would orphan iCloud data.
+                wireSyncPromptActions()
                 syncCheckComplete = true
-                showSyncPrompt = true
+                syncPrompt.markPending()
             case .exists, .missing:
                 await syncEngine.start()
                 try setSyncMetadata(key: "sync_initialized", value: "true")
@@ -235,6 +220,18 @@ struct AutorotaAppApp: App {
             }
         } catch {
             syncCheckComplete = true
+        }
+    }
+
+    private func wireSyncPromptActions() {
+        syncPrompt.onAccept = { [syncEngine] in
+            Task { await syncEngine.start() }
+            // Takes precedence over any earlier `sync_disabled` — the
+            // initialized check runs first on subsequent launches.
+            try? setSyncMetadata(key: "sync_initialized", value: "true")
+        }
+        syncPrompt.onDecline = {
+            try? setSyncMetadata(key: "sync_disabled", value: "true")
         }
     }
 

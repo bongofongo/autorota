@@ -6,8 +6,10 @@
 //! `testutil::corpus` it ships in release builds.
 //!
 //! Dataset shape is part of the demo script:
-//! - 12 employees nicknamed after solar bodies (the eight planets plus Luna,
-//!   Titan, Pluto, and Ceres), mixing full- and part-time
+//! - 22 employees nicknamed after solar bodies (the eight planets plus
+//!   moons and dwarf planets), mixing full- and part-time across realistic
+//!   availability archetypes: students on evenings/weekends, school-hours
+//!   parents, early-bird openers, closers, weekenders, and an on-call flex
 //! - two roles (Barista, Kitchen), several employees holding both
 //! - Mercury's availability is deliberately left unset — the tour's first
 //!   hands-on step has the user fill it in
@@ -257,6 +259,222 @@ pub fn demo_employees() -> Vec<Employee> {
                 a
             },
         ),
+        // The second wave of moons: realistic availability archetypes.
+        // Europa: student — weekday evenings plus full weekends.
+        emp(
+            13,
+            "Evie",
+            "Marchetti",
+            "Europa",
+            &[ROLE_BARISTA],
+            15.0,
+            11.40,
+            {
+                let mut a = Availability::default();
+                set_hours(&mut a, &WEEKDAYS, 17, 22, AvailabilityState::Yes);
+                set_hours(&mut a, &WEEKDAYS, 6, 17, AvailabilityState::No);
+                set_hours(&mut a, &WEEKEND, 8, 22, AvailabilityState::Yes);
+                a
+            },
+        ),
+        // Io: early-bird opener — mornings only, could stretch to afternoon.
+        emp(
+            14,
+            "Iona",
+            "Campbell",
+            "Io",
+            &[ROLE_BARISTA],
+            25.0,
+            12.60,
+            {
+                let mut a = Availability::default();
+                set_hours(&mut a, &WEEKDAYS, 6, 12, AvailabilityState::Yes);
+                set_hours(&mut a, &WEEKDAYS, 12, 15, AvailabilityState::Maybe);
+                set_hours(&mut a, &[Weekday::Sat], 6, 12, AvailabilityState::Yes);
+                set_hours(&mut a, &[Weekday::Sun], 6, 22, AvailabilityState::No);
+                a
+            },
+        ),
+        // Callisto: full-time kitchen with a midweek weekend (off Tue/Wed).
+        emp(
+            15,
+            "Cal",
+            "Mendes",
+            "Callisto",
+            &[ROLE_KITCHEN],
+            40.0,
+            14.00,
+            {
+                let mut a = Availability::default();
+                set_hours(
+                    &mut a,
+                    &[
+                        Weekday::Thu,
+                        Weekday::Fri,
+                        Weekday::Sat,
+                        Weekday::Sun,
+                        Weekday::Mon,
+                    ],
+                    7,
+                    19,
+                    AvailabilityState::Yes,
+                );
+                set_hours(
+                    &mut a,
+                    &[Weekday::Tue, Weekday::Wed],
+                    6,
+                    22,
+                    AvailabilityState::No,
+                );
+                a
+            },
+        ),
+        // Ganymede: classic nine-to-five full-timer, both roles.
+        emp(
+            16,
+            "Ganesh",
+            "Rao",
+            "Ganymede",
+            &[ROLE_BARISTA, ROLE_KITCHEN],
+            37.0,
+            13.80,
+            {
+                let mut a = Availability::default();
+                set_hours(&mut a, &WEEKDAYS, 9, 17, AvailabilityState::Yes);
+                set_hours(&mut a, &[Weekday::Sat], 9, 13, AvailabilityState::Maybe);
+                set_hours(&mut a, &[Weekday::Sun], 6, 22, AvailabilityState::No);
+                a
+            },
+        ),
+        // Triton: school-hours parent — weekdays inside the school run.
+        emp(
+            17,
+            "Tricia",
+            "Boyle",
+            "Triton",
+            &[ROLE_KITCHEN],
+            22.0,
+            12.30,
+            {
+                let mut a = Availability::default();
+                set_hours(&mut a, &WEEKDAYS, 9, 15, AvailabilityState::Yes);
+                set_hours(&mut a, &WEEKDAYS, 15, 22, AvailabilityState::No);
+                set_hours(&mut a, &WEEKEND, 6, 22, AvailabilityState::No);
+                a
+            },
+        ),
+        // Phobos: weekender who also covers Friday nights.
+        emp(
+            18,
+            "Phoebe",
+            "Adjei",
+            "Phobos",
+            &[ROLE_BARISTA],
+            14.0,
+            11.60,
+            {
+                let mut a = Availability::default();
+                set_hours(&mut a, &[Weekday::Fri], 16, 22, AvailabilityState::Yes);
+                set_hours(&mut a, &WEEKEND, 8, 22, AvailabilityState::Yes);
+                set_hours(
+                    &mut a,
+                    &[Weekday::Mon, Weekday::Tue, Weekday::Wed, Weekday::Thu],
+                    6,
+                    22,
+                    AvailabilityState::No,
+                );
+                a
+            },
+        ),
+        // Deimos: dedicated closer — afternoons and evenings all week.
+        emp(
+            19,
+            "Dimitri",
+            "Volkov",
+            "Deimos",
+            &[ROLE_BARISTA, ROLE_KITCHEN],
+            32.0,
+            13.10,
+            {
+                let mut a = Availability::default();
+                set_hours(&mut a, &ALL_WEEK, 14, 22, AvailabilityState::Yes);
+                set_hours(&mut a, &ALL_WEEK, 6, 14, AvailabilityState::No);
+                a
+            },
+        ),
+        // Charon: flexible on-call — will take anything, commits to nothing.
+        emp(
+            20,
+            "Sharon",
+            "Whitfield",
+            "Charon",
+            &[ROLE_BARISTA],
+            10.0,
+            11.20,
+            {
+                let mut a = Availability::default();
+                set_hours(&mut a, &ALL_WEEK, 6, 22, AvailabilityState::Maybe);
+                a
+            },
+        ),
+        // Rhea: firm early week + Saturday, tentative late-week afternoons.
+        emp(
+            21,
+            "Rhea",
+            "Solano",
+            "Rhea",
+            &[ROLE_KITCHEN],
+            20.0,
+            12.40,
+            {
+                let mut a = Availability::default();
+                set_hours(
+                    &mut a,
+                    &[Weekday::Mon, Weekday::Tue, Weekday::Sat],
+                    7,
+                    15,
+                    AvailabilityState::Yes,
+                );
+                set_hours(
+                    &mut a,
+                    &[Weekday::Wed, Weekday::Thu, Weekday::Fri],
+                    12,
+                    18,
+                    AvailabilityState::Maybe,
+                );
+                set_hours(&mut a, &[Weekday::Sun], 6, 22, AvailabilityState::No);
+                a
+            },
+        ),
+        // Enceladus: student — two fixed evenings plus Sundays.
+        emp(
+            22,
+            "Enzo",
+            "Silva",
+            "Enceladus",
+            &[ROLE_KITCHEN],
+            12.0,
+            11.30,
+            {
+                let mut a = Availability::default();
+                set_hours(
+                    &mut a,
+                    &[Weekday::Mon, Weekday::Wed],
+                    18,
+                    22,
+                    AvailabilityState::Yes,
+                );
+                set_hours(&mut a, &[Weekday::Sun], 8, 20, AvailabilityState::Yes);
+                set_hours(
+                    &mut a,
+                    &[Weekday::Tue, Weekday::Thu, Weekday::Fri, Weekday::Sat],
+                    6,
+                    22,
+                    AvailabilityState::No,
+                );
+                a
+            },
+        ),
     ]
 }
 
@@ -414,15 +632,35 @@ mod tests {
     async fn seeds_full_planet_crew() {
         let pool = seeded_pool(demo_week()).await;
         let employees = queries::list_employees(&pool).await.unwrap();
-        assert_eq!(employees.len(), 12);
+        assert_eq!(employees.len(), 22);
 
         let nicknames: Vec<&str> = employees
             .iter()
             .filter_map(|e| e.nickname.as_deref())
             .collect();
         for body in [
-            "Mercury", "Venus", "Earth", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Luna",
-            "Titan", "Pluto", "Ceres",
+            "Mercury",
+            "Venus",
+            "Earth",
+            "Mars",
+            "Jupiter",
+            "Saturn",
+            "Uranus",
+            "Neptune",
+            "Luna",
+            "Titan",
+            "Pluto",
+            "Ceres",
+            "Europa",
+            "Io",
+            "Callisto",
+            "Ganymede",
+            "Triton",
+            "Phobos",
+            "Deimos",
+            "Charon",
+            "Rhea",
+            "Enceladus",
         ] {
             assert!(nicknames.contains(&body), "{body} missing");
         }

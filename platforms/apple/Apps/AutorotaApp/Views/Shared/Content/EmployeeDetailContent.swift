@@ -1,6 +1,5 @@
 import SwiftUI
 import AutorotaKit
-import TipKit
 
 enum ContactMethod: String {
     case imessage
@@ -33,6 +32,7 @@ struct EmployeeDetailContent: View {
 
     @AppStorage("appCurrency") private var displayCurrency: String = AppCurrency.usd.rawValue
     @Environment(ExchangeRateService.self) private var exchangeRates
+    @Environment(DemoModeController.self) private var demo
     @Environment(\.dismiss) private var dismiss
     @State private var showingEditSheet = false
     @State private var overrideVM = OverrideViewModel()
@@ -55,6 +55,9 @@ struct EmployeeDetailContent: View {
     /// live-saving each change as `manual` per-date overrides.
     @State private var isEditingGrid = false
     @State private var gridEditSlots: [AvailabilitySlot] = []
+    /// Sticky lasso mode is on in the inline grid — pauses List scrolling
+    /// so plain drags draw selections instead of scrolling the page.
+    @State private var gridLassoActive = false
 
     static let weekdayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     private static let weekRangeFmt: DateFormatter = {
@@ -465,10 +468,12 @@ struct EmployeeDetailContent: View {
                             gridEditSlots = newSlots
                             Task { await persistGridEdits(newSlots) }
                         },
+                        onLassoModeChange: { gridLassoActive = $0 },
                         outlinedWeekdays: outlined,
                         readOnlyWeekdays: readOnly,
                         weekdaySubheaders: subheaders
                     )
+                    .tutorialTarget(.availabilityGrid)
                 } else {
                     AvailabilityGridView(
                         slots: merged,
@@ -495,15 +500,23 @@ struct EmployeeDetailContent: View {
                     Button {
                         if !isEditingGrid {
                             gridEditSlots = mergedActualSlots(for: weekDays(offset: availabilityWeekOffset))
+                            demo.noteTutorialEvent(.gridEditStarted)
+                        } else {
+                            demo.noteTutorialEvent(.gridEditEnded)
                         }
-                        withAnimation { isEditingGrid.toggle() }
+                        // No animation: the editable grid must be usable the
+                        // instant the pencil is tapped.
+                        isEditingGrid.toggle()
                     } label: {
                         Image(systemName: isEditingGrid ? "checkmark.circle.fill" : "pencil.circle")
-                            .font(.body)
+                            .font(.title2)
+                            .frame(width: 36, height: 36)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.borderless)
                     .accessibilityLabel(isEditingGrid ? "Done editing availability" : "Edit availability grid")
                     .accessibilityIdentifier("employee.availability.editGrid")
+                    .tutorialTarget(.availabilityPencil)
                 }
             }
             .onChange(of: availabilityWeekOffset) { _, newOffset in
@@ -565,15 +578,34 @@ struct EmployeeDetailContent: View {
                             }
                         }
                     }
-                    Button("Add Exception") { showingAddOverride = true }
-                        .foregroundStyle(.tint)
+                    Button("Add Exception") {
+                        demo.noteTutorialEvent(.exceptionSheetOpened)
+                        showingAddOverride = true
+                    }
+                    .foregroundStyle(.tint)
+                    .tutorialTarget(.addExceptionButton)
+                    .onAppear {
+                        // Lazy List row: appearing means the user scrolled
+                        // the Exceptions section into view.
+                        demo.noteTutorialEvent(.exceptionsSectionVisible(nickname: employee.nickname))
+                    }
                 }
             }
         }
         .navigationTitle(employee.displayName)
+        .scrollDisabled(gridLassoActive)
+        .onChange(of: isEditingGrid) { _, editing in
+            // The grid (and its toggle state) unmounts with edit mode; make
+            // sure scrolling never stays stuck off.
+            if !editing { gridLassoActive = false }
+        }
         .task {
+            demo.noteTutorialEvent(.employeeDetailOpened(nickname: employee.nickname))
             await overrideVM.loadForEmployee(id: employee.id)
             await shiftVM.load(employeeId: employee.id)
+        }
+        .onDisappear {
+            demo.noteTutorialEvent(.employeeDetailClosed)
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {

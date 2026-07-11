@@ -171,7 +171,8 @@ compiled `autorota-ffi` dylib.
 | Data bundle export/import (Employees & Shifts pages; whole page or single category — roles, employees, availability exceptions, shifts, shift changes) | `DataBundleTransferView` (`DataBundleToolbarMenu`, `DataBundleImportView`), `autorota-core/exchange/*` |
 | iCloud sync (private database, per-field merge, first-launch prompt) | `AutorotaSyncEngine`, `SyncConflictResolver`, `SyncRecordMapper`, `SyncPromptView` |
 | Onboarding | `OnboardingView` |
-| Demo mode (guided pre-purchase tour on a throwaway seeded DB; planet-crew sample data) | `DemoModeController`, `DemoBanner`, `autorota-core/demo.rs`, `switch_db`/`seed_demo_db` FFI |
+| Demo mode (guided pre-purchase tour on a throwaway seeded DB; planet-crew sample data; spotlight coach marks with per-step sub-sequences on iPhone/iPad — the app's only interactive teaching, TipKit was removed in favour of it) | `DemoModeController`, `DemoBanner`, `TutorialSpotlight`, `autorota-core/demo.rs`, `switch_db`/`seed_demo_db` FFI |
+| Availability grid bulk editing (sticky lasso toggle → drag selection; hold-then-drag activation shelved, see `docs/availability-hold-drag-lasso.md`) | `AvailabilityGridView` |
 | Configurable tab bar + Menu overflow | `TabPage`, `TabLayoutManager`, `SettingsView` |
 | Rota-page overflow menu (Delete / Edit / Share / Generate) | `RotaOverflowPopover`, spec in `docs/specs/rota-overflow-menu.md` |
 

@@ -1,7 +1,6 @@
 import Foundation
 import Observation
 import AutorotaKit
-import TipKit
 import os
 
 private extension Logger {
@@ -283,7 +282,6 @@ final class RotaViewModel {
             warnings = result.warnings
             isDirty = true
             await loadSchedule()
-            await AutorotaEvents.firstScheduleGenerated.donate()
         } catch {
             self.error = userFacingMessage(error)
         }

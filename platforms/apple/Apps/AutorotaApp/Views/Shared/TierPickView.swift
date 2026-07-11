@@ -4,9 +4,11 @@ struct TierPickView: View {
     @Binding var isPresented: Bool
     @Environment(LicenseService.self) private var license
     @Environment(DemoModeController.self) private var demo
+    @Environment(SyncPromptCoordinator.self) private var syncPrompt
     @State private var infoTier: Tier?
     @State private var isWorking: WorkingAction?
     @State private var errorMessage: String?
+    @State private var showSyncPrompt = false
     /// Becomes true after the first purchase/restore failure so we can
     /// surface a local "Try offline" escape — without it, a hard-gated
     /// TierPick traps users on devices with no App Store reachability.
@@ -23,6 +25,7 @@ struct TierPickView: View {
                 // Employee + Cloud (Multi-Site) tiers hidden for now.
                 // Re-enable: tierCard(.employee); tierCard(.saas)
                 restoreRow
+                syncRestoreRow
                 offlineEscapeRow
                 if license.state.allowsMutation {
                     Button {
@@ -38,6 +41,32 @@ struct TierPickView: View {
         }
         .sheet(item: $infoTier) { tier in
             TierInfoModal(tier: tier)
+        }
+        // The launch-time iCloud-data prompt appears HERE and only here —
+        // never over a demo run or arbitrary screens. Swiping it away
+        // defers the decision; the syncRestoreRow stays available.
+        .sheet(isPresented: $showSyncPrompt) {
+            SyncPromptView(
+                onAccept: {
+                    syncPrompt.accept()
+                    showSyncPrompt = false
+                },
+                onDecline: {
+                    syncPrompt.decline()
+                    showSyncPrompt = false
+                }
+            )
+        }
+        .onAppear {
+            if syncPrompt.pending && !demo.isActive {
+                showSyncPrompt = true
+            }
+        }
+        .onChange(of: syncPrompt.pending) { _, pending in
+            // The CloudKit zone check can finish after this page appeared.
+            if pending && !demo.isActive {
+                showSyncPrompt = true
+            }
         }
         .alert(
             "license.error.title",
@@ -107,6 +136,28 @@ struct TierPickView: View {
         .buttonStyle(.bordered)
         .controlSize(.regular)
         .disabled(isWorking != nil)
+    }
+
+    /// Shown while iCloud data exists and hasn't been restored — whether
+    /// the popup was deferred with a swipe-down OR declined ("start
+    /// fresh"). Reopens the sync prompt.
+    @ViewBuilder
+    private var syncRestoreRow: some View {
+        if syncPrompt.cloudDataAvailable {
+            Button {
+                showSyncPrompt = true
+            } label: {
+                HStack {
+                    Image(systemName: "icloud.and.arrow.down")
+                    Text("sync.prompt.plan_row")
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
+            .disabled(isWorking != nil)
+            .accessibilityIdentifier("tierpick.syncRestore")
+        }
     }
 
     @ViewBuilder

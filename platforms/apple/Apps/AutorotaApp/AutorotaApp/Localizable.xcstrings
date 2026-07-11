@@ -3636,6 +3636,9 @@
     "Deletes all local data and quits. Reopen to start onboarding from scratch." : {
 
     },
+    "Demo finished" : {
+
+    },
     "demo.banner.chip" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3719,7 +3722,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Availability, exceptions, scheduling, tweaks, and a shareable PDF — that's the whole weekly workflow. Ready to run your own team?"
+            "value" : "Availability, exceptions, shifts, scheduling, tweaks, and a shareable PDF — that's the whole weekly workflow. Ready to run your own team?"
           }
         }
       }
@@ -3779,6 +3782,17 @@
         }
       }
     },
+    "demo.export.finish" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finish Demo"
+          }
+        }
+      }
+    },
     "demo.menu.exit" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3823,6 +3837,39 @@
         }
       }
     },
+    "demo.spotlight.next" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next"
+          }
+        }
+      }
+    },
+    "demo.spotlight.progress %lld %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld of %2$lld"
+          }
+        }
+      }
+    },
+    "demo.spotlight.skip" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skip"
+          }
+        }
+      }
+    },
     "demo.step.alterRota.instruction" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3851,7 +3898,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Open Exceptions from the Menu tab, then add an employee exception for Marcus “Mars” Reid on a day next week."
+            "value" : "Open Marcus “Mars” Reid in Employees and add an exception range giving him days off next week."
           }
         }
       }
@@ -3863,6 +3910,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Give Mars a day off"
+          }
+        }
+      }
+    },
+    "demo.step.createShift.instruction" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On the Shifts tab, add a new shift with the plus button and set who it needs under Role & Staffing."
+          }
+        }
+      }
+    },
+    "demo.step.createShift.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create a shift"
           }
         }
       }
@@ -3917,7 +3986,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Open the Employees tab — twelve staff named for planets, moons, and dwarf planets, two roles, a mix of full- and part-time."
+            "value" : "Open the Employees tab — twenty-two staff named for planets and moons, two roles, and a realistic mix of full-timers, students, parents, and weekenders."
           }
         }
       }
@@ -3951,6 +4020,303 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Set Mercury's availability"
+          }
+        }
+      }
+    },
+    "demo.sub.alterRota.alterAssignment" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap a shift card to swap, move, add, or remove someone."
+          }
+        }
+      }
+    },
+    "demo.sub.alterRota.enterSandbox" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the sliders to enter sandbox mode — a safe space to rearrange the rota."
+          }
+        }
+      }
+    },
+    "demo.sub.alterRota.swapSecondTap" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Now tap a highlighted employee to complete the swap."
+          }
+        }
+      }
+    },
+    "demo.sub.alterRota.tapDone" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the checkmark when you're happy — changes save automatically."
+          }
+        }
+      }
+    },
+    "demo.sub.createException.openEmployeesTab" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Head back to the Employees tab."
+          }
+        }
+      }
+    },
+    "demo.sub.createException.openMars" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Marcus “Mars” Reid."
+          }
+        }
+      }
+    },
+    "demo.sub.createException.scrollToException" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scroll down to the Exceptions section on Mars's page."
+          }
+        }
+      }
+    },
+    "demo.sub.createException.tapAddException" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap Add Exception, toggle Date Range, and give Mars a few days off next week."
+          }
+        }
+      }
+    },
+    "demo.sub.createShift.openShiftsTab" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Head to the Shifts tab."
+          }
+        }
+      }
+    },
+    "demo.sub.createShift.roleStaffing" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Name it, pick its days and times, then use Role & Staffing to set how many people it needs — overall or per role. Save when you're done."
+          }
+        }
+      }
+    },
+    "demo.sub.createShift.shiftPurpose" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shifts are the time slots your crew fills — the scheduler matches available employees to each one on the days it runs."
+          }
+        }
+      }
+    },
+    "demo.sub.createShift.tapAddShift" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the plus to create a new shift."
+          }
+        }
+      }
+    },
+    "demo.sub.exportPDF.customizeLayout" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pick a layout and profile to see what exports look like, then tap Finish Demo."
+          }
+        }
+      }
+    },
+    "demo.sub.exportPDF.openRotaTab" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Return to the Rota tab."
+          }
+        }
+      }
+    },
+    "demo.sub.exportPDF.openShare" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Share to see the export options."
+          }
+        }
+      }
+    },
+    "demo.sub.generateRota.goToNextWeek" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Step forward to next week with the arrow."
+          }
+        }
+      }
+    },
+    "demo.sub.generateRota.openRotaTab" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Head to the Rota tab."
+          }
+        }
+      }
+    },
+    "demo.sub.generateRota.tapGenerate" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the wand to auto-fill the schedule from everyone's availability."
+          }
+        }
+      }
+    },
+    "demo.sub.meetCrew.openEmployeesTab" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the Employees tab to meet the crew."
+          }
+        }
+      }
+    },
+    "demo.sub.setAvailability.bulkApply" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap inside the selection to change the whole block at once."
+          }
+        }
+      }
+    },
+    "demo.sub.setAvailability.cycleCell" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap any cell to cycle it: green = available, red = not, grey = maybe."
+          }
+        }
+      }
+    },
+    "demo.sub.setAvailability.lassoBlock" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drag across the grid to select a block of hours."
+          }
+        }
+      }
+    },
+    "demo.sub.setAvailability.openEmployeesTab" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the Employees tab."
+          }
+        }
+      }
+    },
+    "demo.sub.setAvailability.openMercury" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open May “Mercury” Herrera."
+          }
+        }
+      }
+    },
+    "demo.sub.setAvailability.tapAvailabilityDone" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the checkmark to save Mercury's availability."
+          }
+        }
+      }
+    },
+    "demo.sub.setAvailability.tapPencil" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap the pencil next to Availability to edit the grid in place."
+          }
+        }
+      }
+    },
+    "demo.sub.setAvailability.toggleLassoOff" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nice! Toggle the lasso off to get scrolling back."
           }
         }
       }
@@ -10443,6 +10809,17 @@
         }
       }
     },
+    "Lasso selection" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lasso selection"
+          }
+        }
+      }
+    },
     "Last Name" : {
       "localizations" : {
         "ar" : {
@@ -10609,6 +10986,9 @@
           }
         }
       }
+    },
+    "License" : {
+
     },
     "license.banner.read_only.body" : {
       "localizations" : {
@@ -10841,6 +11221,7 @@
       }
     },
     "license.cta.manage_subscription" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -15336,6 +15717,9 @@
         }
       }
     },
+    "Off" : {
+
+    },
     "OK" : {
       "localizations" : {
         "ar" : {
@@ -15375,6 +15759,9 @@
           }
         }
       }
+    },
+    "On" : {
+
     },
     "onboarding.alert.cancel" : {
       "extractionState" : "manual",
@@ -17588,9 +17975,6 @@
         }
       }
     },
-    "Re-show the in-app tips you've already dismissed." : {
-
-    },
     "Ready (%lld)" : {
       "localizations" : {
         "ar" : {
@@ -18007,9 +18391,6 @@
           }
         }
       }
-    },
-    "Replay Tooltips" : {
-
     },
     "Required role" : {
       "extractionState" : "stale",
@@ -20545,9 +20926,6 @@
         }
       }
     },
-    "Subscription" : {
-
-    },
     "Suffix" : {
       "localizations" : {
         "ar" : {
@@ -20657,6 +21035,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Start Fresh"
+          }
+        }
+      }
+    },
+    "sync.prompt.plan_row" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore existing iCloud data…"
           }
         }
       }
@@ -21582,730 +21971,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "時間"
-          }
-        }
-      }
-    },
-    "tip.availability.cycle.message" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "انقر على خانة الساعة للتنقّل بين لا → ربما → نعم."
-          }
-        },
-        "bn" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "একটি ঘণ্টার সেলে ট্যাপ করে না → হয়তো → হ্যাঁ-এর মধ্যে চক্রায়িত করুন।"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tap an hour cell to cycle through No → Maybe → Yes."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Toca una celda horaria para alternar entre No → Quizás → Sí."
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "घंटे की सेल पर टैप करके नहीं → शायद → हाँ के बीच साइकल करें।"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "点击小时格子在 否 → 也许 → 可 之间循环切换。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "點擊小時格子在 否 → 也許 → 可 之間循環切換。"
-          }
-        }
-      }
-    },
-    "tip.availability.cycle.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "انقر للتنقّل"
-          }
-        },
-        "bn" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "চক্রায়িত করতে ট্যাপ করুন"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tap to cycle"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Toca para alternar"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "साइकल करने के लिए टैप करें"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "点击循环切换"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "點擊循環切換"
-          }
-        }
-      }
-    },
-    "tip.availability.drag.message" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "اسحب عبر عدة خانات لتعيين نطاق كامل دفعة واحدة."
-          }
-        },
-        "bn" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "একসাথে একটি সম্পূর্ণ পরিসর সেট করতে একাধিক সেলের ওপর টানুন।"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Press and hold, then drag to select a block. Tap the selection to cycle it, tap elsewhere to dismiss."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Arrastra por varias celdas para fijar todo un rango a la vez."
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "एक साथ पूरी रेंज सेट करने के लिए कई सेलों पर खींचें।"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "拖动跨越多个格子以一次性设置整个范围。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "拖動跨越多個格子以一次設定整個範圍。"
-          }
-        }
-      }
-    },
-    "tip.availability.drag.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "السحب للتعديلات الجماعية"
-          }
-        },
-        "bn" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "একসাথে সম্পাদনার জন্য টানুন"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hold & drag to bulk edit"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Arrastra para editar en bloque"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "एक साथ संपादन के लिए खींचें"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "拖动批量编辑"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "拖動批次編輯"
-          }
-        }
-      }
-    },
-    "tip.availability.mode.message" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "يتكرر التوفر الافتراضي كل أسبوع. بدّل إلى الفعلي لتجاوز التوفر لأسبوع واحد فقط."
-          }
-        },
-        "bn" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ডিফল্ট প্রাপ্যতা প্রতি সপ্তাহে পুনরাবৃত্ত হয়। একটি একক সপ্তাহের জন্য প্রাপ্যতা ওভাররাইড করতে Actual-এ স্যুইচ করুন।"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Default availability repeats every week. Switch to Actual to override availability for a single week."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La disponibilidad predeterminada se repite cada semana. Cambia a Real para sobrescribirla solo una semana."
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "डिफ़ॉल्ट उपलब्धता हर सप्ताह दोहराती है। एक ही सप्ताह के लिए उपलब्धता ओवरराइड करने हेतु Actual पर स्विच करें।"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "默认可用性每周重复。切换到「实际」以覆盖单周的可用性。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "預設可用性每週重複。切換到「實際」以覆蓋單週的可用性。"
-          }
-        }
-      }
-    },
-    "tip.availability.mode.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "الافتراضي مقابل الفعلي"
-          }
-        },
-        "bn" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ডিফল্ট বনাম Actual"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Default vs. Actual"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Predeterminada vs. Real"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "डिफ़ॉल्ट बनाम Actual"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "默认 vs. 实际"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "預設 vs. 實際"
-          }
-        }
-      }
-    },
-    "tip.editlog.restore.message" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "انقر استعادة على أي حفظ لإرجاع الأسبوع إلى تلك اللقطة. يصبح الوضع الحالي حفظاً جديداً أولاً."
-          }
-        },
-        "bn" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "যেকোনো সেভে Restore ট্যাপ করে সপ্তাহটি সেই স্ন্যাপশটে ফিরিয়ে আনুন। বর্তমান অবস্থা প্রথমে একটি নতুন সেভে পরিণত হয়।"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tap Restore on any save to roll the week back to that snapshot. Current state becomes a new save first."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Toca Restaurar en cualquier versión guardada para revertir la semana a esa instantánea. El estado actual se guarda primero como una nueva versión."
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "किसी भी सेव पर Restore टैप करके सप्ताह को उस स्नैपशॉट पर वापस ले जाएँ। पहले वर्तमान स्थिति एक नई सेव बन जाती है।"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "点击任意保存项的「恢复」以将该周回滚到此快照。当前状态会先成为新的保存项。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "點擊任意保存項的「復原」以將該週回滾到此快照。目前狀態會先成為新的保存項。"
-          }
-        }
-      }
-    },
-    "tip.editlog.restore.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "استعادة حفظ"
-          }
-        },
-        "bn" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "একটি সেভ পুনরুদ্ধার করুন"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Restore a save"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Restaurar una versión"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "एक सेव पुनर्स्थापित करें"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "恢复保存项"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "復原保存項"
-          }
-        }
-      }
-    },
-    "tip.employee.roles.message" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "اختر الأدوار التي يمكن لهذا الموظف تغطيتها حتى يقوم المُجدوِل بتعيينه فقط للمناوبات المطابقة."
-          }
-        },
-        "bn" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "এই কর্মচারী যে ভূমিকাগুলি কভার করতে পারেন সেগুলি বেছে নিন যাতে শিডিউলার শুধুমাত্র মিলে যাওয়া শিফটে তাদের বরাদ্দ করে।"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pick the roles this employee can cover so the scheduler only assigns them to matching shifts."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elige los roles que puede cubrir este empleado para que el programador solo le asigne turnos compatibles."
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "इस कर्मचारी द्वारा कवर की जा सकने वाली भूमिकाएँ चुनें ताकि शेड्यूलर उन्हें केवल मेल खाती शिफ्टों पर असाइन करे।"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选择此员工可担任的角色，以便排班器只将其分配到匹配的班次。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "選擇此員工可擔任的角色，以便排班器只將其分配到匹配的班次。"
-          }
-        }
-      }
-    },
-    "tip.employee.roles.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "الأدوار تقود الجدولة"
-          }
-        },
-        "bn" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ভূমিকা শিডিউলিংকে চালিত করে"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Roles drive scheduling"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Los roles guían la programación"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "भूमिकाएँ शेड्यूलिंग को संचालित करती हैं"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "角色驱动排班"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "角色驅動排班"
-          }
-        }
-      }
-    },
-    "tip.employees.add.message" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tap the menu to add employees, set weekly availability, or import a roster."
-          }
-        }
-      }
-    },
-    "tip.employees.add.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Add your team"
-          }
-        }
-      }
-    },
-    "tip.export.profile.message" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "جدول الموظفين يحذف الأجور. تقرير المدير يتضمن التكاليف بالساعة."
-          }
-        },
-        "bn" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Staff Schedule মজুরি বাদ দেয়। Manager Report-এ ঘণ্টাপ্রতি খরচ থাকে।"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Staff Schedule omits wages. Manager Report includes hourly costs."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El Horario del Personal omite los salarios. El Informe del Responsable incluye los costes por hora."
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Staff Schedule वेतन छोड़ देता है। Manager Report में प्रति घंटा लागत शामिल होती है।"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "「员工排班表」省略工资。「经理报表」包含小时成本。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "「員工排班表」省略薪資。「經理報表」包含小時成本。"
-          }
-        }
-      }
-    },
-    "tip.export.profile.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "اختر الملف الشخصي المناسب"
-          }
-        },
-        "bn" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "সঠিক প্রোফাইল বেছে নিন"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pick the right profile"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elige el perfil adecuado"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "सही प्रोफ़ाइल चुनें"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选择合适的配置"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "選擇合適的設定檔"
-          }
-        }
-      }
-    },
-    "tip.rota.share.message" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Open the menu to export as PDF, CSV, or JSON, or send schedules to your team."
-          }
-        }
-      }
-    },
-    "tip.rota.share.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Share the rota"
-          }
-        }
-      }
-    },
-    "tip.rota.twopass.message" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "يعمل التوليد على مرحلتين: أولاً تغطية الأدوار المطلوبة، ثم تعبئة باقي الساعات للوصول إلى الساعات المستهدفة. راجع المساعدة → المُجدوِل لقواعد كسر التعادل."
-          }
-        },
-        "bn" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "জেনারেট দুই ধাপে চলে: প্রথমে প্রয়োজনীয় ভূমিকা কভার করে, তারপর লক্ষ্য ঘণ্টা পর্যন্ত পূরণ করে। টাইব্রেক নিয়মাবলির জন্য Help → Scheduler দেখুন।"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Generate runs in two passes: first cover required roles, then top up to target hours. See Help → Scheduler for tie-break rules."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Generar funciona en dos pasadas: primero cubre los roles requeridos y luego completa las horas hasta el objetivo. Consulta Ayuda → Programador para las reglas de desempate."
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Generate दो पासों में चलता है: पहले आवश्यक भूमिकाओं को कवर करता है, फिर लक्ष्य घंटों तक भरता है। टाई-ब्रेक नियमों के लिए Help → Scheduler देखें।"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "「生成」分两轮进行：首先覆盖必需角色，然后填充至目标工时。并列规则请参见「帮助 → 排班器」。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "「產生」分兩輪進行：首先覆蓋必需角色，然後填充至目標工時。並列規則請參見「說明 → 排班器」。"
-          }
-        }
-      }
-    },
-    "tip.rota.twopass.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "جدولة مكوّنة من مرحلتين"
-          }
-        },
-        "bn" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "দুই-ধাপের শিডিউলিং"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Two-pass scheduling"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Programación en dos pasadas"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "दो-पास शेड्यूलिंग"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "两轮排班"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "兩輪排班"
-          }
-        }
-      }
-    },
-    "tip.shifts.template.message" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Templates auto-create shifts every week. Add one for each part of the day."
-          }
-        }
-      }
-    },
-    "tip.shifts.template.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Define recurring shifts"
           }
         }
       }
@@ -23593,6 +23258,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在 iCloud 上找到您的 Autorota 資料。要下載到此裝置嗎?"
+          }
+        }
+      }
+    },
+    "demo.sub.setAvailability.toggleLassoOn" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Now try multi-select: tap the lasso tool to turn it on."
           }
         }
       }

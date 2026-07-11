@@ -545,6 +545,8 @@ struct EmployeeAvailabilityOverrideSheet: View {
     @State private var currentDateIndex = 0
     @State private var showLongRangeWarning = false
     @State private var showDeleteConfirmation = false
+    /// Sticky lasso toggle is on in a grid — pauses Form scrolling.
+    @State private var gridLassoActive = false
 
     private static let softMaxDaysInRange = 84  // 12 weeks
 
@@ -693,6 +695,12 @@ struct EmployeeAvailabilityOverrideSheet: View {
                 }
             }
             .onAppear { prefill() }
+            .scrollDisabled(gridLassoActive)
+            .onChange(of: isDateRange) { _, _ in
+                // Section swap unmounts the toggled grid; never leave
+                // scrolling stuck off.
+                gridLassoActive = false
+            }
             .alert("Long date range", isPresented: $showLongRangeWarning) {
                 Button("Cancel", role: .cancel) {}
                 Button("Save anyway") { save() }
@@ -729,7 +737,8 @@ struct EmployeeAvailabilityOverrideSheet: View {
                 visibleHourStart: 6,
                 visibleHourEnd: 22,
                 limitToWeekdays: [weekdayForDate],
-                onChange: { slots = $0 }
+                onChange: { slots = $0 },
+                onLassoModeChange: { gridLassoActive = $0 }
             )
         }
     }
@@ -798,7 +807,8 @@ struct EmployeeAvailabilityOverrideSheet: View {
                 visibleHourStart: 6,
                 visibleHourEnd: 22,
                 limitToWeekdays: [currentWeekday],
-                onChange: { setCurrentSlots($0) }
+                onChange: { setCurrentSlots($0) },
+                onLassoModeChange: { gridLassoActive = $0 }
             )
         } header: {
             Text("Availability for \(currentWeekday)")

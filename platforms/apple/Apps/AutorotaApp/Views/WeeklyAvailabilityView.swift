@@ -8,6 +8,8 @@ struct WeeklyAvailabilityView: View {
     @Environment(\.dismiss) private var dismiss
     /// Tracks whether the current window is landscape (width > height).
     @State private var isLandscape = false
+    /// A card's sticky lasso toggle is on — pauses the grid-layout scroll.
+    @State private var gridLassoActive = false
 
     /// Next Monday's date, used for the header.
     private var nextWeekStart: Date {
@@ -110,7 +112,8 @@ struct WeeklyAvailabilityView: View {
                             employee: employee,
                             vm: vm,
                             progressVM: progressVM,
-                            weekStartString: weekStartString
+                            weekStartString: weekStartString,
+                            onLassoModeChange: { gridLassoActive = $0 }
                         )
                         .frame(maxHeight: .infinity, alignment: .top)
                     }
@@ -118,6 +121,7 @@ struct WeeklyAvailabilityView: View {
                 .padding(.horizontal, 12)
                 .padding(.bottom, 20)
             }
+            .scrollDisabled(gridLassoActive)
         }
     }
 }
@@ -129,16 +133,24 @@ private struct AvailabilityCard: View {
     let vm: EmployeeViewModel
     let progressVM: AvailabilityProgressViewModel
     let weekStartString: String
+    let onLassoModeChange: (Bool) -> Void
 
     @State private var overrideVM = OverrideViewModel()
     @State private var slots: [AvailabilitySlot] = []
     private let visibleRange: (start: Int, end: Int)
 
-    init(employee: FfiEmployee, vm: EmployeeViewModel, progressVM: AvailabilityProgressViewModel, weekStartString: String) {
+    init(
+        employee: FfiEmployee,
+        vm: EmployeeViewModel,
+        progressVM: AvailabilityProgressViewModel,
+        weekStartString: String,
+        onLassoModeChange: @escaping (Bool) -> Void
+    ) {
         self.employee = employee
         self.vm = vm
         self.progressVM = progressVM
         self.weekStartString = weekStartString
+        self.onLassoModeChange = onLassoModeChange
         self.visibleRange = AvailabilityGridView.inferredVisibleRange(from: employee.defaultAvailability)
     }
 
@@ -212,6 +224,7 @@ private struct AvailabilityCard: View {
                     slots = newSlots
                     Task { await persistEdits(newSlots) }
                 },
+                onLassoModeChange: onLassoModeChange,
                 outlinedWeekdays: outlinedWeekdays,
                 weekdaySubheaders: weekdaySubheaders
             )

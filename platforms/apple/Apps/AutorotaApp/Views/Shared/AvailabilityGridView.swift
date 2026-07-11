@@ -1,12 +1,14 @@
 import SwiftUI
 import AutorotaKit
-import TipKit
 
 /// A 7-column × 24-row grid showing availability state per weekday/hour.
 /// When `isEditable` is true, tapping a cell cycles through No → Maybe → Yes.
-/// Holding briefly then dragging draws a rectangle selection (lasso); on
-/// release it persists — tap inside to bulk-cycle, tap outside to clear.
-/// Quick swipes fail the hold, so enclosing scroll views keep scrolling.
+/// Multi-select: the toolbar's lasso toggle turns drags into a rectangle
+/// selection (callers pause scrolling via `onLassoModeChange` while it's
+/// on); on release the selection persists — tap inside to bulk-cycle, tap
+/// outside to clear. A hold-then-drag activation shipped briefly but was
+/// shelved for fighting page scrolling — see
+/// docs/availability-hold-drag-lasso.md before re-adding it.
 struct AvailabilityGridView: View {
 
     let slots: [AvailabilitySlot]
@@ -18,6 +20,9 @@ struct AvailabilityGridView: View {
     var limitToWeekdays: [String]? = nil
     var onChange: (([AvailabilitySlot]) -> Void)?
     var onVisibleRangeChange: ((Int, Int) -> Void)?
+    /// Called when the sticky lasso toggle flips, so enclosing scroll views
+    /// can disable scrolling while plain drags are drawing selections.
+    var onLassoModeChange: ((Bool) -> Void)?
     var onReset: (() -> Void)?
     /// Weekdays whose columns should be outlined (e.g. days with an override on the current week).
     var outlinedWeekdays: Set<String> = []
@@ -46,19 +51,14 @@ struct AvailabilityGridView: View {
     private static let rowHeight: CGFloat = 18
     private static let headerHeight: CGFloat = 16
 
-    private let cycleTip = AvailabilityCycleTip()
-    private let dragTip = AvailabilityDragTip()
-
-    // Selection state. There is no explicit selection *mode* — holding
-    // briefly then dragging draws a lasso; the resulting selection persists
-    // until the user taps inside (apply) or outside (clear).
+    // Selection state. Flipping the sticky lasso toggle in the toolbar
+    // makes drags draw a selection; it persists until the user taps
+    // inside (apply) or outside (clear).
+    @State private var lassoToggleActive = false
     @State private var dragAnchorCell: (col: Int, row: Int)?
     @State private var dragCurrentCell: (col: Int, row: Int)?
-    /// True from the moment the hold arms the lasso until the finger lifts.
-    /// Drives the haptic tick that tells the user dragging now selects.
-    @State private var lassoArmed = false
-    /// True once the armed finger has actually moved (new lasso in progress).
-    /// A press that arms but never drags leaves the prior selection intact.
+    /// True once a drag has actually moved (new lasso in progress). The
+    /// first movement replaces any prior selection.
     @State private var lassoDidDrag = false
 
     private var hasSelection: Bool { selectionRect != nil }
@@ -86,11 +86,7 @@ struct AvailabilityGridView: View {
     var body: some View {
         VStack(spacing: 8) {
             if isEditable {
-                if onReset != nil || showRangePicker {
-                    toolbarRow
-                }
-                TipView(dragTip)
-                TipView(cycleTip)
+                toolbarRow
             }
 
             GeometryReader { geometry in
@@ -105,60 +101,47 @@ struct AvailabilityGridView: View {
                     }
 
                     // Unified touch layer: tap cycles a cell (or applies /
-                    // clears an active selection); hold-then-drag lassos.
-                    // A quick swipe fails the hold, so the enclosing scroll
-                    // view keeps working over the grid.
+                    // clears an active selection). With the sticky lasso
+                    // toggle on, drags select (the container disables
+                    // scrolling via onLassoModeChange); with it off, drags
+                    // pass through to the enclosing scroll view.
                     if isEditable {
                         Color.clear
                             .contentShape(Rectangle())
                             .onTapGesture { location in
                                 handleTap(at: location, cellWidth: cellWidth)
                             }
-                            .gesture(
-                                // `maximumDistance` makes the hold fail as soon
-                                // as the finger drifts — a swipe that starts
-                                // moving immediately never arms the lasso and
-                                // scrolls the page instead.
-                                LongPressGesture(minimumDuration: 0.2, maximumDistance: 8)
-                                    .sequenced(before: DragGesture(minimumDistance: 4, coordinateSpace: .named("availGrid")))
-                                    .onChanged { value in
-                                        switch value {
-                                        case .first(true):
-                                            // Hold succeeded — arm the lasso.
-                                            // The existing selection is NOT
-                                            // cleared here: a stationary press
-                                            // that never drags must leave it
-                                            // intact so tap-inside still applies.
-                                            lassoArmed = true
-                                        case .second(true, let drag?):
-                                            // First real movement starts the new
-                                            // lasso, replacing any old selection.
-                                            if !lassoDidDrag {
-                                                lassoDidDrag = true
-                                                dragAnchorCell = cellAt(point: drag.startLocation, cellWidth: cellWidth)
-                                            }
-                                            dragCurrentCell = cellAt(point: drag.location, cellWidth: cellWidth)
-                                        default:
-                                            break
-                                        }
-                                    }
-                                    .onEnded { _ in
-                                        // Selection stays — tap inside applies,
-                                        // tap outside clears.
-                                        if lassoDidDrag {
-                                            Task { await AvailabilityDragTip.cycleDismissed.donate() }
-                                        }
-                                        lassoArmed = false
-                                        lassoDidDrag = false
-                                    }
-                            )
-                            .sensoryFeedback(.impact(weight: .light), trigger: lassoArmed) { _, armed in armed }
+                            .gesture(plainLassoDrag(cellWidth: cellWidth), isEnabled: lassoToggleActive)
                     }
                 }
                 .coordinateSpace(name: "availGrid")
             }
             .frame(height: gridHeight)
         }
+    }
+
+    // MARK: - Lasso gesture
+
+    // A hold-then-drag activation (no toggle needed) shipped briefly and
+    // was shelved for interfering with page scrolling; its full
+    // implementation is preserved in docs/availability-hold-drag-lasso.md.
+
+    /// Drag lasso while the sticky toggle is on.
+    private func plainLassoDrag(cellWidth: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 3, coordinateSpace: .named("availGrid"))
+            .onChanged { value in
+                if !lassoDidDrag {
+                    lassoDidDrag = true
+                    dragAnchorCell = cellAt(point: value.startLocation, cellWidth: cellWidth)
+                }
+                dragCurrentCell = cellAt(point: value.location, cellWidth: cellWidth)
+            }
+            .onEnded { _ in
+                if lassoDidDrag, hasSelection {
+                    NotificationCenter.default.post(name: .autorotaTutorialAction, object: TutorialAction.lassoDrawn)
+                }
+                lassoDidDrag = false
+            }
     }
 
     // MARK: - Grid content
@@ -246,6 +229,7 @@ struct AvailabilityGridView: View {
 
     private var toolbarRow: some View {
         HStack {
+            lassoToggleButton
             if let onReset {
                 Button(action: onReset) {
                     Image(systemName: "arrow.counterclockwise")
@@ -258,6 +242,33 @@ struct AvailabilityGridView: View {
             }
             Spacer()
         }
+    }
+
+    /// Sticky lasso mode: while on, plain drags draw selections and the
+    /// enclosing scroll view is disabled (via `onLassoModeChange`).
+    private var lassoToggleButton: some View {
+        Button {
+            lassoToggleActive.toggle()
+            onLassoModeChange?(lassoToggleActive)
+            NotificationCenter.default.post(
+                name: .autorotaTutorialAction,
+                object: lassoToggleActive ? TutorialAction.lassoToggledOn : TutorialAction.lassoToggledOff
+            )
+        } label: {
+            Image(systemName: "lasso")
+                .foregroundStyle(lassoToggleActive ? Color.white : Color.secondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+                .background(
+                    lassoToggleActive ? Color.accentColor : Color.clear,
+                    in: RoundedRectangle(cornerRadius: 6)
+                )
+        }
+        .buttonStyle(.borderless)
+        .accessibilityLabel("Lasso selection")
+        .accessibilityValue(lassoToggleActive ? "On" : "Off")
+        .accessibilityIdentifier("availability.lassoToggle")
+        .tutorialTarget(.lassoToggle)
     }
 
     private var rangePickerContent: some View {
@@ -390,7 +401,6 @@ struct AvailabilityGridView: View {
         guard Self.hourIsInRange(hour, start: visibleHourStart, end: visibleHourEnd),
               !readOnlyWeekdays.contains(day) else { return }
         toggle(weekday: day, hour: hour)
-        Task { await AvailabilityDragTip.cycleDismissed.donate() }
     }
 
     private func toggleSelectedCells(rect: (minCol: Int, maxCol: Int, minRow: Int, maxRow: Int)) {
@@ -413,6 +423,7 @@ struct AvailabilityGridView: View {
 
         let majorityState = stateCounts.max(by: { $0.value < $1.value })?.key ?? "Maybe"
         let nextState = cycled(majorityState)
+        NotificationCenter.default.post(name: .autorotaTutorialAction, object: TutorialAction.lassoApplied)
 
         var updated = slots
         for (day, hour) in cellKeys {
@@ -432,6 +443,7 @@ struct AvailabilityGridView: View {
     // MARK: - Single cell toggle
 
     private func toggle(weekday: String, hour: Int) {
+        NotificationCenter.default.post(name: .autorotaTutorialAction, object: TutorialAction.cellCycled)
         var updated = slots
         if let idx = updated.firstIndex(where: { $0.weekday == weekday && $0.hour == UInt8(hour) }) {
             let next = cycled(updated[idx].state)
@@ -540,7 +552,6 @@ private struct CellView: View {
             .onTapGesture {
                 guard isEditable else { return }
                 onTap()
-                Task { await AvailabilityDragTip.cycleDismissed.donate() }
             }
             .accessibilityElement()
             .accessibilityLabel("\(weekday) \(String(format: "%02d", hour)):00")

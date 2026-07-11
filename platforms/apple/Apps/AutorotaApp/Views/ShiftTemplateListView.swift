@@ -1,5 +1,4 @@
 import SwiftUI
-import TipKit
 import AutorotaKit
 
 struct ShiftTemplateListView: View {
@@ -11,8 +10,8 @@ struct ShiftTemplateListView: View {
     @State private var editing: FfiShiftTemplate?
     @State private var renamingRole: FfiRole?
     @State private var renameText = ""
-    private let addTemplateTip = ShiftTemplateAddTip()
     @Environment(\.isMenuPushed) private var isMenuPushed
+    @Environment(DemoModeController.self) private var demo
 
     private var bothLoaded: Bool {
         vm.hasLoaded && roleVM.hasLoaded
@@ -131,6 +130,7 @@ struct ShiftTemplateListView: View {
                     }
                     .buttonStyle(.borderless)
                     .accessibilityLabel("Add shift")
+                    .tutorialTarget(.addShiftButton)
                 }
             }
             .headerProminence(.increased)
@@ -140,9 +140,6 @@ struct ShiftTemplateListView: View {
     var body: some View {
         OptionalNavigationStack(embed: !isMenuPushed) {
             VStack(spacing: 0) {
-                TipView(addTemplateTip)
-                    .padding(.horizontal)
-                    .padding(.top, 8)
                 Group {
                 if !bothLoaded {
                     // Neutral placeholder until both VMs report hasLoaded.
@@ -181,6 +178,9 @@ struct ShiftTemplateListView: View {
                         }
                     }
                 }
+            }
+            .onChange(of: showingAddTemplateSheet) { _, shown in
+                if shown { demo.noteTutorialEvent(.addShiftSheetOpened) }
             }
             .sheet(isPresented: $showingAddTemplateSheet) {
                 ShiftTemplateEditSheet(viewModel: vm, roles: roleVM.roles)
@@ -279,6 +279,8 @@ struct ShiftTemplateEditSheet: View {
     var existing: FfiShiftTemplate?
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(DemoModeController.self) private var demo
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private static let allDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
@@ -345,6 +347,26 @@ struct ShiftTemplateEditSheet: View {
             }
             .onAppear { prefill() }
         }
+        #if os(iOS)
+        // The sheet covers the root spotlight overlay, so the demo tour's
+        // Role & Staffing walkthrough tooltip mounts here.
+        .overlay {
+            ZStack {
+                if let spot = demo.currentSpotlight, spot.target == .shiftRoleStaffingHint {
+                    TutorialSpotlightOverlay(
+                        spotlight: spot,
+                        targetFrame: nil,
+                        onSkip: { demo.skipCurrentSubStep() }
+                    )
+                    .transition(TutorialFade.transition(isFirstOfSet: false))
+                }
+            }
+            .animation(
+                reduceMotion ? nil : .default,
+                value: demo.currentSpotlight
+            )
+        }
+        #endif
         #if os(macOS)
         .frame(minWidth: 420, idealWidth: 480, minHeight: 460, idealHeight: 540)
         #endif

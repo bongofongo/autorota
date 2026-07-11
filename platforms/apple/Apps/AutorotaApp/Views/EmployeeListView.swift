@@ -1,5 +1,4 @@
 import SwiftUI
-import TipKit
 import AutorotaKit
 
 struct EmployeeListView: View {
@@ -11,7 +10,6 @@ struct EmployeeListView: View {
     @State private var selectedEmployee: FfiEmployee?
     @State private var sendScheduleTarget: FfiEmployee?
     @State private var showingImport = false
-    private let addEmployeeTip = EmployeesAddTip()
     @Environment(\.isMenuPushed) private var isMenuPushed
     var body: some View {
         OptionalNavigationStack(embed: !isMenuPushed) {
@@ -73,15 +71,11 @@ struct EmployeeListView: View {
                                     .tint(.blue)
                                 }
                                 #endif
+                                .modifier(EmployeeRowTutorialTag(nickname: employee.nickname))
                             }
                         }
                     }
                 }
-            }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                TipView(addEmployeeTip)
-                    .padding(.horizontal)
-                    .padding(.top, 8)
             }
             .navigationTitle("Employees")
             .toolbar {
@@ -161,5 +155,20 @@ struct EmployeeListView: View {
         guard employeeBridge.requestNewEmployeeSheet else { return }
         showingAddSheet = true
         employeeBridge.requestNewEmployeeSheet = false
+    }
+}
+
+/// Registers the demo tour targets on Mercury's and Mars's rows (the two
+/// seeded demo-crew members the guided steps point at).
+private struct EmployeeRowTutorialTag: ViewModifier {
+    let nickname: String?
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        switch nickname {
+        case "Mercury": content.tutorialTarget(.mercuryRow)
+        case "Mars":    content.tutorialTarget(.marsRow)
+        default:        content
+        }
     }
 }
