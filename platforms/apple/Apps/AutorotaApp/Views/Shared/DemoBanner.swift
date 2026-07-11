@@ -27,8 +27,23 @@ struct DemoBanner: View {
             // Title only — the step instruction lives in the pull-up
             // checklist sheet (tap the banner) to keep the preview compact.
             if let step = demo.currentStep {
-                Text(LocalizedStringKey(step.titleKey))
-                    .font(.subheadline.weight(.semibold))
+                if showsHintNudge {
+                    Image(systemName: "lightbulb.fill")
+                        .font(.caption)
+                        .foregroundStyle(Color.accentColor)
+                        .symbolEffect(.pulse)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(LocalizedStringKey(step.titleKey))
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                        Text("demo.banner.hint")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text(LocalizedStringKey(step.titleKey))
+                        .font(.subheadline.weight(.semibold))
+                }
             } else {
                 Text("demo.banner.complete.title")
                     .font(.subheadline.weight(.semibold))
@@ -100,6 +115,18 @@ struct DemoBanner: View {
         }
     }
 
+    /// Nudge the user toward the hint card when the spotlight can't help:
+    /// on iOS that's the guidance-hidden state (wrong tab / skipped dry);
+    /// macOS has no spotlight overlay at all, so the nudge always shows
+    /// while a step is pending.
+    private var showsHintNudge: Bool {
+        #if os(iOS)
+        demo.isGuidanceHidden
+        #else
+        true
+        #endif
+    }
+
     private var progressDots: some View {
         HStack(spacing: 4) {
             ForEach(demo.steps) { step in
@@ -154,17 +181,22 @@ private struct DemoChecklistSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                ForEach(demo.steps) { step in
-                    HStack(spacing: 12) {
-                        stateIcon(step.state, isCurrent: step.id == demo.currentStep?.id)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(LocalizedStringKey(step.titleKey))
-                                .font(.body.weight(
-                                    step.id == demo.currentStep?.id ? .semibold : .regular
-                                ))
-                            Text(LocalizedStringKey(step.instructionKey))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                if let path = demo.hintPath, let step = demo.currentStep {
+                    hintCard(path: path, step: step)
+                }
+                Section {
+                    ForEach(demo.steps) { step in
+                        HStack(spacing: 12) {
+                            stateIcon(step.state, isCurrent: step.id == demo.currentStep?.id)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(LocalizedStringKey(step.titleKey))
+                                    .font(.body.weight(
+                                        step.id == demo.currentStep?.id ? .semibold : .regular
+                                    ))
+                                Text(LocalizedStringKey(step.instructionKey))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
@@ -180,6 +212,79 @@ private struct DemoChecklistSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+
+    /// Expanded guidance for the current step: the next direction as a
+    /// headline, then the full route with live done/current/todo markers.
+    /// Updates as the user acts, so it can be followed at the medium detent.
+    private func hintCard(path: [DemoHintItem], step: DemoStep) -> some View {
+        Section {
+            VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("demo.hint.title")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                    Text(LocalizedStringKey(step.titleKey))
+                        .font(.headline)
+                }
+
+                // The one thing to do next; falls back to the step's own
+                // instruction when every direction reads satisfied and the
+                // step is just waiting on its completion signal.
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: "arrow.turn.down.right")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.accentColor)
+                    Text(LocalizedStringKey(
+                        demo.currentHintItem?.instructionKey ?? step.instructionKey
+                    ))
+                    .font(.subheadline.weight(.medium))
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("demo.hint.how")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+                    ForEach(Array(path.enumerated()), id: \.element.id) { index, item in
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            hintItemIcon(item.state)
+                            Text("\(index + 1).")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                            Text(LocalizedStringKey(item.instructionKey))
+                                .font(.caption)
+                                .fontWeight(item.state == .current ? .semibold : .regular)
+                                .foregroundStyle(item.state == .todo ? .secondary : .primary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+            .accessibilityIdentifier("demo.hint.card")
+        }
+        .listRowBackground(Color.accentColor.opacity(0.08))
+    }
+
+    @ViewBuilder
+    private func hintItemIcon(_ state: DemoHintItem.State) -> some View {
+        switch state {
+        case .satisfied:
+            Image(systemName: "checkmark.circle.fill")
+                .font(.caption)
+                .foregroundStyle(Color.accentColor)
+        case .current:
+            Image(systemName: "circle.dotted.circle")
+                .font(.caption)
+                .foregroundStyle(Color.accentColor)
+        case .todo:
+            Image(systemName: "circle")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 
     @ViewBuilder

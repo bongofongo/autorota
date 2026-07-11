@@ -708,6 +708,9 @@
         }
       }
     },
+    "%lld." : {
+
+    },
     "%lld/%u" : {
       "localizations" : {
         "ar" : {
@@ -3672,6 +3675,17 @@
         }
       }
     },
+    "demo.banner.hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap for directions"
+          }
+        }
+      }
+    },
     "demo.banner.next" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3789,6 +3803,39 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Finish Demo"
+          }
+        }
+      }
+    },
+    "demo.help.replay" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replay Demo"
+          }
+        }
+      }
+    },
+    "demo.hint.how" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How to get there"
+          }
+        }
+      }
+    },
+    "demo.hint.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current task"
           }
         }
       }
@@ -4317,6 +4364,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nice! Toggle the lasso off to get scrolling back."
+          }
+        }
+      }
+    },
+    "demo.sub.setAvailability.toggleLassoOn" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Now try multi-select: tap the lasso tool to turn it on."
           }
         }
       }
@@ -23258,17 +23316,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "在 iCloud 上找到您的 Autorota 資料。要下載到此裝置嗎?"
-          }
-        }
-      }
-    },
-    "demo.sub.setAvailability.toggleLassoOn" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Now try multi-select: tap the lasso tool to turn it on."
           }
         }
       }

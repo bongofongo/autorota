@@ -74,6 +74,24 @@ enum DemoSubStepID: String {
     case customizeLayout
 }
 
+/// One row of the "how to get there" hint path shown in the checklist
+/// sheet. Mirrors the current step's sub-sequence, but nav prerequisites
+/// are judged against *live* app context so a user who backed out sees
+/// them flip back to todo.
+struct DemoHintItem: Identifiable, Equatable {
+    enum State {
+        case satisfied
+        case current
+        case todo
+    }
+
+    let sub: DemoSubStepID
+    let state: State
+    /// Localization key of the direction; reuses the tooltip strings.
+    let instructionKey: String
+    var id: String { sub.rawValue }
+}
+
 /// Drives demo mode: swaps the app onto a throwaway seeded database, pauses
 /// iCloud sync, lifts the license gate, and walks a step checklist that
 /// auto-advances by observing `.autorotaDataChanged` / `.autorotaExportCompleted`.
@@ -95,6 +113,14 @@ final class DemoModeController {
         var resumeSync: () async -> Void
         var setGateDemoActive: (Bool) -> Void
         var tourWeekStart: () -> String    // Monday the tour centres on
+        // Defaulted so existing construction sites (tests included) opt in
+        // only when they care about completion persistence.
+        var loadDemoEverCompleted: () -> Bool = {
+            UserDefaults.standard.bool(forKey: DemoModeController.demoEverCompletedKey)
+        }
+        var persistDemoEverCompleted: () -> Void = {
+            UserDefaults.standard.set(true, forKey: DemoModeController.demoEverCompletedKey)
+        }
 
         static func live(syncEngine: AutorotaSyncEngine) -> Environment {
             Environment(
@@ -115,10 +141,17 @@ final class DemoModeController {
         }
     }
 
+    /// UserDefaults key marking that a demo tour finished at least once.
+    static let demoEverCompletedKey = "demoEverCompleted"
+
     private(set) var isActive = false
     private(set) var steps: [DemoStep] = DemoStep.ID.allCases.map { DemoStep(id: $0) }
     /// True once every step is done/skipped; drives the completion card.
     private(set) var isComplete = false
+    /// A tour has been finished at least once, ever (persisted). Moves the
+    /// demo entry point from the Menu landing to the Help page, relabeled
+    /// "Replay Demo".
+    private(set) var hasEverCompletedDemo: Bool
     /// Set when enter/exit hits an FFI error; surfaced as an alert.
     var lastError: String?
 
@@ -134,6 +167,15 @@ final class DemoModeController {
     /// waits until the user backs out to the Employees list before its
     /// first prompt appears.
     private var isEmployeeDetailOpen = false
+    /// Nickname on the open employee detail page; feeds the hint path's
+    /// live checks for the open-Mercury / open-Mars prerequisites.
+    private(set) var openEmployeeNickname: String?
+    /// The availability grid is in inline edit mode (pencil tapped).
+    private(set) var isGridEditing = false
+    /// Sub-steps dismissed via the tooltip's Skip button. Their action was
+    /// never observed, so the hint path keeps showing them as todo instead
+    /// of pretending they happened.
+    private var skippedSubs: Set<DemoSubStepID> = []
     /// An assignment was mutated while `alterRota` was current — the step
     /// completes once the user leaves sandbox mode (teaching Done/auto-save),
     /// or immediately if the mutation happened outside sandbox mode.
@@ -168,6 +210,7 @@ final class DemoModeController {
     ) {
         self.env = environment
         self.service = service ?? GatedAutorotaService()
+        self.hasEverCompletedDemo = environment.loadDemoEverCompleted()
     }
 
     var currentStep: DemoStep? {
@@ -197,6 +240,71 @@ final class DemoModeController {
         )
     }
 
+    // MARK: - Hint path
+
+    /// "How to get there" directions for the current step, judged against
+    /// live app context: nav prerequisites the user backed out of read as
+    /// todo again, and Skip-dismissed actions never read as done. The first
+    /// unsatisfied item is the one to do next.
+    var hintPath: [DemoHintItem]? {
+        guard isActive, !isComplete, let step = currentStep else { return nil }
+        let subs = Self.subSteps(for: step.id)
+        var sawCurrent = false
+        return subs.enumerated().map { index, sub in
+            let satisfied = contextSatisfied(sub)
+                ?? (index < currentSubStepIndex && !skippedSubs.contains(sub))
+            let state: DemoHintItem.State
+            if satisfied {
+                state = .satisfied
+            } else if sawCurrent {
+                state = .todo
+            } else {
+                state = .current
+                sawCurrent = true
+            }
+            return DemoHintItem(
+                sub: sub,
+                state: state,
+                instructionKey: "demo.sub.\(step.id.rawValue).\(sub.rawValue)"
+            )
+        }
+    }
+
+    /// The next direction to follow — the hint card's headline. Nil when
+    /// every item reads satisfied and the step is waiting on its data
+    /// predicate (the card falls back to the step instruction).
+    var currentHintItem: DemoHintItem? {
+        hintPath?.first { $0.state == .current }
+    }
+
+    /// True when a step is pending but the spotlight overlay would render
+    /// nothing — the sequence was skipped dry, or the target lives on a tab
+    /// the user isn't on. Drives the banner's "tap for directions" nudge.
+    var isGuidanceHidden: Bool {
+        guard isActive, !isComplete, currentStep != nil else { return false }
+        guard let spot = currentSpotlight else { return true }
+        if let required = spot.target.requiredTab, required != currentTab {
+            return true
+        }
+        return false
+    }
+
+    /// Whether live app context satisfies a navigation prerequisite; nil
+    /// for action sub-steps, which are judged by sequence position instead.
+    private func contextSatisfied(_ sub: DemoSubStepID) -> Bool? {
+        switch sub {
+        case .openEmployeesTab: return currentTab == .employees
+        case .openShiftsTab:    return currentTab == .templates
+        case .openRotaTab:      return currentTab == .rota
+        case .openMercury:      return openEmployeeNickname == "Mercury"
+        case .openMars:         return openEmployeeNickname == "Mars"
+        case .tapPencil:        return isGridEditing
+        case .goToNextWeek:     return isOnTourWeek
+        case .enterSandbox:     return isSandboxActive
+        default:                return nil
+        }
+    }
+
     // MARK: - Enter / exit
 
     func enterDemo() {
@@ -213,6 +321,8 @@ final class DemoModeController {
             isSandboxActive = false
             isOnTourWeek = false
             isEmployeeDetailOpen = false
+            openEmployeeNickname = nil
+            isGridEditing = false
             resetSteps()
             isActive = true
             startObserving()
@@ -322,8 +432,15 @@ final class DemoModeController {
         case .weekChanged(let tour):     isOnTourWeek = tour
         case .sandboxEntered:            isSandboxActive = true
         case .sandboxExited:             isSandboxActive = false
-        case .employeeDetailOpened:      isEmployeeDetailOpen = true
-        case .employeeDetailClosed:      isEmployeeDetailOpen = false
+        case .employeeDetailOpened(let nick):
+            isEmployeeDetailOpen = true
+            openEmployeeNickname = nick
+        case .employeeDetailClosed:
+            isEmployeeDetailOpen = false
+            openEmployeeNickname = nil
+            isGridEditing = false
+        case .gridEditStarted:           isGridEditing = true
+        case .gridEditEnded:             isGridEditing = false
         default: break
         }
 
@@ -378,6 +495,7 @@ final class DemoModeController {
         guard isActive, let step = currentStep else { return }
         let subs = Self.subSteps(for: step.id)
         guard currentSubStepIndex < subs.count else { return }
+        skippedSubs.insert(subs[currentSubStepIndex])
         currentSubStepIndex += 1
         normalizeSubSteps()
         completeStepIfSequenceExhausted()
@@ -482,6 +600,7 @@ final class DemoModeController {
     private func resetSteps() {
         steps = DemoStep.ID.allCases.map { DemoStep(id: $0) }
         assignmentAlteredDuringStep = false
+        skippedSubs = []
         currentSubStepIndex = 0
         normalizeSubSteps()
     }
@@ -492,10 +611,15 @@ final class DemoModeController {
         // The next step starts its guided sequence from the top, minus
         // anything the current app context already satisfies.
         assignmentAlteredDuringStep = false
+        skippedSubs = []
         currentSubStepIndex = 0
         normalizeSubSteps()
         if currentStep == nil {
             isComplete = true
+            if !hasEverCompletedDemo {
+                hasEverCompletedDemo = true
+                env.persistDemoEverCompleted()
+            }
         }
     }
 

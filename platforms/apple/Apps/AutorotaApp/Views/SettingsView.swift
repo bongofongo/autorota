@@ -139,7 +139,9 @@ struct SettingsView: View {
                     } label: {
                         Label("License", systemImage: "creditcard")
                     }
-                    if !demo.isActive {
+                    // First-timers get the demo up front; after one full
+                    // completion it lives on the Help page as "Replay Demo".
+                    if !demo.isActive, !demo.hasEverCompletedDemo {
                         Button {
                             demo.enterDemo()
                         } label: {

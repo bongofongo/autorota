@@ -601,6 +601,13 @@ struct EmployeeDetailContent: View {
         }
         .task {
             demo.noteTutorialEvent(.employeeDetailOpened(nickname: employee.nickname))
+            // A tab switch keeps this view (and an active grid edit) alive
+            // while onDisappear told the tour the context was gone — re-arm
+            // it so hint directions don't ask for a pencil tap that already
+            // happened.
+            if isEditingGrid {
+                demo.noteTutorialEvent(.gridEditStarted)
+            }
             await overrideVM.loadForEmployee(id: employee.id)
             await shiftVM.load(employeeId: employee.id)
         }

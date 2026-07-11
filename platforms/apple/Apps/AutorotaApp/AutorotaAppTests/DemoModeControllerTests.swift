@@ -14,6 +14,7 @@ struct DemoModeControllerTests {
         var log: [String] = []
         var syncWasRunning = true
         var switchError: Error?
+        var demoEverCompleted = false
 
         func environment() -> DemoModeController.Environment {
             DemoModeController.Environment(
@@ -31,7 +32,12 @@ struct DemoModeControllerTests {
                 },
                 resumeSync: { [self] in log.append("resumeSync") },
                 setGateDemoActive: { [self] in log.append("gate:\($0)") },
-                tourWeekStart: { "2099-04-20" }
+                tourWeekStart: { "2099-04-20" },
+                loadDemoEverCompleted: { [self] in demoEverCompleted },
+                persistDemoEverCompleted: { [self] in
+                    demoEverCompleted = true
+                    log.append("persistCompleted")
+                }
             )
         }
     }
@@ -389,6 +395,33 @@ struct DemoModeControllerTests {
         #expect(controller.currentStep == nil)
     }
 
+    @Test func firstCompletionPersistsEverCompletedFlagOnce() {
+        let env = EnvRecorder()
+        let controller = makeController(env: env, mock: seededMock())
+        #expect(!controller.hasEverCompletedDemo)
+
+        controller.enterDemo()
+        controller.advanceManualStep()
+        skipAll(controller)
+
+        #expect(controller.hasEverCompletedDemo)
+        #expect(env.log.filter { $0 == "persistCompleted" }.count == 1)
+
+        // A replay completing again must not re-persist.
+        controller.restartTour()
+        controller.advanceManualStep()
+        skipAll(controller)
+        #expect(env.log.filter { $0 == "persistCompleted" }.count == 1)
+    }
+
+    @Test func controllerLoadsPersistedEverCompletedFlag() {
+        let env = EnvRecorder()
+        env.demoEverCompleted = true
+        let controller = makeController(env: env, mock: seededMock())
+
+        #expect(controller.hasEverCompletedDemo)
+    }
+
     @Test func restartTourResetsSteps() {
         let env = EnvRecorder()
         let controller = makeController(env: env, mock: seededMock())
@@ -622,6 +655,107 @@ struct DemoModeControllerTests {
 
         #expect(controller.currentSpotlight == nil)
         #expect(!controller.isActive)
+    }
+
+    // MARK: - Hint path
+
+    @Test func hintPathFlipsNavPrerequisitesWhenUserBacksOut() {
+        let env = EnvRecorder()
+        let controller = makeController(env: env, mock: seededMock())
+        controller.enterDemo()
+        controller.noteTutorialEvent(.tabSelected(.employees)) // -> setAvailability
+        controller.noteTutorialEvent(.employeeDetailOpened(nickname: "Mercury"))
+        controller.noteTutorialEvent(.gridEditStarted)
+        #expect(controller.currentHintItem?.sub == .cycleCell)
+
+        // Wander off: close Mercury's page and switch to the Rota tab. The
+        // nav prerequisites must read as the route back, not as done.
+        controller.noteTutorialEvent(.employeeDetailClosed)
+        controller.noteTutorialEvent(.tabSelected(.rota))
+
+        let path = controller.hintPath!
+        func state(_ sub: DemoSubStepID) -> DemoHintItem.State? {
+            path.first { $0.sub == sub }?.state
+        }
+        #expect(state(.openEmployeesTab) == .current)
+        #expect(state(.openMercury) == .todo)
+        #expect(state(.tapPencil) == .todo)
+        #expect(state(.cycleCell) == .todo)
+        #expect(controller.currentHintItem?.sub == .openEmployeesTab)
+        #expect(controller.currentHintItem?.instructionKey
+                == "demo.sub.setAvailability.openEmployeesTab")
+
+        // Returning re-satisfies the prerequisites and the path picks up
+        // where the user left off.
+        controller.noteTutorialEvent(.tabSelected(.employees))
+        controller.noteTutorialEvent(.employeeDetailOpened(nickname: "Mercury"))
+        controller.noteTutorialEvent(.gridEditStarted)
+        #expect(controller.currentHintItem?.sub == .cycleCell)
+    }
+
+    @Test func hintPathKeepsSkippedActionsTodo() {
+        let env = EnvRecorder()
+        let controller = makeController(env: env, mock: seededMock())
+        controller.enterDemo()
+        controller.noteTutorialEvent(.tabSelected(.employees)) // -> setAvailability
+        controller.skipCurrentSubStep() // skip openMercury (context-checked anyway)
+        controller.skipCurrentSubStep() // skip tapPencil (context-checked anyway)
+        controller.skipCurrentSubStep() // skip cycleCell — an action sub
+
+        // The spotlight has moved on, but the skipped items still read as
+        // the route in the hint path (their effects never happened):
+        // Mercury's page isn't open, so it's the current direction, and the
+        // skipped cycleCell action is todo — never satisfied.
+        #expect(controller.currentSpotlight?.target == .lassoToggle)
+        let path = controller.hintPath!
+        #expect(path.first { $0.sub == .openMercury }?.state == .current)
+        #expect(path.first { $0.sub == .tapPencil }?.state == .todo)
+        #expect(path.first { $0.sub == .cycleCell }?.state == .todo)
+    }
+
+    @Test func hintPathFallsBackWhenAllItemsSatisfied() async {
+        let env = EnvRecorder()
+        let controller = makeController(env: env, mock: seededMock())
+        controller.enterDemo()
+        controller.advanceManualStep()
+        skip(controller, to: .alterRota)
+        controller.noteTutorialEvent(.tabSelected(.rota))
+        controller.noteTutorialEvent(.sandboxEntered)
+        controller.noteTutorialEvent(.swapSourceSelected)
+        await controller.evaluateCurrentStep(changedTables: [.assignment])
+
+        // Everything up to Done is satisfied; Done is the current item
+        // (completes via sandboxExited, not an observed action).
+        #expect(controller.currentHintItem?.sub == .tapDone)
+
+        controller.noteTutorialEvent(.sandboxExited)
+        #expect(controller.currentStep?.id == .exportPDF)
+    }
+
+    @Test func guidanceHiddenOnWrongTabOrExhaustedSequence() {
+        let env = EnvRecorder()
+        let controller = makeController(env: env, mock: seededMock())
+        #expect(!controller.isGuidanceHidden) // inactive
+
+        controller.enterDemo()
+        // meetCrew's employeesTab prompt floats everywhere — not hidden.
+        #expect(!controller.isGuidanceHidden)
+
+        controller.noteTutorialEvent(.tabSelected(.employees)) // -> setAvailability
+        controller.noteTutorialEvent(.employeeDetailOpened(nickname: "Mercury"))
+        #expect(!controller.isGuidanceHidden) // pencil tip on its own tab
+
+        // Wrong tab for the page-bound pencil target.
+        controller.noteTutorialEvent(.tabSelected(.rota))
+        #expect(controller.isGuidanceHidden)
+        controller.noteTutorialEvent(.tabSelected(.employees))
+        #expect(!controller.isGuidanceHidden)
+
+        // Skipping the sequence dry hides guidance too.
+        let subCount = DemoModeController.subSteps(for: .setAvailability).count
+        for _ in 0..<subCount { controller.skipCurrentSubStep() }
+        #expect(controller.currentSpotlight == nil)
+        #expect(controller.isGuidanceHidden)
     }
 
     // MARK: - Gate
