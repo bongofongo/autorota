@@ -482,6 +482,16 @@
         }
       }
     },
+    "%@–%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@–%2$@"
+          }
+        }
+      }
+    },
     "%@, position %lld of %lld" : {
       "localizations" : {
         "en" : {
@@ -710,6 +720,16 @@
     },
     "%lld." : {
 
+    },
+    "%lld/%lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld/%2$lld"
+          }
+        }
+      }
     },
     "%lld/%u" : {
       "localizations" : {
@@ -4885,6 +4905,16 @@
         }
       }
     },
+    "Edit %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Edit %1$@ %2$@"
+          }
+        }
+      }
+    },
     "Edit availability grid" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5932,6 +5962,9 @@
         }
       }
     },
+    "Every shift this week has met its minimum and maximum headcount." : {
+
+    },
     "Everyday" : {
 
     },
@@ -6639,6 +6672,9 @@
           }
         }
       }
+    },
+    "Fully staffed" : {
+
     },
     "GBP (£)" : {
       "extractionState" : "manual",
@@ -14362,6 +14398,19 @@
         }
       }
     },
+    "Needs %lld more %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Needs %1$lld more %2$@"
+          }
+        }
+      }
+    },
+    "Needs %lld more to reach the minimum" : {
+
+    },
     "New Employee" : {
       "localizations" : {
         "ar" : {
@@ -17152,6 +17201,9 @@
     "Options" : {
 
     },
+    "Options, %lld staffing warnings" : {
+
+    },
     "Orange outline = exception for that day" : {
       "localizations" : {
         "ar" : {
@@ -18876,6 +18928,9 @@
     "Roles only" : {
 
     },
+    "Room for %lld more" : {
+
+    },
     "Rota" : {
       "localizations" : {
         "ar" : {
@@ -19254,6 +19309,7 @@
       }
     },
     "Scheduling Warnings" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -20487,6 +20543,9 @@
     "Shows a sample PDF of this template" : {
 
     },
+    "Shows this shift in the rota." : {
+
+    },
     "Skip" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -21614,6 +21673,12 @@
         }
       }
     },
+    "These shifts are below their minimum staffing." : {
+
+    },
+    "These shifts have met their minimum but still have room before the maximum." : {
+
+    },
     "This deletes the current schedule and its assignments, then generates a new one." : {
 
     },
@@ -22703,6 +22768,9 @@
           }
         }
       }
+    },
+    "Warnings (%lld)" : {
+
     },
     "Week" : {
       "localizations" : {

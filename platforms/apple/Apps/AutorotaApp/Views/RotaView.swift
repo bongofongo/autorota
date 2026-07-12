@@ -5,6 +5,11 @@ struct RotaView: View {
 
     @State private var vm = RotaViewModel()
     @State private var showExportSheet = false
+    @State private var showStaffingSheet = false
+    /// Shift picked in the warnings sheet; handed to the grid via
+    /// `vm.requestShiftFocus` only after the sheet has fully dismissed, so the
+    /// editor sheet doesn't race the dismissal transition.
+    @State private var pendingFocusShiftId: Int64?
     /// `-1` means "not yet loaded" — treat as having employees so the existing
     /// no-schedule CUV (with Generate prompt) is the default. Only an explicit
     /// `0` triggers the prerequisite empty state.
@@ -184,14 +189,6 @@ struct RotaView: View {
             } message: {
                 Text("This deletes the current schedule and its assignments, then generates a new one.")
             }
-            .alert("Scheduling Warnings", isPresented: .constant(!vm.warnings.isEmpty)) {
-                Button("OK") { vm.warnings = [] }
-            } message: {
-                Text(vm.warnings.map { w in
-                    let roleLabel = w.requiredRole.isEmpty ? "Any Role" : w.requiredRole
-                    return "\(w.weekday) \(w.startTime)–\(w.endTime) (\(roleLabel)): \(w.filled)/\(w.needed) filled"
-                }.joined(separator: "\n"))
-            }
             .errorAlert($vm.error)
             .sheet(isPresented: $showExportSheet, onDismiss: {
                 // Demo "Finish Demo" defers step completion to here so the
@@ -201,6 +198,21 @@ struct RotaView: View {
                 ExportSheetView(
                     weekStart: vm.selectedWeekStart,
                     service: vm.service
+                )
+            }
+            .sheet(isPresented: $showStaffingSheet, onDismiss: {
+                if let id = pendingFocusShiftId {
+                    pendingFocusShiftId = nil
+                    vm.requestShiftFocus(id)
+                }
+            }) {
+                StaffingIssuesView(
+                    issues: vm.staffingIssues,
+                    dayLabel: { vm.dayOfMonthLabel($0) },
+                    onSelect: { issue in
+                        pendingFocusShiftId = issue.shiftId
+                        showStaffingSheet = false
+                    }
                 )
             }
             .task {
@@ -318,6 +330,14 @@ struct RotaView: View {
     @ViewBuilder
     private var optionsMenu: some View {
         Menu {
+            Button { showStaffingSheet = true } label: {
+                if vm.staffingWarnings.isEmpty {
+                    Label("Warnings", systemImage: "exclamationmark.triangle")
+                } else {
+                    Label("Warnings (\(vm.staffingWarnings.count))", systemImage: "exclamationmark.triangle")
+                }
+            }
+            Divider()
             if !isPad {
                 Button { showExportSheet = true } label: {
                     Label("Share", systemImage: "square.and.arrow.up")
@@ -332,13 +352,49 @@ struct RotaView: View {
                 Label("Delete week", systemImage: "trash")
             }
         } label: {
+            // The toolbar wraps items in a circular glass shape that clips
+            // its content, so the badge must stay inside the button bounds:
+            // widen the label's frame so the overlay corner sits inside the
+            // glass instead of offsetting past the glyph's edge.
             Image(systemName: "ellipsis")
+                .frame(width: 30, height: 30)
         }
-        .accessibilityLabel("Options")
+        // The badge hangs on the Menu container, not the label: the label
+        // morphs into the popup and is only re-rendered after the dismiss
+        // transition, which made a label-attached badge vanish briefly every
+        // time the menu closed.
+        .overlay(alignment: .topTrailing) {
+            staffingBadge
+                .allowsHitTesting(false)
+        }
+        .accessibilityLabel(
+            vm.staffingWarnings.isEmpty
+                ? "Options"
+                : "Options, \(vm.staffingWarnings.count) staffing warnings"
+        )
         .accessibilityIdentifier("rota.options")
         // Share lives inside this menu on iPhone/macOS, so the export
         // tour step points here; iPad tags its discrete Share button.
         .modifier(ShareEntryTutorialTag(enabled: !isPad))
+    }
+
+    /// Corner indicator on the ellipsis: orange numbered capsule when any
+    /// shift is under its minimum; a subtle dot when the only gaps are
+    /// below-max notes. Nothing when fully staffed.
+    @ViewBuilder
+    private var staffingBadge: some View {
+        if !vm.staffingWarnings.isEmpty {
+            Text("\(vm.staffingWarnings.count)")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 3.5)
+                .padding(.vertical, 1)
+                .background(.orange, in: Capsule())
+        } else if !vm.staffingNotes.isEmpty {
+            Circle()
+                .fill(.secondary)
+                .frame(width: 6, height: 6)
+        }
     }
 }
 
@@ -415,6 +471,7 @@ private struct ScheduleGridView: View {
     /// confirmed. nil when no confirmation is pending.
     @State private var pendingSheet: ScheduleSheet?
     @State private var showUnlockPastConfirmation = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     #if os(iOS)
     /// How far past a horizontal edge the user must pull (then lift) for the
@@ -465,11 +522,32 @@ private struct ScheduleGridView: View {
     }
 
     var body: some View {
-        GeometryReader { geo in
-            if geo.size.width > geo.size.height {
-                landscapeContent(availableSize: geo.size)
-            } else {
-                portraitContent
+        ScrollViewReader { proxy in
+            GeometryReader { geo in
+                if geo.size.width > geo.size.height {
+                    landscapeContent(availableSize: geo.size)
+                } else {
+                    portraitContent
+                }
+            }
+            .onChange(of: vm.shiftFocusRequest) { _, request in
+                guard let request else { return }
+                vm.shiftFocusRequest = nil
+                guard let shift = schedule.shifts.first(where: { $0.id == request.shiftId }) else { return }
+                if reduceMotion {
+                    proxy.scrollTo(shift.id, anchor: .center)
+                } else {
+                    withAnimation(.smooth(duration: 0.35)) {
+                        proxy.scrollTo(shift.id, anchor: .center)
+                    }
+                }
+                // Let the scroll settle before the editor slides up, so the
+                // user sees where the shift lives before it's covered.
+                let delay: UInt64 = reduceMotion ? 50_000_000 : 450_000_000
+                Task {
+                    try? await Task.sleep(nanoseconds: delay)
+                    requestSheet(.shiftEditor(shift))
+                }
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -542,6 +620,7 @@ private struct ScheduleGridView: View {
                                 onAddEmployee: { requestSheet(.addEmployee(shift)) }
                             )
                             .modifier(FirstShiftTutorialTag(isFirst: shift.id == firstShiftId))
+                            .id(shift.id)
                         }
                         if shifts.isEmpty {
                             Text("No shifts")
@@ -686,6 +765,7 @@ private struct ScheduleGridView: View {
                         isCompact: true
                     )
                     .modifier(FirstShiftTutorialTag(isFirst: shift.id == firstShiftId))
+                    .id(shift.id)
                 }
             }
 
@@ -1390,6 +1470,13 @@ private struct ShiftEditorSheet: View {
 
     private var assignments: [FfiScheduleEntry] { vm.assignments(for: shift.id) }
 
+    /// Times plus the primary role when the shift has one, e.g.
+    /// "09:00–17:00 · Barista". Wildcard shifts show just the times.
+    private var subtitleText: String {
+        let times = "\(shift.startTime)–\(shift.endTime)"
+        return shift.requiredRole.isEmpty ? times : "\(times) · \(shift.requiredRole)"
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -1450,7 +1537,8 @@ private struct ShiftEditorSheet: View {
             #if os(macOS)
             .formStyle(.grouped)
             #endif
-            .navigationTitle("Edit Shift")
+            .navigationTitle("Edit \(shift.weekday) \(vm.dayOfMonthLabel(shift.weekday))")
+            .navigationSubtitle(subtitleText)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif

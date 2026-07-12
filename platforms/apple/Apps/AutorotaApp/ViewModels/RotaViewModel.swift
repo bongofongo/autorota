@@ -55,7 +55,6 @@ final class RotaViewModel {
     private var hasLoaded = false
     var isScheduling = false
     var error: String?
-    var warnings: [FfiShortfallWarning] = []
 
     var selectedWeekStart: String = currentWeekStart()
     /// Direction of the most recent week step (-1 toward the past, +1 toward
@@ -94,6 +93,10 @@ final class RotaViewModel {
     private var shiftsByWeekday: [String: [FfiShiftInfo]] = [:]
     private var entriesByShift: [Int64: [FfiScheduleEntry]] = [:]
     private var conflictByAssignmentId: [Int64: ConflictReason?] = [:]
+    /// Live staffing gaps for the loaded week, recomputed per `loadSchedule`
+    /// (warnings = below min or per-role min unmet; notes = min met, below max).
+    /// Drives the options-menu badge and the Warnings sheet.
+    private(set) var staffingIssues: [StaffingIssue] = []
     /// Today's ISO date, snapshotted per load so past/today checks don't
     /// re-format `Date()` per render.
     private var todayISO: String = ""
@@ -188,6 +191,7 @@ final class RotaViewModel {
             shiftsByWeekday = [:]
             entriesByShift = [:]
             conflictByAssignmentId = [:]
+            staffingIssues = []
             return
         }
 
@@ -215,6 +219,57 @@ final class RotaViewModel {
             }
         }
         conflictByAssignmentId = conflicts
+
+        staffingIssues = StaffingIssue.displaySort(
+            schedule.shifts.flatMap { staffingIssues(for: $0) }
+        )
+    }
+
+    // MARK: - Staffing issues
+
+    /// Live staffing gaps for one shift. Per-role coverage mirrors the
+    /// scheduler's `role_deficits`: an assigned employee counts toward every
+    /// required role they hold.
+    private func staffingIssues(for shift: FfiShiftInfo) -> [StaffingIssue] {
+        let entries = entriesByShift[shift.id] ?? []
+        let filled = entries.count
+        var issues: [StaffingIssue] = []
+
+        func issue(_ severity: StaffingIssue.Severity, role: String?, filled: Int, needed: Int) -> StaffingIssue {
+            StaffingIssue(
+                shiftId: shift.id, severity: severity, weekday: shift.weekday,
+                date: shift.date, startTime: shift.startTime, endTime: shift.endTime,
+                role: role, filled: filled, needed: needed
+            )
+        }
+
+        if filled < Int(shift.minEmployees) {
+            issues.append(issue(.warning, role: nil, filled: filled, needed: Int(shift.minEmployees)))
+        }
+        for req in shift.roleRequirements where req.minCount > 0 {
+            let covered = entries.filter {
+                employeesById[$0.employeeId]?.roles.contains(req.role) ?? false
+            }.count
+            if covered < Int(req.minCount) {
+                issues.append(issue(.warning, role: req.role, filled: covered, needed: Int(req.minCount)))
+            }
+        }
+        if filled >= Int(shift.minEmployees) && filled < Int(shift.maxEmployees) {
+            issues.append(issue(.note, role: nil, filled: filled, needed: Int(shift.maxEmployees)))
+        }
+        return issues
+    }
+
+    var staffingWarnings: [StaffingIssue] { staffingIssues.filter { $0.severity == .warning } }
+    var staffingNotes: [StaffingIssue] { staffingIssues.filter { $0.severity == .note } }
+    var hasStaffingIssues: Bool { !staffingIssues.isEmpty }
+
+    /// Pending scroll-to-shift + open-editor request, consumed by the grid.
+    /// Set via `requestShiftFocus` after the warnings sheet dismisses.
+    var shiftFocusRequest: ShiftFocusRequest?
+
+    func requestShiftFocus(_ shiftId: Int64) {
+        shiftFocusRequest = ShiftFocusRequest(shiftId: shiftId, token: UUID())
     }
 
     // MARK: - Conflict detection
@@ -276,10 +331,8 @@ final class RotaViewModel {
     private func performSchedule() async {
         isScheduling = true
         error = nil
-        warnings = []
         do {
-            let result = try await service.runSchedule(weekStart: selectedWeekStart)
-            warnings = result.warnings
+            _ = try await service.runSchedule(weekStart: selectedWeekStart)
             isDirty = true
             await loadSchedule()
         } catch {

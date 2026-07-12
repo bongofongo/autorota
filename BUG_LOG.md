@@ -2,6 +2,12 @@
 
 Concise running log of bugs encountered. Each entry is one bullet with sub-bullets. New entries appended at top. Patched entries remain `pending verification` until the user confirms.
 
+- **Staffing-warnings badge vanishes from the rota options button after closing the menu**
+  - Date fixed: 2026-07-12 (pending verification)
+  - Where / what / repro: Rota tab → open the top-left options menu (Warnings / Share / Regenerate / Delete week) → close it. The orange warning-count badge on the ellipsis disappeared and only reappeared after a noticeable delay. Root cause: the badge was an `.overlay` on the `Image` inside the `Menu`'s `label:`; iOS 26 toolbar menus morph the label into the popup and re-render label content only after the dismiss transition completes, so a label-attached badge lagged the button's reappearance every close.
+  - Patched: yes — pending user verification
+  - Fix: `RotaView.swift` `optionsMenu` — moved the badge overlay off the label onto the `Menu` container (with `.allowsHitTesting(false)` so taps pass through). The container doesn't participate in the label morph, so the badge stays rendered through open/close. Verified on iPhone 17 Pro Max sim: badge present immediately after dismissal, geometry unchanged.
+
 - **Loading spinner flashes on tab-switch to Rota when the week has no rota**
   - Date fixed: 2026-07-02 (pending verification)
   - Where / what / repro: switch from another tab onto Rota on a week with no generated rota (the "No Schedule" / prerequisite empty state). A "Loading schedule…" spinner flashes for a split second before the empty state renders, causing a stutter. Absent when the week has an active rota. `RotaView.task` re-fires `loadSchedule()` on every tab reappearance (iPhone system `TabView`); the cold-load spinner gate was `schedule == nil`. On a no-rota week `schedule` stays nil across reloads, so every reappear counted as a cold load → `isLoading = true` → the `ProgressView` teardown/rebuild flash. Same class as the Shifts-tab empty-state flicker (below) and the earlier RotaView content-case fix — the `schedule == nil` heuristic covered has-content but not confirmed-empty.

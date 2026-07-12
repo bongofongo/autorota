@@ -335,21 +335,157 @@ struct RotaViewModelTests {
         #expect(vm.error == "boom")
     }
 
-    @Test func runScheduleSetsWarnings() async {
+    @Test func runScheduleCompletesAndReloads() async {
         let mock = MockAutorotaService()
-        let warning = FfiShortfallWarning(
-            shiftId: 1, needed: 2, filled: 1, weekday: "Mon",
-            startTime: "07:00", endTime: "12:00", requiredRole: "Barista", role: "Barista"
-        )
-        mock.stubbedScheduleResult = FfiScheduleResult(assignments: [], warnings: [warning])
+        mock.stubbedScheduleResult = FfiScheduleResult(assignments: [], warnings: [])
         mock.stubbedWeekSchedule = makeSchedule()
         let vm = RotaViewModel(service: mock)
         vm.selectedWeekStart = "2099-01-07" // future week bypasses confirmation gate
 
         await vm.runSchedule()
 
-        #expect(vm.warnings.count == 1)
+        #expect(mock.callLog.contains { $0.hasPrefix("runSchedule") })
         #expect(vm.isScheduling == false)
+    }
+
+    // MARK: - Staffing issues
+
+    /// min 2 / max 3 with one entry → one under-minimum warning, no note.
+    @Test func staffingIssuesUnderMinimumIsWarning() async {
+        let mock = MockAutorotaService()
+        var shift = makeShiftInfo()
+        shift.minEmployees = 2
+        shift.maxEmployees = 3
+        mock.stubbedWeekSchedule = makeSchedule(
+            shifts: [shift],
+            entries: [makeEntry(assignmentId: 1, shiftId: shift.id)]
+        )
+        let vm = await loadedVM(mock)
+
+        #expect(vm.staffingWarnings.count == 1)
+        #expect(vm.staffingNotes.isEmpty)
+        let warning = vm.staffingWarnings[0]
+        #expect(warning.filled == 1)
+        #expect(warning.needed == 2)
+        #expect(warning.role == nil)
+    }
+
+    /// min 1 / max 3 with two entries → note only (2/3 staffed).
+    @Test func staffingIssuesBelowMaximumIsNote() async {
+        let mock = MockAutorotaService()
+        var shift = makeShiftInfo()
+        shift.minEmployees = 1
+        shift.maxEmployees = 3
+        mock.stubbedWeekSchedule = makeSchedule(
+            shifts: [shift],
+            entries: [
+                makeEntry(assignmentId: 1, shiftId: shift.id, employeeId: 1),
+                makeEntry(assignmentId: 2, shiftId: shift.id, employeeId: 2),
+            ]
+        )
+        let vm = await loadedVM(mock)
+
+        #expect(vm.staffingWarnings.isEmpty)
+        #expect(vm.staffingNotes.count == 1)
+        let note = vm.staffingNotes[0]
+        #expect(note.filled == 2)
+        #expect(note.needed == 3)
+    }
+
+    /// Overall min met but a per-role minimum unmet → role warning; below
+    /// max also yields a note. Employee 2 lacks the Barista role.
+    @Test func staffingIssuesUnmetRoleMinimumIsWarning() async {
+        let mock = MockAutorotaService()
+        var shift = makeShiftInfo()
+        shift.minEmployees = 2
+        shift.maxEmployees = 3
+        shift.roleRequirements = [FfiRoleRequirement(role: "Barista", minCount: 2)]
+        mock.stubbedWeekSchedule = makeSchedule(
+            shifts: [shift],
+            entries: [
+                makeEntry(assignmentId: 1, shiftId: shift.id, employeeId: 1),
+                makeEntry(assignmentId: 2, shiftId: shift.id, employeeId: 2),
+            ]
+        )
+        var barista = makeEmployee(id: 1)
+        barista.roles = ["Barista"]
+        var waiter = makeEmployee(id: 2)
+        waiter.roles = ["Waiter"]
+        mock.stubbedEmployees = [barista, waiter]
+        let vm = await loadedVM(mock)
+
+        #expect(vm.staffingWarnings.count == 1)
+        let warning = vm.staffingWarnings[0]
+        #expect(warning.role == "Barista")
+        #expect(warning.filled == 1)
+        #expect(warning.needed == 2)
+        #expect(vm.staffingNotes.count == 1)
+    }
+
+    /// At max on every shift → no issues at all.
+    @Test func staffingIssuesFullyStaffedIsEmpty() async {
+        let mock = MockAutorotaService()
+        var shift = makeShiftInfo()
+        shift.minEmployees = 1
+        shift.maxEmployees = 1
+        mock.stubbedWeekSchedule = makeSchedule(
+            shifts: [shift],
+            entries: [makeEntry(assignmentId: 1, shiftId: shift.id)]
+        )
+        let vm = await loadedVM(mock)
+
+        #expect(vm.hasStaffingIssues == false)
+    }
+
+    /// Warnings sort ahead of notes regardless of weekday order.
+    @Test func staffingIssuesWarningsSortBeforeNotes() async {
+        let mock = MockAutorotaService()
+        var monNote = makeShiftInfo(id: 1, weekday: "Mon")
+        monNote.minEmployees = 1
+        monNote.maxEmployees = 2
+        var friWarning = makeShiftInfo(id: 2, weekday: "Fri")
+        friWarning.minEmployees = 1
+        friWarning.maxEmployees = 1
+        mock.stubbedWeekSchedule = makeSchedule(
+            shifts: [monNote, friWarning],
+            entries: [makeEntry(assignmentId: 1, shiftId: 1)]
+        )
+        let vm = await loadedVM(mock)
+
+        #expect(vm.staffingIssues.count == 2)
+        #expect(vm.staffingIssues[0].severity == .warning)
+        #expect(vm.staffingIssues[0].shiftId == 2)
+        #expect(vm.staffingIssues[1].severity == .note)
+    }
+
+    /// Focus requests carry the shift id, and repeat requests for the same
+    /// shift are distinct values so the grid's onChange re-fires.
+    @Test func requestShiftFocusProducesDistinctRequests() {
+        let mock = MockAutorotaService()
+        let vm = RotaViewModel(service: mock)
+
+        vm.requestShiftFocus(42)
+        let first = vm.shiftFocusRequest
+        #expect(first?.shiftId == 42)
+
+        vm.requestShiftFocus(42)
+        let second = vm.shiftFocusRequest
+        #expect(second?.shiftId == 42)
+        #expect(first != second)
+    }
+
+    /// Clearing the schedule clears the computed issues.
+    @Test func staffingIssuesClearOnNilSchedule() async {
+        let mock = MockAutorotaService()
+        var shift = makeShiftInfo()
+        shift.minEmployees = 2
+        mock.stubbedWeekSchedule = makeSchedule(shifts: [shift])
+        let vm = await loadedVM(mock)
+        #expect(vm.hasStaffingIssues == true)
+
+        vm.schedule = nil
+
+        #expect(vm.hasStaffingIssues == false)
     }
 
     // MARK: - Generate confirmation dialog
