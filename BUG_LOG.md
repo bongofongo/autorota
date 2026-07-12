@@ -2,6 +2,28 @@
 
 Concise running log of bugs encountered. Each entry is one bullet with sub-bullets. New entries appended at top. Patched entries remain `pending verification` until the user confirms.
 
+- **Scheduler ignores overnight shifts in overlap + daily-hour checks (double-booking possible)**
+  - Date fixed: 2026-07-12 (pending verification)
+  - Where / what / repro: `crates/autorota-core/src/scheduler/mod.rs`. `has_time_overlap` compared bare `NaiveTime`s, so an overnight shift (e.g. Fri 22:00–02:00) never overlapped anything: a same-day 20:00–23:00 shift or a next-day 01:00–05:00 shift could be assigned to the same employee. Additionally all overnight hours were booked on the start date, so the post-midnight tail never counted against the next day's `max_daily_hours`. Found by the test-gap audit; repro pinned in `tests/scheduler_overnight_test.rs` (tests failed before the fix).
+  - Patched: yes — pending user verification
+  - Fix: overlap now compares concrete `[start, end)` `NaiveDateTime` intervals (`shift_interval`; end ≤ start rolls to the next day) across adjacent dates; daily hours split at midnight (`daily_hour_portions`) in both `record_assignment` and the `is_eligible` daily-budget check. Same pass also deduplicates duplicate `Overridden` rows for one (employee, shift), which previously double-counted hours and emitted two assignment records. Regression net: `tests/scheduler_overnight_test.rs` + corpus invariant suite `tests/scheduler_invariants_test.rs`.
+
+- **Data-bundle import is not transactional — failed import leaves partial data**
+  - Date fixed: 2026-07-12 (pending verification)
+  - Where / what / repro: `crates/autorota-core/src/exchange/mod.rs` `import_data_bundle`. Every section inserted directly against the pool; a validation or DB error partway (e.g. an invalid employee later in the bundle) kept everything imported before it — same bug class previously fixed for roster import. Repro pinned in `exchange::tests::failed_import_leaves_database_untouched` (failed before the fix).
+  - Patched: yes — pending user verification
+  - Fix: the whole import now runs inside one `pool.begin()` transaction threaded through all section helpers; supporting `queries.rs` fns gained `Acquire`-generic or `_conn` variants (`insert_shift_template_conn`, `update_shift_template_conn`, `set_template_role_requirements_conn`). Template fns kept concrete pool wrappers because `Acquire`-generic signatures trip a higher-ranked lifetime error inside the Tauri command macro (app-desktop error count verified unchanged vs. clean main).
+
+- **SQLite foreign keys unenforced on most pool connections**
+  - Date fixed: 2026-07-12 (pending verification)
+  - Where / what / repro: `crates/autorota-core/src/db/mod.rs::connect`. Connect options set `foreign_keys(false)` for every pooled connection; the post-migration `PRAGMA foreign_keys=ON` only reached the single connection that executed it. Any other lazily-opened connection (pool max 5) accepted dangling references — e.g. an assignment pointing at a deleted employee/shift. Repro pinned in `tests/db_error_paths_test.rs::fk_enforced_on_every_pool_connection` (failed before the fix).
+  - Patched: yes — pending user verification
+  - Fix: setup (WAL + migrations + `foreign_key_check`) now runs on a single-connection pool with FKs off (migrations rebuild tables); file-backed databases then get a fresh pool whose connect options enable FKs on every connection. In-memory databases keep the single setup connection — a second `:memory:` connection would be a separate empty database, so this also removes a latent hazard where the old 5-connection memory pool could hand out an unmigrated database.
+
+- **Test-gap remediation: new suites added (not a user-visible bug)**
+  - Date: 2026-07-12
+  - Corpus-driven scheduler invariant suite (`tests/scheduler_invariants_test.rs`: 40 seeded configs, incl. new multi-role/wildcard/overnight enriched corpus via `CorpusConfig`; legacy bench corpus verified byte-stable), Save/Edit-Log diff engine integration tests (`tests/save_diff_test.rs`: `snapshot_from_live`, `diff_saves`, `diff_save_vs_previous`, `diff_rota_vs_latest_save_detailed`, tags, restore, capacity/role-requirement mutators), DB error-path tests (`tests/db_error_paths_test.rs`), and overnight/pass-1 scheduler tests (`tests/scheduler_overnight_test.rs`).
+
 - **Staffing-warnings badge vanishes from the rota options button after closing the menu**
   - Date fixed: 2026-07-12 (pending verification)
   - Where / what / repro: Rota tab → open the top-left options menu (Warnings / Share / Regenerate / Delete week) → close it. The orange warning-count badge on the ellipsis disappeared and only reappeared after a noticeable delay. Root cause: the badge was an `.overlay` on the `Image` inside the `Menu`'s `label:`; iOS 26 toolbar menus morph the label into the popup and re-render label content only after the dismiss transition completes, so a label-attached badge lagged the button's reappearance every close.

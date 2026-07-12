@@ -65,16 +65,49 @@ pub struct Corpus {
     pub week_start: NaiveDate,
 }
 
+/// Knobs for corpus generation beyond the size/seed triple.
+#[derive(Debug, Clone, Copy)]
+pub struct CorpusConfig {
+    pub employees: usize,
+    pub weeks: usize,
+    pub seed: u64,
+    /// Also generate multi-role, wildcard, and overnight shift templates.
+    /// Off for benches: their corpus must stay byte-identical so criterion and
+    /// XCUITest perf baselines remain comparable across runs.
+    pub enriched_shifts: bool,
+}
+
 /// Generate a deterministic corpus.
 ///
 /// `weeks` is currently advisory — only the first week's shifts are fanned out.
 /// Larger week counts are reserved for future multi-week scheduling benches.
 pub fn generate_corpus(employees: usize, weeks: usize, seed: u64) -> Corpus {
+    generate_corpus_with(CorpusConfig {
+        employees,
+        weeks,
+        seed,
+        enriched_shifts: false,
+    })
+}
+
+/// Generate a corpus with explicit config. The legacy `enriched_shifts: false`
+/// path is byte-identical to `generate_corpus`.
+pub fn generate_corpus_with(cfg: CorpusConfig) -> Corpus {
+    let CorpusConfig {
+        employees,
+        weeks,
+        seed,
+        ..
+    } = cfg;
     let mut rng = ChaCha8Rng::seed_from_u64(seed);
     let week_start = NaiveDate::from_ymd_opt(2026, 4, 20).unwrap(); // Monday
     let rota_id: i64 = 1;
 
-    let templates = build_templates();
+    let mut templates = build_templates();
+    if cfg.enriched_shifts {
+        templates.extend(enriched_templates());
+    }
+    let templates = templates;
     let employees_v = build_employees(&mut rng, employees);
     let shifts = build_shifts(&mut rng, &templates, week_start, weeks, rota_id);
     let avail_overrides = build_avail_overrides(&mut rng, &employees_v, week_start);
@@ -265,6 +298,67 @@ fn build_templates() -> Vec<ShiftTemplate> {
             t
         })
         .collect()
+}
+
+/// Extra templates for `CorpusConfig::enriched_shifts`: a genuine multi-role
+/// shift (two-stage fill), a wildcard shift, and an overnight shift.
+fn enriched_templates() -> Vec<ShiftTemplate> {
+    let all = vec![
+        Weekday::Mon,
+        Weekday::Tue,
+        Weekday::Wed,
+        Weekday::Thu,
+        Weekday::Fri,
+        Weekday::Sat,
+        Weekday::Sun,
+    ];
+    vec![
+        ShiftTemplate {
+            id: 7,
+            name: "Full service".to_string(),
+            weekdays: all.clone(),
+            start_time: NaiveTime::from_hms_opt(10, 0, 0).unwrap(),
+            end_time: NaiveTime::from_hms_opt(16, 0, 0).unwrap(),
+            required_role: "barista".to_string(),
+            min_employees: 3,
+            max_employees: 5,
+            role_requirements: vec![
+                RoleRequirement {
+                    role: "barista".to_string(),
+                    min_count: 2,
+                },
+                RoleRequirement {
+                    role: "kitchen".to_string(),
+                    min_count: 1,
+                },
+            ],
+            deleted: false,
+        },
+        ShiftTemplate {
+            id: 8,
+            name: "Floater".to_string(),
+            weekdays: all.clone(),
+            start_time: NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
+            end_time: NaiveTime::from_hms_opt(17, 0, 0).unwrap(),
+            required_role: String::new(),
+            min_employees: 1,
+            max_employees: 2,
+            role_requirements: Vec::new(),
+            deleted: false,
+        },
+        ShiftTemplate {
+            id: 9,
+            name: "Night clean".to_string(),
+            weekdays: all,
+            start_time: NaiveTime::from_hms_opt(22, 0, 0).unwrap(),
+            end_time: NaiveTime::from_hms_opt(2, 0, 0).unwrap(),
+            required_role: String::new(),
+            min_employees: 1,
+            max_employees: 1,
+            role_requirements: Vec::new(),
+            deleted: false,
+        },
+    ]
 }
 
 fn build_employees(rng: &mut ChaCha8Rng, count: usize) -> Vec<Employee> {

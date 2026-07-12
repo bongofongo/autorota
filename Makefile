@@ -36,7 +36,7 @@ XCB     := xcodebuild -project $(PROJECT) -scheme $(SCHEME)
 
 .PHONY: rust-test rust-test-unit rust-test-integration rust-fmt rust-clippy lint
 .PHONY: rust-test-one rust-test-scheduler rust-test-models rust-test-export
-.PHONY: rust-test-db rust-test-edge rust-test-loud
+.PHONY: rust-test-db rust-test-edge rust-test-loud rust-test-invariants rust-test-saves
 
 rust-test: rust-test-unit rust-test-integration
 
@@ -67,6 +67,13 @@ rust-test-db:
 
 rust-test-edge:
 	cargo test --test edge_cases_test -p autorota-core $(CARGO_TEST_FLAGS)
+
+# Corpus-driven scheduler invariant suite (seeded, deterministic).
+rust-test-invariants:
+	cargo test --test scheduler_invariants_test -p autorota-core $(CARGO_TEST_FLAGS)
+
+rust-test-saves:
+	cargo test --test save_diff_test -p autorota-core $(CARGO_TEST_FLAGS)
 
 # Always-verbose test run (shows println! output).
 rust-test-loud:

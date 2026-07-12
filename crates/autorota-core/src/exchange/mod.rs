@@ -15,7 +15,7 @@ use std::collections::HashMap;
 
 use chrono::{NaiveDate, NaiveTime, Weekday};
 use serde::{Deserialize, Serialize};
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 use crate::db::queries;
 use crate::export::config::ExportResult;
@@ -405,9 +405,13 @@ pub async fn import_data_bundle(
     let bundle = parse_bundle(bytes)?;
     let mut summary = BundleImportSummary::default();
 
+    // The whole bundle applies atomically: any failure mid-import rolls back
+    // every section (mirrors the roster-import transaction fix).
+    let mut tx = pool.begin().await?;
+
     // Existing role names, lowercase → original. Sections below add to it as
     // they auto-create roles.
-    let mut role_names: HashMap<String, String> = queries::list_roles(pool)
+    let mut role_names: HashMap<String, String> = queries::list_roles(&mut *tx)
         .await?
         .into_iter()
         .map(|r| (r.name.trim().to_lowercase(), r.name))
@@ -415,32 +419,33 @@ pub async fn import_data_bundle(
 
     if let Some(roles) = &bundle.roles {
         for name in roles {
-            ensure_role(pool, name, &mut role_names, &mut summary.roles_added).await?;
+            ensure_role(&mut tx, name, &mut role_names, &mut summary.roles_added).await?;
         }
     }
 
     if let Some(employees) = &bundle.employees {
-        import_employees(pool, employees, &mut role_names, &mut summary).await?;
+        import_employees(&mut tx, employees, &mut role_names, &mut summary).await?;
     }
 
     if let Some(exceptions) = &bundle.employee_exceptions {
-        import_employee_exceptions(pool, exceptions, &mut summary).await?;
+        import_employee_exceptions(&mut tx, exceptions, &mut summary).await?;
     }
 
     if let Some(templates) = &bundle.shift_templates {
-        import_shift_templates(pool, templates, &mut role_names, &mut summary).await?;
+        import_shift_templates(&mut tx, templates, &mut role_names, &mut summary).await?;
     }
 
     if let Some(exceptions) = &bundle.shift_exceptions {
-        import_shift_exceptions(pool, exceptions, &mut summary).await?;
+        import_shift_exceptions(&mut tx, exceptions, &mut summary).await?;
     }
 
+    tx.commit().await?;
     Ok(summary)
 }
 
 /// Insert the role if no existing role matches case-insensitively.
 async fn ensure_role(
-    pool: &SqlitePool,
+    conn: &mut SqliteConnection,
     name: &str,
     role_names: &mut HashMap<String, String>,
     added: &mut u32,
@@ -453,7 +458,7 @@ async fn ensure_role(
     if role_names.contains_key(&key) {
         return Ok(());
     }
-    queries::insert_role(pool, trimmed).await?;
+    queries::insert_role(&mut *conn, trimmed).await?;
     role_names.insert(key, trimmed.to_string());
     *added += 1;
     Ok(())
@@ -469,12 +474,12 @@ fn name_key(first: &str, last: &str, nick: Option<&str>) -> String {
 }
 
 async fn import_employees(
-    pool: &SqlitePool,
+    conn: &mut SqliteConnection,
     employees: &[BundleEmployee],
     role_names: &mut HashMap<String, String>,
     summary: &mut BundleImportSummary,
 ) -> Result<(), ExchangeError> {
-    let existing = queries::list_employees(pool).await?;
+    let existing = queries::list_employees(&mut *conn).await?;
     let mut by_name: HashMap<String, Vec<&Employee>> = HashMap::new();
     for e in &existing {
         by_name
@@ -485,7 +490,7 @@ async fn import_employees(
 
     for be in employees {
         for role in &be.roles {
-            ensure_role(pool, role, role_names, &mut summary.roles_added).await?;
+            ensure_role(&mut *conn, role, role_names, &mut summary.roles_added).await?;
         }
 
         let key = name_key(&be.first_name, &be.last_name, be.nickname.as_deref());
@@ -497,7 +502,7 @@ async fn import_employees(
                     context: format!("employee {} {}", be.first_name, be.last_name),
                     error,
                 })?;
-                queries::insert_employee(pool, &emp).await?;
+                queries::insert_employee(&mut *conn, &emp).await?;
                 summary.employees_added += 1;
             }
             [existing_emp] => {
@@ -507,7 +512,7 @@ async fn import_employees(
                     context: format!("employee {} {}", be.first_name, be.last_name),
                     error,
                 })?;
-                queries::update_employee(pool, &emp).await?;
+                queries::update_employee(&mut *conn, &emp).await?;
                 summary.employees_updated += 1;
             }
             many => {
@@ -575,12 +580,12 @@ fn apply_bundle_to_employee(emp: &mut Employee, be: &BundleEmployee) {
 }
 
 async fn import_employee_exceptions(
-    pool: &SqlitePool,
+    conn: &mut SqliteConnection,
     exceptions: &[BundleEmployeeException],
     summary: &mut BundleImportSummary,
 ) -> Result<(), ExchangeError> {
     // Reload so exceptions can attach to employees inserted by this bundle.
-    let employees = queries::list_employees(pool).await?;
+    let employees = queries::list_employees(&mut *conn).await?;
     let mut by_name: HashMap<String, Vec<i64>> = HashMap::new();
     for e in &employees {
         by_name
@@ -601,7 +606,7 @@ async fn import_employee_exceptions(
                     notes: ex.notes.clone(),
                     source: ex.source,
                 };
-                queries::upsert_employee_availability_override(pool, &ovr).await?;
+                queries::upsert_employee_availability_override(&mut *conn, &ovr).await?;
                 summary.employee_exceptions_applied += 1;
             }
             Some(many) => summary.warnings.push(format!(
@@ -621,12 +626,12 @@ async fn import_employee_exceptions(
 }
 
 async fn import_shift_templates(
-    pool: &SqlitePool,
+    conn: &mut SqliteConnection,
     templates: &[BundleShiftTemplate],
     role_names: &mut HashMap<String, String>,
     summary: &mut BundleImportSummary,
 ) -> Result<(), ExchangeError> {
-    let existing = queries::list_shift_templates(pool).await?;
+    let existing = queries::list_shift_templates(&mut *conn).await?;
     let mut by_name: HashMap<String, Vec<&ShiftTemplate>> = HashMap::new();
     for t in &existing {
         by_name
@@ -637,14 +642,14 @@ async fn import_shift_templates(
 
     for bt in templates {
         ensure_role(
-            pool,
+            &mut *conn,
             &bt.required_role,
             role_names,
             &mut summary.roles_added,
         )
         .await?;
         for req in &bt.role_requirements {
-            ensure_role(pool, &req.role, role_names, &mut summary.roles_added).await?;
+            ensure_role(&mut *conn, &req.role, role_names, &mut summary.roles_added).await?;
         }
 
         let key = bt.name.trim().to_lowercase();
@@ -656,7 +661,7 @@ async fn import_shift_templates(
                     context: format!("shift template \"{}\"", bt.name),
                     error,
                 })?;
-                queries::insert_shift_template(pool, &tmpl).await?;
+                queries::insert_shift_template_conn(&mut *conn, &tmpl).await?;
                 summary.shift_templates_added += 1;
             }
             [existing_tmpl] => {
@@ -665,7 +670,7 @@ async fn import_shift_templates(
                     context: format!("shift template \"{}\"", bt.name),
                     error,
                 })?;
-                queries::update_shift_template(pool, &tmpl).await?;
+                queries::update_shift_template_conn(&mut *conn, &tmpl).await?;
                 summary.shift_templates_updated += 1;
             }
             many => {
@@ -696,12 +701,12 @@ fn bundle_to_template(bt: &BundleShiftTemplate, id: i64) -> ShiftTemplate {
 }
 
 async fn import_shift_exceptions(
-    pool: &SqlitePool,
+    conn: &mut SqliteConnection,
     exceptions: &[BundleShiftException],
     summary: &mut BundleImportSummary,
 ) -> Result<(), ExchangeError> {
     // Reload so exceptions can attach to templates inserted by this bundle.
-    let templates = queries::list_shift_templates(pool).await?;
+    let templates = queries::list_shift_templates(&mut *conn).await?;
     let mut by_name: HashMap<String, Vec<i64>> = HashMap::new();
     for t in &templates {
         by_name
@@ -725,7 +730,7 @@ async fn import_shift_exceptions(
                     max_employees: ex.max_employees,
                     notes: ex.notes.clone(),
                 };
-                queries::upsert_shift_template_override(pool, &ovr).await?;
+                queries::upsert_shift_template_override(&mut *conn, &ovr).await?;
                 summary.shift_exceptions_applied += 1;
             }
             Some(many) => summary.warnings.push(format!(
@@ -997,6 +1002,43 @@ mod tests {
         let parsed: DataBundle = serde_json::from_str(&exported.data).unwrap();
         assert!(parsed.employees.is_none());
         assert!(parsed.roles.is_some());
+    }
+
+    #[tokio::test]
+    async fn failed_import_leaves_database_untouched() {
+        let pool = test_pool().await;
+
+        // Roles and the first employee are valid; the second employee fails
+        // validation (negative wage) partway through the employees section.
+        let bundle = serde_json::json!({
+            "version": BUNDLE_VERSION,
+            "roles": ["Barista"],
+            "employees": [
+                {
+                    "first_name": "Alice",
+                    "last_name": "Smith",
+                    "roles": ["Barista"],
+                    "target_weekly_hours": 30.0,
+                    "weekly_hours_deviation": 5.0
+                },
+                {
+                    "first_name": "Bob",
+                    "last_name": "Jones",
+                    "target_weekly_hours": 20.0,
+                    "hourly_wage": -5.0
+                }
+            ]
+        })
+        .to_string();
+
+        let err = import_data_bundle(&pool, bundle.as_bytes())
+            .await
+            .unwrap_err();
+        assert!(matches!(err, ExchangeError::Validation { .. }));
+
+        // Nothing from the earlier, valid parts of the bundle may persist.
+        assert!(queries::list_roles(&pool).await.unwrap().is_empty());
+        assert!(queries::list_employees(&pool).await.unwrap().is_empty());
     }
 
     #[test]

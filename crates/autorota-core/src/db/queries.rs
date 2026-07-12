@@ -1,5 +1,5 @@
 use chrono::{NaiveDate, NaiveTime, Weekday};
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 use crate::models::assignment::{Assignment, AssignmentStatus};
 use crate::models::availability::Availability;
@@ -86,12 +86,16 @@ where
     Ok(row.map(employee_from_row))
 }
 
-pub async fn list_employees(pool: &SqlitePool) -> Result<Vec<Employee>, sqlx::Error> {
+pub async fn list_employees<'a, A>(conn: A) -> Result<Vec<Employee>, sqlx::Error>
+where
+    A: sqlx::Acquire<'a, Database = sqlx::Sqlite>,
+{
+    let mut conn = conn.acquire().await?;
     let rows: Vec<EmployeeRow> = sqlx::query_as(
         "SELECT id, first_name, last_name, nickname, roles, start_date, target_weekly_hours, weekly_hours_deviation, max_daily_hours, notes, bank_details, phone, email, preferred_contact, hourly_wage, wage_currency, default_availability, availability, deleted
          FROM employees WHERE deleted = 0 ORDER BY start_date",
     )
-    .fetch_all(pool)
+    .fetch_all(&mut *conn)
     .await?;
 
     Ok(rows.into_iter().map(employee_from_row).collect())
@@ -230,8 +234,19 @@ fn employee_from_row(row: EmployeeRow) -> Employee {
 
 // ─── Shift Templates ─────────────────────────────────────────
 
+// Concrete pool wrapper: an `Acquire`-generic signature here trips a
+// higher-ranked lifetime error inside the Tauri command macro expansion.
 pub async fn insert_shift_template(
     pool: &SqlitePool,
+    tmpl: &ShiftTemplate,
+) -> Result<i64, sqlx::Error> {
+    let mut conn = pool.acquire().await?;
+    insert_shift_template_conn(&mut conn, tmpl).await
+}
+
+/// Connection variant, usable inside an open transaction (bundle import).
+pub async fn insert_shift_template_conn(
+    conn: &mut SqliteConnection,
     tmpl: &ShiftTemplate,
 ) -> Result<i64, sqlx::Error> {
     let weekdays_str = weekdays_to_string(&tmpl.weekdays);
@@ -251,11 +266,11 @@ pub async fn insert_shift_template(
     .bind(tmpl.min_employees)
     .bind(tmpl.max_employees)
     .bind(&now)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
 
-    set_template_role_requirements(
-        pool,
+    set_template_role_requirements_conn(
+        &mut *conn,
         id,
         &effective_role_requirements(
             &tmpl.role_requirements,
@@ -286,41 +301,57 @@ fn effective_role_requirements(
     }
 }
 
-pub async fn list_shift_templates(pool: &SqlitePool) -> Result<Vec<ShiftTemplate>, sqlx::Error> {
+pub async fn list_shift_templates<'a, A>(conn: A) -> Result<Vec<ShiftTemplate>, sqlx::Error>
+where
+    A: sqlx::Acquire<'a, Database = sqlx::Sqlite>,
+{
+    let mut conn = conn.acquire().await?;
     let rows: Vec<ShiftTemplateRow> = sqlx::query_as(
         "SELECT id, name, weekdays, start_time, end_time, required_role, min_employees, max_employees, deleted
          FROM shift_templates WHERE deleted = 0 ORDER BY start_time",
     )
-    .fetch_all(pool)
+    .fetch_all(&mut *conn)
     .await?;
 
     let templates: Vec<ShiftTemplate> = rows
         .into_iter()
         .filter_map(shift_template_from_row)
         .collect();
-    hydrate_template_requirements(pool, templates).await
+    hydrate_template_requirements(&mut conn, templates).await
 }
 
 /// Like `list_shift_templates` but includes soft-deleted templates (for historical lookups).
 pub async fn list_all_shift_templates(
     pool: &SqlitePool,
 ) -> Result<Vec<ShiftTemplate>, sqlx::Error> {
+    let mut conn = pool.acquire().await?;
     let rows: Vec<ShiftTemplateRow> = sqlx::query_as(
         "SELECT id, name, weekdays, start_time, end_time, required_role, min_employees, max_employees, deleted
          FROM shift_templates ORDER BY start_time",
     )
-    .fetch_all(pool)
+    .fetch_all(&mut *conn)
     .await?;
 
     let templates: Vec<ShiftTemplate> = rows
         .into_iter()
         .filter_map(shift_template_from_row)
         .collect();
-    hydrate_template_requirements(pool, templates).await
+    hydrate_template_requirements(&mut conn, templates).await
 }
 
+// Concrete pool wrapper: an `Acquire`-generic signature here trips a
+// higher-ranked lifetime error inside the Tauri command macro expansion.
 pub async fn update_shift_template(
     pool: &SqlitePool,
+    tmpl: &ShiftTemplate,
+) -> Result<(), sqlx::Error> {
+    let mut conn = pool.acquire().await?;
+    update_shift_template_conn(&mut conn, tmpl).await
+}
+
+/// Connection variant, usable inside an open transaction (bundle import).
+pub async fn update_shift_template_conn(
+    conn: &mut SqliteConnection,
     tmpl: &ShiftTemplate,
 ) -> Result<(), sqlx::Error> {
     let weekdays_str = weekdays_to_string(&tmpl.weekdays);
@@ -340,11 +371,11 @@ pub async fn update_shift_template(
     .bind(tmpl.max_employees)
     .bind(&now)
     .bind(tmpl.id)
-    .execute(pool)
+    .execute(&mut *conn)
     .await?;
 
-    set_template_role_requirements(
-        pool,
+    set_template_role_requirements_conn(
+        &mut *conn,
         tmpl.id,
         &effective_role_requirements(
             &tmpl.role_requirements,
@@ -372,13 +403,16 @@ pub async fn delete_shift_template(pool: &SqlitePool, id: i64) -> Result<(), sql
 // ─── Role requirements (multi-role shifts) ───────────────────
 
 async fn load_role_requirements(
-    pool: &SqlitePool,
+    conn: &mut SqliteConnection,
     table: &str,
     fk_column: &str,
     fk_value: i64,
 ) -> Result<Vec<RoleRequirement>, sqlx::Error> {
     let sql = format!("SELECT role, min_count FROM {table} WHERE {fk_column} = ? ORDER BY id");
-    let rows: Vec<(String, u32)> = sqlx::query_as(&sql).bind(fk_value).fetch_all(pool).await?;
+    let rows: Vec<(String, u32)> = sqlx::query_as(&sql)
+        .bind(fk_value)
+        .fetch_all(&mut *conn)
+        .await?;
     Ok(rows
         .into_iter()
         .map(|(role, min_count)| RoleRequirement { role, min_count })
@@ -386,7 +420,7 @@ async fn load_role_requirements(
 }
 
 async fn replace_role_requirements(
-    pool: &SqlitePool,
+    conn: &mut SqliteConnection,
     table: &str,
     fk_column: &str,
     fk_value: i64,
@@ -394,7 +428,7 @@ async fn replace_role_requirements(
 ) -> Result<(), sqlx::Error> {
     sqlx::query(&format!("DELETE FROM {table} WHERE {fk_column} = ?"))
         .bind(fk_value)
-        .execute(pool)
+        .execute(&mut *conn)
         .await?;
     for req in reqs {
         sqlx::query(&format!(
@@ -403,7 +437,7 @@ async fn replace_role_requirements(
         .bind(fk_value)
         .bind(&req.role)
         .bind(req.min_count)
-        .execute(pool)
+        .execute(&mut *conn)
         .await?;
     }
     Ok(())
@@ -434,7 +468,15 @@ pub async fn set_shift_role_requirements(
     shift_id: i64,
     reqs: &[RoleRequirement],
 ) -> Result<(), sqlx::Error> {
-    replace_role_requirements(pool, "shift_role_requirements", "shift_id", shift_id, reqs).await?;
+    let mut conn = pool.acquire().await?;
+    replace_role_requirements(
+        &mut conn,
+        "shift_role_requirements",
+        "shift_id",
+        shift_id,
+        reqs,
+    )
+    .await?;
     sqlx::query(
         "UPDATE shifts SET required_role = ?, role_requirements_json = ?, sync_status = 0, last_modified = ? WHERE id = ?",
     )
@@ -442,7 +484,7 @@ pub async fn set_shift_role_requirements(
     .bind(role_requirements_to_json(reqs))
     .bind(chrono::Utc::now().to_rfc3339())
     .bind(shift_id)
-    .execute(pool)
+    .execute(&mut *conn)
     .await?;
     Ok(())
 }
@@ -453,8 +495,18 @@ pub async fn set_template_role_requirements(
     template_id: i64,
     reqs: &[RoleRequirement],
 ) -> Result<(), sqlx::Error> {
+    let mut conn = pool.acquire().await?;
+    set_template_role_requirements_conn(&mut conn, template_id, reqs).await
+}
+
+/// Connection variant, usable inside an open transaction.
+pub async fn set_template_role_requirements_conn(
+    conn: &mut SqliteConnection,
+    template_id: i64,
+    reqs: &[RoleRequirement],
+) -> Result<(), sqlx::Error> {
     replace_role_requirements(
-        pool,
+        &mut *conn,
         "template_role_requirements",
         "template_id",
         template_id,
@@ -468,7 +520,7 @@ pub async fn set_template_role_requirements(
     .bind(role_requirements_to_json(reqs))
     .bind(chrono::Utc::now().to_rfc3339())
     .bind(template_id)
-    .execute(pool)
+    .execute(&mut *conn)
     .await?;
     Ok(())
 }
@@ -507,12 +559,12 @@ fn shift_template_from_row(row: ShiftTemplateRow) -> Option<ShiftTemplate> {
 
 /// Attach each template's role requirements (loaded separately to avoid a join).
 async fn hydrate_template_requirements(
-    pool: &SqlitePool,
+    conn: &mut SqliteConnection,
     mut templates: Vec<ShiftTemplate>,
 ) -> Result<Vec<ShiftTemplate>, sqlx::Error> {
     for tmpl in &mut templates {
         tmpl.role_requirements =
-            load_role_requirements(pool, "template_role_requirements", "template_id", tmpl.id)
+            load_role_requirements(conn, "template_role_requirements", "template_id", tmpl.id)
                 .await?;
     }
     Ok(templates)
@@ -765,9 +817,11 @@ pub async fn list_shifts_for_rota(
     .await?;
 
     let mut shifts: Vec<Shift> = rows.into_iter().filter_map(shift_from_row).collect();
+    let mut conn = pool.acquire().await?;
     for shift in &mut shifts {
         shift.role_requirements =
-            load_role_requirements(pool, "shift_role_requirements", "shift_id", shift.id).await?;
+            load_role_requirements(&mut conn, "shift_role_requirements", "shift_id", shift.id)
+                .await?;
     }
     Ok(shifts)
 }
@@ -997,9 +1051,13 @@ fn assignment_from_row(
 
 // ─── Roles ──────────────────────────────────────────────────
 
-pub async fn list_roles(pool: &SqlitePool) -> Result<Vec<Role>, sqlx::Error> {
+pub async fn list_roles<'a, A>(conn: A) -> Result<Vec<Role>, sqlx::Error>
+where
+    A: sqlx::Acquire<'a, Database = sqlx::Sqlite>,
+{
+    let mut conn = conn.acquire().await?;
     let rows: Vec<(i64, String)> = sqlx::query_as("SELECT id, name FROM roles ORDER BY name")
-        .fetch_all(pool)
+        .fetch_all(&mut *conn)
         .await?;
 
     Ok(rows
@@ -1008,14 +1066,18 @@ pub async fn list_roles(pool: &SqlitePool) -> Result<Vec<Role>, sqlx::Error> {
         .collect())
 }
 
-pub async fn insert_role(pool: &SqlitePool, name: &str) -> Result<i64, sqlx::Error> {
+pub async fn insert_role<'a, A>(conn: A, name: &str) -> Result<i64, sqlx::Error>
+where
+    A: sqlx::Acquire<'a, Database = sqlx::Sqlite>,
+{
+    let mut conn = conn.acquire().await?;
     let now = chrono::Utc::now().to_rfc3339();
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO roles (name, last_modified, sync_status) VALUES (?, ?, 0) RETURNING id",
     )
     .bind(name)
     .bind(&now)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
 
     Ok(id)
@@ -1135,10 +1197,14 @@ pub async fn delete_role(pool: &SqlitePool, id: i64) -> Result<(), sqlx::Error> 
 // ─── Employee Availability Overrides ─────────────────────────
 
 /// Insert or replace an employee availability override (one per employee+date).
-pub async fn upsert_employee_availability_override(
-    pool: &SqlitePool,
+pub async fn upsert_employee_availability_override<'a, A>(
+    conn: A,
     ovr: &EmployeeAvailabilityOverride,
-) -> Result<i64, sqlx::Error> {
+) -> Result<i64, sqlx::Error>
+where
+    A: sqlx::Acquire<'a, Database = sqlx::Sqlite>,
+{
+    let mut conn = conn.acquire().await?;
     let avail_json = ovr.availability.to_json().unwrap_or_default();
     let now = chrono::Utc::now().to_rfc3339();
     // `source` is sticky in one direction only: an existing "exception" row is
@@ -1168,7 +1234,7 @@ pub async fn upsert_employee_availability_override(
     .bind(&ovr.notes)
     .bind(ovr.source.as_str())
     .bind(&now)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
     Ok(id)
 }
@@ -1276,10 +1342,14 @@ fn employee_avail_override_from_row(
 // ─── Shift Template Overrides ─────────────────────────────────
 
 /// Insert or replace a shift template override (one per template+date).
-pub async fn upsert_shift_template_override(
-    pool: &SqlitePool,
+pub async fn upsert_shift_template_override<'a, A>(
+    conn: A,
     ovr: &ShiftTemplateOverride,
-) -> Result<i64, sqlx::Error> {
+) -> Result<i64, sqlx::Error>
+where
+    A: sqlx::Acquire<'a, Database = sqlx::Sqlite>,
+{
+    let mut conn = conn.acquire().await?;
     let start_str = ovr.start_time.map(|t| t.format("%H:%M:%S").to_string());
     let end_str = ovr.end_time.map(|t| t.format("%H:%M:%S").to_string());
     let now = chrono::Utc::now().to_rfc3339();
@@ -1306,7 +1376,7 @@ pub async fn upsert_shift_template_override(
     .bind(ovr.max_employees.map(|v| v as i64))
     .bind(&ovr.notes)
     .bind(&now)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
     Ok(id)
 }
@@ -2611,8 +2681,9 @@ pub async fn apply_remote_record(
                     .flatten();
             if let Some(j) = json {
                 let reqs = role_requirements_from_json(&j);
+                let mut conn = pool.acquire().await?;
                 replace_role_requirements(
-                    pool,
+                    &mut conn,
                     "shift_role_requirements",
                     "shift_id",
                     record.record_id,
@@ -2631,8 +2702,9 @@ pub async fn apply_remote_record(
             .flatten();
             if let Some(j) = json {
                 let reqs = role_requirements_from_json(&j);
+                let mut conn = pool.acquire().await?;
                 replace_role_requirements(
-                    pool,
+                    &mut conn,
                     "template_role_requirements",
                     "template_id",
                     record.record_id,

@@ -5,37 +5,40 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::str::FromStr;
 
 /// Create a connection pool and run migrations.
+///
+/// Setup runs on a single-connection pool with FK checks disabled (migrations
+/// rebuild tables). Afterwards, file-backed databases get a fresh pool whose
+/// connect options enable FKs, so *every* pooled connection enforces them —
+/// a `PRAGMA foreign_keys=ON` issued through the pool only reaches one
+/// connection and left the others unenforced. In-memory databases keep the
+/// single setup connection (a second `:memory:` connection would be a
+/// different, empty database), with the PRAGMA applied to it directly.
 pub async fn connect(database_url: &str) -> Result<SqlitePool, sqlx::Error> {
-    // Use foreign_keys(false) on the connect options so every connection
-    // in the pool starts with FK checks disabled during setup.
-    let opts = SqliteConnectOptions::from_str(database_url)?
+    let is_memory = database_url.contains(":memory:") || database_url.contains("mode=memory");
+
+    let setup_opts = SqliteConnectOptions::from_str(database_url)?
         .create_if_missing(true)
         .foreign_keys(false);
 
-    let pool = SqlitePoolOptions::new()
-        .max_connections(5)
-        .connect_with(opts)
+    let setup_pool = SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect_with(setup_opts)
         .await?;
 
     sqlx::query("PRAGMA journal_mode=WAL;")
-        .execute(&pool)
+        .execute(&setup_pool)
         .await?;
 
-    run_migrations(&pool).await?;
+    run_migrations(&setup_pool).await?;
 
-    // Enable foreign keys for all future operations.
-    sqlx::query("PRAGMA foreign_keys=ON;")
-        .execute(&pool)
-        .await?;
-
-    // After re-enabling FKs, ask SQLite to verify the existing data does
-    // not violate any constraint. Migrations that did the right thing under
-    // `foreign_keys=OFF` (e.g. table rebuilds) but accidentally left
+    // With FKs about to be enforced, ask SQLite to verify the existing data
+    // does not violate any constraint. Migrations that did the right thing
+    // under `foreign_keys=OFF` (e.g. table rebuilds) but accidentally left
     // dangling refs will surface here instead of biting a later query at
     // runtime.
     let violations: Vec<(String, Option<i64>, String, i64)> =
         sqlx::query_as("PRAGMA foreign_key_check")
-            .fetch_all(&pool)
+            .fetch_all(&setup_pool)
             .await?;
     if !violations.is_empty() {
         let summary: Vec<String> = violations
@@ -50,7 +53,23 @@ pub async fn connect(database_url: &str) -> Result<SqlitePool, sqlx::Error> {
         )));
     }
 
-    Ok(pool)
+    if is_memory {
+        // Single-connection pool: the PRAGMA sticks for the pool's lifetime.
+        sqlx::query("PRAGMA foreign_keys=ON;")
+            .execute(&setup_pool)
+            .await?;
+        return Ok(setup_pool);
+    }
+
+    setup_pool.close().await;
+
+    let opts = SqliteConnectOptions::from_str(database_url)?
+        .create_if_missing(true)
+        .foreign_keys(true);
+    SqlitePoolOptions::new()
+        .max_connections(5)
+        .connect_with(opts)
+        .await
 }
 
 /// Run a migration SQL script inside a transaction. If any statement in the

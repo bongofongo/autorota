@@ -6,8 +6,47 @@ use crate::models::availability::AvailabilityState;
 use crate::models::employee::Employee;
 use crate::models::overrides::EmployeeAvailabilityOverride;
 use crate::models::shift::Shift;
-use chrono::{Datelike, NaiveDate};
+use chrono::{Datelike, Duration, NaiveDate, NaiveDateTime};
 use std::collections::{HashMap, HashSet};
+
+// ─── Overnight-aware time helpers ────────────────────────────
+
+/// Concrete `[start, end)` interval for a shift. An overnight shift
+/// (end_time <= start_time) ends on the following calendar day.
+fn shift_interval(shift: &Shift) -> (NaiveDateTime, NaiveDateTime) {
+    let start = shift.date.and_time(shift.start_time);
+    // end == start is a zero-duration shift (matches duration_hours), not 24h.
+    let end_date = if shift.end_time >= shift.start_time {
+        shift.date
+    } else {
+        shift.date + Duration::days(1)
+    };
+    (start, end_date.and_time(shift.end_time))
+}
+
+/// Hours a shift contributes to each calendar day it touches. Overnight
+/// shifts split at midnight; the second entry is zero-hours otherwise.
+fn daily_hour_portions(shift: &Shift) -> [(NaiveDate, f32); 2] {
+    if shift.end_time >= shift.start_time {
+        [(shift.date, shift.duration_hours()), (shift.date, 0.0)]
+    } else {
+        let until_midnight = (86400
+            - shift
+                .start_time
+                .signed_duration_since(chrono::NaiveTime::MIN)
+                .num_seconds()) as f32
+            / 3600.0;
+        let after_midnight = shift
+            .end_time
+            .signed_duration_since(chrono::NaiveTime::MIN)
+            .num_seconds() as f32
+            / 3600.0;
+        [
+            (shift.date, until_midnight),
+            (shift.date + Duration::days(1), after_midnight),
+        ]
+    }
+}
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -73,12 +112,12 @@ impl SchedulerState {
         rota_id: i64,
         status: AssignmentStatus,
     ) {
-        let hours = shift.duration_hours();
-        *self.weekly_hours.entry(employee_id).or_default() += hours;
-        *self
-            .daily_hours
-            .entry((employee_id, shift.date))
-            .or_default() += hours;
+        *self.weekly_hours.entry(employee_id).or_default() += shift.duration_hours();
+        for (day, hours) in daily_hour_portions(shift) {
+            if hours > 0.0 {
+                *self.daily_hours.entry((employee_id, day)).or_default() += hours;
+            }
+        }
         self.shift_assignments
             .entry(shift.id)
             .or_default()
@@ -162,17 +201,19 @@ fn is_eligible(
         return false;
     }
 
-    let shift_hours = shift.duration_hours();
-
-    // Must have daily budget remaining
-    let daily = state.employee_daily_hours(employee.id, shift.date);
-    if daily + shift_hours > employee.max_daily_hours {
-        return false;
+    // Must have daily budget remaining on every day the shift touches
+    // (an overnight shift's tail counts toward the following day).
+    for (day, hours) in daily_hour_portions(shift) {
+        if hours > 0.0
+            && state.employee_daily_hours(employee.id, day) + hours > employee.max_daily_hours
+        {
+            return false;
+        }
     }
 
     // Must have weekly budget remaining
     let weekly = state.employee_weekly_hours(employee.id);
-    if weekly + shift_hours > employee.max_weekly_hours() {
+    if weekly + shift.duration_hours() > employee.max_weekly_hours() {
         return false;
     }
 
@@ -190,16 +231,20 @@ fn has_time_overlap(
     state: &SchedulerState,
     all_shifts: &HashMap<i64, &Shift>,
 ) -> bool {
+    let (start, end) = shift_interval(shift);
     for assignment in &state.assignments {
         if assignment.employee_id != employee_id {
             continue;
         }
         if let Some(existing) = all_shifts.get(&assignment.shift_id) {
-            if existing.date != shift.date {
+            // Overnight shifts spill into the next day, so shifts up to one
+            // calendar day apart can still collide.
+            if (existing.date - shift.date).num_days().abs() > 1 {
                 continue;
             }
+            let (e_start, e_end) = shift_interval(existing);
             // Two shifts overlap if one starts before the other ends and vice versa
-            if shift.start_time < existing.end_time && existing.start_time < shift.end_time {
+            if start < e_end && e_start < end {
                 return true;
             }
         }
@@ -315,6 +360,11 @@ pub fn schedule_pure(
             continue;
         }
         if let Some(shift) = shift_map.get(&a.shift_id) {
+            // Duplicate Overridden rows for the same (employee, shift) must not
+            // double-count hours or emit a second assignment.
+            if state.is_assigned_to_shift(a.employee_id, a.shift_id) {
+                continue;
+            }
             let emp = emp_map.get(&a.employee_id);
             let name = emp.map(|e| e.display_name());
             let wage = emp.and_then(|e| e.hourly_wage);
