@@ -4,28 +4,30 @@ import Testing
 
 struct PricingCatalogTests {
 
+    // Local Manager is currently free for early users, so the display price is a
+    // localized "Free" label regardless of region.
+
     @Test
-    func gbpForUnitedKingdom() {
+    func freeForUnitedKingdom() {
         let locale = Locale(identifier: "en_GB")
-        #expect(PricingCatalog.displayPrice(for: .localManager, locale: locale) == "£6.99")
+        #expect(PricingCatalog.displayPrice(for: .localManager, locale: locale) == "Free")
     }
 
     @Test
-    func usdAsFallback() {
+    func freeForUnitedStates() {
         let locale = Locale(identifier: "en_US")
-        #expect(PricingCatalog.displayPrice(for: .localManager, locale: locale) == "$6.99")
+        #expect(PricingCatalog.displayPrice(for: .localManager, locale: locale) == "Free")
     }
 
     @Test
-    func usdForGermany() {
+    func freeForGermany() {
         let locale = Locale(identifier: "de_DE")
-        #expect(PricingCatalog.displayPrice(for: .localManager, locale: locale) == "$6.99")
+        #expect(PricingCatalog.displayPrice(for: .localManager, locale: locale) == "Free")
     }
 
     @Test
-    func unknownRegionFallsBackToUSD() {
-        let locale = Locale(identifier: "en_NZ")
-        #expect(PricingCatalog.displayPrice(for: .localManager, locale: locale) == "$6.99")
+    func localManagerIsFree() {
+        #expect(PricingCatalog.isFree(for: .localManager))
     }
 
     @Test

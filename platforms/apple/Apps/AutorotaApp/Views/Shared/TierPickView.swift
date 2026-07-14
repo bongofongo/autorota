@@ -263,9 +263,11 @@ struct TierPickView: View {
                 HStack(alignment: .firstTextBaseline) {
                     Text(price)
                         .font(.title2.bold())
-                    Text("license.tier.local_manager.price_note")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                    if !PricingCatalog.isFree(for: tier) {
+                        Text("license.tier.local_manager.price_note")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
             HStack(spacing: 8) {
