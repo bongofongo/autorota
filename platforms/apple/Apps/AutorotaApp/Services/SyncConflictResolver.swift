@@ -12,9 +12,13 @@ enum SyncConflictResolver {
 
     /// Performs a three-way merge between base, local, and server versions of a record.
     ///
-    /// Multi-role shift requirements ride sync as one opaque string field
-    /// (`role_requirements_json`), so the whole requirement list merges as a
-    /// single unit under the per-field policy below: if only one side changed
+    /// Multi-role shift requirements ride sync as one opaque JSON *value*
+    /// (`role_requirements_json`) — one key in the row dict this merge operates
+    /// on. (The whole row in turn travels as a single CloudKit `payload` field;
+    /// see `SyncRecordMapper`. That is an edge-encoding detail — the merge still
+    /// sees the same per-key dictionary either way.) So the whole requirement
+    /// list merges as a single unit under the per-field policy below: if only
+    /// one side changed
     /// it from base, that side wins; if both changed it differently, the server
     /// value wins (whole-list last-writer-wins). Per-element merge (device A
     /// adds "opening" while device B bumps "barista" to 2) is a deliberate

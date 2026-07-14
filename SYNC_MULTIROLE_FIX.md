@@ -181,9 +181,11 @@ supported and is a deliberate non-goal. Note it in the resolver doc comment.
   `SyncRecordMapper.recordType` — all field-agnostic.
 - FFI: `apply_remote_record` / `get_pending_sync_records` are already exported and
   generic over `syncable_columns`.
-- CloudKit schema: the dev environment auto-creates the new string field on
-  first push; for production, add `role_requirements_json` (String) to the
-  `Shift` and `ShiftTemplate` record types before shipping.
+- CloudKit schema: **no per-column change.** As of 2026-07-14 `SyncRecordMapper`
+  stores each row's whole JSON in a single `payload` String field per record type,
+  so `role_requirements_json` rides inside `payload` like every other column.
+  One-time only: ensure a `payload` field exists on each record type in the
+  Development schema (auto-created on first sync) and promote to Production once.
 
 ## Test plan
 
@@ -217,6 +219,7 @@ additions (opaque field), but add one resolver case asserting a changed
 - `platforms/apple/Apps/AutorotaApp/Services/SyncConflictResolver.swift` — doc
   comment on whole-list LWW (optional)
 - Tests: `crates/autorota-core/tests/db_integration.rs`
-- CloudKit dashboard: add `role_requirements_json` String field to `Shift` and
-  `ShiftTemplate` record types before production release.
+- CloudKit dashboard: no per-column field needed — each record type carries a
+  single `payload` String field (see `SyncRecordMapper`); promote the Development
+  schema to Production once.
 ```

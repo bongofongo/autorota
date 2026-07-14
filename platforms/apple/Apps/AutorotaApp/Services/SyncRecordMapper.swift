@@ -51,45 +51,42 @@ enum SyncRecordMapper {
         CKRecord.ID(recordName: "\(tableName)_\(rowID)", zoneID: zoneID)
     }
 
-    /// Converts an FfiSyncRecord to a CKRecord, setting all fields from the JSON.
+    /// The single CloudKit field that carries a row's entire synced JSON.
+    ///
+    /// Every record type stores its whole row as one opaque JSON string here,
+    /// rather than mapping each SQLite column to its own typed CloudKit field.
+    /// This keeps the CloudKit schema fixed (one `payload` field per record
+    /// type) so adding a synced column never requires a schema change — the
+    /// row JSON is produced/consumed field-agnostically by the Rust sync
+    /// pipeline (`get_pending_sync_records` / `apply_remote_record`), so the
+    /// app-internal representation is unchanged.
+    static let payloadKey = "payload"
+
+    /// Converts an FfiSyncRecord to a CKRecord, storing the full row JSON in
+    /// the single `payload` field.
     static func toCKRecord(_ syncRecord: FfiSyncRecord) -> CKRecord? {
         let ckRecordType = recordType(for: syncRecord.tableName)
         let recordID = makeRecordID(tableName: syncRecord.tableName, rowID: syncRecord.recordId)
         let record = CKRecord(recordType: ckRecordType, recordID: recordID)
-
-        guard let data = syncRecord.fields.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else { return nil }
-
-        for (key, value) in json {
-            if key == "id" { continue } // ID is in the record name, not a field
-            switch value {
-            case let s as String: record[key] = s as CKRecordValue
-            case let n as NSNumber: record[key] = n as CKRecordValue
-            case is NSNull: record[key] = nil
-            default: record[key] = "\(value)" as CKRecordValue
-            }
-        }
-
+        record[payloadKey] = syncRecord.fields as CKRecordValue
         return record
     }
 
-    /// Converts a CKRecord back to an FfiSyncRecord.
+    /// Converts a CKRecord back to an FfiSyncRecord by reading the `payload`
+    /// field verbatim. `last_modified` is pulled out of the JSON for the
+    /// conflict-resolution timestamp; the JSON itself is passed through
+    /// untouched (nulls included, so "cleared" stays distinct from "absent").
     static func fromCKRecord(_ record: CKRecord) -> FfiSyncRecord? {
-        guard let (tableName, rowID) = parseRecordID(record.recordID) else { return nil }
-
-        var json: [String: Any] = ["id": rowID]
-        for key in record.allKeys() {
-            if let value = record[key] {
-                json[key] = value
-            }
-        }
-
-        guard let data = try? JSONSerialization.data(withJSONObject: json),
-              let fields = String(data: data, encoding: .utf8)
+        guard let (tableName, rowID) = parseRecordID(record.recordID),
+              let fields = record[payloadKey] as? String
         else { return nil }
 
-        let lastModified = (json["last_modified"] as? String) ?? ""
+        var lastModified = ""
+        if let data = fields.data(using: .utf8),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let lm = json["last_modified"] as? String {
+            lastModified = lm
+        }
 
         return FfiSyncRecord(
             tableName: tableName,
