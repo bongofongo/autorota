@@ -135,12 +135,8 @@ struct DataBundleToolbarMenu: View {
         do {
             let result = try await service.exportDataBundle(sections: sections)
             #if os(iOS)
-            let dir = FileManager.default.temporaryDirectory
-                .appendingPathComponent("autorota-bundle-\(UUID().uuidString)", isDirectory: true)
-            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            let url = dir.appendingPathComponent(result.filename)
-            try result.data.write(to: url, atomically: true, encoding: .utf8)
-            shareURL = url
+            let dir = try makeExportTempDir(prefix: "autorota-bundle")
+            shareURL = try result.write(into: dir, binary: false)
             #else
             let panel = NSSavePanel()
             panel.nameFieldStringValue = result.filename

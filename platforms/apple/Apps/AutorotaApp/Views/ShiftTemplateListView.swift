@@ -282,7 +282,7 @@ struct ShiftTemplateEditSheet: View {
     @Environment(DemoModeController.self) private var demo
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private static let allDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    private static let allDays = AvailabilityWeekMath.weekdayOrder
 
     @State private var name = ""
     @State private var selectedDays: Set<String> = []
@@ -376,8 +376,7 @@ struct ShiftTemplateEditSheet: View {
         if let t = existing {
             name = t.name
             selectedDays = Set(t.weekdays)
-            let fmt = DateFormatter()
-            fmt.dateFormat = "HH:mm"
+            let fmt = AvailabilityWeekMath.timeFmt
             startTime = fmt.date(from: t.startTime) ?? Date()
             endTime = fmt.date(from: t.endTime) ?? Date()
             minStaff = Int(t.minEmployees)
@@ -387,13 +386,11 @@ struct ShiftTemplateEditSheet: View {
     }
 
     private func save() {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "HH:mm"
+        let fmt = AvailabilityWeekMath.timeFmt
         let orderedDays = Self.allDays.filter { selectedDays.contains($0) }
 
-        let floor = roleReqs.map { Int($0.minCount) }.max() ?? 0
-        let effMin = max(minStaff, floor)
-        let effMax = max(maxStaff, effMin)
+        let (effMin, effMax) = effectiveStaffRange(
+            minStaff: minStaff, maxStaff: maxStaff, roleReqs: roleReqs)
         let tmpl = FfiShiftTemplate(
             id: existing?.id ?? 0,
             name: name,

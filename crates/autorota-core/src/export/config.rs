@@ -1,6 +1,31 @@
 use std::fmt;
 use std::str::FromStr;
 
+/// Generate matching `FromStr`/`Display` impls mapping each variant to its
+/// canonical string form. `$label` names the type in the parse error, e.g.
+/// `"export layout"` → `"invalid export layout: {other}"`.
+macro_rules! string_enum {
+    ($ty:ident, $label:literal, { $($variant:ident => $s:literal),+ $(,)? }) => {
+        impl FromStr for $ty {
+            type Err = String;
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                match s {
+                    $($s => Ok(Self::$variant),)+
+                    other => Err(format!(concat!("invalid ", $label, ": {}"), other)),
+                }
+            }
+        }
+
+        impl fmt::Display for $ty {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                match self {
+                    $(Self::$variant => write!(f, $s),)+
+                }
+            }
+        }
+    };
+}
+
 /// Grid layout: rows × columns.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExportLayout {
@@ -10,25 +35,10 @@ pub enum ExportLayout {
     ShiftByWeekday,
 }
 
-impl FromStr for ExportLayout {
-    type Err = String;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "employee_by_weekday" => Ok(Self::EmployeeByWeekday),
-            "shift_by_weekday" => Ok(Self::ShiftByWeekday),
-            other => Err(format!("invalid export layout: {other}")),
-        }
-    }
-}
-
-impl fmt::Display for ExportLayout {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::EmployeeByWeekday => write!(f, "employee_by_weekday"),
-            Self::ShiftByWeekday => write!(f, "shift_by_weekday"),
-        }
-    }
-}
+string_enum!(ExportLayout, "export layout", {
+    EmployeeByWeekday => "employee_by_weekday",
+    ShiftByWeekday => "shift_by_weekday",
+});
 
 /// Output format.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -41,33 +51,14 @@ pub enum ExportFormat {
     Ics,
 }
 
-impl FromStr for ExportFormat {
-    type Err = String;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "csv" => Ok(Self::Csv),
-            "json" => Ok(Self::Json),
-            "pdf" => Ok(Self::Pdf),
-            "xlsx" => Ok(Self::Xlsx),
-            "markdown" => Ok(Self::Markdown),
-            "ics" => Ok(Self::Ics),
-            other => Err(format!("invalid export format: {other}")),
-        }
-    }
-}
-
-impl fmt::Display for ExportFormat {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Csv => write!(f, "csv"),
-            Self::Json => write!(f, "json"),
-            Self::Pdf => write!(f, "pdf"),
-            Self::Xlsx => write!(f, "xlsx"),
-            Self::Markdown => write!(f, "markdown"),
-            Self::Ics => write!(f, "ics"),
-        }
-    }
-}
+string_enum!(ExportFormat, "export format", {
+    Csv => "csv",
+    Json => "json",
+    Pdf => "pdf",
+    Xlsx => "xlsx",
+    Markdown => "markdown",
+    Ics => "ics",
+});
 
 /// Fixed PDF template selection (only consulted when format == Pdf).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -80,27 +71,11 @@ pub enum PdfTemplate {
     ByRole,
 }
 
-impl FromStr for PdfTemplate {
-    type Err = String;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "weekly_grid" => Ok(Self::WeeklyGrid),
-            "per_employee" => Ok(Self::PerEmployee),
-            "by_role" => Ok(Self::ByRole),
-            other => Err(format!("invalid pdf template: {other}")),
-        }
-    }
-}
-
-impl fmt::Display for PdfTemplate {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::WeeklyGrid => write!(f, "weekly_grid"),
-            Self::PerEmployee => write!(f, "per_employee"),
-            Self::ByRole => write!(f, "by_role"),
-        }
-    }
-}
+string_enum!(PdfTemplate, "pdf template", {
+    WeeklyGrid => "weekly_grid",
+    PerEmployee => "per_employee",
+    ByRole => "by_role",
+});
 
 /// Export profile controlling what data is included.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -111,25 +86,10 @@ pub enum ExportProfile {
     ManagerReport,
 }
 
-impl FromStr for ExportProfile {
-    type Err = String;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "staff_schedule" => Ok(Self::StaffSchedule),
-            "manager_report" => Ok(Self::ManagerReport),
-            other => Err(format!("invalid export profile: {other}")),
-        }
-    }
-}
-
-impl fmt::Display for ExportProfile {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::StaffSchedule => write!(f, "staff_schedule"),
-            Self::ManagerReport => write!(f, "manager_report"),
-        }
-    }
-}
+string_enum!(ExportProfile, "export profile", {
+    StaffSchedule => "staff_schedule",
+    ManagerReport => "manager_report",
+});
 
 /// Which fields to show in each grid cell.
 #[derive(Debug, Clone)]

@@ -16,12 +16,8 @@ private extension Logger {
 /// (fixed format + POSIX locale), so they're hoisted out of the hot render
 /// path where day headers and labels would otherwise allocate one per call.
 private enum RotaDateFmt {
-    static let iso: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.locale = Locale(identifier: "en_US_POSIX")
-        return f
-    }()
+    /// App-wide shared ISO formatter (see AvailabilityWeekMath).
+    static let iso = AvailabilityWeekMath.isoFmt
     static let shortMonthDay: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "MMM d"
@@ -199,7 +195,7 @@ final class RotaViewModel {
         entriesByShift = Dictionary(grouping: schedule.entries, by: \.shiftId)
 
         // Shifts grouped + sorted by weekday for display.
-        let order = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        let order = AvailabilityWeekMath.weekdayOrder
         let grouped = Dictionary(grouping: schedule.shifts, by: \.weekday)
         var sortedByWeekday: [String: [FfiShiftInfo]] = [:]
         for (day, shifts) in grouped {
@@ -613,8 +609,7 @@ final class RotaViewModel {
 
     /// Date string for a weekday offset in the selected week (Mon=0, Tue=1, ..., Sun=6).
     func dateForWeekday(_ weekday: String) -> String {
-        let offsets = ["Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6]
-        guard let offset = offsets[weekday] else { return selectedWeekStart }
+        guard let offset = AvailabilityWeekMath.weekdayIndex[weekday] else { return selectedWeekStart }
         guard let monday = RotaDateFmt.iso.date(from: selectedWeekStart) else { return selectedWeekStart }
         guard let target = RotaDateFmt.calendar.date(byAdding: .day, value: offset, to: monday) else {
             return selectedWeekStart
@@ -662,7 +657,7 @@ final class RotaViewModel {
 
     /// All weekdays for the schedule (used by edit mode to show "Add Shift" for empty days).
     var allWeekdays: [String] {
-        ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        AvailabilityWeekMath.weekdayOrder
     }
 
     /// Assignments for a specific shift, from the per-load cache.

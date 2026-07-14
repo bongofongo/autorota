@@ -107,32 +107,14 @@ struct EmployeeEditSheet: View {
         return parts[1].contains(".")
     }
 
-    private static let sheetDateFmt: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.locale = Locale(identifier: "en_US_POSIX")
-        return f
-    }()
-
     private static let sheetWeekRangeFmt: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "MMM d"
         return f
     }()
 
-    private func sheetMondayOfWeek(offset: Int) -> Date {
-        let cal = Calendar(identifier: .iso8601)
-        let monday = cal.date(from: cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date()))!
-        return cal.date(byAdding: .weekOfYear, value: offset, to: monday)!
-    }
-
     private func sheetWeekDays(offset: Int) -> [(weekday: String, date: Date, iso: String)] {
-        let cal = Calendar(identifier: .iso8601)
-        let mon = sheetMondayOfWeek(offset: offset)
-        return (0..<7).map { i in
-            let d = cal.date(byAdding: .day, value: i, to: mon)!
-            return (EmployeeDetailContent.weekdayOrder[i], d, Self.sheetDateFmt.string(from: d))
-        }
+        AvailabilityWeekMath.weekDays(from: weekStart(weeksFromNow: offset))
     }
 
     private var sheetOverrideByIso: [String: FfiEmployeeAvailabilityOverride] {
@@ -141,24 +123,20 @@ struct EmployeeEditSheet: View {
     }
 
     private func mergedActualSlotsForEdit(offset: Int) -> [AvailabilitySlot] {
-        let days = sheetWeekDays(offset: offset)
-        var out: [AvailabilitySlot] = []
-        for (wd, _, iso) in days {
-            if let edits = actualEditsByDate[iso] {
-                for s in edits {
-                    out.append(AvailabilitySlot(weekday: wd, hour: s.hour, state: s.state))
-                }
-            } else if let ovr = sheetOverrideByIso[iso] {
-                for s in ovr.availability {
-                    out.append(AvailabilitySlot(weekday: wd, hour: s.hour, state: s.state))
-                }
-            } else {
-                for s in defaultAvailabilitySlots where s.weekday == wd {
-                    out.append(s)
-                }
-            }
+        // Unsaved in-sheet edits take precedence over stored overrides:
+        // wrap them as synthetic overrides so the shared merge applies them.
+        var overrides = sheetOverrideByIso
+        for (iso, edits) in actualEditsByDate {
+            overrides[iso] = FfiEmployeeAvailabilityOverride(
+                id: 0, employeeId: existing?.id ?? 0, date: iso,
+                availability: edits, notes: nil, source: "manual"
+            )
         }
-        return out
+        return AvailabilityWeekMath.merge(
+            days: sheetWeekDays(offset: offset),
+            overrides: overrides,
+            defaultAvailability: defaultAvailabilitySlots
+        )
     }
 
     private func applyActualEdit(newSlots: [AvailabilitySlot]) {
@@ -474,9 +452,7 @@ struct EmployeeEditSheet: View {
         lastName = e.lastName
         nickname = e.nickname ?? ""
         selectedRoles = Set(e.roles)
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        startDate = fmt.date(from: e.startDate) ?? Date()
+        startDate = AvailabilityWeekMath.isoFmt.date(from: e.startDate) ?? Date()
         targetHours = Double(e.targetWeeklyHours)
         deviation = Double(e.weeklyHoursDeviation)
         maxDaily = Double(e.maxDailyHours)
@@ -523,9 +499,6 @@ struct EmployeeEditSheet: View {
     }
 
     private func save() {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-
         let finalDefault = AvailabilityGridView.slotsWithOutOfRangeSetToNo(
             slots: defaultAvailabilitySlots, start: defaultVisibleStart, end: defaultVisibleEnd)
 
@@ -541,7 +514,7 @@ struct EmployeeEditSheet: View {
             nickname: trimmedNick.isEmpty ? nil : trimmedNick,
             displayName: "",
             roles: Array(selectedRoles),
-            startDate: fmt.string(from: startDate),
+            startDate: AvailabilityWeekMath.isoFmt.string(from: startDate),
             targetWeeklyHours: Float(targetHours),
             weeklyHoursDeviation: Float(deviation),
             maxDailyHours: Float(maxDaily),
@@ -588,7 +561,7 @@ struct EmployeeEditSheet: View {
                 uniquingKeysWith: { a, _ in a }
             )
             for (iso, editedDay) in actualEditsByDate {
-                guard let date = Self.sheetDateFmt.date(from: iso) else { continue }
+                guard let date = AvailabilityWeekMath.isoFmt.date(from: iso) else { continue }
                 let wd = wdMap[cal.component(.weekday, from: date)] ?? "Mon"
                 let sortedEdit = editedDay.sorted { $0.hour < $1.hour }
                 let defaultDay = defaultForWeekday(wd)

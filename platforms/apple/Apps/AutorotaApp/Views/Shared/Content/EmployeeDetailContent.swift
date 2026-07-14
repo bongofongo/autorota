@@ -59,7 +59,6 @@ struct EmployeeDetailContent: View {
     /// so plain drags draw selections instead of scrolling the page.
     @State private var gridLassoActive = false
 
-    static let weekdayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     private static let weekRangeFmt: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "MMM d"
@@ -74,12 +73,7 @@ struct EmployeeDetailContent: View {
         var endDate: String { items.last?.date ?? "" }
     }
 
-    private static let isoFmt: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.locale = Locale(identifier: "en_US_POSIX")
-        return f
-    }()
+    private static let isoFmt = AvailabilityWeekMath.isoFmt
 
     private static let displayFmt: DateFormatter = {
         let f = DateFormatter()
@@ -171,19 +165,8 @@ struct EmployeeDetailContent: View {
         cost.map { exchangeRates.convert($0, from: employee.wageCurrency ?? displayCurrency, to: displayCurrency) }
     }
 
-    private func mondayOfWeek(offset: Int) -> Date {
-        let cal = Calendar(identifier: .iso8601)
-        let monday = cal.date(from: cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date()))!
-        return cal.date(byAdding: .weekOfYear, value: offset, to: monday)!
-    }
-
     private func weekDays(offset: Int) -> [(weekday: String, date: Date, iso: String)] {
-        let cal = Calendar(identifier: .iso8601)
-        let mon = mondayOfWeek(offset: offset)
-        return (0..<7).map { i in
-            let d = cal.date(byAdding: .day, value: i, to: mon)!
-            return (Self.weekdayOrder[i], d, Self.isoFmt.string(from: d))
-        }
+        AvailabilityWeekMath.weekDays(from: weekStart(weeksFromNow: offset))
     }
 
     private var overrideByDate: [String: FfiEmployeeAvailabilityOverride] {
@@ -192,19 +175,11 @@ struct EmployeeDetailContent: View {
     }
 
     private func mergedActualSlots(for days: [(weekday: String, date: Date, iso: String)]) -> [AvailabilitySlot] {
-        var slots: [AvailabilitySlot] = []
-        for (wd, _, iso) in days {
-            if let ovr = overrideByDate[iso] {
-                for s in ovr.availability {
-                    slots.append(AvailabilitySlot(weekday: wd, hour: s.hour, state: s.state))
-                }
-            } else {
-                for s in employee.defaultAvailability where s.weekday == wd {
-                    slots.append(AvailabilitySlot(weekday: wd, hour: s.hour, state: s.state))
-                }
-            }
-        }
-        return slots
+        AvailabilityWeekMath.merge(
+            days: days,
+            overrides: overrideByDate,
+            defaultAvailability: employee.defaultAvailability
+        )
     }
 
     private var todayStartOfDay: Date {

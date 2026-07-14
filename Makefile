@@ -37,6 +37,7 @@ XCB     := xcodebuild -project $(PROJECT) -scheme $(SCHEME)
 .PHONY: rust-test rust-test-unit rust-test-integration rust-fmt rust-clippy lint
 .PHONY: rust-test-one rust-test-scheduler rust-test-models rust-test-export
 .PHONY: rust-test-db rust-test-edge rust-test-loud rust-test-invariants rust-test-saves
+.PHONY: rust-test-migrations rust-test-concurrency rust-test-pdf rust-test-ffi
 
 rust-test: rust-test-unit rust-test-integration
 
@@ -74,6 +75,22 @@ rust-test-invariants:
 
 rust-test-saves:
 	cargo test --test save_diff_test -p autorota-core $(CARGO_TEST_FLAGS)
+
+# Migration upgrade-path spine (001 → current, schema equivalence + data).
+rust-test-migrations:
+	cargo test --test migration_matrix_test -p autorota-core $(CARGO_TEST_FLAGS)
+
+# Pool-contention smoke tests (file-backed DB, 5-connection pool).
+rust-test-concurrency:
+	cargo test --test db_concurrency_test -p autorota-core $(CARGO_TEST_FLAGS)
+
+# PDF text-layer content assertions (lopdf extraction).
+rust-test-pdf:
+	cargo test --test export_pdf_content_test -p autorota-core $(CARGO_TEST_FLAGS)
+
+# FFI surface tests (lifecycle, export/import, sync, saves).
+rust-test-ffi:
+	cargo test -p autorota-ffi $(CARGO_TEST_FLAGS)
 
 # Always-verbose test run (shows println! output).
 rust-test-loud:

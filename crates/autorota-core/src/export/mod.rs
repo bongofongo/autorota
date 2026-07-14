@@ -308,6 +308,26 @@ pub async fn export_employee_schedule(
     end_date: NaiveDate,
     config: EmployeeExportConfig,
 ) -> Result<ExportResult, ExportError> {
+    let mut results = export_employee_schedules(
+        pool,
+        employee_id,
+        start_date,
+        end_date,
+        std::slice::from_ref(&config),
+    )
+    .await?;
+    Ok(results.remove(0))
+}
+
+/// Render several export configs (e.g. the personal bundle's four formats)
+/// for one employee from a single data load.
+pub async fn export_employee_schedules(
+    pool: &SqlitePool,
+    employee_id: i64,
+    start_date: NaiveDate,
+    end_date: NaiveDate,
+    configs: &[EmployeeExportConfig],
+) -> Result<Vec<ExportResult>, ExportError> {
     let employee = queries::get_employee(pool, employee_id)
         .await?
         .ok_or(ExportError::EmployeeNotFound(employee_id))?;
@@ -330,16 +350,21 @@ pub async fn export_employee_schedule(
         all_shifts.extend(shifts);
     }
 
-    render_employee_export(
-        &employee.display_name(),
-        employee_id,
-        start_date,
-        end_date,
-        &all_assignments,
-        &all_shifts,
-        &templates,
-        &config,
-    )
+    configs
+        .iter()
+        .map(|config| {
+            render_employee_export(
+                &employee.display_name(),
+                employee_id,
+                start_date,
+                end_date,
+                &all_assignments,
+                &all_shifts,
+                &templates,
+                config,
+            )
+        })
+        .collect()
 }
 
 /// Pure-render version of employee-schedule export. Assumes `assignments` and

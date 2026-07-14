@@ -119,8 +119,7 @@ struct SendSchedulePicker: View {
         defer { isWorking = false }
 
         let (start, end) = resolveRange()
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
+        let fmt = AvailabilityWeekMath.isoFmt
 
         let config = FfiEmployeeExportConfig(
             employeeId: employee.id,
@@ -137,26 +136,9 @@ struct SendSchedulePicker: View {
         do {
             let results = try await service.exportEmployeeBundle(config: config)
 
-            let dir = FileManager.default.temporaryDirectory
-                .appendingPathComponent("autorota-bundle-\(UUID().uuidString)", isDirectory: true)
-            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            let dir = try makeExportTempDir(prefix: "autorota-bundle")
             bundleTempDir = dir
-
-            var urls: [URL] = []
-            for r in results {
-                let url = dir.appendingPathComponent(r.filename)
-                if r.mimeType == "application/pdf"
-                    || r.mimeType.contains("spreadsheetml") {
-                    guard let data = Data(base64Encoded: r.data) else {
-                        throw BundleError.invalidBinary
-                    }
-                    try data.write(to: url, options: .atomic)
-                } else {
-                    try r.data.write(to: url, atomically: true, encoding: .utf8)
-                }
-                urls.append(url)
-            }
-            bundleURLs = urls
+            bundleURLs = try results.map { try $0.write(into: dir) }
 
             #if os(iOS)
             showShareSheet = true
@@ -167,7 +149,7 @@ struct SendSchedulePicker: View {
             panel.canCreateDirectories = true
             panel.prompt = "Save Here"
             if panel.runModal() == .OK, let dest = panel.url {
-                for url in urls {
+                for url in bundleURLs {
                     let target = dest.appendingPathComponent(url.lastPathComponent)
                     if FileManager.default.fileExists(atPath: target.path) {
                         try FileManager.default.removeItem(at: target)
@@ -207,18 +189,10 @@ struct SendSchedulePicker: View {
         }
     }
 
+    /// This week's Monday as a `Date`, derived from the shared FFI-side helper.
     private static func currentWeekStart() -> Date {
-        var cal = Calendar(identifier: .iso8601)
-        cal.firstWeekday = 2 // Monday
-        let now = Date()
-        let comps = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: now)
-        return cal.date(from: comps) ?? now
+        AvailabilityWeekMath.isoFmt.date(from: AutorotaKit.currentWeekStart()) ?? Date()
     }
-}
-
-private enum BundleError: LocalizedError {
-    case invalidBinary
-    var errorDescription: String? { "A bundle file could not be decoded." }
 }
 
 #if os(iOS)

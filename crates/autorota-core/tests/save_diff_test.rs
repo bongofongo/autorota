@@ -452,3 +452,45 @@ async fn set_template_role_requirements_replaces_and_denormalises() {
         "primary role denormalised to first requirement"
     );
 }
+
+/// Restore must preserve template linkage. Template shifts are matched across
+/// regenerations by `(date, template_id)` — a restore that re-inserts them
+/// with `template_id = NULL` turns them ad-hoc, so the very save that was just
+/// restored diffs as "everything removed + added" (phantom Edit-Log diff) and
+/// re-materialisation loses track of them.
+#[tokio::test]
+async fn restore_preserves_template_linkage_and_diffs_clean() {
+    let pool = test_pool().await;
+
+    let tmpl = helpers::ShiftTemplateBuilder::new("Morning").build();
+    let tmpl_id = queries::insert_shift_template(&pool, &tmpl).await.unwrap();
+
+    let rota_id = queries::insert_rota(&pool, week()).await.unwrap();
+    queries::materialise_shifts(&pool, rota_id, week())
+        .await
+        .unwrap();
+    let before = queries::list_shifts_for_rota(&pool, rota_id).await.unwrap();
+    assert!(
+        before.iter().any(|s| s.template_id == Some(tmpl_id)),
+        "materialised shift should be template-linked"
+    );
+
+    let save_id = queries::create_save(&pool, rota_id).await.unwrap();
+    queries::restore_from_save(&pool, save_id).await.unwrap();
+
+    let after = queries::list_shifts_for_rota(&pool, rota_id).await.unwrap();
+    assert_eq!(after.len(), before.len());
+    assert!(
+        after.iter().any(|s| s.template_id == Some(tmpl_id)),
+        "restore dropped template_id — restored shifts became ad-hoc"
+    );
+
+    let diff = queries::diff_rota_vs_latest_save_detailed(&pool, rota_id)
+        .await
+        .unwrap();
+    assert!(
+        diff.is_empty(),
+        "restored rota should diff clean against the restored save, got {} changes",
+        diff.len()
+    );
+}

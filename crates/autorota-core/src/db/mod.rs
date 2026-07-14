@@ -82,42 +82,41 @@ async fn run_migration_tx(pool: &SqlitePool, sql: &str) -> Result<(), sqlx::Erro
     tx.commit().await
 }
 
+/// True if `table` has a column named `column` (pragma_table_info lookup).
+async fn has_column(pool: &SqlitePool, table: &str, column: &str) -> Result<bool, sqlx::Error> {
+    sqlx::query_scalar("SELECT COUNT(*) > 0 FROM pragma_table_info(?) WHERE name = ?")
+        .bind(table)
+        .bind(column)
+        .fetch_one(pool)
+        .await
+}
+
+/// True if a table named `name` exists.
+async fn has_table(pool: &SqlitePool, name: &str) -> Result<bool, sqlx::Error> {
+    sqlx::query_scalar("SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name = ?")
+        .bind(name)
+        .fetch_one(pool)
+        .await
+}
+
 async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     let m1 = include_str!("../../migrations/001_initial.sql");
     run_migration_tx(pool, m1).await?;
 
     // Migration 002: only run if the old 'weekday' column exists (pre-migration schema).
-    let has_old_column: bool = sqlx::query_scalar(
-        "SELECT COUNT(*) > 0 FROM pragma_table_info('shift_templates') WHERE name = 'weekday'",
-    )
-    .fetch_one(pool)
-    .await?;
-
-    if has_old_column {
+    if has_column(pool, "shift_templates", "weekday").await? {
         let m2 = include_str!("../../migrations/002_weekdays_and_cascade.sql");
         run_migration_tx(pool, m2).await?;
     }
 
     // Migration 003: add employee work preference fields if they don't exist yet.
-    let has_target_weekly: bool = sqlx::query_scalar(
-        "SELECT COUNT(*) > 0 FROM pragma_table_info('employees') WHERE name = 'target_weekly_hours'",
-    )
-    .fetch_one(pool)
-    .await?;
-
-    if !has_target_weekly {
+    if !has_column(pool, "employees", "target_weekly_hours").await? {
         let m3 = include_str!("../../migrations/003_employee_work_prefs.sql");
         run_migration_tx(pool, m3).await?;
     }
 
     // Migration 004: add soft-delete flags and snapshot employee name in assignments.
-    let has_deleted_col: bool = sqlx::query_scalar(
-        "SELECT COUNT(*) > 0 FROM pragma_table_info('employees') WHERE name = 'deleted'",
-    )
-    .fetch_one(pool)
-    .await?;
-
-    if !has_deleted_col {
+    if !has_column(pool, "employees", "deleted").await? {
         let m4 = include_str!("../../migrations/004_history_support.sql");
         run_migration_tx(pool, m4).await?;
     }
@@ -135,13 +134,7 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     }
 
     // Migration 006: create roles master table and populate from existing data.
-    let has_roles_table: bool = sqlx::query_scalar(
-        "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='roles'",
-    )
-    .fetch_one(pool)
-    .await?;
-
-    if !has_roles_table {
+    if !has_table(pool, "roles").await? {
         // Multi-statement migration: schema create + two backfills must
         // commit atomically so the roles table is never visible without its
         // populated rows.
@@ -165,61 +158,31 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     }
 
     // Migration 007: split 'name' column into first_name, last_name, nickname.
-    let has_first_name: bool = sqlx::query_scalar(
-        "SELECT COUNT(*) > 0 FROM pragma_table_info('employees') WHERE name = 'first_name'",
-    )
-    .fetch_one(pool)
-    .await?;
-
-    if !has_first_name {
+    if !has_column(pool, "employees", "first_name").await? {
         let m7 = include_str!("../../migrations/007_employee_name_split.sql");
         run_migration_tx(pool, m7).await?;
     }
 
     // Migration 008: employee availability overrides + shift template overrides.
-    let has_overrides: bool = sqlx::query_scalar(
-        "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='employee_availability_overrides'",
-    )
-    .fetch_one(pool)
-    .await?;
-
-    if !has_overrides {
+    if !has_table(pool, "employee_availability_overrides").await? {
         let m8 = include_str!("../../migrations/008_overrides.sql");
         run_migration_tx(pool, m8).await?;
     }
 
     // Migration 009: add hourly_wage to employees and assignments.
-    let has_hourly_wage: bool = sqlx::query_scalar(
-        "SELECT COUNT(*) > 0 FROM pragma_table_info('employees') WHERE name = 'hourly_wage'",
-    )
-    .fetch_one(pool)
-    .await?;
-
-    if !has_hourly_wage {
+    if !has_column(pool, "employees", "hourly_wage").await? {
         let m9 = include_str!("../../migrations/009_employee_wages.sql");
         run_migration_tx(pool, m9).await?;
     }
 
     // Migration 010: add wage_currency to employees.
-    let has_wage_currency: bool = sqlx::query_scalar(
-        "SELECT COUNT(*) > 0 FROM pragma_table_info('employees') WHERE name = 'wage_currency'",
-    )
-    .fetch_one(pool)
-    .await?;
-
-    if !has_wage_currency {
+    if !has_column(pool, "employees", "wage_currency").await? {
         let m10 = include_str!("../../migrations/010_employee_wage_currency.sql");
         run_migration_tx(pool, m10).await?;
     }
 
     // Migration 011: add sync tracking columns and tables.
-    let has_sync_status: bool = sqlx::query_scalar(
-        "SELECT COUNT(*) > 0 FROM pragma_table_info('employees') WHERE name = 'sync_status'",
-    )
-    .fetch_one(pool)
-    .await?;
-
-    if !has_sync_status {
+    if !has_column(pool, "employees", "sync_status").await? {
         let m11 = include_str!("../../migrations/011_sync_support.sql");
         run_migration_tx(pool, m11).await?;
     }
@@ -265,26 +228,14 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     run_migration_tx(pool, m13).await?;
 
     // Migration 014: availability progress tracking for carousel workflow.
-    let has_availability_progress: bool = sqlx::query_scalar(
-        "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='availability_progress'",
-    )
-    .fetch_one(pool)
-    .await?;
-
-    if !has_availability_progress {
+    if !has_table(pool, "availability_progress").await? {
         let m14 = include_str!("../../migrations/014_availability_progress.sql");
         run_migration_tx(pool, m14).await?;
     }
 
     // Migration 015: drop staged_shifts table (staging replaced by UI-only selection).
     // The finalized column is left in the DB schema but ignored by code.
-    let has_staged_shifts: bool = sqlx::query_scalar(
-        "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='staged_shifts'",
-    )
-    .fetch_one(pool)
-    .await?;
-
-    if has_staged_shifts {
+    if has_table(pool, "staged_shifts").await? {
         let m15 = include_str!("../../migrations/015_remove_finalized_staging.sql");
         run_migration_tx(pool, m15).await?;
     }
@@ -330,39 +281,21 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     }
 
     // Migration 017: rename committed_at → saved_at in saves table.
-    let has_committed_at: bool = sqlx::query_scalar(
-        "SELECT COUNT(*) > 0 FROM pragma_table_info('saves') WHERE name = 'committed_at'",
-    )
-    .fetch_one(pool)
-    .await?;
-
-    if has_committed_at {
+    if has_column(pool, "saves", "committed_at").await? {
         let m17 = include_str!("../../migrations/017_rename_committed_at_to_saved_at.sql");
         run_migration_tx(pool, m17).await?;
     }
 
     // Migration 018: per-save tag table (replaces single `label` column — label
     // is left in place as a dead column so we don't need a table rebuild).
-    let has_save_tags: bool = sqlx::query_scalar(
-        "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='save_tags'",
-    )
-    .fetch_one(pool)
-    .await?;
-
-    if !has_save_tags {
+    if !has_table(pool, "save_tags").await? {
         let m18 = include_str!("../../migrations/018_save_tags.sql");
         run_migration_tx(pool, m18).await?;
     }
 
     // Migration 019: per-save `restored_at` timestamp — promotes a restored
     // save to the top of its week and drives the red "Restored" badge.
-    let has_restored_at: bool = sqlx::query_scalar(
-        "SELECT COUNT(*) > 0 FROM pragma_table_info('saves') WHERE name = 'restored_at'",
-    )
-    .fetch_one(pool)
-    .await?;
-
-    if !has_restored_at {
+    if !has_column(pool, "saves", "restored_at").await? {
         let m19 = include_str!("../../migrations/019_save_restored_at.sql");
         run_migration_tx(pool, m19).await?;
     }
@@ -370,74 +303,39 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     // Migration 020: per-row `source` on employee_availability_overrides —
     // distinguishes `exception` (created via Exceptions UI) from `manual`
     // (normal per-date edit through the availability grid).
-    let has_ovr_source: bool = sqlx::query_scalar(
-        "SELECT COUNT(*) > 0 FROM pragma_table_info('employee_availability_overrides') WHERE name = 'source'",
-    )
-    .fetch_one(pool)
-    .await?;
-
-    if !has_ovr_source {
+    if !has_column(pool, "employee_availability_overrides", "source").await? {
         let m20 = include_str!("../../migrations/020_override_source.sql");
         run_migration_tx(pool, m20).await?;
     }
 
     // Migration 021: `phone` + `whatsapp` contact fields on employees.
-    let has_phone: bool = sqlx::query_scalar(
-        "SELECT COUNT(*) > 0 FROM pragma_table_info('employees') WHERE name = 'phone'",
-    )
-    .fetch_one(pool)
-    .await?;
-
-    if !has_phone {
+    if !has_column(pool, "employees", "phone").await? {
         let m21 = include_str!("../../migrations/021_employee_contact.sql");
         run_migration_tx(pool, m21).await?;
     }
 
     // Migration 022: collapse `whatsapp` into `phone`, add `preferred_contact`
     // ("imessage" | "whatsapp" | NULL). Guard on the column we're adding.
-    let has_preferred_contact: bool = sqlx::query_scalar(
-        "SELECT COUNT(*) > 0 FROM pragma_table_info('employees') WHERE name = 'preferred_contact'",
-    )
-    .fetch_one(pool)
-    .await?;
-
-    if !has_preferred_contact {
+    if !has_column(pool, "employees", "preferred_contact").await? {
         let m22 = include_str!("../../migrations/022_preferred_contact.sql");
         run_migration_tx(pool, m22).await?;
     }
 
     // Migration 023: optional `email` column on employees. Guard on column
     // presence so re-running on an existing DB is a no-op.
-    let has_email: bool = sqlx::query_scalar(
-        "SELECT COUNT(*) > 0 FROM pragma_table_info('employees') WHERE name = 'email'",
-    )
-    .fetch_one(pool)
-    .await?;
-
-    if !has_email {
+    if !has_column(pool, "employees", "email").await? {
         let m23 = include_str!("../../migrations/023_employee_email.sql");
         run_migration_tx(pool, m23).await?;
     }
 
     // Migration 024: multi-role shifts (per-role minimums on shifts/templates).
-    let has_role_requirements: bool = sqlx::query_scalar(
-        "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type='table' AND name='shift_role_requirements'",
-    )
-    .fetch_one(pool)
-    .await?;
-
-    if !has_role_requirements {
+    if !has_table(pool, "shift_role_requirements").await? {
         let m24 = include_str!("../../migrations/024_shift_role_requirements.sql");
         run_migration_tx(pool, m24).await?;
     }
 
     // Migration 025: sync mirror column for role requirements.
-    let has_rr_json: bool = sqlx::query_scalar(
-        "SELECT COUNT(*) > 0 FROM pragma_table_info('shifts') WHERE name = 'role_requirements_json'",
-    )
-    .fetch_one(pool)
-    .await?;
-    if !has_rr_json {
+    if !has_column(pool, "shifts", "role_requirements_json").await? {
         let m25 = include_str!("../../migrations/025_role_requirements_sync.sql");
         run_migration_tx(pool, m25).await?;
     }

@@ -1349,6 +1349,16 @@ private struct ConflictBadge: View {
 
 // MARK: - Role and staffing section
 
+/// Effective staffing range clamped to the role-derived floor: the overall
+/// minimum can't go below the largest per-role minimum, and the maximum
+/// can't go below the effective minimum. Used by the shift editor, the
+/// add-shift sheet, and the template editor on save.
+func effectiveStaffRange(minStaff: Int, maxStaff: Int, roleReqs: [FfiRoleRequirement]) -> (min: Int, max: Int) {
+    let floor = roleReqs.map { Int($0.minCount) }.max() ?? 0
+    let effMin = max(minStaff, floor)
+    return (effMin, max(maxStaff, effMin))
+}
+
 /// Editable "Role and staffing" form section shared by the shift editor, the
 /// add-shift sheet, and the template editor. Min staff is clamped to the
 /// role-derived floor (the largest role minimum); empty requirements mean a
@@ -1457,9 +1467,7 @@ private struct ShiftEditorSheet: View {
     init(vm: RotaViewModel, shift: FfiShiftInfo) {
         self.vm = vm
         self.shift = shift
-        let fmt = DateFormatter()
-        fmt.dateFormat = "HH:mm"
-        fmt.locale = Locale(identifier: "en_US_POSIX")
+        let fmt = AvailabilityWeekMath.timeFmt
         let base = Calendar.current.startOfDay(for: Date())
         _startDate = State(initialValue: fmt.date(from: shift.startTime) ?? base)
         _endDate = State(initialValue: fmt.date(from: shift.endTime) ?? base)
@@ -1548,15 +1556,12 @@ private struct ShiftEditorSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        let fmt = DateFormatter()
-                        fmt.dateFormat = "HH:mm"
-                        fmt.locale = Locale(identifier: "en_US_POSIX")
+                        let fmt = AvailabilityWeekMath.timeFmt
                         let start = fmt.string(from: startDate)
                         let end = fmt.string(from: endDate)
                         // Effective min is clamped to the role-derived floor.
-                        let floor = roleReqs.map { Int($0.minCount) }.max() ?? 0
-                        let effMin = max(minStaff, floor)
-                        let effMax = max(maxStaff, effMin)
+                        let (effMin, effMax) = effectiveStaffRange(
+                            minStaff: minStaff, maxStaff: maxStaff, roleReqs: roleReqs)
                         Task {
                             await vm.updateShiftTimes(id: shift.id, startTime: start, endTime: end)
                             await vm.updateShift(
@@ -1701,14 +1706,11 @@ private struct AddShiftSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Create") {
-                        let fmt = DateFormatter()
-                        fmt.dateFormat = "HH:mm"
-                        fmt.locale = Locale(identifier: "en_US_POSIX")
+                        let fmt = AvailabilityWeekMath.timeFmt
                         let start = fmt.string(from: startDate)
                         let end = fmt.string(from: endDate)
-                        let floor = roleReqs.map { Int($0.minCount) }.max() ?? 0
-                        let effMin = max(minStaff, floor)
-                        let effMax = max(maxStaff, effMin)
+                        let (effMin, effMax) = effectiveStaffRange(
+                            minStaff: minStaff, maxStaff: maxStaff, roleReqs: roleReqs)
                         Task {
                             await vm.createAdHocShift(
                                 date: date, startTime: start,

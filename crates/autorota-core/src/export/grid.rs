@@ -34,6 +34,47 @@ struct ResolvedAssignment<'a> {
     hourly_wage: Option<f32>,
 }
 
+/// Name of the template the shift came from, if any.
+fn template_name(shift: &Shift, tmpl_map: &HashMap<i64, &ShiftTemplate>) -> Option<String> {
+    shift
+        .template_id
+        .and_then(|tid| tmpl_map.get(&tid))
+        .map(|t| t.name.clone())
+}
+
+/// Template name, else a "Role HH:MM-HH:MM" fallback for ad-hoc shifts.
+fn shift_label(shift: &Shift, tmpl_map: &HashMap<i64, &ShiftTemplate>) -> String {
+    template_name(shift, tmpl_map).unwrap_or_else(|| {
+        format!(
+            "{} {}-{}",
+            shift.required_role,
+            shift.start_time.format("%H:%M"),
+            shift.end_time.format("%H:%M"),
+        )
+    })
+}
+
+/// Manager-report totals: per-day summaries plus the weekly cost sum.
+/// Returns `(None, None)` for staff-schedule exports.
+fn finalize_totals(
+    is_manager: bool,
+    daily_hours: &[f32],
+    daily_cost: &[f32],
+) -> (Option<Vec<DaySummary>>, Option<f32>) {
+    if !is_manager {
+        return (None, None);
+    }
+    let totals: Vec<DaySummary> = daily_hours
+        .iter()
+        .zip(daily_cost.iter())
+        .map(|(&h, &c)| DaySummary {
+            total_hours: h,
+            total_cost: c,
+        })
+        .collect();
+    (Some(totals), Some(daily_cost.iter().sum()))
+}
+
 /// Build one `ExportGrid` per unique role present in `shifts`, in alphabetical
 /// role order. Each grid is produced by filtering the shifts/assignments for
 /// that role and delegating to `build_grid` — no business logic is duplicated.
@@ -124,23 +165,8 @@ pub fn build_grid(
         .iter()
         .filter_map(|a| {
             let shift = shift_map.get(&a.shift_id)?;
-            let employee_name = emp_map
-                .get(&a.employee_id)
-                .map(|e| e.display_name())
-                .or_else(|| a.employee_name.clone())
-                .unwrap_or_else(|| format!("Employee #{}", a.employee_id));
-            let shift_name = shift
-                .template_id
-                .and_then(|tid| tmpl_map.get(&tid))
-                .map(|t| t.name.clone())
-                .unwrap_or_else(|| {
-                    format!(
-                        "{} {}-{}",
-                        shift.required_role,
-                        shift.start_time.format("%H:%M"),
-                        shift.end_time.format("%H:%M"),
-                    )
-                });
+            let employee_name = a.resolved_employee_name(&emp_map);
+            let shift_name = shift_label(shift, &tmpl_map);
             Some(ResolvedAssignment {
                 employee_name,
                 shift,
@@ -275,20 +301,7 @@ fn build_employee_grid(
         cells.push(row);
     }
 
-    let (daily_totals, weekly_total_cost) = if is_manager {
-        let totals: Vec<DaySummary> = daily_hours
-            .iter()
-            .zip(daily_cost.iter())
-            .map(|(&h, &c)| DaySummary {
-                total_hours: h,
-                total_cost: c,
-            })
-            .collect();
-        let weekly = daily_cost.iter().sum();
-        (Some(totals), Some(weekly))
-    } else {
-        (None, None)
-    };
+    let (daily_totals, weekly_total_cost) = finalize_totals(is_manager, &daily_hours, &daily_cost);
 
     ExportGrid {
         title,
@@ -347,11 +360,7 @@ fn build_shift_grid(
         shift_exists.insert((shift.date, key.clone()));
         if seen.insert(key.clone()) {
             let time_line = format!("{}-{}", key.start.format("%H:%M"), key.end.format("%H:%M"),);
-            let name_line = shift
-                .template_id
-                .and_then(|tid| tmpl_map.get(&tid))
-                .map(|t| t.name.clone())
-                .unwrap_or_else(|| key.role.clone());
+            let name_line = template_name(shift, tmpl_map).unwrap_or_else(|| key.role.clone());
             let label = match row_content {
                 // Custom layouts pick exactly which fields the row label shows.
                 Some(rf) => {
@@ -445,20 +454,7 @@ fn build_shift_grid(
         cells.push(row);
     }
 
-    let (daily_totals, weekly_total_cost) = if is_manager {
-        let totals: Vec<DaySummary> = daily_hours
-            .iter()
-            .zip(daily_cost.iter())
-            .map(|(&h, &c)| DaySummary {
-                total_hours: h,
-                total_cost: c,
-            })
-            .collect();
-        let weekly = daily_cost.iter().sum();
-        (Some(totals), Some(weekly))
-    } else {
-        (None, None)
-    };
+    let (daily_totals, weekly_total_cost) = finalize_totals(is_manager, &daily_hours, &daily_cost);
 
     ExportGrid {
         title,
@@ -533,18 +529,7 @@ pub fn build_single_employee_grid(
                 .iter()
                 .filter_map(|a| {
                     let shift = shift_map.get(&a.shift_id)?;
-                    let shift_name = shift
-                        .template_id
-                        .and_then(|tid| tmpl_map.get(&tid))
-                        .map(|t| t.name.clone())
-                        .unwrap_or_else(|| {
-                            format!(
-                                "{} {}-{}",
-                                shift.required_role,
-                                shift.start_time.format("%H:%M"),
-                                shift.end_time.format("%H:%M"),
-                            )
-                        });
+                    let shift_name = shift_label(shift, &tmpl_map);
 
                     let mut line_parts = Vec::new();
                     if flags.show_shift_name {

@@ -146,42 +146,8 @@ private struct AvailabilityPage: View {
     let employee: FfiEmployee
     let weekStartString: String
 
-    @State private var overrideVM = OverrideViewModel()
-    @State private var slots: [AvailabilitySlot] = []
-    @State private var visibleRange: (start: Int, end: Int)
     /// Sticky lasso toggle is on — pauses this card's scroll view.
     @State private var lassoActive = false
-
-    init(employee: FfiEmployee, weekStartString: String) {
-        self.employee = employee
-        self.weekStartString = weekStartString
-        self._visibleRange = State(initialValue: AvailabilityGridView.inferredVisibleRange(from: employee.defaultAvailability))
-    }
-
-    private var weekDays: [(weekday: String, date: Date, iso: String)] {
-        AvailabilityWeekMath.weekDays(from: weekStartString)
-    }
-
-    private var overrideByIso: [String: FfiEmployeeAvailabilityOverride] {
-        Dictionary(overrideVM.employeeAvailabilityOverrides.map { ($0.date, $0) },
-                   uniquingKeysWith: { a, _ in a })
-    }
-
-    private func mergedSlots() -> [AvailabilitySlot] {
-        AvailabilityWeekMath.merge(
-            days: weekDays,
-            overrides: overrideByIso,
-            defaultAvailability: employee.defaultAvailability
-        )
-    }
-
-    private var outlinedWeekdays: Set<String> {
-        Set(weekDays.compactMap { overrideByIso[$0.iso]?.source == "exception" ? $0.weekday : nil })
-    }
-
-    private var weekdaySubheaders: [String: String] {
-        Dictionary(uniqueKeysWithValues: weekDays.map { ($0.weekday, AvailabilityWeekMath.dayNumber(for: $0.date)) })
-    }
 
     var body: some View {
         ScrollView {
@@ -203,44 +169,17 @@ private struct AvailabilityPage: View {
                     .padding(.horizontal, 16)
                 }
 
-                AvailabilityGridView(
-                    slots: slots,
-                    isEditable: true,
-                    visibleHourStart: visibleRange.start,
-                    visibleHourEnd: visibleRange.end,
+                WeekAvailabilityEditorGrid(
+                    employee: employee,
+                    weekStartString: weekStartString,
                     showRangePicker: true,
-                    onChange: { newSlots in
-                        slots = newSlots
-                        Task { await persistEdits(newSlots) }
-                    },
-                    onVisibleRangeChange: { start, end in
-                        visibleRange = (start, end)
-                    },
-                    onLassoModeChange: { lassoActive = $0 },
-                    outlinedWeekdays: outlinedWeekdays,
-                    weekdaySubheaders: weekdaySubheaders
+                    onLassoModeChange: { lassoActive = $0 }
                 )
                 .padding(.horizontal, 8)
             }
             .padding(.vertical, 8)
         }
         .scrollDisabled(lassoActive)
-        .task {
-            await overrideVM.loadForEmployee(id: employee.id)
-            slots = mergedSlots()
-        }
-    }
-
-    private func persistEdits(_ newSlots: [AvailabilitySlot]) async {
-        await AvailabilityWeekMath.persistWeekEdits(
-            newSlots: newSlots,
-            days: weekDays,
-            overrideByIso: overrideByIso,
-            defaultAvailability: employee.defaultAvailability,
-            employeeId: employee.id,
-            overrideVM: overrideVM
-        )
-        await overrideVM.loadForEmployee(id: employee.id)
     }
 }
 

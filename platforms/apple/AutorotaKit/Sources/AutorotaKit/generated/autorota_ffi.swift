@@ -2562,72 +2562,6 @@ public func FfiConverterTypeFfiImportSummary_lower(_ value: FfiImportSummary) ->
 }
 
 
-public struct FfiMergeConflict {
-    public var recordId: Int64
-    public var resolvedFields: String
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(recordId: Int64, resolvedFields: String) {
-        self.recordId = recordId
-        self.resolvedFields = resolvedFields
-    }
-}
-
-
-
-extension FfiMergeConflict: Equatable, Hashable {
-    public static func ==(lhs: FfiMergeConflict, rhs: FfiMergeConflict) -> Bool {
-        if lhs.recordId != rhs.recordId {
-            return false
-        }
-        if lhs.resolvedFields != rhs.resolvedFields {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(recordId)
-        hasher.combine(resolvedFields)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeFfiMergeConflict: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiMergeConflict {
-        return
-            try FfiMergeConflict(
-                recordId: FfiConverterInt64.read(from: &buf), 
-                resolvedFields: FfiConverterString.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: FfiMergeConflict, into buf: inout [UInt8]) {
-        FfiConverterInt64.write(value.recordId, into: &buf)
-        FfiConverterString.write(value.resolvedFields, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeFfiMergeConflict_lift(_ buf: RustBuffer) throws -> FfiMergeConflict {
-    return try FfiConverterTypeFfiMergeConflict.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeFfiMergeConflict_lower(_ value: FfiMergeConflict) -> RustBuffer {
-    return FfiConverterTypeFfiMergeConflict.lower(value)
-}
-
-
 /**
  * One row from a parsed roster file, annotated with diff state.
  */
@@ -3148,80 +3082,6 @@ public func FfiConverterTypeFfiRoleRequirement_lift(_ buf: RustBuffer) throws ->
 #endif
 public func FfiConverterTypeFfiRoleRequirement_lower(_ value: FfiRoleRequirement) -> RustBuffer {
     return FfiConverterTypeFfiRoleRequirement.lower(value)
-}
-
-
-public struct FfiRota {
-    public var id: Int64
-    public var weekStart: String
-    public var assignments: [FfiAssignment]
-
-    // Default memberwise initializers are never public by default, so we
-    // declare one manually.
-    public init(id: Int64, weekStart: String, assignments: [FfiAssignment]) {
-        self.id = id
-        self.weekStart = weekStart
-        self.assignments = assignments
-    }
-}
-
-
-
-extension FfiRota: Equatable, Hashable {
-    public static func ==(lhs: FfiRota, rhs: FfiRota) -> Bool {
-        if lhs.id != rhs.id {
-            return false
-        }
-        if lhs.weekStart != rhs.weekStart {
-            return false
-        }
-        if lhs.assignments != rhs.assignments {
-            return false
-        }
-        return true
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(id)
-        hasher.combine(weekStart)
-        hasher.combine(assignments)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public struct FfiConverterTypeFfiRota: FfiConverterRustBuffer {
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> FfiRota {
-        return
-            try FfiRota(
-                id: FfiConverterInt64.read(from: &buf), 
-                weekStart: FfiConverterString.read(from: &buf), 
-                assignments: FfiConverterSequenceTypeFfiAssignment.read(from: &buf)
-        )
-    }
-
-    public static func write(_ value: FfiRota, into buf: inout [UInt8]) {
-        FfiConverterInt64.write(value.id, into: &buf)
-        FfiConverterString.write(value.weekStart, into: &buf)
-        FfiConverterSequenceTypeFfiAssignment.write(value.assignments, into: &buf)
-    }
-}
-
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeFfiRota_lift(_ buf: RustBuffer) throws -> FfiRota {
-    return try FfiConverterTypeFfiRota.lift(buf)
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
-public func FfiConverterTypeFfiRota_lower(_ value: FfiRota) -> RustBuffer {
-    return FfiConverterTypeFfiRota.lower(value)
 }
 
 
@@ -5131,30 +4991,6 @@ fileprivate struct FfiConverterOptionTypeFfiEmployeeAvailabilityOverride: FfiCon
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
-fileprivate struct FfiConverterOptionTypeFfiRota: FfiConverterRustBuffer {
-    typealias SwiftType = FfiRota?
-
-    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
-        guard let value = value else {
-            writeInt(&buf, Int8(0))
-            return
-        }
-        writeInt(&buf, Int8(1))
-        FfiConverterTypeFfiRota.write(value, into: &buf)
-    }
-
-    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
-        switch try readInt(&buf) as Int8 {
-        case 0: return nil
-        case 1: return try FfiConverterTypeFfiRota.read(from: &buf)
-        default: throw UniffiInternalError.unexpectedOptionalTag
-        }
-    }
-}
-
-#if swift(>=5.8)
-@_documentation(visibility: private)
-#endif
 fileprivate struct FfiConverterOptionTypeFfiRowContent: FfiConverterRustBuffer {
     typealias SwiftType = FfiRowContent?
 
@@ -5988,13 +5824,6 @@ public func createRole(name: String)throws  -> Int64 {
     )
 })
 }
-public func createRota(weekStart: String)throws  -> Int64 {
-    return try  FfiConverterInt64.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
-    uniffi_autorota_ffi_fn_func_create_rota(
-        FfiConverterString.lower(weekStart),$0
-    )
-})
-}
 public func createSave(rotaId: Int64)throws  -> Int64 {
     return try  FfiConverterInt64.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_create_save(
@@ -6194,20 +6023,6 @@ public func getPendingSyncRecords(tableName: String)throws  -> [FfiSyncRecord] {
 public func getPendingTombstones()throws  -> [FfiTombstone] {
     return try  FfiConverterSequenceTypeFfiTombstone.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_get_pending_tombstones($0
-    )
-})
-}
-public func getRota(id: Int64)throws  -> FfiRota? {
-    return try  FfiConverterOptionTypeFfiRota.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
-    uniffi_autorota_ffi_fn_func_get_rota(
-        FfiConverterInt64.lower(id),$0
-    )
-})
-}
-public func getRotaByWeek(weekStart: String)throws  -> FfiRota? {
-    return try  FfiConverterOptionTypeFfiRota.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
-    uniffi_autorota_ffi_fn_func_get_rota_by_week(
-        FfiConverterString.lower(weekStart),$0
     )
 })
 }
@@ -6615,9 +6430,6 @@ private var initializationResult: InitializationResult = {
     if (uniffi_autorota_ffi_checksum_func_create_role() != 26640) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_autorota_ffi_checksum_func_create_rota() != 14567) {
-        return InitializationResult.apiChecksumMismatch
-    }
     if (uniffi_autorota_ffi_checksum_func_create_save() != 46185) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -6691,12 +6503,6 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_get_pending_tombstones() != 32900) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_autorota_ffi_checksum_func_get_rota() != 30703) {
-        return InitializationResult.apiChecksumMismatch
-    }
-    if (uniffi_autorota_ffi_checksum_func_get_rota_by_week() != 22255) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_get_save_detail() != 9653) {

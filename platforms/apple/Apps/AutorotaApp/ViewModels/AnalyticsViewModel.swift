@@ -116,9 +116,7 @@ final class AnalyticsViewModel {
     // MARK: - Date Range Computation
 
     func effectiveDateRange() -> (start: String, end: String) {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        fmt.locale = Locale(identifier: "en_US_POSIX")
+        let fmt = AvailabilityWeekMath.isoFmt
         return (fmt.string(from: startDate), fmt.string(from: endDate))
     }
 
@@ -189,7 +187,7 @@ final class AnalyticsViewModel {
         hoursByRole = roleMap.values.sorted { $0.totalHours > $1.totalHours }
 
         // Day of week distribution
-        let dayOrder = ["Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6]
+        let dayOrder = AvailabilityWeekMath.weekdayIndex
         var dowMap: [String: DayOfWeekSummary] = [:]
         for r in records {
             if var existing = dowMap[r.weekday] {

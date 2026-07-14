@@ -168,4 +168,45 @@ mod tests {
             "No se encontró el empleado."
         );
     }
+
+    /// All locale files must parse cleanly and expose exactly the same set of
+    /// message IDs as English — a key added or renamed in one file must land
+    /// in all seven.
+    #[test]
+    fn all_locales_have_identical_key_sets() {
+        use std::collections::BTreeSet;
+
+        fn message_ids(locale: &str, src: &str) -> BTreeSet<String> {
+            let res = FluentResource::try_new(src.to_string()).unwrap_or_else(|(_, errs)| {
+                panic!("{locale}/errors.ftl has parse errors: {errs:?}")
+            });
+            res.entries()
+                .filter_map(|entry| match entry {
+                    fluent_syntax::ast::Entry::Message(m) => Some(m.id.name.to_string()),
+                    _ => None,
+                })
+                .collect()
+        }
+
+        let en_keys = message_ids("en", EN_FTL);
+        assert!(!en_keys.is_empty(), "en/errors.ftl has no messages");
+
+        let others = [
+            ("zh-Hans", ZH_HANS_FTL),
+            ("zh-Hant", ZH_HANT_FTL),
+            ("ar", AR_FTL),
+            ("bn", BN_FTL),
+            ("hi", HI_FTL),
+            ("es", ES_FTL),
+        ];
+        for (locale, src) in others {
+            let keys = message_ids(locale, src);
+            let missing: Vec<_> = en_keys.difference(&keys).collect();
+            let extra: Vec<_> = keys.difference(&en_keys).collect();
+            assert!(
+                missing.is_empty() && extra.is_empty(),
+                "{locale}/errors.ftl key drift vs en — missing: {missing:?}, extra: {extra:?}"
+            );
+        }
+    }
 }

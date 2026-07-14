@@ -6,9 +6,9 @@
 //! case a minimal `VTIMEZONE` block is embedded so Apple Calendar resolves DST
 //! correctly without needing an external TZ database.
 
-use chrono::{Duration, NaiveDate, NaiveTime};
+use chrono::{Duration, NaiveDate, NaiveTime, Timelike};
 
-use crate::models::shift::Shift;
+use crate::models::shift::{Shift, crosses_midnight};
 
 /// One calendar entry. Caller resolves assignment → shift → employee naming.
 #[derive(Debug, Clone)]
@@ -94,18 +94,6 @@ fn fold_line(line: &str) -> String {
     out
 }
 
-fn format_datetime_basic(date: NaiveDate, time: NaiveTime) -> String {
-    format!(
-        "{}{:02}{:02}{:02}",
-        date.format("%Y%m%d"),
-        time.hour(),
-        time.minute(),
-        time.second()
-    )
-}
-
-use chrono::Timelike;
-
 /// Render the full iCalendar document. `tzid` when supplied becomes part of
 /// `DTSTART;TZID=<tzid>` and a minimal VTIMEZONE block is added. Pass `None`
 /// for floating local times.
@@ -119,6 +107,15 @@ pub fn render_calendar(events: &[IcsEvent], tzid: Option<&str>) -> String {
     if let Some(tz) = tzid {
         out.push_str(&fold_line("BEGIN:VTIMEZONE"));
         out.push_str(&fold_line(&format!("TZID:{tz}")));
+        // RFC 5545 §3.6.5 requires at least one STANDARD/DAYLIGHT subcomponent.
+        // We ship no tz database, so real offsets for an arbitrary TZID are
+        // unavailable; emit a syntactically valid placeholder. Clients resolve
+        // well-known Olson TZIDs from their own tz data and ignore this block.
+        out.push_str(&fold_line("BEGIN:STANDARD"));
+        out.push_str(&fold_line("DTSTART:19700101T000000"));
+        out.push_str(&fold_line("TZOFFSETFROM:+0000"));
+        out.push_str(&fold_line("TZOFFSETTO:+0000"));
+        out.push_str(&fold_line("END:STANDARD"));
         out.push_str(&fold_line("END:VTIMEZONE"));
     }
 
@@ -172,9 +169,10 @@ fn format_time_basic(t: NaiveTime) -> String {
     format!("{:02}{:02}{:02}", t.hour(), t.minute(), t.second())
 }
 
-/// End date rolls to next day when shift crosses midnight.
+/// End date rolls to next day when shift crosses midnight (`end < start`,
+/// per the canonical rule in `models::shift`; `end == start` stays same-day).
 fn end_date(date: NaiveDate, start: NaiveTime, end: NaiveTime) -> NaiveDate {
-    if end <= start {
+    if crosses_midnight(start, end) {
         date + Duration::days(1)
     } else {
         date
@@ -193,16 +191,6 @@ pub fn render_employee_calendar(
         .map(|(s, label)| IcsEvent::from_shift(s, employee_id, employee_name, label))
         .collect();
     render_calendar(&events, tzid)
-}
-
-// Unused when we already rely on chrono::Timelike via the prelude above.
-#[allow(dead_code)]
-fn _unused_ref(_t: NaiveTime) {}
-
-// Referenced for format_datetime_basic even if not exposed — keep compilable.
-#[allow(dead_code)]
-fn _force_use(d: NaiveDate, t: NaiveTime) -> String {
-    format_datetime_basic(d, t)
 }
 
 #[cfg(test)]
@@ -278,6 +266,36 @@ mod tests {
         assert!(ics.contains("SUMMARY"));
         for line in ics.split("\r\n") {
             assert!(line.len() <= 75, "unfolded line too long: {line:?}");
+        }
+    }
+
+    /// RFC 5545 §3.6.5: a VTIMEZONE component MUST contain at least one
+    /// STANDARD or DAYLIGHT subcomponent, each with DTSTART, TZOFFSETFROM
+    /// and TZOFFSETTO. An empty VTIMEZONE is invalid and strict parsers
+    /// reject the whole calendar.
+    #[test]
+    fn vtimezone_has_required_subcomponent() {
+        let s = mk_shift(1, (2026, 4, 20), (7, 0), (12, 0), "Barista");
+        let ics =
+            render_employee_calendar(1, "Alice", &[(s, "Morning".into())], Some("Europe/London"));
+
+        let start = ics.find("BEGIN:VTIMEZONE").expect("VTIMEZONE present");
+        let end = ics.find("END:VTIMEZONE").expect("VTIMEZONE terminated");
+        let block = &ics[start..end];
+
+        assert!(
+            block.contains("BEGIN:STANDARD") || block.contains("BEGIN:DAYLIGHT"),
+            "VTIMEZONE lacks a STANDARD/DAYLIGHT subcomponent:\n{block}"
+        );
+        for prop in ["DTSTART:", "TZOFFSETFROM:", "TZOFFSETTO:"] {
+            assert!(
+                block.contains(prop),
+                "VTIMEZONE subcomponent missing {prop}\n{block}"
+            );
+        }
+        // Subcomponent must be closed before END:VTIMEZONE.
+        if block.contains("BEGIN:STANDARD") {
+            assert!(block.contains("END:STANDARD"));
         }
     }
 

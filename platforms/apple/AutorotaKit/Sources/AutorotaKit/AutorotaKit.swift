@@ -79,20 +79,19 @@ public func autorotaQuarantineDatabase(at url: URL) throws -> URL {
 
 // MARK: - Convenience date helpers
 
+/// Shared cached "yyyy-MM-dd" formatter (POSIX locale).
+let isoDateFmt: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd"
+    f.locale = Locale(identifier: "en_US_POSIX")
+    return f
+}()
+
 public extension FfiEmployee {
     /// Parse start_date back to a Swift Date for display.
     var startDateValue: Date? {
-        ISO8601DateFormatter.sharedDate.date(from: startDate)
+        isoDateFmt.date(from: startDate)
     }
-}
-
-private extension ISO8601DateFormatter {
-    static let sharedDate: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.locale = Locale(identifier: "en_US_POSIX")
-        return f
-    }()
 }
 
 // MARK: - Async wrappers
@@ -101,228 +100,159 @@ private extension ISO8601DateFormatter {
 // Call them from a Task.detached or a detached background Task to avoid
 // blocking the main actor. Convenience wrappers below handle that pattern.
 
+/// Run a blocking FFI call on a detached task so it never blocks the main actor.
+private func detached<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
+    try await Task.detached(priority: .userInitiated) { try work() }.value
+}
+
 public func listRolesAsync() async throws -> [FfiRole] {
-    try await Task.detached(priority: .userInitiated) {
-        try listRoles()
-    }.value
+    try await detached { try listRoles() }
 }
 
 public func createRoleAsync(name: String) async throws -> Int64 {
-    try await Task.detached(priority: .userInitiated) {
-        try createRole(name: name)
-    }.value
+    try await detached { try createRole(name: name) }
 }
 
 public func updateRoleAsync(id: Int64, name: String) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try updateRole(id: id, name: name)
-    }.value
+    try await detached { try updateRole(id: id, name: name) }
 }
 
 public func deleteRoleAsync(id: Int64) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try deleteRole(id: id)
-    }.value
+    try await detached { try deleteRole(id: id) }
 }
 
 public func listEmployeesAsync() async throws -> [FfiEmployee] {
-    try await Task.detached(priority: .userInitiated) {
-        try listEmployees()
-    }.value
+    try await detached { try listEmployees() }
 }
 
 public func createEmployeeAsync(_ employee: FfiEmployee) async throws -> Int64 {
-    try await Task.detached(priority: .userInitiated) {
-        try createEmployee(employee: employee)
-    }.value
+    try await detached { try createEmployee(employee: employee) }
 }
 
 public func updateEmployeeAsync(_ employee: FfiEmployee) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try updateEmployee(employee: employee)
-    }.value
+    try await detached { try updateEmployee(employee: employee) }
 }
 
 public func deleteEmployeeAsync(id: Int64) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try deleteEmployee(id: id)
-    }.value
+    try await detached { try deleteEmployee(id: id) }
 }
 
 public func listShiftTemplatesAsync() async throws -> [FfiShiftTemplate] {
-    try await Task.detached(priority: .userInitiated) {
-        try listShiftTemplates()
-    }.value
+    try await detached { try listShiftTemplates() }
 }
 
 public func createShiftTemplateAsync(_ template: FfiShiftTemplate) async throws -> Int64 {
-    try await Task.detached(priority: .userInitiated) {
-        try createShiftTemplate(template: template)
-    }.value
+    try await detached { try createShiftTemplate(template: template) }
 }
 
 public func updateShiftTemplateAsync(_ template: FfiShiftTemplate) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try updateShiftTemplate(template: template)
-    }.value
+    try await detached { try updateShiftTemplate(template: template) }
 }
 
 public func deleteShiftTemplateAsync(id: Int64) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try deleteShiftTemplate(id: id)
-    }.value
+    try await detached { try deleteShiftTemplate(id: id) }
 }
 
 public func getWeekScheduleAsync(weekStart: String) async throws -> FfiWeekSchedule? {
-    try await Task.detached(priority: .userInitiated) {
-        try getWeekSchedule(weekStart: weekStart)
-    }.value
+    try await detached { try getWeekSchedule(weekStart: weekStart) }
 }
 
 public func runScheduleAsync(weekStart: String) async throws -> FfiScheduleResult {
-    try await Task.detached(priority: .userInitiated) {
-        try runSchedule(weekStart: weekStart)
-    }.value
+    try await detached { try runSchedule(weekStart: weekStart) }
 }
 
 public func materialiseWeekAsync(weekStart: String) async throws -> Int64 {
-    try await Task.detached(priority: .userInitiated) {
-        try materialiseWeek(weekStart: weekStart)
-    }.value
+    try await detached { try materialiseWeek(weekStart: weekStart) }
 }
 
 public func createEmptyWeekAsync(weekStart: String) async throws -> Int64 {
-    try await Task.detached(priority: .userInitiated) {
-        try createEmptyWeek(weekStart: weekStart)
-    }.value
+    try await detached { try createEmptyWeek(weekStart: weekStart) }
 }
 
 public func deleteWeekAsync(weekStart: String) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try deleteWeek(weekStart: weekStart)
-    }.value
+    try await detached { try deleteWeek(weekStart: weekStart) }
 }
 
 public func updateAssignmentStatusAsync(id: Int64, status: String) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try updateAssignmentStatus(id: id, status: status)
-    }.value
+    try await detached { try updateAssignmentStatus(id: id, status: status) }
 }
 
 public func swapAssignmentsAsync(idA: Int64, idB: Int64) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try swapAssignments(idA: idA, idB: idB)
-    }.value
+    try await detached { try swapAssignments(idA: idA, idB: idB) }
 }
 
 public func deleteAssignmentAsync(id: Int64) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try deleteAssignment(id: id)
-    }.value
+    try await detached { try deleteAssignment(id: id) }
 }
 
 public func createAssignmentAsync(_ assignment: FfiAssignment) async throws -> Int64 {
-    try await Task.detached(priority: .userInitiated) {
-        try createAssignment(assignment: assignment)
-    }.value
+    try await detached { try createAssignment(assignment: assignment) }
 }
 
 public func moveAssignmentAsync(id: Int64, newShiftId: Int64) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try moveAssignment(id: id, newShiftId: newShiftId)
-    }.value
+    try await detached { try moveAssignment(id: id, newShiftId: newShiftId) }
 }
 
 public func deleteShiftAsync(id: Int64) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try deleteShift(id: id)
-    }.value
+    try await detached { try deleteShift(id: id) }
 }
 
 public func updateShiftTimesAsync(id: Int64, startTime: String, endTime: String) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try updateShiftTimes(id: id, startTime: startTime, endTime: endTime)
-    }.value
+    try await detached { try updateShiftTimes(id: id, startTime: startTime, endTime: endTime) }
 }
 
 public func updateShiftAsync(id: Int64, minEmployees: UInt32, maxEmployees: UInt32, roleRequirements: [FfiRoleRequirement]) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try updateShift(id: id, minEmployees: minEmployees, maxEmployees: maxEmployees, roleRequirements: roleRequirements)
-    }.value
+    try await detached { try updateShift(id: id, minEmployees: minEmployees, maxEmployees: maxEmployees, roleRequirements: roleRequirements) }
 }
 
 public func createAdHocShiftAsync(rotaId: Int64, date: String, startTime: String, endTime: String, requiredRole: String, roleRequirements: [FfiRoleRequirement]) async throws -> Int64 {
-    try await Task.detached(priority: .userInitiated) {
-        try createAdHocShift(rotaId: rotaId, date: date, startTime: startTime, endTime: endTime, requiredRole: requiredRole, roleRequirements: roleRequirements)
-    }.value
+    try await detached { try createAdHocShift(rotaId: rotaId, date: date, startTime: startTime, endTime: endTime, requiredRole: requiredRole, roleRequirements: roleRequirements) }
 }
 
 public func listShiftsForRotaAsync(rotaId: Int64) async throws -> [FfiShift] {
-    try await Task.detached(priority: .userInitiated) {
-        try listShiftsForRota(rotaId: rotaId)
-    }.value
+    try await detached { try listShiftsForRota(rotaId: rotaId) }
 }
 
 // MARK: - Override async wrappers
 
 public func upsertEmployeeAvailabilityOverrideAsync(override_: FfiEmployeeAvailabilityOverride) async throws -> Int64 {
-    try await Task.detached(priority: .userInitiated) {
-        try upsertEmployeeAvailabilityOverride(override: override_)
-    }.value
+    try await detached { try upsertEmployeeAvailabilityOverride(override: override_) }
 }
 
 public func getEmployeeAvailabilityOverrideAsync(employeeId: Int64, date: String) async throws -> FfiEmployeeAvailabilityOverride? {
-    try await Task.detached(priority: .userInitiated) {
-        try getEmployeeAvailabilityOverride(employeeId: employeeId, date: date)
-    }.value
+    try await detached { try getEmployeeAvailabilityOverride(employeeId: employeeId, date: date) }
 }
 
 public func listEmployeeAvailabilityOverridesAsync(employeeId: Int64) async throws -> [FfiEmployeeAvailabilityOverride] {
-    try await Task.detached(priority: .userInitiated) {
-        try listEmployeeAvailabilityOverrides(employeeId: employeeId)
-    }.value
+    try await detached { try listEmployeeAvailabilityOverrides(employeeId: employeeId) }
 }
 
 public func listAllEmployeeAvailabilityOverridesAsync() async throws -> [FfiEmployeeAvailabilityOverride] {
-    try await Task.detached(priority: .userInitiated) {
-        try listAllEmployeeAvailabilityOverrides()
-    }.value
+    try await detached { try listAllEmployeeAvailabilityOverrides() }
 }
 
 public func deleteEmployeeAvailabilityOverrideAsync(id: Int64) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try deleteEmployeeAvailabilityOverride(id: id)
-    }.value
+    try await detached { try deleteEmployeeAvailabilityOverride(id: id) }
 }
 
 public func upsertShiftTemplateOverrideAsync(override_: FfiShiftTemplateOverride) async throws -> Int64 {
-    try await Task.detached(priority: .userInitiated) {
-        try upsertShiftTemplateOverride(override: override_)
-    }.value
+    try await detached { try upsertShiftTemplateOverride(override: override_) }
 }
 
 public func getShiftTemplateOverrideAsync(templateId: Int64, date: String) async throws -> FfiShiftTemplateOverride? {
-    try await Task.detached(priority: .userInitiated) {
-        try getShiftTemplateOverride(templateId: templateId, date: date)
-    }.value
+    try await detached { try getShiftTemplateOverride(templateId: templateId, date: date) }
 }
 
 public func listShiftTemplateOverridesForTemplateAsync(templateId: Int64) async throws -> [FfiShiftTemplateOverride] {
-    try await Task.detached(priority: .userInitiated) {
-        try listShiftTemplateOverridesForTemplate(templateId: templateId)
-    }.value
+    try await detached { try listShiftTemplateOverridesForTemplate(templateId: templateId) }
 }
 
 public func listAllShiftTemplateOverridesAsync() async throws -> [FfiShiftTemplateOverride] {
-    try await Task.detached(priority: .userInitiated) {
-        try listAllShiftTemplateOverrides()
-    }.value
+    try await detached { try listAllShiftTemplateOverrides() }
 }
 
 public func deleteShiftTemplateOverrideAsync(id: Int64) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try deleteShiftTemplateOverride(id: id)
-    }.value
+    try await detached { try deleteShiftTemplateOverride(id: id) }
 }
 
 // MARK: - Empty availability helper
@@ -332,12 +262,7 @@ public func emptyAvailability() -> [AvailabilitySlot] { [] }
 
 /// Returns today's Monday formatted as "YYYY-MM-DD".
 public func currentWeekStart() -> String {
-    let cal = Calendar(identifier: .iso8601)
-    let monday = cal.date(from: cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date()))!
-    let fmt = DateFormatter()
-    fmt.dateFormat = "yyyy-MM-dd"
-    fmt.locale = Locale(identifier: "en_US_POSIX")
-    return fmt.string(from: monday)
+    weekStart(weeksFromNow: 0)
 }
 
 /// Returns the Monday of the week `weeksAhead` weeks from now.
@@ -345,226 +270,155 @@ public func weekStart(weeksFromNow offset: Int) -> String {
     let cal = Calendar(identifier: .iso8601)
     let monday = cal.date(from: cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: Date()))!
     let target = cal.date(byAdding: .weekOfYear, value: offset, to: monday)!
-    let fmt = DateFormatter()
-    fmt.dateFormat = "yyyy-MM-dd"
-    fmt.locale = Locale(identifier: "en_US_POSIX")
-    return fmt.string(from: target)
+    return isoDateFmt.string(from: target)
 }
 
 // MARK: - Employee Shift History
 
 public func listEmployeeShiftHistoryAsync(employeeId: Int64) async throws -> [FfiEmployeeShiftRecord] {
-    try await Task.detached(priority: .userInitiated) {
-        try listEmployeeShiftHistory(employeeId: employeeId)
-    }.value
+    try await detached { try listEmployeeShiftHistory(employeeId: employeeId) }
 }
 
 public func listAllShiftHistoryAsync(startDate: String?, endDate: String?) async throws -> [FfiEmployeeShiftRecord] {
-    try await Task.detached(priority: .userInitiated) {
-        try listAllShiftHistory(startDate: startDate, endDate: endDate)
-    }.value
+    try await detached { try listAllShiftHistory(startDate: startDate, endDate: endDate) }
 }
 
 // MARK: - Saves
 
 public func createSaveAsync(rotaId: Int64) async throws -> Int64 {
-    try await Task.detached(priority: .userInitiated) {
-        try createSave(rotaId: rotaId)
-    }.value
+    try await detached { try createSave(rotaId: rotaId) }
 }
 
 public func listSavesAsync(rotaId: Int64?) async throws -> [FfiSave] {
-    try await Task.detached(priority: .userInitiated) {
-        try listSaves(rotaId: rotaId)
-    }.value
+    try await detached { try listSaves(rotaId: rotaId) }
 }
 
 public func getSaveDetailAsync(saveId: Int64) async throws -> FfiSaveDetail? {
-    try await Task.detached(priority: .userInitiated) {
-        try getSaveDetail(saveId: saveId)
-    }.value
+    try await detached { try getSaveDetail(saveId: saveId) }
 }
 
 public func rotaHasSavesAsync(rotaId: Int64) async throws -> Bool {
-    try await Task.detached(priority: .userInitiated) {
-        try rotaHasSaves(rotaId: rotaId)
-    }.value
+    try await detached { try rotaHasSaves(rotaId: rotaId) }
 }
 
 public func restoreToSaveAsync(saveId: Int64) async throws -> FfiRestoreResult {
-    try await Task.detached(priority: .userInitiated) {
-        try restoreToSave(saveId: saveId)
-    }.value
+    try await detached { try restoreToSave(saveId: saveId) }
 }
 
 public func diffRotaAsync(rotaId: Int64) async throws -> [FfiShiftDiff] {
-    try await Task.detached(priority: .userInitiated) {
-        try diffRota(rotaId: rotaId)
-    }.value
+    try await detached { try diffRota(rotaId: rotaId) }
 }
 
 public func diffRotaDetailedAsync(rotaId: Int64) async throws -> [FfiChangeDetail] {
-    try await Task.detached(priority: .userInitiated) {
-        try diffRotaDetailed(rotaId: rotaId)
-    }.value
+    try await detached { try diffRotaDetailed(rotaId: rotaId) }
 }
 
 public func diffSavesDetailedAsync(oldSaveId: Int64, newSaveId: Int64) async throws -> [FfiChangeDetail] {
-    try await Task.detached(priority: .userInitiated) {
-        try diffSavesDetailed(oldSaveId: oldSaveId, newSaveId: newSaveId)
-    }.value
+    try await detached { try diffSavesDetailed(oldSaveId: oldSaveId, newSaveId: newSaveId) }
 }
 
 public func diffSaveVsPreviousAsync(saveId: Int64) async throws -> [FfiChangeDetail] {
-    try await Task.detached(priority: .userInitiated) {
-        try diffSaveVsPrevious(saveId: saveId)
-    }.value
+    try await detached { try diffSaveVsPrevious(saveId: saveId) }
 }
 
 public func addSaveTagAsync(saveId: Int64, tag: String) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try addSaveTag(saveId: saveId, tag: tag)
-    }.value
+    try await detached { try addSaveTag(saveId: saveId, tag: tag) }
 }
 
 public func removeSaveTagAsync(saveId: Int64, tag: String) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try removeSaveTag(saveId: saveId, tag: tag)
-    }.value
+    try await detached { try removeSaveTag(saveId: saveId, tag: tag) }
 }
 
 // MARK: - Export
 
 public func exportWeekScheduleAsync(weekStart: String, config: FfiExportConfig) async throws -> FfiExportResult {
-    try await Task.detached(priority: .userInitiated) {
-        try exportWeekSchedule(weekStart: weekStart, config: config)
-    }.value
+    try await detached { try exportWeekSchedule(weekStart: weekStart, config: config) }
 }
 
 public func exportEmployeeScheduleAsync(config: FfiEmployeeExportConfig) async throws -> FfiExportResult {
-    try await Task.detached(priority: .userInitiated) {
-        try exportEmployeeSchedule(config: config)
-    }.value
+    try await detached { try exportEmployeeSchedule(config: config) }
 }
 
 public func exportEmployeeBundleAsync(config: FfiEmployeeExportConfig) async throws -> [FfiExportResult] {
-    try await Task.detached(priority: .userInitiated) {
-        try exportEmployeeBundle(config: config)
-    }.value
+    try await detached { try exportEmployeeBundle(config: config) }
 }
 
 public func exportPreviewFullAsync(config: FfiExportConfig) async throws -> FfiExportResult {
-    try await Task.detached(priority: .userInitiated) {
-        try exportPreviewFull(config: config)
-    }.value
+    try await detached { try exportPreviewFull(config: config) }
 }
 
 public func exportPreviewEmployeeAsync(config: FfiEmployeeExportConfig) async throws -> FfiExportResult {
-    try await Task.detached(priority: .userInitiated) {
-        try exportPreviewEmployee(config: config)
-    }.value
+    try await detached { try exportPreviewEmployee(config: config) }
 }
 
 // MARK: - Roster Import
 
 public func parseRosterFileAsync(bytes: Data, formatHint: String, strategy: String) async throws -> FfiParsedRoster {
-    try await Task.detached(priority: .userInitiated) {
-        try parseRosterFile(bytes: bytes, formatHint: formatHint, strategy: strategy)
-    }.value
+    try await detached { try parseRosterFile(bytes: bytes, formatHint: formatHint, strategy: strategy) }
 }
 
 public func applyRosterImportAsync(rows: [FfiParsedEmployeeRow]) async throws -> FfiImportSummary {
-    try await Task.detached(priority: .userInitiated) {
-        try applyRosterImport(rows: rows)
-    }.value
+    try await detached { try applyRosterImport(rows: rows) }
 }
 
 // MARK: - Data Bundle Exchange
 
 public func exportDataBundleAsync(sections: FfiBundleSections) async throws -> FfiExportResult {
-    try await Task.detached(priority: .userInitiated) {
-        try exportDataBundle(sections: sections)
-    }.value
+    try await detached { try exportDataBundle(sections: sections) }
 }
 
 public func inspectDataBundleAsync(bytes: Data) async throws -> FfiBundleInfo {
-    try await Task.detached(priority: .userInitiated) {
-        try inspectDataBundle(bytes: bytes)
-    }.value
+    try await detached { try inspectDataBundle(bytes: bytes) }
 }
 
 public func importDataBundleAsync(bytes: Data) async throws -> FfiBundleImportSummary {
-    try await Task.detached(priority: .userInitiated) {
-        try importDataBundle(bytes: bytes)
-    }.value
+    try await detached { try importDataBundle(bytes: bytes) }
 }
 
 // MARK: - Sync
 
 public func getPendingSyncRecordsAsync(tableName: String) async throws -> [FfiSyncRecord] {
-    try await Task.detached(priority: .userInitiated) {
-        try getPendingSyncRecords(tableName: tableName)
-    }.value
+    try await detached { try getPendingSyncRecords(tableName: tableName) }
 }
 
 public func markRecordsSyncedAsync(tableName: String, recordIds: [Int64], baseSnapshots: [String]) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try markRecordsSynced(tableName: tableName, recordIds: recordIds, baseSnapshots: baseSnapshots)
-    }.value
+    try await detached { try markRecordsSynced(tableName: tableName, recordIds: recordIds, baseSnapshots: baseSnapshots) }
 }
 
 public func applyRemoteRecordAsync(record: FfiSyncRecord) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try applyRemoteRecord(record: record)
-    }.value
+    try await detached { try applyRemoteRecord(record: record) }
 }
 
 public func getSyncMetadataAsync(key: String) async throws -> String? {
-    try await Task.detached(priority: .userInitiated) {
-        try getSyncMetadata(key: key)
-    }.value
+    try await detached { try getSyncMetadata(key: key) }
 }
 
 public func setSyncMetadataAsync(key: String, value: String) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try setSyncMetadata(key: key, value: value)
-    }.value
+    try await detached { try setSyncMetadata(key: key, value: value) }
 }
 
 public func getBaseSnapshotsAsync(tableName: String, recordIds: [Int64]) async throws -> [FfiBaseSnapshot] {
-    try await Task.detached(priority: .userInitiated) {
-        try getBaseSnapshots(tableName: tableName, recordIds: recordIds)
-    }.value
+    try await detached { try getBaseSnapshots(tableName: tableName, recordIds: recordIds) }
 }
 
 public func getPendingTombstonesAsync() async throws -> [FfiTombstone] {
-    try await Task.detached(priority: .userInitiated) {
-        try getPendingTombstones()
-    }.value
+    try await detached { try getPendingTombstones() }
 }
 
 public func clearTombstonesAsync(ids: [Int64]) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try clearTombstones(ids: ids)
-    }.value
+    try await detached { try clearTombstones(ids: ids) }
 }
 
 public func countEmployeesAsync() async throws -> Int64 {
-    try await Task.detached(priority: .userInitiated) {
-        try countEmployees()
-    }.value
+    try await detached { try countEmployees() }
 }
 
 // MARK: - Availability Progress
 
 public func listAvailabilityProgressAsync(weekStart: String) async throws -> [FfiAvailabilityProgress] {
-    try await Task.detached(priority: .userInitiated) {
-        try listAvailabilityProgress(weekStart: weekStart)
-    }.value
+    try await detached { try listAvailabilityProgress(weekStart: weekStart) }
 }
 
 public func setAvailabilityProgressAsync(employeeId: Int64, weekStart: String, done: Bool) async throws {
-    try await Task.detached(priority: .userInitiated) {
-        try setAvailabilityProgress(employeeId: employeeId, weekStart: weekStart, done: done)
-    }.value
+    try await detached { try setAvailabilityProgress(employeeId: employeeId, weekStart: weekStart, done: done) }
 }

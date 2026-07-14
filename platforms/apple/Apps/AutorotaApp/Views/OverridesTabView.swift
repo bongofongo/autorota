@@ -44,12 +44,7 @@ struct OverridesTabView: View {
         var endDate: String { items.last?.date ?? "" }
     }
 
-    private static let isoFmt: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.locale = Locale(identifier: "en_US_POSIX")
-        return f
-    }()
+    private static let isoFmt = AvailabilityWeekMath.isoFmt
 
     private var employeeOverrideGroups: [EmpOverrideGroup] {
         // Exceptions tab shows only user-classified exception rows.
@@ -376,12 +371,7 @@ private struct EmpOverrideGroupRow: View {
         return f
     }()
 
-    private static let isoFmt: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.locale = Locale(identifier: "en_US_POSIX")
-        return f
-    }()
+    private static let isoFmt = AvailabilityWeekMath.isoFmt
 
     private func pretty(_ iso: String) -> String {
         guard let d = Self.isoFmt.date(from: iso) else { return iso }
@@ -424,12 +414,7 @@ private struct EmpOverrideDayRow: View {
         return f
     }()
 
-    private static let isoFmt: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.locale = Locale(identifier: "en_US_POSIX")
-        return f
-    }()
+    private static let isoFmt = AvailabilityWeekMath.isoFmt
 
     private var pretty: String {
         guard let d = Self.isoFmt.date(from: ovr.date) else { return ovr.date }
@@ -552,12 +537,7 @@ struct EmployeeAvailabilityOverrideSheet: View {
 
     private var isEditing: Bool { existing != nil || existingRange != nil }
 
-    private static let dateFmt: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.locale = Locale(identifier: "en_US_POSIX")
-        return f
-    }()
+    private static let dateFmt = AvailabilityWeekMath.isoFmt
 
     private static let displayFmt: DateFormatter = {
         let f = DateFormatter()
@@ -953,19 +933,9 @@ struct ShiftTemplateOverrideSheet: View {
 
     private var isEditing: Bool { existing != nil }
 
-    private static let timeFmt: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm"
-        f.locale = Locale(identifier: "en_US_POSIX")
-        return f
-    }()
+    private static let timeFmt = AvailabilityWeekMath.timeFmt
 
-    private static let dateFmt: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.locale = Locale(identifier: "en_US_POSIX")
-        return f
-    }()
+    private static let dateFmt = AvailabilityWeekMath.isoFmt
 
     var body: some View {
         NavigationStack {

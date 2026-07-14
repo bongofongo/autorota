@@ -249,6 +249,8 @@ dependencies = [
  "criterion",
  "csv",
  "fluent",
+ "fluent-syntax",
+ "lopdf",
  "printpdf",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
@@ -268,6 +270,7 @@ version = "0.1.0"
 dependencies = [
  "autorota-core",
  "chrono",
+ "serde_json",
  "sqlx",
  "tempfile",
  "thiserror 2.0.18",
@@ -384,6 +387,17 @@ checksum = "874bb8112abecc98cbd6d81ea4fa7e94fb9449648c93cc89aa40c81c24d7de03"
 dependencies = [
  "alloc-no-stdlib",
  "alloc-stdlib",
+]
+
+[[package]]
+name = "bstr"
+version = "1.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "63044e1ae8e69f3b5a92c736ca6269b8d12fa7efe39bf34ddb06d102cf0e2cab"
+dependencies = [
+ "memchr",
+ "regex-automata",
+ "serde",
 ]
 
 [[package]]
@@ -2656,6 +2670,7 @@ version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b49a0272112719d0037ab63d4bb67f73ba659e1e90bc38f235f163a457ac16f3"
 dependencies = [
+ "chrono",
  "dtoa 0.4.8",
  "encoding",
  "flate2",
@@ -2663,6 +2678,7 @@ dependencies = [
  "linked-hash-map",
  "log",
  "lzw",
+ "pom",
  "time 0.2.27",
 ]
 
@@ -3492,6 +3508,15 @@ dependencies = [
  "fdeflate",
  "flate2",
  "miniz_oxide 0.8.9",
+]
+
+[[package]]
+name = "pom"
+version = "3.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c972d8f86e943ad532d0b04e8965a749ad1d18bb981a9c7b3ae72fe7fd7744b"
+dependencies = [
+ "bstr",
 ]
 
 [[package]]

@@ -89,6 +89,9 @@ struct SchedulerState {
     daily_hours: HashMap<(i64, NaiveDate), f32>,
     /// shift_id → employee_ids assigned to that shift
     shift_assignments: HashMap<i64, HashSet<i64>>,
+    /// employee_id → `[start, end)` intervals of shifts assigned so far.
+    /// Consulted by the overlap check so it only scans one employee's shifts.
+    intervals: HashMap<i64, Vec<(NaiveDateTime, NaiveDateTime)>>,
     /// All assignments produced so far
     assignments: Vec<Assignment>,
 }
@@ -99,6 +102,7 @@ impl SchedulerState {
             weekly_hours: HashMap::new(),
             daily_hours: HashMap::new(),
             shift_assignments: HashMap::new(),
+            intervals: HashMap::new(),
             assignments: Vec::new(),
         }
     }
@@ -122,6 +126,10 @@ impl SchedulerState {
             .entry(shift.id)
             .or_default()
             .insert(employee_id);
+        self.intervals
+            .entry(employee_id)
+            .or_default()
+            .push(shift_interval(shift));
         self.assignments.push(Assignment {
             id: 0,
             rota_id,
@@ -164,7 +172,6 @@ fn is_eligible(
     employee: &Employee,
     shift: &Shift,
     state: &SchedulerState,
-    all_shifts: &HashMap<i64, &Shift>,
     avail_override_map: &HashMap<(i64, NaiveDate), &EmployeeAvailabilityOverride>,
 ) -> bool {
     // Role is no longer a hard eligibility gate — multi-role coverage is handled
@@ -218,38 +225,26 @@ fn is_eligible(
     }
 
     // Must not overlap with another shift on the same day
-    if has_time_overlap(employee.id, shift, state, all_shifts) {
+    if has_time_overlap(employee.id, shift, state) {
         return false;
     }
 
     true
 }
 
-fn has_time_overlap(
-    employee_id: i64,
-    shift: &Shift,
-    state: &SchedulerState,
-    all_shifts: &HashMap<i64, &Shift>,
-) -> bool {
+/// Overlap check against only this employee's assigned intervals (kept in
+/// `SchedulerState::intervals`), rather than scanning every assignment.
+/// Overnight shifts are handled by `shift_interval`, which extends the end
+/// past midnight into the following day.
+fn has_time_overlap(employee_id: i64, shift: &Shift, state: &SchedulerState) -> bool {
     let (start, end) = shift_interval(shift);
-    for assignment in &state.assignments {
-        if assignment.employee_id != employee_id {
-            continue;
-        }
-        if let Some(existing) = all_shifts.get(&assignment.shift_id) {
-            // Overnight shifts spill into the next day, so shifts up to one
-            // calendar day apart can still collide.
-            if (existing.date - shift.date).num_days().abs() > 1 {
-                continue;
-            }
-            let (e_start, e_end) = shift_interval(existing);
-            // Two shifts overlap if one starts before the other ends and vice versa
-            if start < e_end && e_start < end {
-                return true;
-            }
-        }
-    }
-    false
+    let Some(intervals) = state.intervals.get(&employee_id) else {
+        return false;
+    };
+    // Two shifts overlap if one starts before the other ends and vice versa.
+    intervals
+        .iter()
+        .any(|&(e_start, e_end)| start < e_end && e_start < end)
 }
 
 // ─── Multi-role coverage helpers ─────────────────────────────
@@ -282,20 +277,23 @@ fn role_deficits(
 
 /// Best-scoring eligible employee for a shift, optionally restricted to holders
 /// of `role`. Uses the same score + deterministic tiebreak as the greedy fill.
+///
+/// Single-pass selection on the composite (score, tiebreak) key. `min_by` with
+/// a descending comparator returns the *first* maximal element, matching the
+/// previous stable sort-descending + take-first behavior exactly.
 #[allow(clippy::too_many_arguments)]
 fn best_candidate<'a>(
     employees: &'a [Employee],
     shift: &Shift,
     state: &SchedulerState,
-    shift_map: &HashMap<i64, &Shift>,
     avail_override_map: &HashMap<(i64, NaiveDate), &EmployeeAvailabilityOverride>,
-    week_start: &NaiveDate,
+    tiebreak_keys: &HashMap<i64, u64>,
     role: Option<&str>,
 ) -> Option<&'a Employee> {
-    let mut candidates: Vec<(&Employee, (u8, i32, i32), u64)> = employees
+    employees
         .iter()
         .filter(|e| role.is_none_or(|r| e.has_role(r)))
-        .filter(|e| is_eligible(e, shift, state, shift_map, avail_override_map))
+        .filter(|e| is_eligible(e, shift, state, avail_override_map))
         .map(|e| {
             let weekly = state.employee_weekly_hours(e.id);
             let daily = state.employee_daily_hours(e.id, shift.date);
@@ -303,13 +301,12 @@ fn best_candidate<'a>(
                 .get(&(e.id, shift.date))
                 .map(|o| &o.availability);
             let score = scoring::score_employee(e, shift, weekly, daily, day_avail);
-            let tb = tiebreak::tiebreak_key(e.id, week_start);
-            (e, score, tb)
+            let tb = tiebreak_keys.get(&e.id).copied().unwrap_or_default();
+            (e, (score, tb))
         })
-        .collect();
-    // Best score first, then tiebreak (higher hash wins).
-    candidates.sort_by(|a, b| b.1.cmp(&a.1).then(b.2.cmp(&a.2)));
-    candidates.first().map(|(e, _, _)| *e)
+        // Best score first, then tiebreak (higher hash wins).
+        .min_by(|a, b| b.1.cmp(&a.1))
+        .map(|(e, _)| e)
 }
 
 /// Construct a shortfall warning. `role` is the role that fell short, or `None`
@@ -351,6 +348,11 @@ pub fn schedule_pure(
             .iter()
             .map(|o| ((o.employee_id, o.date), o))
             .collect();
+    // Tiebreak keys are constant per (employee, week) — compute once per run.
+    let tiebreak_keys: HashMap<i64, u64> = employees
+        .iter()
+        .map(|e| (e.id, tiebreak::tiebreak_key(e.id, &week_start)))
+        .collect();
     let mut state = SchedulerState::new();
     let mut warnings = Vec::new();
 
@@ -392,26 +394,20 @@ pub fn schedule_pure(
     let difficulty: HashMap<i64, usize> = shift_order
         .iter()
         .map(|s| {
-            let eligible_total = employees
+            // Compute the eligible set once per shift; per-role holder counts
+            // are derived from it instead of re-running eligibility.
+            let eligible: Vec<&Employee> = employees
                 .iter()
-                .filter(|e| is_eligible(e, s, &state, &shift_map, &avail_override_map))
-                .count();
+                .filter(|e| is_eligible(e, s, &state, &avail_override_map))
+                .collect();
             let diff = if s.has_required_role() {
                 s.role_requirements
                     .iter()
-                    .map(|req| {
-                        employees
-                            .iter()
-                            .filter(|e| {
-                                e.has_role(&req.role)
-                                    && is_eligible(e, s, &state, &shift_map, &avail_override_map)
-                            })
-                            .count()
-                    })
+                    .map(|req| eligible.iter().filter(|e| e.has_role(&req.role)).count())
                     .min()
-                    .unwrap_or(eligible_total)
+                    .unwrap_or(eligible.len())
             } else {
-                eligible_total
+                eligible.len()
             };
             (s.id, diff)
         })
@@ -444,9 +440,8 @@ pub fn schedule_pure(
                 employees,
                 shift,
                 &state,
-                &shift_map,
                 &avail_override_map,
-                &week_start,
+                &tiebreak_keys,
                 Some(&role),
             ) {
                 Some(emp) => {
@@ -490,9 +485,8 @@ pub fn schedule_pure(
                 employees,
                 shift,
                 &state,
-                &shift_map,
                 &avail_override_map,
-                &week_start,
+                &tiebreak_keys,
                 None,
             ) else {
                 break;
@@ -568,12 +562,15 @@ pub async fn schedule(
         rota.week_start,
     );
 
-    // Persist only newly generated assignments (not the existing overrides)
+    // Persist only newly generated assignments (not the existing overrides),
+    // in a single transaction rather than one autocommit per row.
+    let mut tx = pool.begin().await?;
     for assignment in &result.assignments {
         if assignment.status == AssignmentStatus::Proposed {
-            queries::insert_assignment(pool, assignment).await?;
+            queries::insert_assignment_conn(&mut tx, assignment).await?;
         }
     }
+    tx.commit().await?;
 
     Ok(result)
 }

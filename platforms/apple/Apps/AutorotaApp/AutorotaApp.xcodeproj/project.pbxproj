@@ -17,7 +17,6 @@
 		CC0001022F80000000205001 /* LiveAutorotaService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0001042F80000000205001 /* LiveAutorotaService.swift */; };
 		CC0003012F80000000205001 /* OverrideViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0003022F80000000205001 /* OverrideViewModel.swift */; };
 		CC0005012F80000000205001 /* ShiftHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0005022F80000000205001 /* ShiftHistoryViewModel.swift */; };
-		CC0064013300000000205001 /* StaffingIssue.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0064023300000000205001 /* StaffingIssue.swift */; };
 		CC0007012FA0000000205001 /* ExchangeRateService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0007022FA0000000205001 /* ExchangeRateService.swift */; };
 		CC0009012FC0000000205001 /* AutorotaSyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0009022FC0000000205001 /* AutorotaSyncEngine.swift */; };
 		CC0009032FC0000000205001 /* SyncRecordMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0009042FC0000000205001 /* SyncRecordMapper.swift */; };
@@ -45,6 +44,7 @@
 		CC0061013300000000205001 /* FullExportConfigBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0061023300000000205001 /* FullExportConfigBuilder.swift */; };
 		CC0062013300000000205001 /* ExportSettingsMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0062023300000000205001 /* ExportSettingsMigration.swift */; };
 		CC0063013300000000205001 /* ExportSandboxViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0063023300000000205001 /* ExportSandboxViewModel.swift */; };
+		CC0064013300000000205001 /* StaffingIssue.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0064023300000000205001 /* StaffingIssue.swift */; };
 		CC00DD013110000000205001 /* DemoModeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00DD023110000000205001 /* DemoModeController.swift */; };
 /* End PBXBuildFile section */
 
@@ -78,7 +78,6 @@
 		CC0002052F80000000205001 /* AutorotaAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AutorotaAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC0003022F80000000205001 /* OverrideViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverrideViewModel.swift; sourceTree = "<group>"; };
 		CC0005022F80000000205001 /* ShiftHistoryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShiftHistoryViewModel.swift; sourceTree = "<group>"; };
-		CC0064023300000000205001 /* StaffingIssue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffingIssue.swift; sourceTree = "<group>"; };
 		CC0007022FA0000000205001 /* ExchangeRateService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExchangeRateService.swift; sourceTree = "<group>"; };
 		CC0009022FC0000000205001 /* AutorotaSyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutorotaSyncEngine.swift; sourceTree = "<group>"; };
 		CC0009042FC0000000205001 /* SyncRecordMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncRecordMapper.swift; sourceTree = "<group>"; };
@@ -106,6 +105,7 @@
 		CC0061023300000000205001 /* FullExportConfigBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullExportConfigBuilder.swift; sourceTree = "<group>"; };
 		CC0062023300000000205001 /* ExportSettingsMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSettingsMigration.swift; sourceTree = "<group>"; };
 		CC0063023300000000205001 /* ExportSandboxViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSandboxViewModel.swift; sourceTree = "<group>"; };
+		CC0064023300000000205001 /* StaffingIssue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StaffingIssue.swift; sourceTree = "<group>"; };
 		CC00DD023110000000205001 /* DemoModeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoModeController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 

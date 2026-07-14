@@ -55,15 +55,6 @@ impl Employee {
         self.target_weekly_hours + self.weekly_hours_deviation
     }
 
-    /// The minimum desired weekly hours (used for fairness scoring).
-    pub fn min_weekly_hours(&self) -> f32 {
-        (self.target_weekly_hours - self.weekly_hours_deviation).max(0.0)
-    }
-
-    pub fn reset_availability(&mut self) {
-        self.availability = self.default_availability.clone();
-    }
-
     pub fn has_role(&self, role: &str) -> bool {
         self.roles.iter().any(|r| r == role)
     }
@@ -72,9 +63,7 @@ impl Employee {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::availability::AvailabilityState;
     use crate::testutil::EmployeeBuilder;
-    use chrono::Weekday;
 
     fn make_employee() -> Employee {
         EmployeeBuilder::new("Alice")
@@ -112,20 +101,6 @@ mod tests {
     }
 
     #[test]
-    fn min_weekly_hours_is_target_minus_deviation() {
-        let e = make_employee();
-        assert_eq!(e.min_weekly_hours(), 24.0);
-    }
-
-    #[test]
-    fn min_weekly_hours_floors_at_zero() {
-        let mut e = make_employee();
-        e.target_weekly_hours = 4.0;
-        e.weekly_hours_deviation = 10.0;
-        assert_eq!(e.min_weekly_hours(), 0.0);
-    }
-
-    #[test]
     fn has_role_matches() {
         let e = make_employee();
         assert!(e.has_role("Barista"));
@@ -138,16 +113,5 @@ mod tests {
         let mut e = make_employee();
         e.roles.clear();
         assert!(!e.has_role("Barista"));
-    }
-
-    #[test]
-    fn reset_availability_restores_default() {
-        let mut e = make_employee();
-        e.default_availability
-            .set(Weekday::Mon, 8, AvailabilityState::Yes);
-        e.availability.set(Weekday::Mon, 8, AvailabilityState::No);
-        assert_eq!(e.availability.get(Weekday::Mon, 8), AvailabilityState::No);
-        e.reset_availability();
-        assert_eq!(e.availability.get(Weekday::Mon, 8), AvailabilityState::Yes);
     }
 }

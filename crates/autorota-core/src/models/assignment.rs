@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt;
 use std::str::FromStr;
+
+use crate::models::employee::Employee;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AssignmentStatus {
@@ -43,6 +46,19 @@ pub struct Assignment {
     pub employee_name: Option<String>,
     /// Snapshot of the employee's hourly wage at the time of assignment.
     pub hourly_wage: Option<f32>,
+}
+
+impl Assignment {
+    /// Best available display name for the assignee: the live employee
+    /// record's display name, else the name snapshot taken at assignment
+    /// time, else a placeholder carrying the employee id.
+    pub fn resolved_employee_name(&self, emp_map: &HashMap<i64, &Employee>) -> String {
+        emp_map
+            .get(&self.employee_id)
+            .map(|e| e.display_name())
+            .or_else(|| self.employee_name.clone())
+            .unwrap_or_else(|| format!("Employee #{}", self.employee_id))
+    }
 }
 
 #[cfg(test)]

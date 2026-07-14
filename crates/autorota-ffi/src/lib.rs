@@ -10,7 +10,6 @@ use autorota_core::models::employee::Employee;
 use autorota_core::models::overrides::{
     DayAvailability, EmployeeAvailabilityOverride, OverrideSource, ShiftTemplateOverride,
 };
-use autorota_core::models::rota::Rota;
 use autorota_core::models::shift::{RoleRequirement, Shift, ShiftTemplate};
 use autorota_core::models::shift_history::EmployeeShiftRecord;
 use chrono::{Datelike, Local, NaiveDate, NaiveTime, Weekday};
@@ -79,6 +78,15 @@ fn parse_time(s: &str) -> Result<NaiveTime, FfiError> {
         })
 }
 
+/// Parse a string into any `FromStr<Err = String>` domain type, mapping
+/// failure to `FfiError::InvalidArgument` with `ErrorCode::InvalidGeneric`.
+fn parse_arg<T: std::str::FromStr<Err = String>>(s: &str) -> Result<T, FfiError> {
+    s.parse().map_err(|e| FfiError::InvalidArgument {
+        code: ErrorCode::InvalidGeneric,
+        msg: e,
+    })
+}
+
 fn weekday_to_str(wd: Weekday) -> &'static str {
     match wd {
         Weekday::Mon => "Mon",
@@ -125,13 +133,7 @@ fn slots_to_availability(slots: Vec<AvailabilitySlot>) -> Result<Availability, F
     let mut avail = Availability::default();
     for slot in slots {
         let wd = weekday_from_str(&slot.weekday)?;
-        let state =
-            slot.state
-                .parse::<AvailabilityState>()
-                .map_err(|e| FfiError::InvalidArgument {
-                    code: ErrorCode::InvalidGeneric,
-                    msg: e,
-                })?;
+        let state: AvailabilityState = parse_arg(&slot.state)?;
         avail.set(wd, slot.hour, state);
     }
     Ok(avail)
@@ -286,26 +288,10 @@ fn ffi_to_assignment(a: FfiAssignment) -> Result<Assignment, FfiError> {
         rota_id: a.rota_id,
         shift_id: a.shift_id,
         employee_id: a.employee_id,
-        status: a
-            .status
-            .parse::<AssignmentStatus>()
-            .map_err(|e| FfiError::InvalidArgument {
-                code: ErrorCode::InvalidGeneric,
-                msg: e,
-            })?,
+        status: parse_arg(&a.status)?,
         employee_name: a.employee_name,
         hourly_wage: a.hourly_wage,
     })
-}
-
-// ── Rota conversion ───────────────────────────────────────────────────────────
-
-fn rota_to_ffi(r: Rota) -> FfiRota {
-    FfiRota {
-        id: r.id,
-        week_start: r.week_start.to_string(),
-        assignments: r.assignments.into_iter().map(assignment_to_ffi).collect(),
-    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -519,35 +505,6 @@ pub fn delete_shift_template(id: i64) -> Result<(), FfiError> {
         .map_err(FfiError::from)
 }
 
-// ── Rotas ─────────────────────────────────────────────────────────────────────
-
-#[uniffi::export]
-pub fn get_rota(id: i64) -> Result<Option<FfiRota>, FfiError> {
-    let pool = &pool()?;
-    let row = rt()
-        .block_on(queries::get_rota(pool, id))
-        .map_err(FfiError::from)?;
-    Ok(row.map(rota_to_ffi))
-}
-
-#[uniffi::export]
-pub fn get_rota_by_week(week_start: String) -> Result<Option<FfiRota>, FfiError> {
-    let pool = &pool()?;
-    let date = parse_date(&week_start)?;
-    let row = rt()
-        .block_on(queries::get_rota_by_week(pool, date))
-        .map_err(FfiError::from)?;
-    Ok(row.map(rota_to_ffi))
-}
-
-#[uniffi::export]
-pub fn create_rota(week_start: String) -> Result<i64, FfiError> {
-    let pool = &pool()?;
-    let date = parse_date(&week_start)?;
-    rt().block_on(queries::insert_rota(pool, date))
-        .map_err(FfiError::from)
-}
-
 // ── Assignments ───────────────────────────────────────────────────────────────
 
 #[uniffi::export]
@@ -575,12 +532,7 @@ pub fn create_assignment(mut assignment: FfiAssignment) -> Result<i64, FfiError>
 #[uniffi::export]
 pub fn update_assignment_status(id: i64, status: String) -> Result<(), FfiError> {
     let pool = &pool()?;
-    let s = status
-        .parse::<AssignmentStatus>()
-        .map_err(|e| FfiError::InvalidArgument {
-            code: ErrorCode::InvalidGeneric,
-            msg: e,
-        })?;
+    let s: AssignmentStatus = parse_arg(&status)?;
     rt().block_on(queries::update_assignment_status(pool, id, s))
         .map_err(FfiError::from)
 }
@@ -942,47 +894,19 @@ pub fn list_shifts_for_rota(rota_id: i64) -> Result<Vec<FfiShift>, FfiError> {
 // ── Export ───────────────────────────────────────────────────────────────────
 
 use autorota_core::export::config::{
-    CellContentFlags, EmployeeExportConfig, ExportConfig, ExportFormat, ExportLayout,
-    ExportProfile, PdfTemplate,
+    CellContentFlags, EmployeeExportConfig, ExportConfig, PdfTemplate,
 };
 
 fn parse_export_config(config: FfiExportConfig) -> Result<ExportConfig, FfiError> {
-    let layout: ExportLayout =
-        config
-            .layout
-            .parse()
-            .map_err(|e: String| FfiError::InvalidArgument {
-                code: ErrorCode::InvalidGeneric,
-                msg: e,
-            })?;
-    let format: ExportFormat =
-        config
-            .format
-            .parse()
-            .map_err(|e: String| FfiError::InvalidArgument {
-                code: ErrorCode::InvalidGeneric,
-                msg: e,
-            })?;
-    let profile: ExportProfile =
-        config
-            .profile
-            .parse()
-            .map_err(|e: String| FfiError::InvalidArgument {
-                code: ErrorCode::InvalidGeneric,
-                msg: e,
-            })?;
     let pdf_template: Option<PdfTemplate> = match config.pdf_template.as_deref() {
         None | Some("") => None,
-        Some(s) => Some(s.parse().map_err(|e: String| FfiError::InvalidArgument {
-            code: ErrorCode::InvalidGeneric,
-            msg: e,
-        })?),
+        Some(s) => Some(parse_arg(s)?),
     };
 
     Ok(ExportConfig {
-        layout,
-        format,
-        profile,
+        layout: parse_arg(&config.layout)?,
+        format: parse_arg(&config.format)?,
+        profile: parse_arg(&config.profile)?,
         cell_content: CellContentFlags {
             show_shift_name: config.show_shift_name,
             show_times: config.show_times,
@@ -996,6 +920,51 @@ fn parse_export_config(config: FfiExportConfig) -> Result<ExportConfig, FfiError
             show_role: rc.show_role,
         }),
     })
+}
+
+/// Build a core `EmployeeExportConfig` from its FFI mirror (shared by
+/// `export_employee_schedule`, `export_preview_employee`, and
+/// `export_employee_bundle`).
+fn parse_employee_export_config(
+    config: &FfiEmployeeExportConfig,
+) -> Result<EmployeeExportConfig, FfiError> {
+    Ok(EmployeeExportConfig {
+        employee_id: config.employee_id,
+        format: parse_arg(&config.format)?,
+        profile: parse_arg(&config.profile)?,
+        cell_content: CellContentFlags {
+            show_shift_name: config.show_shift_name,
+            show_times: config.show_times,
+            show_role: config.show_role,
+        },
+        timezone_id: config.timezone_id.clone(),
+    })
+}
+
+fn export_err_to_ffi(e: autorota_core::export::ExportError) -> FfiError {
+    use autorota_core::export::ExportError as E;
+    match e {
+        E::Db(db_err) => FfiError::Db {
+            code: ErrorCode::DbGeneric,
+            msg: db_err.to_string(),
+        },
+        E::NoSchedule(msg) => FfiError::NotFound {
+            code: ErrorCode::NotFoundSchedule,
+            msg,
+        },
+        E::EmployeeNotFound(id) => FfiError::NotFound {
+            code: ErrorCode::NotFoundEmployee,
+            msg: format!("employee {id} not found"),
+        },
+        E::Pdf(msg) => FfiError::InvalidArgument {
+            code: ErrorCode::InvalidPdf,
+            msg,
+        },
+        err @ E::TooLarge { .. } => FfiError::InvalidArgument {
+            code: ErrorCode::InvalidGeneric,
+            msg: err.to_string(),
+        },
+    }
 }
 
 #[uniffi::export]
@@ -1013,30 +982,7 @@ pub fn export_week_schedule(
             date,
             core_config,
         ))
-        .map_err(|e| match e {
-            autorota_core::export::ExportError::Db(db_err) => FfiError::Db {
-                code: ErrorCode::DbGeneric,
-                msg: db_err.to_string(),
-            },
-            autorota_core::export::ExportError::NoSchedule(msg) => FfiError::NotFound {
-                code: ErrorCode::NotFoundSchedule,
-                msg,
-            },
-            autorota_core::export::ExportError::EmployeeNotFound(id) => FfiError::NotFound {
-                code: ErrorCode::NotFoundEmployee,
-                msg: format!("employee {id} not found"),
-            },
-            autorota_core::export::ExportError::Pdf(msg) => FfiError::InvalidArgument {
-                code: ErrorCode::InvalidPdf,
-                msg,
-            },
-            err @ autorota_core::export::ExportError::TooLarge { .. } => {
-                FfiError::InvalidArgument {
-                    code: ErrorCode::InvalidGeneric,
-                    msg: err.to_string(),
-                }
-            }
-        })?;
+        .map_err(export_err_to_ffi)?;
 
     Ok(FfiExportResult {
         data: result.data,
@@ -1052,34 +998,7 @@ pub fn export_employee_schedule(
     let pool = &pool()?;
     let start_date = parse_date(&config.start_date)?;
     let end_date = parse_date(&config.end_date)?;
-    let format: ExportFormat =
-        config
-            .format
-            .parse()
-            .map_err(|e: String| FfiError::InvalidArgument {
-                code: ErrorCode::InvalidGeneric,
-                msg: e,
-            })?;
-    let profile: ExportProfile =
-        config
-            .profile
-            .parse()
-            .map_err(|e: String| FfiError::InvalidArgument {
-                code: ErrorCode::InvalidGeneric,
-                msg: e,
-            })?;
-
-    let core_config = EmployeeExportConfig {
-        employee_id: config.employee_id,
-        format,
-        profile,
-        cell_content: CellContentFlags {
-            show_shift_name: config.show_shift_name,
-            show_times: config.show_times,
-            show_role: config.show_role,
-        },
-        timezone_id: config.timezone_id.clone(),
-    };
+    let core_config = parse_employee_export_config(&config)?;
 
     let result = rt()
         .block_on(autorota_core::export::export_employee_schedule(
@@ -1089,30 +1008,7 @@ pub fn export_employee_schedule(
             end_date,
             core_config,
         ))
-        .map_err(|e| match e {
-            autorota_core::export::ExportError::Db(db_err) => FfiError::Db {
-                code: ErrorCode::DbGeneric,
-                msg: db_err.to_string(),
-            },
-            autorota_core::export::ExportError::NoSchedule(msg) => FfiError::NotFound {
-                code: ErrorCode::NotFoundSchedule,
-                msg,
-            },
-            autorota_core::export::ExportError::EmployeeNotFound(id) => FfiError::NotFound {
-                code: ErrorCode::NotFoundEmployee,
-                msg: format!("employee {id} not found"),
-            },
-            autorota_core::export::ExportError::Pdf(msg) => FfiError::InvalidArgument {
-                code: ErrorCode::InvalidPdf,
-                msg,
-            },
-            err @ autorota_core::export::ExportError::TooLarge { .. } => {
-                FfiError::InvalidArgument {
-                    code: ErrorCode::InvalidGeneric,
-                    msg: err.to_string(),
-                }
-            }
-        })?;
+        .map_err(export_err_to_ffi)?;
 
     Ok(FfiExportResult {
         data: result.data,
@@ -1126,18 +1022,10 @@ pub fn export_employee_schedule(
 #[uniffi::export]
 pub fn export_preview_full(config: FfiExportConfig) -> Result<FfiExportResult, FfiError> {
     let core_config = parse_export_config(config)?;
-    let result = autorota_core::export::preview::generate_preview_full(core_config).map_err(
-        |e| match e {
-            autorota_core::export::ExportError::Pdf(msg) => FfiError::InvalidArgument {
-                code: ErrorCode::InvalidPdf,
-                msg,
-            },
-            other => FfiError::InvalidArgument {
-                code: ErrorCode::InvalidGeneric,
-                msg: other.to_string(),
-            },
-        },
-    )?;
+    // Previews are pure renders (no DB), so only Pdf/TooLarge errors can
+    // occur — both map identically under the shared converter.
+    let result = autorota_core::export::preview::generate_preview_full(core_config)
+        .map_err(export_err_to_ffi)?;
     Ok(FfiExportResult {
         data: result.data,
         filename: result.filename,
@@ -1151,47 +1039,9 @@ pub fn export_preview_full(config: FfiExportConfig) -> Result<FfiExportResult, F
 pub fn export_preview_employee(
     config: FfiEmployeeExportConfig,
 ) -> Result<FfiExportResult, FfiError> {
-    let format: ExportFormat =
-        config
-            .format
-            .parse()
-            .map_err(|e: String| FfiError::InvalidArgument {
-                code: ErrorCode::InvalidGeneric,
-                msg: e,
-            })?;
-    let profile: ExportProfile =
-        config
-            .profile
-            .parse()
-            .map_err(|e: String| FfiError::InvalidArgument {
-                code: ErrorCode::InvalidGeneric,
-                msg: e,
-            })?;
-
-    let core_config = EmployeeExportConfig {
-        employee_id: config.employee_id,
-        format,
-        profile,
-        cell_content: CellContentFlags {
-            show_shift_name: config.show_shift_name,
-            show_times: config.show_times,
-            show_role: config.show_role,
-        },
-        timezone_id: config.timezone_id.clone(),
-    };
-
-    let result = autorota_core::export::preview::generate_preview_employee(core_config).map_err(
-        |e| match e {
-            autorota_core::export::ExportError::Pdf(msg) => FfiError::InvalidArgument {
-                code: ErrorCode::InvalidPdf,
-                msg,
-            },
-            other => FfiError::InvalidArgument {
-                code: ErrorCode::InvalidGeneric,
-                msg: other.to_string(),
-            },
-        },
-    )?;
+    let core_config = parse_employee_export_config(&config)?;
+    let result = autorota_core::export::preview::generate_preview_employee(core_config)
+        .map_err(export_err_to_ffi)?;
     Ok(FfiExportResult {
         data: result.data,
         filename: result.filename,
@@ -1206,20 +1056,62 @@ pub fn export_preview_employee(
 pub fn export_employee_bundle(
     config: FfiEmployeeExportConfig,
 ) -> Result<Vec<FfiExportResult>, FfiError> {
-    let formats = ["pdf", "ics", "markdown", "xlsx"];
-    let mut out = Vec::with_capacity(formats.len());
-    for fmt in formats {
-        let mut cfg = config.clone();
-        cfg.format = fmt.to_string();
-        out.push(export_employee_schedule(cfg)?);
-    }
-    Ok(out)
+    let pool = &pool()?;
+    let start_date = parse_date(&config.start_date)?;
+    let end_date = parse_date(&config.end_date)?;
+    let base = parse_employee_export_config(&config)?;
+
+    let configs: Result<Vec<_>, FfiError> = ["pdf", "ics", "markdown", "xlsx"]
+        .iter()
+        .map(|fmt| {
+            let mut cfg = base.clone();
+            cfg.format = parse_arg(fmt)?;
+            Ok(cfg)
+        })
+        .collect();
+
+    let results = rt()
+        .block_on(autorota_core::export::export_employee_schedules(
+            pool,
+            config.employee_id,
+            start_date,
+            end_date,
+            &configs?,
+        ))
+        .map_err(export_err_to_ffi)?;
+
+    Ok(results
+        .into_iter()
+        .map(|r| FfiExportResult {
+            data: r.data,
+            filename: r.filename,
+            mime_type: r.mime_type,
+        })
+        .collect())
 }
 
 // ── Roster Import ────────────────────────────────────────────────────────────
 
 use autorota_core::exchange;
 use autorota_core::import::{self, MergeStrategy, ParsedEmployeeRow, ParsedRoster};
+
+fn import_err_to_ffi(e: import::roster::ImportError) -> FfiError {
+    use import::roster::ImportError as E;
+    match e {
+        E::Db(db) => FfiError::Db {
+            code: ErrorCode::DbGeneric,
+            msg: db.to_string(),
+        },
+        E::Parse(m) | E::UnsupportedFormat(m) => FfiError::InvalidArgument {
+            code: ErrorCode::InvalidImport,
+            msg: m,
+        },
+        E::Validation { row, error } => FfiError::InvalidArgument {
+            code: ErrorCode::InvalidImport,
+            msg: format!("row {row}: {error}"),
+        },
+    }
+}
 
 fn row_to_ffi(r: ParsedEmployeeRow) -> FfiParsedEmployeeRow {
     FfiParsedEmployeeRow {
@@ -1272,12 +1164,7 @@ pub fn parse_roster_file(
     strategy: String,
 ) -> Result<FfiParsedRoster, FfiError> {
     let pool = &pool()?;
-    let strat: MergeStrategy = strategy
-        .parse()
-        .map_err(|e: String| FfiError::InvalidArgument {
-            code: ErrorCode::InvalidGeneric,
-            msg: e,
-        })?;
+    let strat: MergeStrategy = parse_arg(&strategy)?;
 
     let parsed: ParsedRoster = rt()
         .block_on(import::roster::parse_roster(
@@ -1286,21 +1173,7 @@ pub fn parse_roster_file(
             &format_hint,
             strat,
         ))
-        .map_err(|e| match e {
-            import::roster::ImportError::Db(db) => FfiError::Db {
-                code: ErrorCode::DbGeneric,
-                msg: db.to_string(),
-            },
-            import::roster::ImportError::Parse(m)
-            | import::roster::ImportError::UnsupportedFormat(m) => FfiError::InvalidArgument {
-                code: ErrorCode::InvalidImport,
-                msg: m,
-            },
-            import::roster::ImportError::Validation { row, error } => FfiError::InvalidArgument {
-                code: ErrorCode::InvalidImport,
-                msg: format!("row {row}: {error}"),
-            },
-        })?;
+        .map_err(import_err_to_ffi)?;
 
     Ok(FfiParsedRoster {
         rows: parsed.rows.into_iter().map(row_to_ffi).collect(),
@@ -1314,21 +1187,7 @@ pub fn apply_roster_import(rows: Vec<FfiParsedEmployeeRow>) -> Result<FfiImportS
     let core_rows: Vec<ParsedEmployeeRow> = rows.into_iter().map(ffi_to_row).collect();
     let summary = rt()
         .block_on(import::roster::apply_import(pool, &core_rows))
-        .map_err(|e| match e {
-            import::roster::ImportError::Db(db) => FfiError::Db {
-                code: ErrorCode::DbGeneric,
-                msg: db.to_string(),
-            },
-            import::roster::ImportError::Parse(m)
-            | import::roster::ImportError::UnsupportedFormat(m) => FfiError::InvalidArgument {
-                code: ErrorCode::InvalidImport,
-                msg: m,
-            },
-            import::roster::ImportError::Validation { row, error } => FfiError::InvalidArgument {
-                code: ErrorCode::InvalidImport,
-                msg: format!("row {row}: {error}"),
-            },
-        })?;
+        .map_err(import_err_to_ffi)?;
     Ok(FfiImportSummary {
         inserted: summary.inserted,
         updated: summary.updated,
@@ -1748,13 +1607,35 @@ mod tests {
     // ── Full lifecycle test ──
     // Uses a single test because OnceLock means init_db can only be called once per process.
 
+    /// FFI functions share one process-global DB handle, so tests that touch
+    /// the database must serialise on this lock and switch to their own temp
+    /// file. `unwrap_or_else(into_inner)` keeps later tests running after a
+    /// panicked (poisoned) one.
+    fn db_guard() -> std::sync::MutexGuard<'static, ()> {
+        use std::sync::{Mutex, OnceLock, PoisonError};
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Point the global handle at a fresh temp DB: `init_db` on first use in
+    /// the process, `switch_db` afterwards.
+    fn use_fresh_db(dir: &tempfile::TempDir, name: &str) {
+        let path = dir.path().join(name).to_string_lossy().to_string();
+        if init_db(path.clone()).is_err() {
+            switch_db(path).unwrap();
+        }
+    }
+
     #[test]
     fn full_ffi_lifecycle() {
+        let _guard = db_guard();
         let dir = tempfile::tempdir().unwrap();
         let db_path = dir.path().join("test_ffi.db");
-        init_db(db_path.to_string_lossy().to_string()).unwrap();
+        use_fresh_db(&dir, "test_ffi.db");
 
-        // Double-init should fail
+        // Once initialised, a second init_db must fail.
         assert!(init_db(db_path.to_string_lossy().to_string()).is_err());
 
         // ── Roles ──
@@ -1903,7 +1784,8 @@ mod tests {
 
         seed_demo_db("2099-04-20".into()).unwrap();
         let demo_employees = list_employees().unwrap();
-        assert_eq!(demo_employees.len(), 12);
+        // Full solar-body crew; core pins the same count in `seeds_full_planet_crew`.
+        assert_eq!(demo_employees.len(), 22);
         assert!(
             demo_employees
                 .iter()
@@ -1918,6 +1800,301 @@ mod tests {
         assert!(list_employees().unwrap().is_empty());
 
         drop(dir);
+    }
+
+    // ── FFI surface: export / import / sync / saves ──
+
+    /// Seed a role, an employee available Mon 07–12, and a matching Monday
+    /// template into the current DB. Returns (emp_id, tmpl_id).
+    fn seed_basic_ffi_data() -> (i64, i64) {
+        create_role("Barista".into()).unwrap();
+        let avail: Vec<AvailabilitySlot> = (7..12)
+            .map(|h| AvailabilitySlot {
+                weekday: "Mon".into(),
+                hour: h,
+                state: "Yes".into(),
+            })
+            .collect();
+        let emp_id = create_employee(FfiEmployee {
+            id: 0,
+            first_name: "Alice".into(),
+            last_name: "Smith".into(),
+            nickname: Some("Ally".into()),
+            display_name: String::new(),
+            roles: vec!["Barista".into()],
+            start_date: "2026-01-01".into(),
+            target_weekly_hours: 40.0,
+            weekly_hours_deviation: 6.0,
+            max_daily_hours: 8.0,
+            notes: None,
+            bank_details: None,
+            phone: None,
+            email: None,
+            preferred_contact: None,
+            hourly_wage: Some(12.5),
+            wage_currency: Some("GBP".into()),
+            default_availability: avail.clone(),
+            availability: avail,
+            deleted: false,
+        })
+        .unwrap();
+        let tmpl_id = create_shift_template(FfiShiftTemplate {
+            id: 0,
+            name: "Morning".into(),
+            weekdays: vec!["Mon".into()],
+            start_time: "07:00".into(),
+            end_time: "12:00".into(),
+            required_role: "Barista".into(),
+            min_employees: 1,
+            max_employees: 1,
+            role_requirements: vec![],
+            deleted: false,
+        })
+        .unwrap();
+        (emp_id, tmpl_id)
+    }
+
+    fn export_config(format: &str) -> FfiExportConfig {
+        FfiExportConfig {
+            layout: "employee_by_weekday".into(),
+            format: format.into(),
+            profile: "staff_schedule".into(),
+            show_shift_name: true,
+            show_times: true,
+            show_role: false,
+            pdf_template: None,
+            role_sections: None,
+            row_content: None,
+        }
+    }
+
+    #[test]
+    fn export_week_schedule_csv_and_json_through_ffi() {
+        let _guard = db_guard();
+        let dir = tempfile::tempdir().unwrap();
+        use_fresh_db(&dir, "export.db");
+        seed_basic_ffi_data();
+
+        let week = "2027-06-07"; // a Monday
+        materialise_week(week.into()).unwrap();
+        let result = run_schedule(week.into()).unwrap();
+        assert!(
+            !result.assignments.is_empty(),
+            "scheduler should assign the available employee"
+        );
+
+        let csv = export_week_schedule(week.into(), export_config("csv")).unwrap();
+        assert!(csv.filename.ends_with(".csv"), "filename: {}", csv.filename);
+        assert_eq!(csv.mime_type, "text/csv");
+        assert!(
+            csv.data.contains("Ally"),
+            "CSV missing employee:\n{}",
+            csv.data
+        );
+
+        let json = export_week_schedule(week.into(), export_config("json")).unwrap();
+        assert!(json.filename.ends_with(".json"));
+        let parsed: serde_json::Value =
+            serde_json::from_str(&json.data).expect("JSON export must be valid JSON");
+        assert!(parsed.to_string().contains("Ally"));
+    }
+
+    #[test]
+    fn data_bundle_roundtrips_between_databases() {
+        let _guard = db_guard();
+        let dir = tempfile::tempdir().unwrap();
+        use_fresh_db(&dir, "bundle_src.db");
+        seed_basic_ffi_data();
+
+        let sections = FfiBundleSections {
+            roles: true,
+            employees: true,
+            employee_exceptions: true,
+            shift_templates: true,
+            shift_exceptions: true,
+        };
+        let bundle = export_data_bundle(sections).unwrap();
+        let bytes = bundle.data.clone().into_bytes();
+
+        let info = inspect_data_bundle(bytes.clone()).unwrap();
+        assert_eq!(info.employees, 1);
+        assert_eq!(info.shift_templates, 1);
+        assert!(info.roles >= 1);
+
+        use_fresh_db(&dir, "bundle_dst.db");
+        assert!(list_employees().unwrap().is_empty(), "dst starts empty");
+
+        let summary = import_data_bundle(bytes).unwrap();
+        assert_eq!(summary.employees_added, 1);
+        assert_eq!(summary.shift_templates_added, 1);
+        assert!(
+            summary.warnings.is_empty(),
+            "warnings: {:?}",
+            summary.warnings
+        );
+
+        let emps = list_employees().unwrap();
+        assert_eq!(emps.len(), 1);
+        assert_eq!(emps[0].display_name, "Ally");
+        assert_eq!(list_shift_templates().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn import_data_bundle_rejects_corrupt_and_future_versions() {
+        let _guard = db_guard();
+        let dir = tempfile::tempdir().unwrap();
+        use_fresh_db(&dir, "bundle_bad.db");
+
+        assert!(import_data_bundle(b"not json at all".to_vec()).is_err());
+        assert!(inspect_data_bundle(b"{\"version\":".to_vec()).is_err());
+        assert!(
+            import_data_bundle(br#"{"version": 9999}"#.to_vec()).is_err(),
+            "future bundle version must be rejected"
+        );
+        // Nothing was half-imported.
+        assert!(list_employees().unwrap().is_empty());
+        assert!(list_roles().unwrap().is_empty());
+    }
+
+    #[test]
+    fn parse_roster_file_errors_cleanly_on_garbage() {
+        let _guard = db_guard();
+        let dir = tempfile::tempdir().unwrap();
+        use_fresh_db(&dir, "roster.db");
+
+        assert!(parse_roster_file(b"{ garbage".to_vec(), "json".into(), "name".into()).is_err());
+        assert!(parse_roster_file(b"\x00\x01\x02".to_vec(), "xlsx".into(), "name".into()).is_err());
+        let bad_strategy =
+            parse_roster_file(b"first_name\nA".to_vec(), "csv".into(), "overwrite".into());
+        assert!(matches!(
+            bad_strategy,
+            Err(FfiError::InvalidArgument { .. })
+        ));
+    }
+
+    #[test]
+    fn sync_records_flow_through_ffi() {
+        let _guard = db_guard();
+        let dir = tempfile::tempdir().unwrap();
+        use_fresh_db(&dir, "sync.db");
+
+        let role_id = create_role("Barista".into()).unwrap();
+        let pending = get_pending_sync_records("roles".into()).unwrap();
+        let record = pending
+            .iter()
+            .find(|r| r.record_id == role_id)
+            .expect("new role should be pending sync");
+        let fields: serde_json::Value = serde_json::from_str(&record.fields).unwrap();
+        assert_eq!(fields["name"], "Barista");
+
+        // Marking synced clears it from the pending set.
+        mark_records_synced("roles".into(), vec![role_id], vec![record.fields.clone()]).unwrap();
+        assert!(
+            get_pending_sync_records("roles".into())
+                .unwrap()
+                .iter()
+                .all(|r| r.record_id != role_id),
+            "synced role still pending"
+        );
+
+        // Remote rename comes in: applied locally AND marked synced, so it
+        // must not echo back into the pending set.
+        let mut remote_fields = fields.clone();
+        remote_fields["name"] = serde_json::Value::String("Head Barista".into());
+        apply_remote_record(FfiSyncRecord {
+            table_name: "roles".into(),
+            record_id: role_id,
+            fields: remote_fields.to_string(),
+            last_modified: record.last_modified.clone(),
+        })
+        .unwrap();
+        let roles = list_roles().unwrap();
+        assert_eq!(roles[0].name, "Head Barista");
+        assert!(
+            get_pending_sync_records("roles".into())
+                .unwrap()
+                .iter()
+                .all(|r| r.record_id != role_id),
+            "remote-applied change echoed back as pending"
+        );
+    }
+
+    #[test]
+    fn saves_and_diffs_through_ffi() {
+        let _guard = db_guard();
+        let dir = tempfile::tempdir().unwrap();
+        use_fresh_db(&dir, "saves.db");
+        seed_basic_ffi_data();
+
+        let week = "2027-06-07";
+        let rota_id = materialise_week(week.into()).unwrap();
+        run_schedule(week.into()).unwrap();
+
+        assert!(!rota_has_saves(rota_id).unwrap());
+        let save_id = create_save(rota_id).unwrap();
+        assert!(rota_has_saves(rota_id).unwrap());
+        assert_eq!(list_saves(Some(rota_id)).unwrap().len(), 1);
+        assert!(get_save_detail(save_id).unwrap().is_some());
+
+        // Live state equals the save — detailed diff is clean.
+        let clean = diff_rota_detailed(rota_id).unwrap();
+        assert!(
+            clean.is_empty(),
+            "expected clean diff, got: {:?}",
+            clean
+                .iter()
+                .map(|c| format!("{} shift={} date={}", c.kind, c.shift_id, c.date))
+                .collect::<Vec<_>>()
+        );
+
+        // Mutate live state; diff must pick it up.
+        create_ad_hoc_shift(
+            rota_id,
+            "2027-06-08".into(),
+            "14:00".into(),
+            "18:00".into(),
+            "Barista".into(),
+            vec![],
+        )
+        .unwrap();
+        assert!(
+            !diff_rota_detailed(rota_id).unwrap().is_empty(),
+            "ad-hoc shift not reflected in live-vs-save diff"
+        );
+
+        // Tags round-trip.
+        add_save_tag(save_id, "before-adhoc".into()).unwrap();
+        let detail = get_save_detail(save_id).unwrap().unwrap();
+        assert!(detail.tags.contains(&"before-adhoc".to_string()));
+        remove_save_tag(save_id, "before-adhoc".into()).unwrap();
+
+        // Restore rolls the ad-hoc shift back.
+        restore_to_save(save_id).unwrap();
+        assert!(diff_rota_detailed(rota_id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn missing_ids_map_to_typed_errors_with_localized_copy() {
+        let _guard = db_guard();
+        let dir = tempfile::tempdir().unwrap();
+        use_fresh_db(&dir, "errors.db");
+
+        assert!(get_save_detail(999_999).unwrap().is_none());
+        let Err(err) = restore_to_save(999_999) else {
+            panic!("restoring a missing save must fail");
+        };
+        match &err {
+            FfiError::NotFound { code, msg } | FfiError::Db { code, msg } => {
+                assert!(!msg.is_empty());
+                // The code must map to a real Fluent key in every locale.
+                let localized = autorota_core::i18n::localize(code.fluent_id(), "en");
+                assert!(
+                    !localized.starts_with('['),
+                    "no en translation for {code:?} → {localized}"
+                );
+            }
+            other => panic!("unexpected error variant: {other:?}"),
+        }
     }
 }
 
@@ -1937,13 +2114,7 @@ fn day_availability_to_slots(avail: &DayAvailability) -> Vec<DayAvailabilitySlot
 fn slots_to_day_availability(slots: Vec<DayAvailabilitySlot>) -> Result<DayAvailability, FfiError> {
     let mut avail = DayAvailability::default();
     for s in slots {
-        let state =
-            s.state
-                .parse::<AvailabilityState>()
-                .map_err(|e| FfiError::InvalidArgument {
-                    code: ErrorCode::InvalidGeneric,
-                    msg: e,
-                })?;
+        let state: AvailabilityState = parse_arg(&s.state)?;
         avail.set(s.hour, state);
     }
     Ok(avail)

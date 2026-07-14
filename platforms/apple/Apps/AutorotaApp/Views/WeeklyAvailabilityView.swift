@@ -30,9 +30,7 @@ struct WeeklyAvailabilityView: View {
     }
 
     private var weekStartString: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: nextWeekStart)
+        AvailabilityWeekMath.isoFmt.string(from: nextWeekStart)
     }
 
     private let columns = [
@@ -135,51 +133,7 @@ private struct AvailabilityCard: View {
     let weekStartString: String
     let onLassoModeChange: (Bool) -> Void
 
-    @State private var overrideVM = OverrideViewModel()
-    @State private var slots: [AvailabilitySlot] = []
-    private let visibleRange: (start: Int, end: Int)
-
-    init(
-        employee: FfiEmployee,
-        vm: EmployeeViewModel,
-        progressVM: AvailabilityProgressViewModel,
-        weekStartString: String,
-        onLassoModeChange: @escaping (Bool) -> Void
-    ) {
-        self.employee = employee
-        self.vm = vm
-        self.progressVM = progressVM
-        self.weekStartString = weekStartString
-        self.onLassoModeChange = onLassoModeChange
-        self.visibleRange = AvailabilityGridView.inferredVisibleRange(from: employee.defaultAvailability)
-    }
-
     private var isDone: Bool { progressVM.isDone(employee.id) }
-
-    private var weekDays: [(weekday: String, date: Date, iso: String)] {
-        AvailabilityWeekMath.weekDays(from: weekStartString)
-    }
-
-    private var overrideByIso: [String: FfiEmployeeAvailabilityOverride] {
-        Dictionary(overrideVM.employeeAvailabilityOverrides.map { ($0.date, $0) },
-                   uniquingKeysWith: { a, _ in a })
-    }
-
-    private func mergedSlots() -> [AvailabilitySlot] {
-        AvailabilityWeekMath.merge(
-            days: weekDays,
-            overrides: overrideByIso,
-            defaultAvailability: employee.defaultAvailability
-        )
-    }
-
-    private var outlinedWeekdays: Set<String> {
-        Set(weekDays.compactMap { overrideByIso[$0.iso]?.source == "exception" ? $0.weekday : nil })
-    }
-
-    private var weekdaySubheaders: [String: String] {
-        Dictionary(uniqueKeysWithValues: weekDays.map { ($0.weekday, AvailabilityWeekMath.dayNumber(for: $0.date)) })
-    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -215,133 +169,13 @@ private struct AvailabilityCard: View {
                 .buttonStyle(.plain)
             }
 
-            AvailabilityGridView(
-                slots: slots,
-                isEditable: true,
-                visibleHourStart: visibleRange.start,
-                visibleHourEnd: visibleRange.end,
-                onChange: { newSlots in
-                    slots = newSlots
-                    Task { await persistEdits(newSlots) }
-                },
-                onLassoModeChange: onLassoModeChange,
-                outlinedWeekdays: outlinedWeekdays,
-                weekdaySubheaders: weekdaySubheaders
+            WeekAvailabilityEditorGrid(
+                employee: employee,
+                weekStartString: weekStartString,
+                onLassoModeChange: onLassoModeChange
             )
         }
         .padding(12)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-        .task {
-            await overrideVM.loadForEmployee(id: employee.id)
-            slots = mergedSlots()
-        }
-    }
-
-    private func persistEdits(_ newSlots: [AvailabilitySlot]) async {
-        await AvailabilityWeekMath.persistWeekEdits(
-            newSlots: newSlots,
-            days: weekDays,
-            overrideByIso: overrideByIso,
-            defaultAvailability: employee.defaultAvailability,
-            employeeId: employee.id,
-            overrideVM: overrideVM
-        )
-        await overrideVM.loadForEmployee(id: employee.id)
-    }
-}
-
-// MARK: - Date-aware weekly availability helper
-
-/// Shared logic for the mass availability picker: maps a week's ISO Monday
-/// into per-date context, merges default availability with stored overrides,
-/// and persists grid edits as per-date employee availability overrides
-/// (preserving exception classification, tagging fresh rows as "manual").
-enum AvailabilityWeekMath {
-
-    static let weekdayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-
-    static let isoFmt: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.locale = Locale(identifier: "en_US_POSIX")
-        return f
-    }()
-
-    static func weekDays(from weekStartIso: String) -> [(weekday: String, date: Date, iso: String)] {
-        guard let monday = isoFmt.date(from: weekStartIso) else { return [] }
-        let cal = Calendar(identifier: .iso8601)
-        return (0..<7).map { i in
-            let d = cal.date(byAdding: .day, value: i, to: monday)!
-            return (weekdayOrder[i], d, isoFmt.string(from: d))
-        }
-    }
-
-    static func dayNumber(for date: Date) -> String {
-        String(Calendar(identifier: .iso8601).component(.day, from: date))
-    }
-
-    static func merge(
-        days: [(weekday: String, date: Date, iso: String)],
-        overrides: [String: FfiEmployeeAvailabilityOverride],
-        defaultAvailability: [AvailabilitySlot]
-    ) -> [AvailabilitySlot] {
-        var out: [AvailabilitySlot] = []
-        for (wd, _, iso) in days {
-            if let ovr = overrides[iso] {
-                for s in ovr.availability {
-                    out.append(AvailabilitySlot(weekday: wd, hour: s.hour, state: s.state))
-                }
-            } else {
-                for s in defaultAvailability where s.weekday == wd {
-                    out.append(s)
-                }
-            }
-        }
-        return out
-    }
-
-    static func persistWeekEdits(
-        newSlots: [AvailabilitySlot],
-        days: [(weekday: String, date: Date, iso: String)],
-        overrideByIso: [String: FfiEmployeeAvailabilityOverride],
-        defaultAvailability: [AvailabilitySlot],
-        employeeId: Int64,
-        overrideVM: OverrideViewModel
-    ) async {
-        for (wd, _, iso) in days {
-            let newDay = newSlots
-                .filter { $0.weekday == wd }
-                .map { DayAvailabilitySlot(hour: $0.hour, state: $0.state) }
-                .sorted { $0.hour < $1.hour }
-            let defaultDay = defaultAvailability
-                .filter { $0.weekday == wd }
-                .map { DayAvailabilitySlot(hour: $0.hour, state: $0.state) }
-                .sorted { $0.hour < $1.hour }
-            let existing = overrideByIso[iso]
-
-            if newDay == defaultDay {
-                // Matches default template. Silently delete stale *manual*
-                // overrides, but leave explicit exceptions alone — users
-                // classify those via the Exceptions UI.
-                if let ex = existing, ex.source != "exception" {
-                    await overrideVM.deleteEmployeeOverride(id: ex.id)
-                }
-                continue
-            }
-
-            let currentStored = existing?.availability.sorted { $0.hour < $1.hour } ?? defaultDay
-            if newDay == currentStored { continue }
-
-            let source = existing?.source ?? "manual"
-            let ovr = FfiEmployeeAvailabilityOverride(
-                id: existing?.id ?? 0,
-                employeeId: employeeId,
-                date: iso,
-                availability: newDay,
-                notes: existing?.notes,
-                source: source
-            )
-            await overrideVM.upsertEmployeeOverride(ovr)
-        }
     }
 }

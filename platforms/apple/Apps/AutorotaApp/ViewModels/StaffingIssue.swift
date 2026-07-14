@@ -42,8 +42,9 @@ struct ShiftFocusRequest: Equatable {
 extension StaffingIssue {
     /// Warnings before notes; within each severity, weekday order then start time.
     static func displaySort(_ issues: [StaffingIssue]) -> [StaffingIssue] {
-        let dayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-        func dayIndex(_ d: String) -> Int { dayOrder.firstIndex(of: d) ?? dayOrder.count }
+        func dayIndex(_ d: String) -> Int {
+            AvailabilityWeekMath.weekdayIndex[d] ?? AvailabilityWeekMath.weekdayOrder.count
+        }
         return issues.sorted { a, b in
             if a.severity != b.severity { return a.severity == .warning }
             if a.weekday != b.weekday { return dayIndex(a.weekday) < dayIndex(b.weekday) }

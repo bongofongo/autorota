@@ -699,10 +699,8 @@ struct ExportSheetView: View {
     }
 
     private func emailSubject() -> String {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
         let pretty: String
-        if let date = fmt.date(from: weekStart) {
+        if let date = AvailabilityWeekMath.isoFmt.date(from: weekStart) {
             let out = DateFormatter()
             out.dateFormat = "d MMM yyyy"
             pretty = out.string(from: date)
@@ -713,13 +711,7 @@ struct ExportSheetView: View {
     }
 
     private func payloadData(_ result: FfiExportResult) throws -> Data {
-        if isBinary(format: format) {
-            guard let data = Data(base64Encoded: result.data) else {
-                throw ExportSheetError.invalidBinaryPayload
-            }
-            return data
-        }
-        return Data(result.data.utf8)
+        try result.decodedPayload(binary: exportFormatIsBinary(format))
     }
 
     private func typeIdentifier(for filename: String) -> String {
@@ -730,32 +722,15 @@ struct ExportSheetView: View {
     // MARK: - File I/O
 
     private func makeTempDir() throws -> URL {
-        let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("autorota-export-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir
+        try makeExportTempDir(prefix: "autorota-export")
     }
 
     private func writeResult(_ result: FfiExportResult, into dir: URL) throws -> URL {
-        let url = dir.appendingPathComponent(result.filename)
-        if isBinary(format: format) {
-            guard let data = Data(base64Encoded: result.data) else {
-                throw ExportSheetError.invalidBinaryPayload
-            }
-            try data.write(to: url, options: .atomic)
-        } else {
-            try result.data.write(to: url, atomically: true, encoding: .utf8)
-        }
-        return url
-    }
-
-    private func isBinary(format: String) -> Bool {
-        format == "pdf" || format == "xlsx"
+        try result.write(into: dir, binary: exportFormatIsBinary(format))
     }
 
     private func weekRange() -> (String, String) {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
+        let fmt = AvailabilityWeekMath.isoFmt
         guard let start = fmt.date(from: weekStart),
               let end = Calendar.current.date(byAdding: .day, value: 6, to: start) else {
             return (weekStart, weekStart)
@@ -821,7 +796,6 @@ struct ExportSheetView: View {
 }
 
 private enum ExportSheetError: LocalizedError {
-    case invalidBinaryPayload
     case employeeNotFound
     case messagesUnavailable
     case attachmentsUnavailable
@@ -829,8 +803,6 @@ private enum ExportSheetError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .invalidBinaryPayload:
-            return String(localized: "The exported binary payload could not be decoded.")
         case .employeeNotFound:
             return String(localized: "The selected employee could not be found.")
         case .messagesUnavailable:

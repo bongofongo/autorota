@@ -33,7 +33,7 @@ struct AvailabilityGridView: View {
     /// Optional per-weekday header labels (e.g. date strings "20"). Rendered beneath the day name.
     var weekdaySubheaders: [String: String] = [:]
 
-    private static let weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    private static let weekdays = AvailabilityWeekMath.weekdayOrder
     private static let subheaderHeight: CGFloat = 12
 
     /// Header row height including the optional subheader (date number).

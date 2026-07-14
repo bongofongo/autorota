@@ -110,20 +110,8 @@ struct RotaExportPreview: View {
     private func prepareFileIfNeeded() {
         guard format == "xlsx" || format == "ics", fileURL == nil else { return }
         do {
-            let dir = FileManager.default.temporaryDirectory
-                .appendingPathComponent("autorota-preview-\(UUID().uuidString)", isDirectory: true)
-            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            let url = dir.appendingPathComponent(result.filename)
-            if format == "xlsx" {
-                guard let data = decodedBinary() else {
-                    setupError = "Could not decode XLSX payload."
-                    return
-                }
-                try data.write(to: url, options: .atomic)
-            } else {
-                try result.data.write(to: url, atomically: true, encoding: .utf8)
-            }
-            fileURL = url
+            let dir = try makeExportTempDir(prefix: "autorota-preview")
+            fileURL = try result.write(into: dir, binary: format == "xlsx")
         } catch {
             setupError = error.localizedDescription
         }
@@ -154,8 +142,9 @@ struct RotaExportPreview: View {
 
 // MARK: - PDFKit
 
+/// Shared PDF preview representable (also used by ExportPreviewSheet).
 #if os(iOS)
-private struct PDFPreview: UIViewRepresentable {
+struct PDFPreview: UIViewRepresentable {
     let data: Data
     func makeUIView(context: Context) -> PDFView {
         let v = PDFView()
@@ -170,7 +159,7 @@ private struct PDFPreview: UIViewRepresentable {
     }
 }
 #else
-private struct PDFPreview: NSViewRepresentable {
+struct PDFPreview: NSViewRepresentable {
     let data: Data
     func makeNSView(context: Context) -> PDFView {
         let v = PDFView()

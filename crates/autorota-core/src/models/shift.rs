@@ -60,6 +60,26 @@ impl ShiftTemplate {
     }
 }
 
+/// Canonical midnight-crossing rule shared by the scheduler, exporters and
+/// models: a `(start, end)` time pair crosses midnight iff `end < start`.
+/// `end == start` is a zero-duration same-day interval, not a 24h one.
+pub fn crosses_midnight(start: NaiveTime, end: NaiveTime) -> bool {
+    end < start
+}
+
+/// Duration in hours of a `(start, end)` time pair, wrapping past midnight
+/// when [`crosses_midnight`] holds.
+pub fn duration_hours(start: NaiveTime, end: NaiveTime) -> f32 {
+    let s = start.num_seconds_from_midnight();
+    let e = end.num_seconds_from_midnight();
+    let secs = if crosses_midnight(start, end) {
+        86400 - s + e
+    } else {
+        e - s
+    };
+    secs as f32 / 3600.0
+}
+
 impl Shift {
     /// Returns true if this shift constrains roles.
     pub fn has_required_role(&self) -> bool {
@@ -83,15 +103,13 @@ impl Shift {
         self.min_employees.max(self.derived_min())
     }
 
+    /// True when the shift wraps past midnight into the next day.
+    pub fn crosses_midnight(&self) -> bool {
+        crosses_midnight(self.start_time, self.end_time)
+    }
+
     pub fn duration_hours(&self) -> f32 {
-        let start = self.start_time.num_seconds_from_midnight();
-        let end = self.end_time.num_seconds_from_midnight();
-        let secs = if end >= start {
-            end - start
-        } else {
-            86400 - start + end
-        };
-        secs as f32 / 3600.0
+        duration_hours(self.start_time, self.end_time)
     }
 
     pub fn weekday(&self) -> Weekday {

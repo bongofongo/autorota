@@ -1330,6 +1330,69 @@ async fn pending_sync_records_json_has_all_columns() {
     }
 }
 
+/// Schema-drift canary: `syncable_columns` must stay in lockstep with the
+/// live schema for every synced table. Direction (a) catches a column being
+/// renamed/dropped without updating the sync mapping (the generated SQL would
+/// break at runtime); direction (b) catches a migration adding a column that
+/// silently never syncs. A column that genuinely must not sync belongs on the
+/// EXCLUDED list here, deliberately.
+#[sqlx::test]
+async fn syncable_columns_match_live_schema() {
+    use sqlx::Row;
+    use std::collections::HashSet;
+
+    const TABLES: [&str; 8] = [
+        "employees",
+        "shift_templates",
+        "rotas",
+        "shifts",
+        "assignments",
+        "roles",
+        "employee_availability_overrides",
+        "shift_template_overrides",
+    ];
+    // Sync bookkeeping columns (local-only by design) plus dead columns kept
+    // in the schema but ignored by code: employees.max_weekly_hours (superseded
+    // by target/deviation in migration 003) and rotas.finalized (superseded by
+    // the commits/saves flow in migrations 012/015).
+    const EXCLUDED: [&str; 4] = [
+        "sync_status",
+        "sync_base_snapshot",
+        "max_weekly_hours",
+        "finalized",
+    ];
+
+    let pool = test_pool().await;
+    for table in TABLES {
+        let syncable: HashSet<&str> = queries::syncable_columns(table).into_iter().collect();
+        assert!(!syncable.is_empty(), "no syncable_columns arm for {table}");
+
+        let rows = sqlx::query(&format!("PRAGMA table_info({table})"))
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+        let schema: HashSet<String> = rows.iter().map(|r| r.get::<String, _>("name")).collect();
+        assert!(
+            !schema.is_empty(),
+            "table {table} missing from migrated schema"
+        );
+
+        for col in &syncable {
+            assert!(
+                schema.contains(*col),
+                "syncable_columns({table}) lists '{col}' which is not in the schema"
+            );
+        }
+        for col in &schema {
+            assert!(
+                syncable.contains(col.as_str()) || EXCLUDED.contains(&col.as_str()),
+                "{table}.{col} exists in schema but is neither synced nor excluded — \
+                 update syncable_columns() or the EXCLUDED list"
+            );
+        }
+    }
+}
+
 // ── Role-requirement sync mirror tests (migration 025) ──
 
 /// Helper: insert a rota + one ad-hoc shift, returning (rota_id, shift_id).

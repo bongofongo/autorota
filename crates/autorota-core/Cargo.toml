@@ -28,6 +28,9 @@ perf-helpers = ["test-helpers"]
 autorota-core = { path = ".", features = ["test-helpers"] }
 tempfile = "3"
 criterion = { workspace = true }
+# Both already in Cargo.lock transitively (fluent, printpdf) — no new crates.
+fluent-syntax = "0.11"
+lopdf = "0.26"
 
 [[bench]]
 name = "scheduler"

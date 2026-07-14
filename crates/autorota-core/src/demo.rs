@@ -58,6 +58,9 @@ const WEEKEND: [Weekday; 2] = [Weekday::Sat, Weekday::Sun];
 
 /// The planet crew. IDs are local ordinals; the seeder remaps to real row IDs.
 pub fn demo_employees() -> Vec<Employee> {
+    use AvailabilityState::{Maybe, No, Yes};
+    use Weekday::{Fri, Mon, Sat, Sun, Thu, Tue, Wed};
+
     vec![
         // Mercury: availability intentionally unset — tour step fills it.
         emp(
@@ -78,25 +81,10 @@ pub fn demo_employees() -> Vec<Employee> {
             &[ROLE_BARISTA],
             38.0,
             12.25,
-            {
-                let mut a = Availability::default();
-                set_hours(
-                    &mut a,
-                    &[
-                        Weekday::Mon,
-                        Weekday::Tue,
-                        Weekday::Wed,
-                        Weekday::Thu,
-                        Weekday::Fri,
-                        Weekday::Sat,
-                    ],
-                    7,
-                    20,
-                    AvailabilityState::Yes,
-                );
-                set_hours(&mut a, &[Weekday::Sun], 6, 22, AvailabilityState::No);
-                a
-            },
+            avail(&[
+                (&[Mon, Tue, Wed, Thu, Fri, Sat], 7, 20, Yes),
+                (&[Sun], 6, 22, No),
+            ]),
         ),
         emp(
             3,
@@ -106,37 +94,29 @@ pub fn demo_employees() -> Vec<Employee> {
             &[ROLE_BARISTA, ROLE_KITCHEN],
             40.0,
             13.75,
-            {
-                let mut a = Availability::default();
-                set_hours(&mut a, &ALL_WEEK, 6, 22, AvailabilityState::Yes);
-                a
-            },
+            avail(&[(&ALL_WEEK, 6, 22, Yes)]),
         ),
         // Mars: works a short weekday pattern — tour step gives him a day off.
-        emp(4, "Marcus", "Reid", "Mars", &[ROLE_KITCHEN], 16.0, 12.00, {
-            let mut a = Availability::default();
-            set_hours(
-                &mut a,
-                &[Weekday::Mon, Weekday::Wed, Weekday::Fri],
-                8,
-                16,
-                AvailabilityState::Yes,
-            );
-            set_hours(
-                &mut a,
-                &[Weekday::Tue, Weekday::Thu],
-                6,
-                22,
-                AvailabilityState::No,
-            );
-            a
-        }),
-        emp(5, "Jun", "Osei", "Jupiter", &[ROLE_KITCHEN], 38.0, 13.50, {
-            let mut a = Availability::default();
-            set_hours(&mut a, &WEEKDAYS, 6, 20, AvailabilityState::Yes);
-            set_hours(&mut a, &WEEKEND, 6, 22, AvailabilityState::No);
-            a
-        }),
+        emp(
+            4,
+            "Marcus",
+            "Reid",
+            "Mars",
+            &[ROLE_KITCHEN],
+            16.0,
+            12.00,
+            avail(&[(&[Mon, Wed, Fri], 8, 16, Yes), (&[Tue, Thu], 6, 22, No)]),
+        ),
+        emp(
+            5,
+            "Jun",
+            "Osei",
+            "Jupiter",
+            &[ROLE_KITCHEN],
+            38.0,
+            13.50,
+            avail(&[(&WEEKDAYS, 6, 20, Yes), (&WEEKEND, 6, 22, No)]),
+        ),
         emp(
             6,
             "Sadie",
@@ -145,19 +125,18 @@ pub fn demo_employees() -> Vec<Employee> {
             &[ROLE_BARISTA, ROLE_KITCHEN],
             14.0,
             12.50,
-            {
-                let mut a = Availability::default();
-                set_hours(&mut a, &WEEKEND, 8, 21, AvailabilityState::Yes);
-                set_hours(&mut a, &WEEKDAYS, 6, 22, AvailabilityState::No);
-                a
-            },
+            avail(&[(&WEEKEND, 8, 21, Yes), (&WEEKDAYS, 6, 22, No)]),
         ),
-        emp(7, "Uma", "Novak", "Uranus", &[ROLE_BARISTA], 20.0, 11.75, {
-            let mut a = Availability::default();
-            set_hours(&mut a, &ALL_WEEK, 16, 22, AvailabilityState::Yes);
-            set_hours(&mut a, &ALL_WEEK, 6, 16, AvailabilityState::Maybe);
-            a
-        }),
+        emp(
+            7,
+            "Uma",
+            "Novak",
+            "Uranus",
+            &[ROLE_BARISTA],
+            20.0,
+            11.75,
+            avail(&[(&ALL_WEEK, 16, 22, Yes), (&ALL_WEEK, 6, 16, Maybe)]),
+        ),
         emp(
             8,
             "Nadia",
@@ -166,25 +145,10 @@ pub fn demo_employees() -> Vec<Employee> {
             &[ROLE_BARISTA],
             35.0,
             13.00,
-            {
-                let mut a = Availability::default();
-                set_hours(
-                    &mut a,
-                    &[
-                        Weekday::Tue,
-                        Weekday::Wed,
-                        Weekday::Thu,
-                        Weekday::Fri,
-                        Weekday::Sat,
-                        Weekday::Sun,
-                    ],
-                    8,
-                    20,
-                    AvailabilityState::Yes,
-                );
-                set_hours(&mut a, &[Weekday::Mon], 6, 22, AvailabilityState::No);
-                a
-            },
+            avail(&[
+                (&[Tue, Wed, Thu, Fri, Sat, Sun], 8, 20, Yes),
+                (&[Mon], 6, 22, No),
+            ]),
         ),
         // Beyond the planets: moons and dwarf planets round out the crew.
         emp(
@@ -195,12 +159,7 @@ pub fn demo_employees() -> Vec<Employee> {
             &[ROLE_BARISTA],
             10.0,
             11.25,
-            {
-                let mut a = Availability::default();
-                set_hours(&mut a, &WEEKEND, 7, 16, AvailabilityState::Yes);
-                set_hours(&mut a, &WEEKDAYS, 6, 22, AvailabilityState::No);
-                a
-            },
+            avail(&[(&WEEKEND, 7, 16, Yes), (&WEEKDAYS, 6, 22, No)]),
         ),
         emp(
             10,
@@ -210,12 +169,9 @@ pub fn demo_employees() -> Vec<Employee> {
             &[ROLE_BARISTA, ROLE_KITCHEN],
             36.0,
             13.25,
-            {
-                let mut a = Availability::default();
-                set_hours(&mut a, &ALL_WEEK, 8, 20, AvailabilityState::Yes);
-                a
-            },
+            avail(&[(&ALL_WEEK, 8, 20, Yes)]),
         ),
+        // Pluto: smallest contract on the roster — fitting for a dwarf planet.
         emp(
             11,
             "Paul",
@@ -224,19 +180,7 @@ pub fn demo_employees() -> Vec<Employee> {
             &[ROLE_KITCHEN],
             8.0,
             11.00,
-            {
-                // Smallest contract on the roster — fitting for a dwarf planet.
-                let mut a = Availability::default();
-                set_hours(
-                    &mut a,
-                    &[Weekday::Tue, Weekday::Thu],
-                    8,
-                    14,
-                    AvailabilityState::Yes,
-                );
-                set_hours(&mut a, &WEEKEND, 6, 22, AvailabilityState::No);
-                a
-            },
+            avail(&[(&[Tue, Thu], 8, 14, Yes), (&WEEKEND, 6, 22, No)]),
         ),
         emp(
             12,
@@ -246,18 +190,7 @@ pub fn demo_employees() -> Vec<Employee> {
             &[ROLE_KITCHEN],
             18.0,
             12.10,
-            {
-                let mut a = Availability::default();
-                set_hours(
-                    &mut a,
-                    &[Weekday::Mon, Weekday::Tue, Weekday::Wed],
-                    8,
-                    18,
-                    AvailabilityState::Yes,
-                );
-                set_hours(&mut a, &WEEKEND, 6, 22, AvailabilityState::Maybe);
-                a
-            },
+            avail(&[(&[Mon, Tue, Wed], 8, 18, Yes), (&WEEKEND, 6, 22, Maybe)]),
         ),
         // The second wave of moons: realistic availability archetypes.
         // Europa: student — weekday evenings plus full weekends.
@@ -269,13 +202,11 @@ pub fn demo_employees() -> Vec<Employee> {
             &[ROLE_BARISTA],
             15.0,
             11.40,
-            {
-                let mut a = Availability::default();
-                set_hours(&mut a, &WEEKDAYS, 17, 22, AvailabilityState::Yes);
-                set_hours(&mut a, &WEEKDAYS, 6, 17, AvailabilityState::No);
-                set_hours(&mut a, &WEEKEND, 8, 22, AvailabilityState::Yes);
-                a
-            },
+            avail(&[
+                (&WEEKDAYS, 17, 22, Yes),
+                (&WEEKDAYS, 6, 17, No),
+                (&WEEKEND, 8, 22, Yes),
+            ]),
         ),
         // Io: early-bird opener — mornings only, could stretch to afternoon.
         emp(
@@ -286,14 +217,12 @@ pub fn demo_employees() -> Vec<Employee> {
             &[ROLE_BARISTA],
             25.0,
             12.60,
-            {
-                let mut a = Availability::default();
-                set_hours(&mut a, &WEEKDAYS, 6, 12, AvailabilityState::Yes);
-                set_hours(&mut a, &WEEKDAYS, 12, 15, AvailabilityState::Maybe);
-                set_hours(&mut a, &[Weekday::Sat], 6, 12, AvailabilityState::Yes);
-                set_hours(&mut a, &[Weekday::Sun], 6, 22, AvailabilityState::No);
-                a
-            },
+            avail(&[
+                (&WEEKDAYS, 6, 12, Yes),
+                (&WEEKDAYS, 12, 15, Maybe),
+                (&[Sat], 6, 12, Yes),
+                (&[Sun], 6, 22, No),
+            ]),
         ),
         // Callisto: full-time kitchen with a midweek weekend (off Tue/Wed).
         emp(
@@ -304,30 +233,10 @@ pub fn demo_employees() -> Vec<Employee> {
             &[ROLE_KITCHEN],
             40.0,
             14.00,
-            {
-                let mut a = Availability::default();
-                set_hours(
-                    &mut a,
-                    &[
-                        Weekday::Thu,
-                        Weekday::Fri,
-                        Weekday::Sat,
-                        Weekday::Sun,
-                        Weekday::Mon,
-                    ],
-                    7,
-                    19,
-                    AvailabilityState::Yes,
-                );
-                set_hours(
-                    &mut a,
-                    &[Weekday::Tue, Weekday::Wed],
-                    6,
-                    22,
-                    AvailabilityState::No,
-                );
-                a
-            },
+            avail(&[
+                (&[Thu, Fri, Sat, Sun, Mon], 7, 19, Yes),
+                (&[Tue, Wed], 6, 22, No),
+            ]),
         ),
         // Ganymede: classic nine-to-five full-timer, both roles.
         emp(
@@ -338,13 +247,11 @@ pub fn demo_employees() -> Vec<Employee> {
             &[ROLE_BARISTA, ROLE_KITCHEN],
             37.0,
             13.80,
-            {
-                let mut a = Availability::default();
-                set_hours(&mut a, &WEEKDAYS, 9, 17, AvailabilityState::Yes);
-                set_hours(&mut a, &[Weekday::Sat], 9, 13, AvailabilityState::Maybe);
-                set_hours(&mut a, &[Weekday::Sun], 6, 22, AvailabilityState::No);
-                a
-            },
+            avail(&[
+                (&WEEKDAYS, 9, 17, Yes),
+                (&[Sat], 9, 13, Maybe),
+                (&[Sun], 6, 22, No),
+            ]),
         ),
         // Triton: school-hours parent — weekdays inside the school run.
         emp(
@@ -355,13 +262,11 @@ pub fn demo_employees() -> Vec<Employee> {
             &[ROLE_KITCHEN],
             22.0,
             12.30,
-            {
-                let mut a = Availability::default();
-                set_hours(&mut a, &WEEKDAYS, 9, 15, AvailabilityState::Yes);
-                set_hours(&mut a, &WEEKDAYS, 15, 22, AvailabilityState::No);
-                set_hours(&mut a, &WEEKEND, 6, 22, AvailabilityState::No);
-                a
-            },
+            avail(&[
+                (&WEEKDAYS, 9, 15, Yes),
+                (&WEEKDAYS, 15, 22, No),
+                (&WEEKEND, 6, 22, No),
+            ]),
         ),
         // Phobos: weekender who also covers Friday nights.
         emp(
@@ -372,19 +277,11 @@ pub fn demo_employees() -> Vec<Employee> {
             &[ROLE_BARISTA],
             14.0,
             11.60,
-            {
-                let mut a = Availability::default();
-                set_hours(&mut a, &[Weekday::Fri], 16, 22, AvailabilityState::Yes);
-                set_hours(&mut a, &WEEKEND, 8, 22, AvailabilityState::Yes);
-                set_hours(
-                    &mut a,
-                    &[Weekday::Mon, Weekday::Tue, Weekday::Wed, Weekday::Thu],
-                    6,
-                    22,
-                    AvailabilityState::No,
-                );
-                a
-            },
+            avail(&[
+                (&[Fri], 16, 22, Yes),
+                (&WEEKEND, 8, 22, Yes),
+                (&[Mon, Tue, Wed, Thu], 6, 22, No),
+            ]),
         ),
         // Deimos: dedicated closer — afternoons and evenings all week.
         emp(
@@ -395,12 +292,7 @@ pub fn demo_employees() -> Vec<Employee> {
             &[ROLE_BARISTA, ROLE_KITCHEN],
             32.0,
             13.10,
-            {
-                let mut a = Availability::default();
-                set_hours(&mut a, &ALL_WEEK, 14, 22, AvailabilityState::Yes);
-                set_hours(&mut a, &ALL_WEEK, 6, 14, AvailabilityState::No);
-                a
-            },
+            avail(&[(&ALL_WEEK, 14, 22, Yes), (&ALL_WEEK, 6, 14, No)]),
         ),
         // Charon: flexible on-call — will take anything, commits to nothing.
         emp(
@@ -411,11 +303,7 @@ pub fn demo_employees() -> Vec<Employee> {
             &[ROLE_BARISTA],
             10.0,
             11.20,
-            {
-                let mut a = Availability::default();
-                set_hours(&mut a, &ALL_WEEK, 6, 22, AvailabilityState::Maybe);
-                a
-            },
+            avail(&[(&ALL_WEEK, 6, 22, Maybe)]),
         ),
         // Rhea: firm early week + Saturday, tentative late-week afternoons.
         emp(
@@ -426,25 +314,11 @@ pub fn demo_employees() -> Vec<Employee> {
             &[ROLE_KITCHEN],
             20.0,
             12.40,
-            {
-                let mut a = Availability::default();
-                set_hours(
-                    &mut a,
-                    &[Weekday::Mon, Weekday::Tue, Weekday::Sat],
-                    7,
-                    15,
-                    AvailabilityState::Yes,
-                );
-                set_hours(
-                    &mut a,
-                    &[Weekday::Wed, Weekday::Thu, Weekday::Fri],
-                    12,
-                    18,
-                    AvailabilityState::Maybe,
-                );
-                set_hours(&mut a, &[Weekday::Sun], 6, 22, AvailabilityState::No);
-                a
-            },
+            avail(&[
+                (&[Mon, Tue, Sat], 7, 15, Yes),
+                (&[Wed, Thu, Fri], 12, 18, Maybe),
+                (&[Sun], 6, 22, No),
+            ]),
         ),
         // Enceladus: student — two fixed evenings plus Sundays.
         emp(
@@ -455,25 +329,11 @@ pub fn demo_employees() -> Vec<Employee> {
             &[ROLE_KITCHEN],
             12.0,
             11.30,
-            {
-                let mut a = Availability::default();
-                set_hours(
-                    &mut a,
-                    &[Weekday::Mon, Weekday::Wed],
-                    18,
-                    22,
-                    AvailabilityState::Yes,
-                );
-                set_hours(&mut a, &[Weekday::Sun], 8, 20, AvailabilityState::Yes);
-                set_hours(
-                    &mut a,
-                    &[Weekday::Tue, Weekday::Thu, Weekday::Fri, Weekday::Sat],
-                    6,
-                    22,
-                    AvailabilityState::No,
-                );
-                a
-            },
+            avail(&[
+                (&[Mon, Wed], 18, 22, Yes),
+                (&[Sun], 8, 20, Yes),
+                (&[Tue, Thu, Fri, Sat], 6, 22, No),
+            ]),
         ),
     ]
 }
@@ -570,6 +430,16 @@ fn emp(
         availability,
         deleted: false,
     }
+}
+
+/// Build an `Availability` from `(days, start-hour, end-hour, state)` spans,
+/// applied in order.
+fn avail(spans: &[(&[Weekday], u8, u8, AvailabilityState)]) -> Availability {
+    let mut a = Availability::default();
+    for &(days, start_h, end_h, state) in spans {
+        set_hours(&mut a, days, start_h, end_h, state);
+    }
+    a
 }
 
 fn set_hours(

@@ -1,4 +1,4 @@
-use chrono::{NaiveDate, NaiveTime, Timelike};
+use chrono::{NaiveDate, NaiveTime};
 
 use crate::models::assignment::AssignmentStatus;
 
@@ -23,13 +23,6 @@ pub struct EmployeeShiftRecord {
 
 impl EmployeeShiftRecord {
     pub fn duration_hours(&self) -> f32 {
-        let start = self.start_time.num_seconds_from_midnight();
-        let end = self.end_time.num_seconds_from_midnight();
-        let secs = if end >= start {
-            end - start
-        } else {
-            86400 - start + end
-        };
-        secs as f32 / 3600.0
+        crate::models::shift::duration_hours(self.start_time, self.end_time)
     }
 }

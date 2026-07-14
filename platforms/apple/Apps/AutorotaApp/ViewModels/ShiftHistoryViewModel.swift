@@ -61,9 +61,7 @@ final class ShiftHistoryViewModel {
     private func categorise(_ records: [FfiEmployeeShiftRecord]) {
         let mondayStr = currentWeekStart()
         let cal = Calendar(identifier: .iso8601)
-        let fmt = DateFormatter()
-        fmt.dateFormat = "yyyy-MM-dd"
-        fmt.locale = Locale(identifier: "en_US_POSIX")
+        let fmt = AvailabilityWeekMath.isoFmt
         guard let monday = fmt.date(from: mondayStr),
               let sunday = cal.date(byAdding: .day, value: 6, to: monday)
         else {

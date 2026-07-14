@@ -7,7 +7,6 @@ use autorota_core::models::overrides::{
     DayAvailability, EmployeeAvailabilityOverride, OverrideSource, ShiftTemplateOverride,
 };
 use autorota_core::models::role::Role;
-use autorota_core::models::rota::Rota;
 use autorota_core::models::shift::ShiftTemplate;
 use autorota_core::models::shift_history::EmployeeShiftRecord;
 use autorota_core::scheduler;
@@ -161,39 +160,6 @@ async fn delete_shift_template(state: State<'_, AppState>, id: i64) -> Result<()
         .map_err(|e| e.to_string())
 }
 
-// ─── Rotas ───────────────────────────────────────────────────
-
-#[tauri::command]
-async fn get_rota(state: State<'_, AppState>, id: i64) -> Result<Option<Rota>, String> {
-    let pool = get_pool(&state).await?;
-    queries::get_rota(&pool, id)
-        .await
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn get_rota_by_week(
-    state: State<'_, AppState>,
-    week_start: String,
-) -> Result<Option<Rota>, String> {
-    let pool = get_pool(&state).await?;
-    let date = NaiveDate::parse_from_str(&week_start, "%Y-%m-%d")
-        .map_err(|e| format!("Invalid date: {e}"))?;
-    queries::get_rota_by_week(&pool, date)
-        .await
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn create_rota(state: State<'_, AppState>, week_start: String) -> Result<i64, String> {
-    let pool = get_pool(&state).await?;
-    let date = NaiveDate::parse_from_str(&week_start, "%Y-%m-%d")
-        .map_err(|e| format!("Invalid date: {e}"))?;
-    queries::insert_rota(&pool, date)
-        .await
-        .map_err(|e| e.to_string())
-}
-
 // ─── Assignments ─────────────────────────────────────────────
 
 #[tauri::command]
@@ -202,13 +168,18 @@ async fn create_assignment(
     mut assignment: Assignment,
 ) -> Result<i64, String> {
     let pool = get_pool(&state).await?;
-    // Snapshot the employee name if not already set
-    if assignment.employee_name.is_none() {
+    // Snapshot the employee name and wage if not already set
+    if assignment.employee_name.is_none() || assignment.hourly_wage.is_none() {
         if let Some(emp) = queries::get_employee(&pool, assignment.employee_id)
             .await
             .map_err(|e| e.to_string())?
         {
-            assignment.employee_name = Some(emp.display_name());
+            if assignment.employee_name.is_none() {
+                assignment.employee_name = Some(emp.display_name());
+            }
+            if assignment.hourly_wage.is_none() {
+                assignment.hourly_wage = emp.hourly_wage;
+            }
         }
     }
     queries::insert_assignment(&pool, &assignment)
@@ -224,57 +195,6 @@ async fn update_assignment_status(
 ) -> Result<(), String> {
     let pool = get_pool(&state).await?;
     queries::update_assignment_status(&pool, id, status)
-        .await
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn move_assignment(
-    state: State<'_, AppState>,
-    id: i64,
-    new_shift_id: i64,
-) -> Result<(), String> {
-    let pool = get_pool(&state).await?;
-
-    // Load the assignment to find its rota
-    let assignment = sqlx::query_as::<_, (i64, i64, i64, i64, String, Option<String>)>(
-        "SELECT id, rota_id, shift_id, employee_id, status, employee_name FROM assignments WHERE id = ?"
-    )
-    .bind(id)
-    .fetch_optional(&pool)
-    .await
-    .map_err(|e| e.to_string())?
-    .ok_or("Assignment not found")?;
-
-    let rota_id = assignment.1;
-
-    // Validate target shift belongs to same rota
-    let target_shift = sqlx::query_as::<_, (i64, i64, u32)>(
-        "SELECT id, rota_id, max_employees FROM shifts WHERE id = ?",
-    )
-    .bind(new_shift_id)
-    .fetch_optional(&pool)
-    .await
-    .map_err(|e| e.to_string())?
-    .ok_or("Target shift not found")?;
-
-    if target_shift.1 != rota_id {
-        return Err("Target shift belongs to a different rota".into());
-    }
-
-    // Check capacity
-    let current_count: (i64,) =
-        sqlx::query_as("SELECT COUNT(*) FROM assignments WHERE shift_id = ?")
-            .bind(new_shift_id)
-            .fetch_one(&pool)
-            .await
-            .map_err(|e| e.to_string())?;
-
-    if current_count.0 >= target_shift.2 as i64 {
-        return Err("Target shift is at capacity".into());
-    }
-
-    queries::update_assignment_shift(&pool, id, new_shift_id)
         .await
         .map_err(|e| e.to_string())
 }
@@ -771,21 +691,6 @@ async fn upsert_employee_availability_override(
 }
 
 #[tauri::command]
-async fn get_employee_availability_override(
-    state: State<'_, AppState>,
-    employee_id: i64,
-    date: String,
-) -> Result<Option<TauriEmployeeAvailabilityOverride>, String> {
-    let pool = get_pool(&state).await?;
-    let d = NaiveDate::parse_from_str(&date, "%Y-%m-%d")
-        .map_err(|e| format!("invalid date '{date}': {e}"))?;
-    queries::get_employee_availability_override(&pool, employee_id, d)
-        .await
-        .map(|opt| opt.map(employee_avail_override_to_tauri))
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 async fn list_employee_availability_overrides(
     state: State<'_, AppState>,
     employee_id: i64,
@@ -842,37 +747,6 @@ async fn upsert_shift_template_override(
 }
 
 #[tauri::command]
-async fn get_shift_template_override(
-    state: State<'_, AppState>,
-    template_id: i64,
-    date: String,
-) -> Result<Option<TauriShiftTemplateOverride>, String> {
-    let pool = get_pool(&state).await?;
-    let d = NaiveDate::parse_from_str(&date, "%Y-%m-%d")
-        .map_err(|e| format!("invalid date '{date}': {e}"))?;
-    queries::get_shift_template_override(&pool, template_id, d)
-        .await
-        .map(|opt| opt.map(shift_template_override_to_tauri))
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-async fn list_shift_template_overrides_for_template(
-    state: State<'_, AppState>,
-    template_id: i64,
-) -> Result<Vec<TauriShiftTemplateOverride>, String> {
-    let pool = get_pool(&state).await?;
-    queries::list_shift_template_overrides_for_template(&pool, template_id)
-        .await
-        .map(|v| {
-            v.into_iter()
-                .map(shift_template_override_to_tauri)
-                .collect()
-        })
-        .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 async fn list_all_shift_template_overrides(
     state: State<'_, AppState>,
 ) -> Result<Vec<TauriShiftTemplateOverride>, String> {
@@ -918,12 +792,8 @@ pub fn run() {
             create_shift_template,
             update_shift_template,
             delete_shift_template,
-            get_rota,
-            get_rota_by_week,
-            create_rota,
             create_assignment,
             update_assignment_status,
-            move_assignment,
             swap_assignments,
             delete_assignment,
             delete_shift,
@@ -933,13 +803,10 @@ pub fn run() {
             run_schedule,
             get_week_schedule,
             upsert_employee_availability_override,
-            get_employee_availability_override,
             list_employee_availability_overrides,
             list_all_employee_availability_overrides,
             delete_employee_availability_override,
             upsert_shift_template_override,
-            get_shift_template_override,
-            list_shift_template_overrides_for_template,
             list_all_shift_template_overrides,
             delete_shift_template_override,
             list_employee_shift_history,

@@ -115,9 +115,6 @@ final class EmployeeExportViewModel {
         }
     }
 
-    private static let dateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        return f
-    }()
+    /// App-wide shared ISO formatter (POSIX locale; see AvailabilityWeekMath).
+    private static let dateFormatter = AvailabilityWeekMath.isoFmt
 }

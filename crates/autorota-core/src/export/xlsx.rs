@@ -48,16 +48,6 @@ pub fn render_workbook(sheets: &[(String, &ExportGrid)]) -> Result<Vec<u8>, Stri
     book.save_to_buffer().map_err(err_to_string)
 }
 
-/// Append a "Cost Summary" sheet derived from a manager grid's daily_totals.
-pub fn render_workbook_with_cost_summary(
-    main_sheets: &[(String, &ExportGrid)],
-    cost_grid: &ExportGrid,
-) -> Result<Vec<u8>, String> {
-    let mut all: Vec<(String, &ExportGrid)> = main_sheets.to_vec();
-    all.push(("Cost Summary".to_string(), cost_grid));
-    render_workbook(&all)
-}
-
 fn write_grid(ws: &mut rust_xlsxwriter::Worksheet, grid: &ExportGrid) -> Result<(), XlsxError> {
     let hfmt = header_fmt();
     let cfmt = cell_fmt();
@@ -179,5 +169,46 @@ mod tests {
                 .count(),
             31
         );
+    }
+
+    /// Formula-injection regression pin (parity with the CSV neutralisation
+    /// tests): cells are written via `write_string_with_format`, which produces
+    /// string-typed cells that Excel never evaluates. If the writer ever
+    /// switches to a type-inferring `write` call, these payloads would come
+    /// back as Float/formula and this test fails.
+    #[test]
+    fn formula_payloads_stay_inert_strings() {
+        let payloads = [
+            "=SUM(A1:A9)",
+            "+cmd|' /C calc'!A0",
+            "-2+3",
+            "@foo",
+            "\t=1+1",
+            "\r=1+1",
+        ];
+        let g = ExportGrid {
+            title: "Week".into(),
+            column_headers: vec!["Mon".into()],
+            row_headers: payloads.iter().map(|p| format!("row {p}")).collect(),
+            cells: payloads.iter().map(|p| vec![p.to_string()]).collect(),
+            daily_totals: None,
+            weekly_total_cost: None,
+        };
+        let bytes = render_workbook(&[("Schedule".into(), &g)]).unwrap();
+        let mut wb: calamine::Xlsx<_> =
+            calamine::open_workbook_from_rs(Cursor::new(bytes)).unwrap();
+        let range = wb.worksheet_range("Schedule").unwrap();
+
+        // Skip the header row; every payload cell must round-trip as a string
+        // with content intact — never a number or formula result. (`\r` legally
+        // round-trips as the OOXML escape `_x000D_`; still a string cell.)
+        for (i, payload) in payloads.iter().enumerate() {
+            let expected = payload.replace('\r', "_x000D_");
+            let cell = range.get_value(((i + 1) as u32, 1)).unwrap();
+            match cell {
+                Data::String(s) => assert_eq!(s, &expected, "payload mangled at row {i}"),
+                other => panic!("payload {payload:?} came back as non-string {other:?}"),
+            }
+        }
     }
 }

@@ -307,11 +307,6 @@ int64_t uniffi_autorota_ffi_fn_func_create_empty_week(RustBuffer week_start, Rus
 int64_t uniffi_autorota_ffi_fn_func_create_role(RustBuffer name, RustCallStatus *_Nonnull out_status
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_CREATE_ROTA
-#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_CREATE_ROTA
-int64_t uniffi_autorota_ffi_fn_func_create_rota(RustBuffer week_start, RustCallStatus *_Nonnull out_status
-);
-#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_CREATE_SAVE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_CREATE_SAVE
 int64_t uniffi_autorota_ffi_fn_func_create_save(int64_t rota_id, RustCallStatus *_Nonnull out_status
@@ -436,16 +431,6 @@ RustBuffer uniffi_autorota_ffi_fn_func_get_pending_sync_records(RustBuffer table
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_PENDING_TOMBSTONES
 RustBuffer uniffi_autorota_ffi_fn_func_get_pending_tombstones(RustCallStatus *_Nonnull out_status
     
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_ROTA
-#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_ROTA
-RustBuffer uniffi_autorota_ffi_fn_func_get_rota(int64_t id, RustCallStatus *_Nonnull out_status
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_ROTA_BY_WEEK
-#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_ROTA_BY_WEEK
-RustBuffer uniffi_autorota_ffi_fn_func_get_rota_by_week(RustBuffer week_start, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_GET_SAVE_DETAIL
@@ -1009,12 +994,6 @@ uint16_t uniffi_autorota_ffi_checksum_func_create_role(void
     
 );
 #endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_CREATE_ROTA
-#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_CREATE_ROTA
-uint16_t uniffi_autorota_ffi_checksum_func_create_rota(void
-    
-);
-#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_CREATE_SAVE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_CREATE_SAVE
 uint16_t uniffi_autorota_ffi_checksum_func_create_save(void
@@ -1162,18 +1141,6 @@ uint16_t uniffi_autorota_ffi_checksum_func_get_pending_sync_records(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_PENDING_TOMBSTONES
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_PENDING_TOMBSTONES
 uint16_t uniffi_autorota_ffi_checksum_func_get_pending_tombstones(void
-    
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_ROTA
-#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_ROTA
-uint16_t uniffi_autorota_ffi_checksum_func_get_rota(void
-    
-);
-#endif
-#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_ROTA_BY_WEEK
-#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_GET_ROTA_BY_WEEK
-uint16_t uniffi_autorota_ffi_checksum_func_get_rota_by_week(void
     
 );
 #endif

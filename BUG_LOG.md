@@ -150,3 +150,38 @@ Concise running log of bugs encountered. Each entry is one bullet with sub-bulle
   - Where / what / repro: Finish the demo tour → completion card → "Choose Your Plan". The onboarding tier picker came up with no opaque background — its content floated directly over the rota page. Root cause: the card called `dismiss()` and `demo.exitDemo()` in the same action, so `ContentView.onChange(of: demo.isActive)` presented the onboarding `fullScreenCover` while the completion sheet was still mid-dismissal; a cover presented during another presentation's dismissal transaction can render without its opaque backdrop.
   - Patched: yes — pending user verification
   - Fix: `DemoBanner.swift` — "Choose Your Plan" now only flags `exitAfterCompletionDismiss` and dismisses; `demo.exitDemo()` runs in the completion sheet's `onDismiss`, after the transition finishes, so the cover presents cleanly. Belt-and-braces: `ContentView.swift` gives the onboarding cover an explicit `.presentationBackground(Color(uiColor: .systemBackground))` so the tier picker can never render transparent even if a presentation race recurs.
+
+- **`full_ffi_lifecycle` test failing on clean main: stale demo-crew count**
+  - Date fixed: 2026-07-12 (pending verification)
+  - Where / what / repro: `cargo test -p autorota-ffi` → `tests::full_ffi_lifecycle` panics at `crates/autorota-ffi/src/lib.rs:1906` (`left: 22, right: 12`). The demo seed grew from 12 to 22 employees ("solar bodies" crew, pinned by core's `seeds_full_planet_crew`) but the FFI lifecycle assert was never updated. Pre-existing failure, discovered last session.
+  - Patched: yes — pending user verification
+  - Fix: assert updated to 22 with a comment tying it to the core pin. Test green.
+
+- **ICS export emits RFC-invalid empty VTIMEZONE**
+  - Date fixed: 2026-07-12 (pending verification)
+  - Where / what / repro: `crates/autorota-core/src/export/ics.rs::render_calendar` — when a timezone is set, the VTIMEZONE block was just `BEGIN:VTIMEZONE / TZID:<tz> / END:VTIMEZONE`. RFC 5545 §3.6.5 requires at least one STANDARD or DAYLIGHT subcomponent; strict parsers can reject the whole calendar.
+  - Patched: yes — pending user verification
+  - Fix: emit a minimal syntactically valid `STANDARD` subcomponent (`DTSTART:19700101T000000`, `TZOFFSETFROM/TZOFFSETTO:+0000`). Real offsets are impossible without a tz database (no runtime deps policy); clients resolve well-known Olson TZIDs from their own tz data and ignore the embedded definition. New test `vtimezone_has_required_subcomponent` (written failing-first) pins the structure.
+
+- **Restore-from-save drops template linkage — phantom Edit-Log diff after restore**
+  - Date fixed: 2026-07-12 (pending verification)
+  - Where / what / repro: `crates/autorota-core/src/db/queries.rs::restore_from_save` re-inserted every snapshot shift with `template_id = NULL`. The diff engine matches template shifts by `(date, template_id)` (ad-hoc by `shift_id`), so after restoring a save of template-materialised shifts, the live rota diffed as "everything removed + added" against the very save just restored, and the restored shifts fell out of template tracking (re-materialisation, template overrides). Existing tests missed it because `save_diff_test::seed_week` uses ad-hoc shifts only; caught by the new FFI save/diff surface test.
+  - Patched: yes — pending user verification
+  - Fix: restore now binds the snapshot's `template_id`, guarded by a live-template existence check (falls back to ad-hoc if the template row was hard-deleted by remote sync, avoiding an FK violation). Failing-first core test `restore_preserves_template_linkage_and_diffs_clean` plus FFI end-to-end coverage in `saves_and_diffs_through_ffi`.
+
+- **PDF export cannot render non-Latin names (known limitation, not fixed)**
+  - Date investigated: 2026-07-12
+  - Where / what / repro: all PDF templates use printpdf built-in Helvetica (WinAnsi encoding). CJK/Arabic/etc. employee names or shift labels don't survive into the rendered text layer (confirmed via lopdf extraction: Latin text extracts, CJK is absent). No panic, no error — glyphs silently missing.
+  - Patched: no — proper fix requires embedding a Unicode TTF (size + licensing decision). Behavior pinned by `non_winansi_names_do_not_panic` in `tests/export_pdf_content_test.rs`; the test self-documents to be inverted when a Unicode font lands.
+
+- **Tauri `create_assignment` snapshots name but not wage (parity gap with FFI)**
+  - Date fixed: 2026-07-14 (pending verification)
+  - Where / what / repro: `crates/app-desktop/src-tauri/src/lib.rs::create_assignment` only snapshotted `employee_name` at creation; the documented invariant (and the FFI path used by the Apple apps) snapshots name AND wage. Assignments created via the desktop app therefore had `hourly_wage = NULL`, so shift-history cost columns and manager reports showed no cost for those assignments even when the employee had a wage set.
+  - Patched: yes — pending user verification
+  - Fix: Tauri command now mirrors the FFI logic exactly — if `employee_name` or `hourly_wage` is missing, load the employee once and backfill both independently.
+
+- **Two date formatters missing POSIX locale (12/24-hour + non-Gregorian locale hazard)**
+  - Date fixed: 2026-07-14 (pending verification)
+  - Where / what / repro: `WeeklyAvailabilityView.weekStartString` built its "yyyy-MM-dd" formatter without `en_US_POSIX` (mass-availability week key could mis-format under non-Gregorian user calendars), and `ShiftTemplateEditSheet` prefill/save built "HH:mm" formatters without POSIX locale (12-hour-locale devices with forced 12-hour format could parse/emit shift times with AM/PM artifacts). `EmployeeExportViewModel.dateFormatter` had the same gap.
+  - Patched: yes — pending user verification
+  - Fix: consolidated all "yyyy-MM-dd" and "HH:mm" formatting onto shared cached POSIX-locale formatters (`AvailabilityWeekMath.isoFmt` / `.timeFmt`, new `Views/Shared/AvailabilityWeekMath.swift`) as part of the app-wide formatter dedup; the three offending sites now use them.

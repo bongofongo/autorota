@@ -115,15 +115,6 @@ pub struct FfiAssignment {
     pub hourly_wage: Option<f32>,
 }
 
-// ── Rota ──────────────────────────────────────────────────────────────────────
-
-#[derive(Clone, uniffi::Record)]
-pub struct FfiRota {
-    pub id: i64,
-    pub week_start: String,
-    pub assignments: Vec<FfiAssignment>,
-}
-
 // ── WeekSchedule (denormalised view returned by get_week_schedule) ────────────
 
 #[derive(Clone, uniffi::Record)]
@@ -412,12 +403,6 @@ pub struct FfiSyncRecord {
     pub record_id: i64,
     pub fields: String,
     pub last_modified: String,
-}
-
-#[derive(Clone, uniffi::Record)]
-pub struct FfiMergeConflict {
-    pub record_id: i64,
-    pub resolved_fields: String,
 }
 
 #[derive(Clone, uniffi::Record)]
