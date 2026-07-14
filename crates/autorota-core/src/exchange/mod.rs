@@ -602,7 +602,7 @@ async fn import_employee_exceptions(
                     id: 0,
                     employee_id: *id,
                     date: ex.date,
-                    availability: ex.availability.clone(),
+                    availability: ex.availability,
                     notes: ex.notes.clone(),
                     source: ex.source,
                 };

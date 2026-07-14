@@ -37,6 +37,10 @@ name = "scheduler"
 harness = false
 
 [[bench]]
+name = "hotpath"
+harness = false
+
+[[bench]]
 name = "save"
 harness = false
 

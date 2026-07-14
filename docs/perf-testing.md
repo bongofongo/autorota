@@ -20,7 +20,11 @@ Rust results: `target/criterion/report/index.html`. Swift results: latest `.xcre
 
 | Bench file | Group | Sizes | Notes |
 |---|---|---|---|
-| `crates/autorota-core/benches/scheduler.rs` | `schedule_pure` | 50 / 200 / 500 employees | Pure two-pass algorithm |
+| `crates/autorota-core/benches/scheduler.rs` | `schedule_pure` | 50 / 200 / 500 employees | Employee axis, 1 week |
+| `crates/autorota-core/benches/scheduler.rs` | `schedule_pure_weeks` | 1 / 4 / 12 weeks @ 200 | Week (shift) axis — the dimension that grows workload |
+| `crates/autorota-core/benches/scheduler.rs` | `schedule_pure_enriched` | 50 / 200 / 500 | Two-stage multi-role / wildcard / overnight fill |
+| `crates/autorota-core/benches/hotpath.rs` | `for_window` | 200 | Availability scan (hottest inner primitive) |
+| `crates/autorota-core/benches/hotpath.rs` | `has_role` | 200 | Role filter |
 | `crates/autorota-core/benches/save.rs` | `snapshot_serialize` | 50 / 200 / 500 | `serde_json::to_string(&SaveSnapshot)` |
 | `crates/autorota-core/benches/save.rs` | `diff_snapshots` | 200 | Edit Log diff path |
 | `crates/autorota-core/benches/export.rs` | `export_build_grid` | 50 / 200 / 500 | Pure grid build |
@@ -28,7 +32,9 @@ Rust results: `target/criterion/report/index.html`. Swift results: latest `.xcre
 | `crates/autorota-core/benches/export.rs` | `export_xlsx` | 200 | `rust_xlsxwriter` |
 | `crates/autorota-core/benches/export.rs` | `export_pdf_weekly` | 200 | `printpdf`, sample size 20 |
 
-All benches share a deterministic synthetic corpus: `crates/autorota-core/src/testutil/corpus.rs` (`generate_corpus(employees, weeks, seed)`). Same `(employees, weeks, seed)` tuple → byte-identical output.
+All benches share a deterministic synthetic corpus: `crates/autorota-core/src/testutil/corpus.rs` (`generate_corpus(employees, weeks, seed)`). Same `(employees, weeks, seed)` tuple → byte-identical output; `weeks == 1` is byte-identical to the legacy single-week corpus so historical baselines stay comparable. `generate_corpus_with(CorpusConfig { enriched_shifts: true, .. })` adds the multi-role/wildcard/overnight templates the enriched bench exercises.
+
+The `for_window` micro-bench isolates the scheduler's hottest inner primitive so an algorithm-level speedup there is attributable rather than hidden inside the whole-algorithm number.
 
 ### Swift XCUITest perf tests
 
@@ -100,7 +106,13 @@ To set a baseline: in Xcode, open the test result, click the metric, choose **Se
 - `criterion-html` — full HTML report from `target/criterion/`.
 - `swift-perf-xcresult` — latest `.xcresult` bundle.
 
-A short bencher-format summary is posted as a PR comment.
+A short bencher-format summary is written to the GitHub job summary.
+
+### Soft regression gate
+
+The `rust-bench` job also runs a **soft gate** on the scheduler engine. It benches the PR's merge base and the PR head on the *same* runner — so absolute timings are directly comparable and machine variance cancels out — then lets criterion's own statistical comparison decide. If `schedule_pure*` regresses with `p < 0.05`, the step exits non-zero: because the job is `continue-on-error`, this turns the check red and adds a `::warning::` annotation **without blocking merge**. Read the `criterion-html` artifact (or the step's `cmp.txt`) to see which group moved and by how much.
+
+A genuine, intended slowdown (e.g. a new scheduling constraint) is acknowledged by merging past the red check; there is no baseline file to update. The gate is scoped to the scheduler bench only — save/export stay purely informational.
 
 ## MVP non-goals
 

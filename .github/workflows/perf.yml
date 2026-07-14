@@ -1,9 +1,11 @@
 name: Perf
 
-# Informational-only — never blocks merge. Both jobs use continue-on-error.
-# Artifacts are uploaded for manual inspection; a short bencher-format summary
-# is written to the GitHub job summary. See docs/perf-testing.md for how to
-# read the output.
+# Never blocks merge — both jobs use continue-on-error. Artifacts are uploaded
+# for manual inspection and a short bencher-format summary is written to the
+# GitHub job summary. The rust-bench job additionally runs a *soft* regression
+# gate on the scheduler engine (base vs PR on the same runner): a statistically
+# significant slowdown turns the check red and adds a warning annotation, but
+# does not block merge. See docs/perf-testing.md for how to read the output.
 
 on:
   pull_request:
@@ -45,6 +47,29 @@ jobs:
             cat bench-output.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Soft regression gate on the scheduler engine. Benches the PR's merge base
+      # and the PR head on the *same* runner (so absolute timings are comparable,
+      # neutralising machine variance) and lets criterion's own statistical
+      # comparison flag a regression. This job is continue-on-error, so a non-zero
+      # exit surfaces a red check + warning annotation without blocking merge.
+      - name: Scheduler regression check (base vs PR)
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -o pipefail
+          git fetch --no-tags --depth=1 origin "$BASE_REF"
+          git checkout -q FETCH_HEAD
+          cargo bench -p autorota-core --bench scheduler -- --save-baseline base >/dev/null 2>&1
+          git checkout -q "$HEAD_SHA"
+          cargo bench -p autorota-core --bench scheduler -- --baseline base | tee cmp.txt
+          if grep -q "Performance has regressed" cmp.txt; then
+            echo "::warning::Scheduler bench regressed vs $BASE_REF (statistically significant, p<0.05). Review the criterion-html artifact or cmp.txt."
+            exit 1
+          fi
+          echo "No scheduler regression vs $BASE_REF."
 
       - name: Upload criterion HTML report
         if: always()

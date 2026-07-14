@@ -47,6 +47,18 @@ pub const LARGE: CorpusSize = CorpusSize {
     weeks: 1,
 };
 
+/// Multi-week sizes. Fix employees at 200 and scale the week (shift) axis —
+/// the dimension that actually grows scheduler workload. `weeks==1` output is
+/// byte-identical to `MEDIUM`, so these only *append* later weeks.
+pub const WEEKS_4: CorpusSize = CorpusSize {
+    employees: 200,
+    weeks: 4,
+};
+pub const WEEKS_12: CorpusSize = CorpusSize {
+    employees: 200,
+    weeks: 12,
+};
+
 /// Default seed used by benches and the FFI corpus hook so results compare
 /// cleanly across runs. Chosen arbitrarily; the value itself doesn't matter
 /// as long as it's stable.
@@ -79,8 +91,9 @@ pub struct CorpusConfig {
 
 /// Generate a deterministic corpus.
 ///
-/// `weeks` is currently advisory — only the first week's shifts are fanned out.
-/// Larger week counts are reserved for future multi-week scheduling benches.
+/// `weeks` fans the templates across `weeks` consecutive weeks. `weeks==1` is
+/// byte-identical to the legacy single-week output; larger counts append later
+/// weeks so multi-week baselines stay comparable.
 pub fn generate_corpus(employees: usize, weeks: usize, seed: u64) -> Corpus {
     generate_corpus_with(CorpusConfig {
         employees,
@@ -442,30 +455,35 @@ fn build_shifts(
     _rng: &mut ChaCha8Rng,
     templates: &[ShiftTemplate],
     week_start: NaiveDate,
-    _weeks: usize,
+    weeks: usize,
     rota_id: i64,
 ) -> Vec<Shift> {
+    let weeks = weeks.max(1);
     let mut out = Vec::new();
     let mut next_id: i64 = 1;
+    // Ordering (template → week → weekday) keeps `weeks == 1` byte-identical to
+    // the legacy single-week output; extra weeks only append with fresh ids.
     for tmpl in templates {
-        for d in 0..7 {
-            let date = week_start + Duration::days(d);
-            if !tmpl.weekdays.contains(&date.weekday()) {
-                continue;
+        for w in 0..weeks {
+            for d in 0..7 {
+                let date = week_start + Duration::days((w * 7) as i64 + d);
+                if !tmpl.weekdays.contains(&date.weekday()) {
+                    continue;
+                }
+                out.push(Shift {
+                    id: next_id,
+                    template_id: Some(tmpl.id),
+                    rota_id,
+                    date,
+                    start_time: tmpl.start_time,
+                    end_time: tmpl.end_time,
+                    required_role: tmpl.required_role.clone(),
+                    min_employees: tmpl.min_employees,
+                    max_employees: tmpl.max_employees,
+                    role_requirements: tmpl.role_requirements.clone(),
+                });
+                next_id += 1;
             }
-            out.push(Shift {
-                id: next_id,
-                template_id: Some(tmpl.id),
-                rota_id,
-                date,
-                start_time: tmpl.start_time,
-                end_time: tmpl.end_time,
-                required_role: tmpl.required_role.clone(),
-                min_employees: tmpl.min_employees,
-                max_employees: tmpl.max_employees,
-                role_requirements: tmpl.role_requirements.clone(),
-            });
-            next_id += 1;
         }
     }
     out

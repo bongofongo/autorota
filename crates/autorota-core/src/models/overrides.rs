@@ -4,33 +4,50 @@ use std::collections::HashMap;
 
 use crate::models::availability::AvailabilityState;
 
+const HOURS_PER_DAY: usize = 24;
+
 /// Per-hour availability for a single specific calendar date.
 ///
-/// Keyed by hour (0–23). Absent hours default to `Maybe`, exactly as in `Availability`.
-/// Serialized as JSON: `{"8":"Yes","14":"No",...}` (string keys, no weekday prefix).
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+/// Backed by a dense `[state; 24]` grid indexed by hour (0–23); every cell
+/// defaults to `Maybe`, so unset hours read exactly like the old sparse map.
+/// The dense layout drops the boxed iterator and per-hour hashing from
+/// `for_window` (the scheduler's override probe).
+/// Serialized as JSON: `{"8":"Yes","14":"No",...}` (only non-`Maybe` cells,
+/// string keys, no weekday prefix — semantically identical to the old format).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(try_from = "HashMap<String, String>", into = "HashMap<String, String>")]
-pub struct DayAvailability(pub HashMap<u8, AvailabilityState>);
+pub struct DayAvailability(pub [AvailabilityState; HOURS_PER_DAY]);
+
+impl Default for DayAvailability {
+    fn default() -> Self {
+        DayAvailability([AvailabilityState::Maybe; HOURS_PER_DAY])
+    }
+}
 
 impl TryFrom<HashMap<String, String>> for DayAvailability {
     type Error = String;
 
     fn try_from(map: HashMap<String, String>) -> Result<Self, Self::Error> {
-        let mut inner = HashMap::new();
+        let mut grid = DayAvailability::default();
         for (k, v) in map {
             let hour: u8 = k.parse().map_err(|_| format!("invalid hour key: {k}"))?;
             let state: AvailabilityState = v
                 .parse()
                 .map_err(|e| format!("invalid state for hour {hour}: {e}"))?;
-            inner.insert(hour, state);
+            // Out-of-range hours are unrepresentable; drop them (unschedulable).
+            if (hour as usize) < HOURS_PER_DAY {
+                grid.0[hour as usize] = state;
+            }
         }
-        Ok(DayAvailability(inner))
+        Ok(grid)
     }
 }
 
 impl From<DayAvailability> for HashMap<String, String> {
     fn from(d: DayAvailability) -> Self {
-        d.0.into_iter()
+        d.0.iter()
+            .enumerate()
+            .filter(|(_, s)| **s != AvailabilityState::Maybe)
             .map(|(h, s)| (h.to_string(), s.to_string()))
             .collect()
     }
@@ -38,28 +55,36 @@ impl From<DayAvailability> for HashMap<String, String> {
 
 impl DayAvailability {
     pub fn get(&self, hour: u8) -> AvailabilityState {
-        self.0
-            .get(&hour)
-            .copied()
-            .unwrap_or(AvailabilityState::Maybe)
+        if (hour as usize) >= HOURS_PER_DAY {
+            return AvailabilityState::Maybe;
+        }
+        self.0[hour as usize]
     }
 
     pub fn set(&mut self, hour: u8, state: AvailabilityState) {
-        self.0.insert(hour, state);
+        if (hour as usize) < HOURS_PER_DAY {
+            self.0[hour as usize] = state;
+        }
     }
 
     /// Returns the worst (minimum) availability state across all hours of a shift window.
-    /// Handles overnight shifts where `end_hour < start_hour`.
+    /// Handles overnight shifts where `end_hour < start_hour`. Tight scan over the
+    /// dense row — no allocation, no hashing.
     pub fn for_window(&self, start_hour: u8, end_hour: u8) -> AvailabilityState {
-        let hours: Box<dyn Iterator<Item = u8>> = if end_hour > start_hour {
-            Box::new(start_hour..end_hour)
+        let mut worst = AvailabilityState::Yes;
+        if end_hour > start_hour {
+            for h in start_hour..end_hour {
+                worst = worst.min(self.0[h as usize]);
+            }
         } else {
-            Box::new((start_hour..24).chain(0..end_hour))
-        };
-        hours
-            .map(|h| self.get(h))
-            .min()
-            .unwrap_or(AvailabilityState::No)
+            for h in start_hour..HOURS_PER_DAY as u8 {
+                worst = worst.min(self.0[h as usize]);
+            }
+            for h in 0..end_hour {
+                worst = worst.min(self.0[h as usize]);
+            }
+        }
+        worst
     }
 
     pub fn to_json(&self) -> Result<String, serde_json::Error> {

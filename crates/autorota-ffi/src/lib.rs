@@ -118,15 +118,35 @@ fn weekday_from_str(s: &str) -> Result<Weekday, FfiError> {
 // ── Availability conversion ───────────────────────────────────────────────────
 
 fn availability_to_slots(avail: &Availability) -> Vec<AvailabilitySlot> {
-    avail
-        .0
-        .iter()
-        .map(|(&(wd, hour), &state)| AvailabilitySlot {
-            weekday: weekday_to_str(wd).to_string(),
-            hour,
-            state: state.to_string(),
-        })
-        .collect()
+    // Dense grid → sparse slots: emit only non-`Maybe` cells (unlisted hours are
+    // `Maybe` on the Swift side too), matching the old sparse-map behavior.
+    let mut slots = Vec::new();
+    for (d, row) in avail.0.iter().enumerate() {
+        let wd = index_to_weekday(d);
+        for (hour, &state) in row.iter().enumerate() {
+            if state != AvailabilityState::Maybe {
+                slots.push(AvailabilitySlot {
+                    weekday: weekday_to_str(wd).to_string(),
+                    hour: hour as u8,
+                    state: state.to_string(),
+                });
+            }
+        }
+    }
+    slots
+}
+
+/// Mon..Sun → 0..6, matching `weekday_to_str`.
+fn index_to_weekday(i: usize) -> Weekday {
+    match i {
+        0 => Weekday::Mon,
+        1 => Weekday::Tue,
+        2 => Weekday::Wed,
+        3 => Weekday::Thu,
+        4 => Weekday::Fri,
+        5 => Weekday::Sat,
+        _ => Weekday::Sun,
+    }
 }
 
 fn slots_to_availability(slots: Vec<AvailabilitySlot>) -> Result<Availability, FfiError> {
@@ -1470,11 +1490,14 @@ mod tests {
         avail.set(Weekday::Fri, 20, AvailabilityState::Maybe);
 
         let slots = availability_to_slots(&avail);
-        assert_eq!(slots.len(), 3);
+        // Only non-`Maybe` cells are emitted — `Maybe` is the default an unlisted
+        // hour reads back as, so the Fri 20 `Maybe` cell is not sent as a slot.
+        assert_eq!(slots.len(), 2);
 
         let restored = slots_to_availability(slots).unwrap();
         assert_eq!(restored.get(Weekday::Mon, 8), AvailabilityState::Yes);
         assert_eq!(restored.get(Weekday::Wed, 14), AvailabilityState::No);
+        // Unlisted ⇒ Maybe, so the round-trip still yields the original value.
         assert_eq!(restored.get(Weekday::Fri, 20), AvailabilityState::Maybe);
     }
 
@@ -2101,11 +2124,14 @@ mod tests {
 // ── Override conversions ──────────────────────────────────────────────────────
 
 fn day_availability_to_slots(avail: &DayAvailability) -> Vec<DayAvailabilitySlot> {
+    // Dense grid → sparse slots: emit only non-`Maybe` cells.
     avail
         .0
         .iter()
-        .map(|(&hour, &state)| DayAvailabilitySlot {
-            hour,
+        .enumerate()
+        .filter(|(_, state)| **state != AvailabilityState::Maybe)
+        .map(|(hour, &state)| DayAvailabilitySlot {
+            hour: hour as u8,
             state: state.to_string(),
         })
         .collect()

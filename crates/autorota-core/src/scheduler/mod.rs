@@ -168,9 +168,29 @@ impl SchedulerState {
 
 // ─── Eligibility ─────────────────────────────────────────────
 
+/// Per-shift geometry that is constant across all employees. Computed once per
+/// shift instead of re-deriving `shift_interval` / `daily_hour_portions` /
+/// `duration_hours` inside the per-employee eligibility loop.
+struct ShiftCtx {
+    interval: (NaiveDateTime, NaiveDateTime),
+    portions: [(NaiveDate, f32); 2],
+    duration: f32,
+}
+
+impl ShiftCtx {
+    fn new(shift: &Shift) -> Self {
+        Self {
+            interval: shift_interval(shift),
+            portions: daily_hour_portions(shift),
+            duration: shift.duration_hours(),
+        }
+    }
+}
+
 fn is_eligible(
     employee: &Employee,
     shift: &Shift,
+    ctx: &ShiftCtx,
     state: &SchedulerState,
     avail_override_map: &HashMap<(i64, NaiveDate), &EmployeeAvailabilityOverride>,
 ) -> bool {
@@ -210,7 +230,7 @@ fn is_eligible(
 
     // Must have daily budget remaining on every day the shift touches
     // (an overnight shift's tail counts toward the following day).
-    for (day, hours) in daily_hour_portions(shift) {
+    for (day, hours) in ctx.portions {
         if hours > 0.0
             && state.employee_daily_hours(employee.id, day) + hours > employee.max_daily_hours
         {
@@ -220,12 +240,12 @@ fn is_eligible(
 
     // Must have weekly budget remaining
     let weekly = state.employee_weekly_hours(employee.id);
-    if weekly + shift.duration_hours() > employee.max_weekly_hours() {
+    if weekly + ctx.duration > employee.max_weekly_hours() {
         return false;
     }
 
     // Must not overlap with another shift on the same day
-    if has_time_overlap(employee.id, shift, state) {
+    if has_time_overlap(employee.id, ctx.interval, state) {
         return false;
     }
 
@@ -236,8 +256,11 @@ fn is_eligible(
 /// `SchedulerState::intervals`), rather than scanning every assignment.
 /// Overnight shifts are handled by `shift_interval`, which extends the end
 /// past midnight into the following day.
-fn has_time_overlap(employee_id: i64, shift: &Shift, state: &SchedulerState) -> bool {
-    let (start, end) = shift_interval(shift);
+fn has_time_overlap(
+    employee_id: i64,
+    (start, end): (NaiveDateTime, NaiveDateTime),
+    state: &SchedulerState,
+) -> bool {
     let Some(intervals) = state.intervals.get(&employee_id) else {
         return false;
     };
@@ -283,17 +306,19 @@ fn role_deficits(
 /// previous stable sort-descending + take-first behavior exactly.
 #[allow(clippy::too_many_arguments)]
 fn best_candidate<'a>(
-    employees: &'a [Employee],
+    candidates: &[&'a Employee],
     shift: &Shift,
+    ctx: &ShiftCtx,
     state: &SchedulerState,
     avail_override_map: &HashMap<(i64, NaiveDate), &EmployeeAvailabilityOverride>,
     tiebreak_keys: &HashMap<i64, u64>,
     role: Option<&str>,
 ) -> Option<&'a Employee> {
-    employees
+    candidates
         .iter()
+        .copied()
         .filter(|e| role.is_none_or(|r| e.has_role(r)))
-        .filter(|e| is_eligible(e, shift, state, avail_override_map))
+        .filter(|e| is_eligible(e, shift, ctx, state, avail_override_map))
         .map(|e| {
             let weekly = state.employee_weekly_hours(e.id);
             let daily = state.employee_daily_hours(e.id, shift.date);
@@ -391,31 +416,52 @@ pub fn schedule_pure(
         .filter(|s| state.slots_filled(s.id) < s.max_employees)
         .collect();
 
-    let difficulty: HashMap<i64, usize> = shift_order
+    // Per shift, compute the geometry (`ctx`) and the eligible set exactly once,
+    // then reuse both through the greedy fill. The eligible set here is computed
+    // against the post-Pass-1 state; eligibility is monotonically non-increasing
+    // as the greedy loop only adds assignments (hours grow, intervals accrue,
+    // availability/role are static), so this set is a sound *candidate pool* —
+    // a superset of who is eligible at any later point. `best_candidate`
+    // re-checks the dynamic predicates, so correctness is preserved while the
+    // per-slot scan shrinks from the whole roster to just this pool.
+    struct ShiftPlan<'a> {
+        ctx: ShiftCtx,
+        pool: Vec<&'a Employee>,
+        difficulty: usize,
+    }
+
+    let plans: HashMap<i64, ShiftPlan> = shift_order
         .iter()
         .map(|s| {
-            // Compute the eligible set once per shift; per-role holder counts
-            // are derived from it instead of re-running eligibility.
-            let eligible: Vec<&Employee> = employees
+            let ctx = ShiftCtx::new(s);
+            let pool: Vec<&Employee> = employees
                 .iter()
-                .filter(|e| is_eligible(e, s, &state, &avail_override_map))
+                .filter(|e| is_eligible(e, s, &ctx, &state, &avail_override_map))
                 .collect();
-            let diff = if s.has_required_role() {
+            // Per-role holder counts are derived from the pool, not re-run.
+            let difficulty = if s.has_required_role() {
                 s.role_requirements
                     .iter()
-                    .map(|req| eligible.iter().filter(|e| e.has_role(&req.role)).count())
+                    .map(|req| pool.iter().filter(|e| e.has_role(&req.role)).count())
                     .min()
-                    .unwrap_or(eligible.len())
+                    .unwrap_or(pool.len())
             } else {
-                eligible.len()
+                pool.len()
             };
-            (s.id, diff)
+            (
+                s.id,
+                ShiftPlan {
+                    ctx,
+                    pool,
+                    difficulty,
+                },
+            )
         })
         .collect();
 
     shift_order.sort_by(|a, b| {
-        let diff_a = difficulty.get(&a.id).copied().unwrap_or(0);
-        let diff_b = difficulty.get(&b.id).copied().unwrap_or(0);
+        let diff_a = plans.get(&a.id).map(|p| p.difficulty).unwrap_or(0);
+        let diff_b = plans.get(&b.id).map(|p| p.difficulty).unwrap_or(0);
         diff_a
             .cmp(&diff_b) // fewest eligible first
             .then(b.effective_min().cmp(&a.effective_min())) // larger needs first
@@ -424,6 +470,9 @@ pub fn schedule_pure(
     });
 
     for shift in &shift_order {
+        let plan = &plans[&shift.id];
+        let ctx = &plan.ctx;
+        let pool = &plan.pool;
         // ── Stage 1: cover each role minimum (shared coverage) ──
         // One employee who holds several required roles reduces several deficits
         // at once. Always pick the role with the largest remaining deficit.
@@ -437,12 +486,13 @@ pub fn schedule_pure(
                 .unwrap();
 
             match best_candidate(
-                employees,
+                pool,
                 shift,
+                ctx,
                 &state,
                 &avail_override_map,
                 &tiebreak_keys,
-                Some(&role),
+                Some(role.as_str()),
             ) {
                 Some(emp) => {
                     state.record_assignment(
@@ -482,8 +532,9 @@ pub fn schedule_pure(
         // ── Stage 2: fill non-reserved slots with any eligible employee ──
         while state.slots_filled(shift.id) < stage2_cap {
             let Some(emp) = best_candidate(
-                employees,
+                pool,
                 shift,
+                ctx,
                 &state,
                 &avail_override_map,
                 &tiebreak_keys,

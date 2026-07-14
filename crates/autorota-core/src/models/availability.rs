@@ -59,21 +59,59 @@ fn str_to_weekday(s: &str) -> Result<Weekday, String> {
     }
 }
 
+const HOURS_PER_DAY: usize = 24;
+const DAYS_PER_WEEK: usize = 7;
+
+/// Mon..Sun → 0..6, matching `weekday_to_str` / `str_to_weekday`.
+fn weekday_index(wd: Weekday) -> usize {
+    wd.num_days_from_monday() as usize
+}
+
+fn weekday_from_index(i: usize) -> Weekday {
+    match i {
+        0 => Weekday::Mon,
+        1 => Weekday::Tue,
+        2 => Weekday::Wed,
+        3 => Weekday::Thu,
+        4 => Weekday::Fri,
+        5 => Weekday::Sat,
+        _ => Weekday::Sun,
+    }
+}
+
 /// Hour-by-hour availability for a single employee.
-/// Keyed by (weekday, hour_of_day) where hour_of_day is 0–23.
 ///
-/// Custom serde serializes as `{"Mon:8": "Yes", "Tue:14": "Maybe", ...}`
-/// so the map is valid JSON (JSON object keys must be strings).
-#[derive(Debug, Clone, Default)]
-pub struct Availability(pub HashMap<(Weekday, u8), AvailabilityState>);
+/// Backed by a dense `[[state; 24]; 7]` grid indexed by (weekday, hour_of_day)
+/// where hour_of_day is 0–23. Every cell defaults to `Maybe`, so an unset grid
+/// reads exactly like the old sparse map (missing key ⇒ `Maybe`). The dense
+/// layout removes per-hour hashing and the boxed iterator from the scheduler's
+/// hot `for_window` path, and makes out-of-range hours structurally impossible.
+///
+/// Custom serde serializes only the non-`Maybe` cells as
+/// `{"Mon:8": "Yes", "Tue:14": "No", ...}` — a sparse, valid-JSON map that is
+/// semantically equivalent to the legacy format (unlisted cells read as `Maybe`).
+#[derive(Debug, Clone)]
+pub struct Availability(pub [[AvailabilityState; HOURS_PER_DAY]; DAYS_PER_WEEK]);
+
+impl Default for Availability {
+    fn default() -> Self {
+        Availability([[AvailabilityState::Maybe; HOURS_PER_DAY]; DAYS_PER_WEEK])
+    }
+}
 
 impl Serialize for Availability {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeMap;
-        let mut map = serializer.serialize_map(Some(self.0.len()))?;
-        for (&(wd, hour), &state) in &self.0 {
-            let key = format!("{}:{}", weekday_to_str(wd), hour);
-            map.serialize_entry(&key, &state)?;
+        // Only cells that differ from the `Maybe` default are stored; unlisted
+        // cells read back as `Maybe`. Deterministic (day, hour) order.
+        let mut map = serializer.serialize_map(None)?;
+        for (d, row) in self.0.iter().enumerate() {
+            for (h, &state) in row.iter().enumerate() {
+                if state != AvailabilityState::Maybe {
+                    let key = format!("{}:{}", weekday_to_str(weekday_from_index(d)), h);
+                    map.serialize_entry(&key, &state)?;
+                }
+            }
         }
         map.end()
     }
@@ -82,44 +120,69 @@ impl Serialize for Availability {
 impl<'de> Deserialize<'de> for Availability {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let raw: HashMap<String, AvailabilityState> = HashMap::deserialize(deserializer)?;
-        let mut inner = HashMap::new();
+        let mut grid = Availability::default();
         for (key, state) in raw {
             let (wd_str, hour_str) = key
                 .split_once(':')
                 .ok_or_else(|| serde::de::Error::custom(format!("invalid key: {key}")))?;
             let wd = str_to_weekday(wd_str).map_err(serde::de::Error::custom)?;
             let hour: u8 = hour_str.parse().map_err(serde::de::Error::custom)?;
-            inner.insert((wd, hour), state);
+            // Out-of-range hours are unrepresentable in the dense grid; drop them
+            // (they were never schedulable — the scheduler only probes 0..23).
+            if (hour as usize) < HOURS_PER_DAY {
+                grid.0[weekday_index(wd)][hour as usize] = state;
+            }
         }
-        Ok(Availability(inner))
+        Ok(grid)
     }
 }
 
 impl Availability {
     pub fn get(&self, weekday: Weekday, hour: u8) -> AvailabilityState {
-        self.0
-            .get(&(weekday, hour))
-            .copied()
-            .unwrap_or(AvailabilityState::Maybe)
+        if (hour as usize) >= HOURS_PER_DAY {
+            return AvailabilityState::Maybe;
+        }
+        self.0[weekday_index(weekday)][hour as usize]
     }
 
     pub fn set(&mut self, weekday: Weekday, hour: u8, state: AvailabilityState) {
-        self.0.insert((weekday, hour), state);
+        if (hour as usize) < HOURS_PER_DAY {
+            self.0[weekday_index(weekday)][hour as usize] = state;
+        }
+    }
+
+    /// True when every cell is `Maybe` — i.e. a blank grid the manager never
+    /// touched (equivalent to the old empty sparse map).
+    pub fn is_blank(&self) -> bool {
+        self.0
+            .iter()
+            .flatten()
+            .all(|&s| s == AvailabilityState::Maybe)
     }
 
     /// Returns the worst (minimum) availability state across all hours of a shift window.
     /// Handles overnight shifts where end_hour < start_hour.
+    ///
+    /// A tight scan over one weekday's dense row — no allocation, no hashing.
+    /// `start_hour` is always ≤ 23 (a `NaiveTime` hour), so the window is never
+    /// empty; `Yes` is the min-fold identity.
     pub fn for_window(&self, weekday: Weekday, start_hour: u8, end_hour: u8) -> AvailabilityState {
-        let hours: Box<dyn Iterator<Item = u8>> = if end_hour > start_hour {
-            Box::new(start_hour..end_hour)
+        let row = &self.0[weekday_index(weekday)];
+        let mut worst = AvailabilityState::Yes;
+        if end_hour > start_hour {
+            for h in start_hour..end_hour {
+                worst = worst.min(row[h as usize]);
+            }
         } else {
-            // Overnight: e.g. 07..24 then 0..02
-            Box::new((start_hour..24).chain(0..end_hour))
-        };
-        hours
-            .map(|h| self.get(weekday, h))
-            .min()
-            .unwrap_or(AvailabilityState::No)
+            // Overnight: e.g. 22..24 then 0..02
+            for h in start_hour..HOURS_PER_DAY as u8 {
+                worst = worst.min(row[h as usize]);
+            }
+            for h in 0..end_hour {
+                worst = worst.min(row[h as usize]);
+            }
+        }
+        worst
     }
 
     /// Serialize to a JSON string for database storage.

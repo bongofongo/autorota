@@ -11,6 +11,15 @@ resolver = "2"
 version = "0.1.0"
 edition = "2024"
 
+[profile.release]
+# Thin LTO + a single codegen unit give the scheduler / export hot paths more
+# cross-crate inlining for ~10-20% runtime (and a smaller dylib — see
+# docs/performance.md). Benches inherit these settings via the `bench` profile.
+lto = "thin"
+codegen-units = 1
+# `panic = "abort"` + `strip = true` would trim the dylib further but lose
+# backtrace detail; left off until app size becomes a hard constraint.
+
 [workspace.dependencies]
 tokio = { version = "1", features = ["full"] }
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "macros", "migrate"] }

@@ -552,7 +552,7 @@ mod tests {
             .find(|e| e.nickname.as_deref() == Some(TOUR_AVAILABILITY_NICKNAME))
             .unwrap();
         assert!(
-            mercury.default_availability.0.is_empty(),
+            mercury.default_availability.is_blank(),
             "Mercury must start with a blank availability grid for the tour"
         );
     }

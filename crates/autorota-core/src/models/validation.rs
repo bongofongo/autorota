@@ -75,12 +75,11 @@ pub fn validate_shift(s: &Shift) -> Result<(), ValidationError> {
     Ok(())
 }
 
-pub fn validate_availability(a: &Availability) -> Result<(), ValidationError> {
-    for (&(_, hour), _) in &a.0 {
-        if hour > 23 {
-            return Err(ValidationError::HourOutOfRange(hour as u32));
-        }
-    }
+pub fn validate_availability(_a: &Availability) -> Result<(), ValidationError> {
+    // The dense `[[state; 24]; 7]` grid makes an out-of-range hour
+    // unrepresentable — `set`/deserialize drop anything ≥ 24 — so there is
+    // nothing left to reject here. Kept as a call site for symmetry with the
+    // other validators and in case future fields need per-cell checks.
     Ok(())
 }
 
@@ -195,19 +194,20 @@ mod tests {
     }
 
     #[test]
-    fn availability_rejects_hour_25() {
+    fn availability_out_of_range_hour_is_unrepresentable() {
+        // The dense grid cannot store hour ≥ 24: `set` drops it, so the grid
+        // stays blank and validation trivially passes. Out-of-range availability
+        // is now structurally impossible rather than caught after the fact.
         let mut a = Availability::default();
-        a.0.insert((Weekday::Mon, 25), AvailabilityState::Yes);
-        assert_eq!(
-            validate_availability(&a).unwrap_err(),
-            ValidationError::HourOutOfRange(25)
-        );
+        a.set(Weekday::Mon, 25, AvailabilityState::Yes);
+        assert!(a.is_blank());
+        assert!(validate_availability(&a).is_ok());
     }
 
     #[test]
     fn availability_accepts_hour_23() {
         let mut a = Availability::default();
-        a.0.insert((Weekday::Mon, 23), AvailabilityState::Yes);
+        a.set(Weekday::Mon, 23, AvailabilityState::Yes);
         assert!(validate_availability(&a).is_ok());
     }
 
