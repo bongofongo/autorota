@@ -8,9 +8,9 @@ enum PricingCatalog {
         let region = locale.region?.identifier ?? "US"
         switch region {
         case "GB":
-            return "£3.99"
+            return "£6.99"
         default:
-            return "$3.99"
+            return "$6.99"
         }
     }
 }
