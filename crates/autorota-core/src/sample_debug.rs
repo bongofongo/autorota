@@ -1,36 +1,53 @@
 //! Debug-only sample dataset: the "default" sample.
 //!
-//! A larger, generically-named sibling of [`crate::demo`], meant for manual
-//! testing in debug builds. Like `demo` it writes real rows so the whole app —
-//! scheduler included — runs against it, and it is loaded onto a throwaway
-//! database that the app swaps in and back out (see the Swift
-//! `SampleDataController`). Unlike `demo` there is no guided tour, and the only
-//! entry point is a `#if DEBUG` button in Settings, so it never reaches users.
+//! Seeds a throwaway database (swapped in by the Swift `SampleDataController`)
+//! to look like a real manager has run a small coffee-and-food restaurant
+//! through the app for 3+ months. Debug-only: the sole entry point is a
+//! `#if DEBUG` button in Settings, so it never reaches users.
 //!
-//! Dataset shape:
-//! - 30 employees with plain first/last names, no nicknames, spread across
-//!   four roles and realistic availability archetypes (openers, closers,
-//!   students on evenings/weekends, school-hours staff, weekenders, on-call
-//!   flex), mixing full- and part-time
-//! - four roles: Barista, Kitchen, Front (cashier / front-of-house), Supervisor
-//! - eight shift templates spanning a plausible cafe week, each with meaningful
-//!   min/max headcount and per-role minimums (`role_requirements`)
-//! - no rota / shifts / assignments — the tester presses Generate to build one
+//! What it seeds (all anchored on the `week_start` passed from the app — the
+//! current Monday):
+//! - 18 employees with plain first/last names (the *same* roster every week),
+//!   across three roles: Barista, Kitchen, Supervisor.
+//! - ~7 shift templates for a small restaurant open ~07:00–21:00, with per-role
+//!   minimums and varied min/max headcount.
+//! - A history of availability exceptions (sick days, holidays) scattered
+//!   across the past ~3 months, plus a few upcoming ones.
+//! - A few historical shift-template overrides (an early close, a cancelled
+//!   brunch).
+//! - 16 weekly rotas — 13 past weeks + the current week + 2 ahead — each
+//!   materialised and scheduled. Past & current weeks are `Confirmed`; the two
+//!   future weeks stay `Proposed` (draft). This populates the analytics
+//!   dashboard over the whole range.
+//! - Backdated saves: one per past/current week (dated the weekend before),
+//!   with a second "edit" save on a handful of weeks so the Edit Log shows
+//!   real diffs.
 
-use chrono::{NaiveDate, NaiveTime, Weekday};
+use chrono::{Duration, NaiveDate, NaiveTime, Weekday};
 use sqlx::SqlitePool;
 
 use crate::db::queries;
+use crate::models::assignment::AssignmentStatus;
 use crate::models::availability::{Availability, AvailabilityState};
 use crate::models::employee::Employee;
+use crate::models::overrides::{
+    DayAvailability, EmployeeAvailabilityOverride, OverrideSource, ShiftTemplateOverride,
+};
 use crate::models::shift::{RoleRequirement, ShiftTemplate};
 
 pub const ROLE_BARISTA: &str = "Barista";
 pub const ROLE_KITCHEN: &str = "Kitchen";
-pub const ROLE_FRONT: &str = "Front";
 pub const ROLE_SUPERVISOR: &str = "Supervisor";
 
-const ROLES: [&str; 4] = [ROLE_BARISTA, ROLE_KITCHEN, ROLE_FRONT, ROLE_SUPERVISOR];
+const ROLES: [&str; 3] = [ROLE_BARISTA, ROLE_KITCHEN, ROLE_SUPERVISOR];
+
+/// How far the fabricated history reaches, in weeks either side of the anchor.
+const PAST_WEEKS: i64 = 13;
+const FUTURE_WEEKS: i64 = 2;
+
+/// Past-week offsets that get a second "edit" save (a staff drop), so the Edit
+/// Log shows a real mid-week diff rather than only the initial creation.
+const EDIT_WEEK_OFFSETS: [i64; 5] = [-11, -8, -5, -3, -1];
 
 const ALL_WEEK: [Weekday; 7] = [
     Weekday::Mon,
@@ -52,13 +69,14 @@ const WEEKDAYS: [Weekday; 5] = [
 
 const WEEKEND: [Weekday; 2] = [Weekday::Sat, Weekday::Sun];
 
-/// The sample crew. IDs are local ordinals; the seeder remaps to real row IDs.
+/// The sample crew — 18 employees. IDs are local ordinals; the seeder remaps
+/// them to real row IDs.
 pub fn sample_employees() -> Vec<Employee> {
     use AvailabilityState::{Maybe, No, Yes};
     use Weekday::{Fri, Mon, Sat, Sun, Thu, Tue, Wed};
 
     vec![
-        // ── Supervisors (some double as barista / kitchen) ──────────────────
+        // ── Supervisors (all double as barista or kitchen) ──────────────────
         emp(
             1,
             "Alex",
@@ -70,15 +88,6 @@ pub fn sample_employees() -> Vec<Employee> {
         ),
         emp(
             2,
-            "Jordan",
-            "Ellis",
-            &[ROLE_SUPERVISOR, ROLE_KITCHEN],
-            40.0,
-            16.00,
-            avail(&[(&WEEKDAYS, 6, 20, Yes), (&WEEKEND, 8, 18, Maybe)]),
-        ),
-        emp(
-            3,
             "Morgan",
             "Reed",
             &[ROLE_SUPERVISOR, ROLE_BARISTA],
@@ -90,17 +99,17 @@ pub fn sample_employees() -> Vec<Employee> {
             ]),
         ),
         emp(
-            4,
-            "Taylor",
-            "Brooks",
-            &[ROLE_SUPERVISOR, ROLE_FRONT],
-            24.0,
-            14.75,
-            avail(&[(&[Fri, Sat, Sun], 8, 22, Yes), (&WEEKDAYS, 16, 22, Maybe)]),
+            3,
+            "Jordan",
+            "Ellis",
+            &[ROLE_SUPERVISOR, ROLE_KITCHEN],
+            40.0,
+            16.00,
+            avail(&[(&WEEKDAYS, 6, 20, Yes), (&WEEKEND, 8, 18, Maybe)]),
         ),
         // ── Baristas ────────────────────────────────────────────────────────
         emp(
-            5,
+            4,
             "Sam",
             "Patel",
             &[ROLE_BARISTA],
@@ -110,7 +119,7 @@ pub fn sample_employees() -> Vec<Employee> {
         ),
         // Riley: student — weekday evenings plus full weekends.
         emp(
-            6,
+            5,
             "Riley",
             "Chen",
             &[ROLE_BARISTA],
@@ -124,7 +133,7 @@ pub fn sample_employees() -> Vec<Employee> {
         ),
         // Casey: early-bird opener — mornings only.
         emp(
-            7,
+            6,
             "Casey",
             "Nguyen",
             &[ROLE_BARISTA],
@@ -138,7 +147,7 @@ pub fn sample_employees() -> Vec<Employee> {
             ]),
         ),
         emp(
-            8,
+            7,
             "Jamie",
             "Foster",
             &[ROLE_BARISTA],
@@ -148,7 +157,7 @@ pub fn sample_employees() -> Vec<Employee> {
         ),
         // Avery: weekender who also covers Friday nights.
         emp(
-            9,
+            8,
             "Avery",
             "Bennett",
             &[ROLE_BARISTA],
@@ -162,7 +171,7 @@ pub fn sample_employees() -> Vec<Employee> {
         ),
         // Quinn: dedicated closer.
         emp(
-            10,
+            9,
             "Quinn",
             "Murphy",
             &[ROLE_BARISTA],
@@ -170,22 +179,9 @@ pub fn sample_employees() -> Vec<Employee> {
             11.90,
             avail(&[(&ALL_WEEK, 15, 22, Yes), (&ALL_WEEK, 6, 15, No)]),
         ),
-        emp(
-            11,
-            "Drew",
-            "Sullivan",
-            &[ROLE_BARISTA, ROLE_FRONT],
-            35.0,
-            13.00,
-            avail(&[
-                (&WEEKDAYS, 9, 17, Yes),
-                (&[Sat], 9, 15, Maybe),
-                (&[Sun], 6, 22, No),
-            ]),
-        ),
         // Harper: student — two fixed evenings plus Sundays.
         emp(
-            12,
+            10,
             "Harper",
             "Diaz",
             &[ROLE_BARISTA],
@@ -197,42 +193,9 @@ pub fn sample_employees() -> Vec<Employee> {
                 (&[Tue, Thu, Fri, Sat], 6, 22, No),
             ]),
         ),
-        // Emerson: school-hours — weekdays inside the school run.
-        emp(
-            13,
-            "Emerson",
-            "Walsh",
-            &[ROLE_BARISTA],
-            22.0,
-            12.30,
-            avail(&[
-                (&WEEKDAYS, 9, 15, Yes),
-                (&WEEKDAYS, 15, 22, No),
-                (&WEEKEND, 6, 22, No),
-            ]),
-        ),
-        emp(
-            14,
-            "Reese",
-            "Coleman",
-            &[ROLE_BARISTA, ROLE_KITCHEN],
-            37.0,
-            13.50,
-            avail(&[(&ALL_WEEK, 7, 19, Yes)]),
-        ),
-        // Skylar: flexible on-call — will take anything, commits to nothing.
-        emp(
-            15,
-            "Skylar",
-            "Flores",
-            &[ROLE_BARISTA],
-            15.0,
-            11.20,
-            avail(&[(&ALL_WEEK, 6, 22, Maybe)]),
-        ),
         // Rowan: mornings, firm early week, tentative later.
         emp(
-            16,
+            11,
             "Rowan",
             "Price",
             &[ROLE_BARISTA],
@@ -244,18 +207,9 @@ pub fn sample_employees() -> Vec<Employee> {
                 (&WEEKEND, 6, 22, No),
             ]),
         ),
-        emp(
-            17,
-            "Micah",
-            "Hughes",
-            &[ROLE_BARISTA],
-            38.0,
-            13.10,
-            avail(&[(&ALL_WEEK, 13, 22, Yes), (&ALL_WEEK, 6, 13, No)]),
-        ),
         // ── Kitchen ─────────────────────────────────────────────────────────
         emp(
-            18,
+            12,
             "Dana",
             "Rivera",
             &[ROLE_KITCHEN],
@@ -264,7 +218,7 @@ pub fn sample_employees() -> Vec<Employee> {
             avail(&[(&ALL_WEEK, 6, 20, Yes)]),
         ),
         emp(
-            19,
+            13,
             "Elliot",
             "Grant",
             &[ROLE_KITCHEN],
@@ -274,7 +228,7 @@ pub fn sample_employees() -> Vec<Employee> {
         ),
         // Frankie: kitchen opener — mornings.
         emp(
-            20,
+            14,
             "Frankie",
             "Long",
             &[ROLE_KITCHEN],
@@ -283,7 +237,7 @@ pub fn sample_employees() -> Vec<Employee> {
             avail(&[(&ALL_WEEK, 7, 14, Yes), (&ALL_WEEK, 14, 22, No)]),
         ),
         emp(
-            21,
+            15,
             "Gabriel",
             "Ortiz",
             &[ROLE_KITCHEN],
@@ -294,21 +248,9 @@ pub fn sample_employees() -> Vec<Employee> {
                 (&[Fri], 10, 18, Maybe),
             ]),
         ),
-        emp(
-            22,
-            "Noa",
-            "Bishop",
-            &[ROLE_KITCHEN, ROLE_FRONT],
-            20.0,
-            12.10,
-            avail(&[
-                (&[Wed, Thu, Fri, Sat], 9, 20, Yes),
-                (&[Sun, Mon, Tue], 6, 22, No),
-            ]),
-        ),
         // Kai: kitchen closer.
         emp(
-            23,
+            16,
             "Kai",
             "Watson",
             &[ROLE_KITCHEN],
@@ -318,7 +260,7 @@ pub fn sample_employees() -> Vec<Employee> {
         ),
         // Lena: weekender.
         emp(
-            24,
+            17,
             "Lena",
             "Fisher",
             &[ROLE_KITCHEN],
@@ -326,85 +268,21 @@ pub fn sample_employees() -> Vec<Employee> {
             11.80,
             avail(&[(&WEEKEND, 8, 20, Yes), (&WEEKDAYS, 6, 22, No)]),
         ),
-        // ── Front (cashier / front-of-house) ────────────────────────────────
+        // Reese: flexes across both coffee and food.
         emp(
-            25,
-            "Priya",
-            "Shah",
-            &[ROLE_FRONT],
-            20.0,
-            11.75,
-            avail(&[
-                (&WEEKDAYS, 8, 16, Yes),
-                (&[Sat], 9, 15, Maybe),
-                (&[Sun], 6, 22, No),
-            ]),
-        ),
-        emp(
-            26,
-            "Oscar",
-            "Dunn",
-            &[ROLE_FRONT],
-            35.0,
-            12.50,
-            avail(&[(&ALL_WEEK, 8, 20, Yes)]),
-        ),
-        // Ivy: student — evenings and weekends.
-        emp(
-            27,
-            "Ivy",
-            "Barrett",
-            &[ROLE_FRONT],
-            14.0,
-            11.30,
-            avail(&[
-                (&[Tue, Thu], 17, 22, Yes),
-                (&WEEKEND, 9, 21, Yes),
-                (&[Mon, Wed, Fri], 6, 22, No),
-            ]),
-        ),
-        emp(
-            28,
-            "Theo",
-            "Marsh",
-            &[ROLE_FRONT],
-            18.0,
-            11.70,
-            avail(&[
-                (&[Mon, Tue, Wed], 11, 19, Yes),
-                (&[Thu, Fri], 11, 19, Maybe),
-            ]),
-        ),
-        emp(
-            29,
-            "Nadia",
-            "Khan",
-            &[ROLE_FRONT, ROLE_BARISTA],
-            22.0,
-            12.20,
-            avail(&[
-                (&[Thu, Fri, Sat, Sun], 10, 21, Yes),
-                (&[Mon, Tue, Wed], 6, 22, No),
-            ]),
-        ),
-        // Leo: weekender.
-        emp(
-            30,
-            "Leo",
-            "Vance",
-            &[ROLE_FRONT],
-            16.0,
-            11.60,
-            avail(&[
-                (&WEEKEND, 8, 22, Yes),
-                (&[Fri], 16, 22, Maybe),
-                (&[Mon, Tue, Wed, Thu], 6, 22, No),
-            ]),
+            18,
+            "Reese",
+            "Coleman",
+            &[ROLE_BARISTA, ROLE_KITCHEN],
+            37.0,
+            13.50,
+            avail(&[(&ALL_WEEK, 7, 19, Yes)]),
         ),
     ]
 }
 
-/// Eight templates spanning a plausible cafe week, with per-role minimums.
+/// Seven templates for a small coffee-and-food restaurant (open ~07:00–21:00),
+/// with per-role minimums and modest headcount so most weeks staff cleanly.
 pub fn sample_templates() -> Vec<ShiftTemplate> {
     vec![
         tmpl(
@@ -414,61 +292,51 @@ pub fn sample_templates() -> Vec<ShiftTemplate> {
             11,
             &ALL_WEEK,
             2,
-            4,
-            &[(ROLE_SUPERVISOR, 1), (ROLE_BARISTA, 2)],
+            3,
+            &[(ROLE_SUPERVISOR, 1), (ROLE_BARISTA, 1)],
         ),
         tmpl(
             2,
-            "Morning Peak",
-            8,
-            12,
-            &ALL_WEEK,
-            3,
-            5,
-            &[(ROLE_BARISTA, 3), (ROLE_FRONT, 1)],
-        ),
-        tmpl(
-            3,
             "Kitchen AM",
             8,
             14,
             &ALL_WEEK,
-            2,
-            3,
-            &[(ROLE_KITCHEN, 2)],
-        ),
-        tmpl(
-            4,
-            "Lunch Rush",
-            11,
-            15,
-            &ALL_WEEK,
-            3,
-            5,
-            &[(ROLE_BARISTA, 2), (ROLE_FRONT, 2)],
-        ),
-        tmpl(
-            5,
-            "Afternoon",
-            14,
-            18,
-            &ALL_WEEK,
-            2,
-            3,
-            &[(ROLE_BARISTA, 2)],
-        ),
-        tmpl(
-            6,
-            "Kitchen PM",
-            14,
-            20,
-            &WEEKDAYS,
             1,
             2,
             &[(ROLE_KITCHEN, 1)],
         ),
         tmpl(
-            7,
+            3,
+            "Lunch",
+            11,
+            15,
+            &ALL_WEEK,
+            3,
+            4,
+            &[(ROLE_BARISTA, 2), (ROLE_KITCHEN, 1)],
+        ),
+        tmpl(
+            4,
+            "Afternoon",
+            14,
+            18,
+            &ALL_WEEK,
+            1,
+            2,
+            &[(ROLE_BARISTA, 1)],
+        ),
+        tmpl(
+            5,
+            "Kitchen PM",
+            16,
+            21,
+            &ALL_WEEK,
+            1,
+            2,
+            &[(ROLE_KITCHEN, 1)],
+        ),
+        tmpl(
+            6,
             "Close",
             17,
             21,
@@ -478,37 +346,184 @@ pub fn sample_templates() -> Vec<ShiftTemplate> {
             &[(ROLE_SUPERVISOR, 1), (ROLE_BARISTA, 1)],
         ),
         tmpl(
-            8,
+            7,
             "Weekend Brunch",
             9,
             14,
             &WEEKEND,
+            3,
             4,
-            6,
-            &[(ROLE_BARISTA, 3), (ROLE_KITCHEN, 2), (ROLE_FRONT, 1)],
+            &[(ROLE_BARISTA, 2), (ROLE_KITCHEN, 1)],
         ),
     ]
 }
 
-/// Seed the sample dataset into `pool`. Expects an empty (freshly migrated)
-/// database; running twice creates duplicates.
+/// Availability exceptions (day-off overrides), each anchored on `anchor` by a
+/// `(week_offset, day_offset)` pair. `employee_id` is a local ordinal — the
+/// seeder remaps it. Negative week offsets are the past history; positive ones
+/// are upcoming.
+fn sample_exceptions(anchor: NaiveDate) -> Vec<EmployeeAvailabilityOverride> {
+    // (employee ordinal, week offset, day-of-week offset, note)
+    const HISTORY: [(i64, i64, i64, &str); 19] = [
+        // Past ~3 months.
+        (5, -12, 1, "Sick day"),
+        (17, -11, 6, "Sick day"),
+        (7, -10, 5, "Family event"),
+        (18, -9, 5, "Holiday — away"),
+        (4, -8, 2, "Personal day"),
+        (14, -7, 4, "Holiday"),
+        (6, -6, 1, "Dentist"),
+        (15, -6, 3, "Sick day"),
+        (16, -5, 6, "Sick day"),
+        (8, -4, 5, "Away"),
+        (3, -4, 1, "Conference"),
+        (11, -3, 2, "Sick day"),
+        (13, -2, 3, "Holiday — away"),
+        (10, -1, 4, "Personal day"),
+        (9, -9, 0, "Sick day"),
+        (12, -11, 3, "Holiday — away"),
+        // Upcoming.
+        (5, 1, 2, "Booked holiday"),
+        (4, 1, 4, "Dentist appointment"),
+        (12, 2, 3, "Holiday — away"),
+    ];
+
+    HISTORY
+        .iter()
+        .enumerate()
+        .map(|(i, &(emp, wk, day, note))| {
+            let date = anchor + Duration::days(wk * 7 + day);
+            off_day((i as i64) + 1, emp, date, note)
+        })
+        .collect()
+}
+
+/// A few historical shift-template overrides (early closes / cancellations).
+/// `template_id` is a local ordinal — the seeder remaps it.
+fn sample_template_overrides(anchor: NaiveDate) -> Vec<ShiftTemplateOverride> {
+    let mk = |id: i64,
+              template: i64,
+              wk: i64,
+              day: i64,
+              cancelled: bool,
+              max: Option<u32>,
+              note: &str| {
+        ShiftTemplateOverride {
+            id,
+            template_id: template,
+            date: anchor + Duration::days(wk * 7 + day),
+            cancelled,
+            start_time: None,
+            end_time: None,
+            min_employees: None,
+            max_employees: max,
+            notes: Some(note.to_string()),
+        }
+    };
+    vec![
+        // Close cancelled on a bank-holiday Monday (early close).
+        mk(1, 6, -6, 0, true, None, "Bank holiday — closed early"),
+        // Weekend brunch cancelled for a private event.
+        mk(2, 7, -8, 6, true, None, "Private event"),
+        // Quiet Saturday lunch — capped smaller.
+        mk(3, 3, -3, 5, false, Some(2), "Quiet Saturday"),
+    ]
+}
+
+/// Seed the full sample dataset (roster + 3-month history) into `pool`.
+/// Expects an empty (freshly migrated) database; running twice creates
+/// duplicates. `anchor` is the current-week Monday the history centres on.
 pub async fn seed_sample_debug_data(
     pool: &SqlitePool,
-    _week_start: NaiveDate,
+    anchor: NaiveDate,
 ) -> Result<(), sqlx::Error> {
+    use std::collections::HashMap;
+
+    // Roles, employees, templates — remembering the real IDs so overrides can
+    // reference them.
     for role in ROLES {
         queries::insert_role(pool, role).await?;
     }
 
+    let mut emp_id_map: HashMap<i64, i64> = HashMap::new();
     for emp in sample_employees() {
-        queries::insert_employee(pool, &emp).await?;
+        let new_id = queries::insert_employee(pool, &emp).await?;
+        emp_id_map.insert(emp.id, new_id);
     }
 
+    let mut tmpl_id_map: HashMap<i64, i64> = HashMap::new();
     for tmpl in sample_templates() {
-        queries::insert_shift_template(pool, &tmpl).await?;
+        let new_id = queries::insert_shift_template(pool, &tmpl).await?;
+        tmpl_id_map.insert(tmpl.id, new_id);
+    }
+
+    // Exceptions & template overrides up front — they're date-keyed, so they're
+    // in place before each week is materialised/scheduled and thus bake into
+    // that week's assignments.
+    for mut ovr in sample_exceptions(anchor) {
+        ovr.employee_id = emp_id_map[&ovr.employee_id];
+        queries::upsert_employee_availability_override(pool, &ovr).await?;
+    }
+    for mut ovr in sample_template_overrides(anchor) {
+        ovr.template_id = tmpl_id_map[&ovr.template_id];
+        queries::upsert_shift_template_override(pool, &ovr).await?;
+    }
+
+    // Generate every week: 13 past + current + 2 future.
+    for offset in -PAST_WEEKS..=FUTURE_WEEKS {
+        let week = anchor + Duration::days(offset * 7);
+        let is_history = offset <= 0; // past + current
+
+        let rota_id = queries::insert_rota(pool, week).await?;
+        queries::materialise_shifts(pool, rota_id, week).await?;
+        crate::scheduler::schedule(pool, rota_id)
+            .await
+            .map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+
+        if !is_history {
+            continue; // future weeks stay Proposed drafts, unsaved
+        }
+
+        queries::set_rota_assignments_status(pool, rota_id, AssignmentStatus::Confirmed).await?;
+
+        // Save dated the weekend before (the "built next week's rota" moment).
+        let first_saved_at = rfc3339_at(week - Duration::days(2), 18);
+        queries::create_save_at(pool, rota_id, &first_saved_at).await?;
+
+        // On a handful of weeks, simulate a mid-week edit (a staff drop) and
+        // save again so the Edit Log shows a real diff.
+        if EDIT_WEEK_OFFSETS.contains(&offset) {
+            let assignments = queries::list_assignments_for_rota(pool, rota_id).await?;
+            if let Some(first) = assignments.first() {
+                queries::delete_assignment(pool, first.id).await?;
+                let second_saved_at = rfc3339_at(week - Duration::days(1), 12);
+                queries::create_save_at(pool, rota_id, &second_saved_at).await?;
+            }
+        }
     }
 
     Ok(())
+}
+
+/// Build an RFC3339 UTC timestamp for `date` at the given hour.
+fn rfc3339_at(date: NaiveDate, hour: u32) -> String {
+    date.and_hms_opt(hour, 0, 0).unwrap().and_utc().to_rfc3339()
+}
+
+/// An all-day "unavailable" exception for one employee on one date.
+fn off_day(id: i64, employee_id: i64, date: NaiveDate, note: &str) -> EmployeeAvailabilityOverride {
+    let mut day = DayAvailability::default();
+    for h in 6..22u8 {
+        day.set(h, AvailabilityState::No);
+    }
+    EmployeeAvailabilityOverride {
+        id,
+        employee_id,
+        date,
+        availability: day,
+        notes: Some(note.to_string()),
+        source: OverrideSource::Exception,
+    }
 }
 
 fn emp(
@@ -597,27 +612,25 @@ fn tmpl(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::shift::Shift;
-    use crate::scheduler;
-    use chrono::{Datelike, Duration};
+    use chrono::Datelike;
 
-    async fn seeded_pool() -> SqlitePool {
+    async fn seeded_pool() -> (SqlitePool, NaiveDate) {
         let pool = crate::db::connect("sqlite::memory:").await.unwrap();
-        seed_sample_debug_data(&pool, sample_week()).await.unwrap();
-        pool
+        let anchor = anchor_week();
+        seed_sample_debug_data(&pool, anchor).await.unwrap();
+        (pool, anchor)
     }
 
-    fn sample_week() -> NaiveDate {
+    fn anchor_week() -> NaiveDate {
         NaiveDate::from_ymd_opt(2099, 4, 20).unwrap() // a Monday
     }
 
     #[tokio::test]
-    async fn seeds_thirty_employees_four_roles_eight_templates() {
-        let pool = seeded_pool().await;
+    async fn seeds_roster_and_templates() {
+        let (pool, _) = seeded_pool().await;
 
         let employees = queries::list_employees(&pool).await.unwrap();
-        assert_eq!(employees.len(), 30);
-        // Generic names only — no nicknames.
+        assert_eq!(employees.len(), 18);
         assert!(employees.iter().all(|e| e.nickname.is_none()));
 
         let roles = queries::list_roles(&pool).await.unwrap();
@@ -626,62 +639,132 @@ mod tests {
         }
 
         let templates = queries::list_shift_templates(&pool).await.unwrap();
-        assert_eq!(templates.len(), 8);
-        // At least one template carries multiple per-role requirements.
+        assert_eq!(templates.len(), 7);
         assert!(templates.iter().any(|t| t.role_requirements.len() >= 2));
     }
 
     #[tokio::test]
-    async fn fulltime_and_parttime_mix() {
-        let employees = sample_employees();
-        let ft = employees
-            .iter()
-            .filter(|e| e.target_weekly_hours >= 30.0)
-            .count();
-        let pt = employees
-            .iter()
-            .filter(|e| e.target_weekly_hours < 30.0)
-            .count();
-        assert!(ft >= 5, "want several full-timers, got {ft}");
-        assert!(pt >= 5, "want several part-timers, got {pt}");
+    async fn generates_sixteen_weeks_of_rotas_with_assignments() {
+        let (pool, anchor) = seeded_pool().await;
+
+        let mut populated = 0;
+        for offset in -PAST_WEEKS..=FUTURE_WEEKS {
+            let week = anchor + Duration::days(offset * 7);
+            let rota = queries::get_rota_by_week(&pool, week)
+                .await
+                .unwrap()
+                .expect("rota should exist for every week");
+            let assignments = queries::list_assignments_for_rota(&pool, rota.id)
+                .await
+                .unwrap();
+            if !assignments.is_empty() {
+                populated += 1;
+            }
+        }
+        assert_eq!(populated as i64, PAST_WEEKS + 1 + FUTURE_WEEKS);
     }
 
     #[tokio::test]
-    async fn scheduler_fills_sample_week() {
-        let week = sample_week();
-        assert_eq!(week.weekday(), Weekday::Mon);
-        let pool = seeded_pool().await;
+    async fn past_confirmed_future_proposed() {
+        let (pool, anchor) = seeded_pool().await;
 
-        // Materialise the week's shifts from templates, mirroring the app's
-        // run-schedule flow before scheduling.
-        let rota_id = queries::insert_rota(&pool, week).await.unwrap();
-        let templates = queries::list_shift_templates(&pool).await.unwrap();
-        for tmpl in &templates {
-            for d in 0..7 {
-                let date = week + Duration::days(d);
-                if !tmpl.weekdays.contains(&date.weekday()) {
-                    continue;
-                }
-                let shift = Shift {
-                    id: 0,
-                    template_id: Some(tmpl.id),
-                    rota_id,
-                    date,
-                    start_time: tmpl.start_time,
-                    end_time: tmpl.end_time,
-                    required_role: tmpl.required_role.clone(),
-                    min_employees: tmpl.min_employees,
-                    max_employees: tmpl.max_employees,
-                    role_requirements: tmpl.role_requirements.clone(),
-                };
-                queries::insert_shift(&pool, &shift).await.unwrap();
-            }
-        }
+        // Current week (offset 0) → Confirmed.
+        let current = week_statuses(&pool, anchor).await;
+        assert!(!current.is_empty());
+        assert!(current.iter().all(|s| *s == AssignmentStatus::Confirmed));
 
-        let result = scheduler::schedule(&pool, rota_id).await.unwrap();
+        // A future week → Proposed.
+        let future = week_statuses(&pool, anchor + Duration::days(7)).await;
+        assert!(!future.is_empty());
+        assert!(future.iter().all(|s| *s == AssignmentStatus::Proposed));
+    }
+
+    async fn week_statuses(pool: &SqlitePool, week: NaiveDate) -> Vec<AssignmentStatus> {
+        let rota = queries::get_rota_by_week(pool, week)
+            .await
+            .unwrap()
+            .unwrap();
+        queries::list_assignments_for_rota(pool, rota.id)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|a| a.status)
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn exceptions_span_past_and_future() {
+        let (pool, anchor) = seeded_pool().await;
+
+        let past = queries::list_employee_availability_overrides_in_range(
+            &pool,
+            anchor - Duration::days(PAST_WEEKS * 7),
+            anchor,
+        )
+        .await
+        .unwrap();
         assert!(
-            !result.assignments.is_empty(),
-            "scheduler produced no assignments for the sample week"
+            past.len() >= 10,
+            "want many historical exceptions, got {}",
+            past.len()
         );
+        assert!(past.iter().all(|o| o.source == OverrideSource::Exception));
+
+        let future = queries::list_employee_availability_overrides_in_range(
+            &pool,
+            anchor,
+            anchor + Duration::days((FUTURE_WEEKS + 1) * 7),
+        )
+        .await
+        .unwrap();
+        assert!(!future.is_empty(), "want upcoming exceptions too");
+    }
+
+    #[tokio::test]
+    async fn backdated_saves_with_a_real_diff() {
+        let (pool, anchor) = seeded_pool().await;
+
+        let saves = queries::list_saves(&pool, None).await.unwrap();
+        // At least one save per past/current week.
+        assert!(saves.len() as i64 >= PAST_WEEKS + 1);
+
+        // Saves span roughly three months of backdated timestamps.
+        let oldest = saves.iter().map(|s| s.saved_at.as_str()).min().unwrap();
+        let anchor_ts = rfc3339_at(anchor, 0);
+        assert!(
+            oldest < anchor_ts.as_str(),
+            "oldest save should predate the anchor"
+        );
+
+        // An edit week has ≥2 saves for its rota and a non-empty diff.
+        let edit_week = anchor + Duration::days(EDIT_WEEK_OFFSETS[0] * 7);
+        let rota = queries::get_rota_by_week(&pool, edit_week)
+            .await
+            .unwrap()
+            .unwrap();
+        let week_saves = queries::list_saves(&pool, Some(rota.id)).await.unwrap();
+        assert!(week_saves.len() >= 2, "edit week should have two saves");
+        let newest = week_saves.first().unwrap(); // list_saves is DESC
+        let diff = queries::diff_save_vs_previous(&pool, newest.id)
+            .await
+            .unwrap();
+        assert!(!diff.is_empty(), "the edit save should produce a diff");
+    }
+
+    #[tokio::test]
+    async fn analytics_range_is_populated() {
+        let (pool, anchor) = seeded_pool().await;
+        let start = anchor - Duration::days(PAST_WEEKS * 7);
+        let end = anchor + Duration::days(7);
+        let history = queries::list_all_shift_history(&pool, Some(start), Some(end))
+            .await
+            .unwrap();
+        assert!(!history.is_empty(), "analytics source should be non-empty");
+        assert!(history.iter().any(|r| r.hourly_wage.is_some()));
+    }
+
+    #[tokio::test]
+    async fn anchor_is_a_monday() {
+        assert_eq!(anchor_week().weekday(), Weekday::Mon);
     }
 }

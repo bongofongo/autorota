@@ -1067,6 +1067,26 @@ pub async fn update_assignment_status(
     Ok(())
 }
 
+/// Set the status of every assignment in a rota in one statement. Used to
+/// bulk-confirm a whole week (e.g. backfilling a sample dataset's historical
+/// rotas as `Confirmed`).
+pub async fn set_rota_assignments_status(
+    pool: &SqlitePool,
+    rota_id: i64,
+    status: AssignmentStatus,
+) -> Result<(), sqlx::Error> {
+    let now = chrono::Utc::now().to_rfc3339();
+    sqlx::query(
+        "UPDATE assignments SET status = ?, last_modified = ?, sync_status = 0 WHERE rota_id = ?",
+    )
+    .bind(status.to_string())
+    .bind(&now)
+    .bind(rota_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 pub async fn update_assignment_shift(
     pool: &SqlitePool,
     id: i64,
@@ -1694,6 +1714,45 @@ pub async fn create_save(pool: &SqlitePool, rota_id: i64) -> Result<i64, sqlx::E
     )
     .bind(rota_id)
     .bind(&now)
+    .bind(&summary)
+    .bind(&snapshot_json)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(save_id)
+}
+
+/// Like [`create_save`] but stamps a caller-supplied `saved_at` (RFC3339)
+/// instead of the current time. Used to fabricate a backdated save history
+/// (e.g. the debug sample dataset); the Edit Log orders by `saved_at`, so the
+/// timestamp fully controls timeline placement.
+pub async fn create_save_at(
+    pool: &SqlitePool,
+    rota_id: i64,
+    saved_at: &str,
+) -> Result<i64, sqlx::Error> {
+    let snapshot = build_live_snapshot(pool, rota_id).await?;
+
+    if snapshot.shifts.is_empty() {
+        return Err(sqlx::Error::Protocol(
+            "cannot create save: rota has no shifts".into(),
+        ));
+    }
+
+    let snapshot_json =
+        serde_json::to_string(&snapshot).map_err(|e| sqlx::Error::Protocol(e.to_string()))?;
+
+    let summary = generate_save_summary(
+        snapshot.total_shifts,
+        snapshot.unique_employees,
+        snapshot.total_hours,
+    );
+
+    let save_id: i64 = sqlx::query_scalar(
+        "INSERT INTO saves (rota_id, saved_at, summary, snapshot_json) VALUES (?, ?, ?, ?) RETURNING id",
+    )
+    .bind(rota_id)
+    .bind(saved_at)
     .bind(&summary)
     .bind(&snapshot_json)
     .fetch_one(pool)
