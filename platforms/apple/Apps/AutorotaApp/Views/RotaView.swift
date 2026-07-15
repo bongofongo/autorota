@@ -595,7 +595,7 @@ private struct ScheduleGridView: View {
                         // second flash on dismiss.
                         editedShiftId = nil
                         Task {
-                            try? await Task.sleep(nanoseconds: 250_000_000)
+                            try? await Task.sleep(nanoseconds: 150_000_000)
                             flashShiftId = shift.id
                             flashToken += 1
                         }
