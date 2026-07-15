@@ -583,7 +583,19 @@ private struct ScheduleGridView: View {
         }) { sheet in
             switch sheet {
             case .shiftEditor(let shift):
-                ShiftEditorSheet(vm: vm, shift: shift, onEdited: { editedShiftId = shift.id })
+                ShiftEditorSheet(
+                    vm: vm,
+                    shift: shift,
+                    onEdited: { editedShiftId = shift.id },
+                    onSaved: {
+                        // Flash right away — Save auto-dismisses, and waiting
+                        // for onDismiss makes the flash feel late. Clearing the
+                        // session dirty flag stops a second flash on dismiss.
+                        editedShiftId = nil
+                        flashShiftId = shift.id
+                        flashToken += 1
+                    }
+                )
             case .addShift(let date):
                 AddShiftSheet(vm: vm, date: date.id)
             case .addEmployee(let shift):
@@ -1495,10 +1507,13 @@ struct RoleStaffingSection: View {
 private struct ShiftEditorSheet: View {
     let vm: RotaViewModel
     let shift: FfiShiftInfo
-    /// Reports a committed edit (assignment change or Save) so the grid can
-    /// flash the card after the sheet dismisses. Deleting the shift does not
-    /// count — there is no card left to flash.
+    /// Reports a committed mid-session edit (assignment add/remove) so the
+    /// grid can flash the card after the sheet dismisses. Deleting the shift
+    /// does not count — there is no card left to flash.
     var onEdited: () -> Void = {}
+    /// Fires at the moment Save is tapped, so the flash starts with the
+    /// dismissal instead of after it.
+    var onSaved: () -> Void = {}
     @Environment(\.dismiss) private var dismiss
     @State private var startDate: Date
     @State private var endDate: Date
@@ -1508,10 +1523,16 @@ private struct ShiftEditorSheet: View {
     @State private var showAddEmployee = false
     @State private var showDeleteConfirm = false
 
-    init(vm: RotaViewModel, shift: FfiShiftInfo, onEdited: @escaping () -> Void = {}) {
+    init(
+        vm: RotaViewModel,
+        shift: FfiShiftInfo,
+        onEdited: @escaping () -> Void = {},
+        onSaved: @escaping () -> Void = {}
+    ) {
         self.vm = vm
         self.shift = shift
         self.onEdited = onEdited
+        self.onSaved = onSaved
         let fmt = AvailabilityWeekMath.timeFmt
         let base = Calendar.current.startOfDay(for: Date())
         _startDate = State(initialValue: fmt.date(from: shift.startTime) ?? base)
@@ -1608,7 +1629,7 @@ private struct ShiftEditorSheet: View {
                         // Effective min is clamped to the role-derived floor.
                         let (effMin, effMax) = effectiveStaffRange(
                             minStaff: minStaff, maxStaff: maxStaff, roleReqs: roleReqs)
-                        onEdited()
+                        onSaved()
                         Task {
                             await vm.updateShiftTimes(id: shift.id, startTime: start, endTime: end)
                             await vm.updateShift(
