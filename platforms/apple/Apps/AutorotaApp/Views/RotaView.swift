@@ -471,6 +471,13 @@ private struct ScheduleGridView: View {
     /// confirmed. nil when no confirmation is pending.
     @State private var pendingSheet: ScheduleSheet?
     @State private var showUnlockPastConfirmation = false
+    /// Shift touched by a committed edit during the current editor-sheet
+    /// session; consumed on dismiss to trigger the card's green flash.
+    @State private var editedShiftId: Int64?
+    /// Which card should flash, and a token bump so repeat edits on the same
+    /// shift re-fire the animation.
+    @State private var flashShiftId: Int64?
+    @State private var flashToken = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     #if os(iOS)
@@ -564,10 +571,19 @@ private struct ScheduleGridView: View {
                 .background(.regularMaterial)
             }
         }
-        .sheet(item: $activeSheet) { sheet in
+        .sheet(item: $activeSheet, onDismiss: {
+            // A committed edit happened during the editor session → flash the
+            // card. Guarded against deleted shifts (no card left to flash).
+            if let id = editedShiftId,
+               schedule.shifts.contains(where: { $0.id == id }) {
+                flashShiftId = id
+                flashToken += 1
+            }
+            editedShiftId = nil
+        }) { sheet in
             switch sheet {
             case .shiftEditor(let shift):
-                ShiftEditorSheet(vm: vm, shift: shift)
+                ShiftEditorSheet(vm: vm, shift: shift, onEdited: { editedShiftId = shift.id })
             case .addShift(let date):
                 AddShiftSheet(vm: vm, date: date.id)
             case .addEmployee(let shift):
@@ -617,7 +633,8 @@ private struct ScheduleGridView: View {
                                 isEditMode: vm.isEditMode,
                                 isLocked: vm.isShiftLocked(shift),
                                 onEdit: { requestSheet(.shiftEditor(shift)) },
-                                onAddEmployee: { requestSheet(.addEmployee(shift)) }
+                                onAddEmployee: { requestSheet(.addEmployee(shift)) },
+                                flashTrigger: shift.id == flashShiftId ? flashToken : nil
                             )
                             .modifier(FirstShiftTutorialTag(isFirst: shift.id == firstShiftId))
                             .id(shift.id)
@@ -762,7 +779,8 @@ private struct ScheduleGridView: View {
                         isLocked: vm.isShiftLocked(shift),
                         onEdit: { requestSheet(.shiftEditor(shift)) },
                         onAddEmployee: { requestSheet(.addEmployee(shift)) },
-                        isCompact: true
+                        isCompact: true,
+                        flashTrigger: shift.id == flashShiftId ? flashToken : nil
                     )
                     .modifier(FirstShiftTutorialTag(isFirst: shift.id == firstShiftId))
                     .id(shift.id)
@@ -880,8 +898,13 @@ private struct ShiftCard: View {
     /// Sandbox-mode quick-add: opens the employee picker for this shift.
     let onAddEmployee: () -> Void
     var isCompact: Bool = false
+    /// Non-nil when this card was edited in the just-closed editor sheet; a
+    /// value change re-fires the green confirmation flash.
+    var flashTrigger: Int? = nil
 
     @State private var showDeleteConfirm = false
+    @State private var flashActive = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Whether sandbox quick-edit controls are active on this card.
     private var sandboxActive: Bool { isEditMode && !isLocked }
@@ -910,6 +933,23 @@ private struct ShiftCard: View {
                 .fill(.background)
                 .shadow(radius: 1)
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.green.opacity(flashActive ? 0.28 : 0))
+                .allowsHitTesting(false)
+        )
+        .scaleEffect(flashActive && !reduceMotion ? 1.04 : 1.0)
+        .sensoryFeedback(.impact(weight: .light), trigger: flashTrigger) { _, new in new != nil }
+        .onChange(of: flashTrigger) { _, new in
+            guard new != nil else { return }
+            if reduceMotion {
+                withAnimation(.easeIn(duration: 0.15)) { flashActive = true }
+                withAnimation(.easeOut(duration: 0.6).delay(0.4)) { flashActive = false }
+            } else {
+                withAnimation(.spring(duration: 0.3, bounce: 0.45)) { flashActive = true }
+                withAnimation(.easeOut(duration: 0.8).delay(0.4)) { flashActive = false }
+            }
+        }
         .opacity(isLocked && isEditMode ? 0.5 : 1.0)
         // Tapping the card opens the editor only in normal mode. In sandbox
         // mode the card is not tappable-to-edit — quick controls handle edits.
@@ -1455,6 +1495,10 @@ struct RoleStaffingSection: View {
 private struct ShiftEditorSheet: View {
     let vm: RotaViewModel
     let shift: FfiShiftInfo
+    /// Reports a committed edit (assignment change or Save) so the grid can
+    /// flash the card after the sheet dismisses. Deleting the shift does not
+    /// count — there is no card left to flash.
+    var onEdited: () -> Void = {}
     @Environment(\.dismiss) private var dismiss
     @State private var startDate: Date
     @State private var endDate: Date
@@ -1464,9 +1508,10 @@ private struct ShiftEditorSheet: View {
     @State private var showAddEmployee = false
     @State private var showDeleteConfirm = false
 
-    init(vm: RotaViewModel, shift: FfiShiftInfo) {
+    init(vm: RotaViewModel, shift: FfiShiftInfo, onEdited: @escaping () -> Void = {}) {
         self.vm = vm
         self.shift = shift
+        self.onEdited = onEdited
         let fmt = AvailabilityWeekMath.timeFmt
         let base = Calendar.current.startOfDay(for: Date())
         _startDate = State(initialValue: fmt.date(from: shift.startTime) ?? base)
@@ -1515,6 +1560,7 @@ private struct ShiftEditorSheet: View {
                                 }
                                 Spacer()
                                 Button(role: .destructive) {
+                                    onEdited()
                                     Task { await vm.deleteAssignment(id: entry.assignmentId) }
                                 } label: {
                                     Image(systemName: "minus.circle.fill")
@@ -1562,6 +1608,7 @@ private struct ShiftEditorSheet: View {
                         // Effective min is clamped to the role-derived floor.
                         let (effMin, effMax) = effectiveStaffRange(
                             minStaff: minStaff, maxStaff: maxStaff, roleReqs: roleReqs)
+                        onEdited()
                         Task {
                             await vm.updateShiftTimes(id: shift.id, startTime: start, endTime: end)
                             await vm.updateShift(
@@ -1576,7 +1623,7 @@ private struct ShiftEditorSheet: View {
                 }
             }
             .sheet(isPresented: $showAddEmployee) {
-                AddEmployeePickerSheet(vm: vm, shift: shift)
+                AddEmployeePickerSheet(vm: vm, shift: shift, onEdited: onEdited)
             }
             .alert("Delete this shift?", isPresented: $showDeleteConfirm) {
                 Button("Cancel", role: .cancel) {}
@@ -1607,6 +1654,9 @@ private struct ShiftEditorSheet: View {
 private struct AddEmployeePickerSheet: View {
     let vm: RotaViewModel
     let shift: FfiShiftInfo
+    /// Reports the committed assignment when this picker runs inside the shift
+    /// editor session. No-op when opened directly from the grid.
+    var onEdited: () -> Void = {}
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -1622,6 +1672,7 @@ private struct AddEmployeePickerSheet: View {
                 } else {
                     List(available, id: \.id) { employee in
                         Button {
+                            onEdited()
                             Task {
                                 await vm.addEmployeeToShift(shiftId: shift.id, employeeId: employee.id)
                                 dismiss()
