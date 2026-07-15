@@ -588,12 +588,17 @@ private struct ScheduleGridView: View {
                     shift: shift,
                     onEdited: { editedShiftId = shift.id },
                     onSaved: {
-                        // Flash right away — Save auto-dismisses, and waiting
-                        // for onDismiss makes the flash feel late. Clearing the
-                        // session dirty flag stops a second flash on dismiss.
+                        // Save auto-dismisses; waiting for onDismiss makes the
+                        // flash feel late, but firing instantly clashes with
+                        // the button tap — a short beat lands it as the sheet
+                        // slides away. Clearing the session dirty flag stops a
+                        // second flash on dismiss.
                         editedShiftId = nil
-                        flashShiftId = shift.id
-                        flashToken += 1
+                        Task {
+                            try? await Task.sleep(nanoseconds: 250_000_000)
+                            flashShiftId = shift.id
+                            flashToken += 1
+                        }
                     }
                 )
             case .addShift(let date):
