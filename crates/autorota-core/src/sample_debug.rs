@@ -12,6 +12,9 @@
 //!   weekly availability persona — full-timers with fixed days off, students
 //!   on evenings/weekends, dedicated openers/closers, weekenders — chosen so
 //!   every shift/role still has at least one fully-available candidate daily.
+//!   Every persona is bounded to a personal daily working window (e.g. an
+//!   early bird's 04:00–15:00, a closer's 15:00–22:00); hours outside the
+//!   window are explicitly unavailable rather than left at `Maybe`.
 //! - ~7 shift templates for a small restaurant open ~07:00–21:00, with per-role
 //!   minimums and varied min/max headcount.
 //! - A history of availability exceptions (sick days, holidays) scattered
@@ -80,7 +83,8 @@ pub fn sample_employees() -> Vec<Employee> {
 
     vec![
         // ── Supervisors (all double as barista or kitchen) ──────────────────
-        // Alex: general manager pattern — works Tue–Sat, off Sun/Mon.
+        // Alex: general manager pattern — long 06–22 window, works Tue–Sat,
+        // off Sun/Mon.
         emp(
             1,
             "Alex",
@@ -88,11 +92,15 @@ pub fn sample_employees() -> Vec<Employee> {
             &[ROLE_SUPERVISOR, ROLE_BARISTA],
             38.0,
             15.50,
-            avail(&[
-                (&[Tue, Wed, Thu, Fri, Sat], 6, 22, Yes),
-                (&[Sun, Mon], 6, 22, No),
-            ]),
+            avail(
+                (6, 22),
+                &[
+                    (&[Tue, Wed, Thu, Fri, Sat], 6, 22, Yes),
+                    (&[Sun, Mon], 0, 24, No),
+                ],
+            ),
         ),
+        // Morgan: 07–21 window on the Thu–Mon rotation, off Tue/Wed.
         emp(
             2,
             "Morgan",
@@ -100,11 +108,15 @@ pub fn sample_employees() -> Vec<Employee> {
             &[ROLE_SUPERVISOR, ROLE_BARISTA],
             37.0,
             15.25,
-            avail(&[
-                (&[Thu, Fri, Sat, Sun, Mon], 7, 21, Yes),
-                (&[Tue, Wed], 6, 22, No),
-            ]),
+            avail(
+                (7, 21),
+                &[
+                    (&[Thu, Fri, Sat, Sun, Mon], 7, 21, Yes),
+                    (&[Tue, Wed], 0, 24, No),
+                ],
+            ),
         ),
+        // Jordan: 06–21 window, firm weekdays, weekends only tentatively.
         emp(
             3,
             "Jordan",
@@ -112,10 +124,13 @@ pub fn sample_employees() -> Vec<Employee> {
             &[ROLE_SUPERVISOR, ROLE_KITCHEN],
             40.0,
             16.00,
-            avail(&[(&WEEKDAYS, 6, 20, Yes), (&WEEKEND, 8, 18, Maybe)]),
+            avail(
+                (6, 21),
+                &[(&WEEKDAYS, 6, 20, Yes), (&WEEKEND, 8, 18, Maybe)],
+            ),
         ),
         // ── Baristas ────────────────────────────────────────────────────────
-        // Sam: dependable full-timer — six days, guards Sundays off.
+        // Sam: dependable full-timer — 07–19 window, six days, Sundays off.
         emp(
             4,
             "Sam",
@@ -123,12 +138,16 @@ pub fn sample_employees() -> Vec<Employee> {
             &[ROLE_BARISTA],
             38.0,
             12.75,
-            avail(&[
-                (&[Mon, Tue, Wed, Thu, Fri, Sat], 7, 19, Yes),
-                (&[Sun], 6, 22, No),
-            ]),
+            avail(
+                (7, 19),
+                &[
+                    (&[Mon, Tue, Wed, Thu, Fri, Sat], 7, 19, Yes),
+                    (&[Sun], 0, 24, No),
+                ],
+            ),
         ),
-        // Riley: student — weekday evenings plus full weekends.
+        // Riley: student — 08–22 window; weekday evenings, a free Tuesday
+        // afternoon, plus full weekends.
         emp(
             5,
             "Riley",
@@ -136,13 +155,17 @@ pub fn sample_employees() -> Vec<Employee> {
             &[ROLE_BARISTA],
             16.0,
             11.40,
-            avail(&[
-                (&WEEKDAYS, 17, 22, Yes),
-                (&WEEKDAYS, 6, 17, No),
-                (&WEEKEND, 8, 22, Yes),
-            ]),
+            avail(
+                (8, 22),
+                &[
+                    (&WEEKDAYS, 8, 17, No),
+                    (&WEEKDAYS, 17, 22, Yes),
+                    (&[Tue], 14, 22, Yes),
+                    (&WEEKEND, 8, 22, Yes),
+                ],
+            ),
         ),
-        // Casey: early-bird opener — mornings only.
+        // Casey: true early bird — 04–15 window, mornings only, Sundays off.
         emp(
             6,
             "Casey",
@@ -150,14 +173,17 @@ pub fn sample_employees() -> Vec<Employee> {
             &[ROLE_BARISTA],
             20.0,
             12.10,
-            avail(&[
-                (&WEEKDAYS, 6, 12, Yes),
-                (&WEEKDAYS, 12, 15, Maybe),
-                (&[Sat], 6, 12, Yes),
-                (&[Sun], 6, 22, No),
-            ]),
+            avail(
+                (4, 15),
+                &[
+                    (&WEEKDAYS, 6, 12, Yes),
+                    (&WEEKDAYS, 12, 15, Maybe),
+                    (&[Sat], 6, 12, Yes),
+                    (&[Sun], 0, 24, No),
+                ],
+            ),
         ),
-        // Jamie: full-timer on the Wed–Sun rotation, off Mon/Tue.
+        // Jamie: full-timer — 07–20 window on the Wed–Sun rotation.
         emp(
             7,
             "Jamie",
@@ -165,26 +191,33 @@ pub fn sample_employees() -> Vec<Employee> {
             &[ROLE_BARISTA],
             36.0,
             13.20,
-            avail(&[
-                (&[Wed, Thu, Fri, Sat, Sun], 7, 20, Yes),
-                (&[Mon, Tue], 6, 22, No),
-            ]),
+            avail(
+                (7, 20),
+                &[
+                    (&[Wed, Thu, Fri, Sat, Sun], 7, 20, Yes),
+                    (&[Mon, Tue], 0, 24, No),
+                ],
+            ),
         ),
-        // Avery: weekender who also covers Friday nights.
+        // Avery: weekender — 08–22 window, plus Friday nights.
         emp(
             8,
             "Avery",
             "Bennett",
             &[ROLE_BARISTA],
-            14.0,
+            18.0,
             11.60,
-            avail(&[
-                (&[Fri], 16, 22, Yes),
-                (&WEEKEND, 8, 22, Yes),
-                (&[Mon, Tue, Wed, Thu], 6, 22, No),
-            ]),
+            avail(
+                (8, 22),
+                &[
+                    (&[Fri], 16, 22, Yes),
+                    (&WEEKEND, 8, 22, Yes),
+                    (&[Mon, Tue, Wed, Thu], 0, 24, No),
+                ],
+            ),
         ),
-        // Quinn: dedicated closer — six evenings, Sundays only if pressed.
+        // Quinn: dedicated closer — 14–22 window, six afternoons-to-close,
+        // Sundays only if pressed.
         emp(
             9,
             "Quinn",
@@ -192,27 +225,32 @@ pub fn sample_employees() -> Vec<Employee> {
             &[ROLE_BARISTA],
             18.0,
             11.90,
-            avail(&[
-                (&[Mon, Tue, Wed, Thu, Fri, Sat], 15, 22, Yes),
-                (&[Sun], 15, 22, Maybe),
-                (&ALL_WEEK, 6, 15, No),
-            ]),
+            avail(
+                (14, 22),
+                &[
+                    (&[Mon, Tue, Wed, Thu, Fri, Sat], 14, 22, Yes),
+                    (&[Sun], 14, 22, Maybe),
+                ],
+            ),
         ),
-        // Harper: student — two fixed evenings plus Sundays.
+        // Harper: student — 08–22 window; two fixed evenings plus Sundays.
         emp(
             10,
             "Harper",
             "Diaz",
             &[ROLE_BARISTA],
-            12.0,
+            16.0,
             11.30,
-            avail(&[
-                (&[Mon, Wed], 18, 22, Yes),
-                (&[Sun], 8, 20, Yes),
-                (&[Tue, Thu, Fri, Sat], 6, 22, No),
-            ]),
+            avail(
+                (8, 22),
+                &[
+                    (&[Mon, Wed], 18, 22, Yes),
+                    (&[Sun], 8, 20, Yes),
+                    (&[Tue, Thu, Fri, Sat], 0, 24, No),
+                ],
+            ),
         ),
-        // Rowan: mornings, firm early week, tentative later.
+        // Rowan: early riser — 05–13 window; firm early week, tentative later.
         emp(
             11,
             "Rowan",
@@ -220,14 +258,18 @@ pub fn sample_employees() -> Vec<Employee> {
             &[ROLE_BARISTA],
             20.0,
             12.00,
-            avail(&[
-                (&[Mon, Tue, Wed], 6, 13, Yes),
-                (&[Thu, Fri], 6, 13, Maybe),
-                (&WEEKEND, 6, 22, No),
-            ]),
+            avail(
+                (5, 13),
+                &[
+                    (&[Mon, Tue, Wed], 6, 13, Yes),
+                    (&[Thu, Fri], 6, 13, Maybe),
+                    (&WEEKEND, 0, 24, No),
+                ],
+            ),
         ),
         // ── Kitchen ─────────────────────────────────────────────────────────
-        // Dana: full-time weekday cook; Saturday at a pinch, never Sunday.
+        // Dana: full-time weekday cook — 06–18 window; Saturday at a pinch,
+        // never Sunday.
         emp(
             12,
             "Dana",
@@ -235,13 +277,17 @@ pub fn sample_employees() -> Vec<Employee> {
             &[ROLE_KITCHEN],
             40.0,
             14.00,
-            avail(&[
-                (&WEEKDAYS, 6, 18, Yes),
-                (&WEEKDAYS, 18, 22, No),
-                (&[Sat], 7, 15, Maybe),
-                (&[Sun], 6, 22, No),
-            ]),
+            avail(
+                (6, 18),
+                &[
+                    (&WEEKDAYS, 6, 18, Yes),
+                    (&[Sat], 7, 15, Maybe),
+                    (&[Sun], 0, 24, No),
+                ],
+            ),
         ),
+        // Elliot: 07–21 window — Mon–Thu plus Saturday, Fridays off, Sunday
+        // only tentatively.
         emp(
             13,
             "Elliot",
@@ -249,9 +295,18 @@ pub fn sample_employees() -> Vec<Employee> {
             &[ROLE_KITCHEN],
             37.0,
             13.75,
-            avail(&[(&WEEKDAYS, 7, 19, Yes), (&WEEKEND, 8, 16, Maybe)]),
+            avail(
+                (7, 21),
+                &[
+                    (&[Mon, Tue, Wed, Thu], 7, 19, Yes),
+                    (&[Sat], 8, 16, Yes),
+                    (&[Sun], 8, 16, Maybe),
+                    (&[Fri], 0, 24, No),
+                ],
+            ),
         ),
-        // Frankie: kitchen opener — six mornings, Sundays off.
+        // Frankie: kitchen opener — 05–14 window, Fri–Sun mornings (the busy
+        // end of the week), Mon–Thu off.
         emp(
             14,
             "Frankie",
@@ -259,13 +314,16 @@ pub fn sample_employees() -> Vec<Employee> {
             &[ROLE_KITCHEN],
             18.0,
             12.20,
-            avail(&[
-                (&[Mon, Tue, Wed, Thu, Fri, Sat], 7, 14, Yes),
-                (&ALL_WEEK, 14, 22, No),
-                (&[Sun], 6, 14, No),
-            ]),
+            avail(
+                (5, 14),
+                &[
+                    (&[Fri, Sat, Sun], 7, 14, Yes),
+                    (&[Mon, Tue, Wed, Thu], 0, 24, No),
+                ],
+            ),
         ),
-        // Gabriel: mid-shift weekdays only — second job takes the weekends.
+        // Gabriel: mid-shifts — 10–18 window Mon–Thu plus Sundays; second job
+        // takes Fridays tentative and Saturdays entirely.
         emp(
             15,
             "Gabriel",
@@ -273,13 +331,17 @@ pub fn sample_employees() -> Vec<Employee> {
             &[ROLE_KITCHEN],
             22.0,
             12.40,
-            avail(&[
-                (&[Mon, Tue, Wed, Thu], 10, 18, Yes),
-                (&[Fri], 10, 18, Maybe),
-                (&WEEKEND, 6, 22, No),
-            ]),
+            avail(
+                (10, 18),
+                &[
+                    (&[Mon, Tue, Wed, Thu, Sun], 10, 18, Yes),
+                    (&[Fri], 10, 18, Maybe),
+                    (&[Sat], 0, 24, No),
+                ],
+            ),
         ),
-        // Kai: kitchen closer — evenings six days, Mondays only reluctantly.
+        // Kai: kitchen closer — 14–22 window, six evenings, Mondays only
+        // reluctantly.
         emp(
             16,
             "Kai",
@@ -287,23 +349,26 @@ pub fn sample_employees() -> Vec<Employee> {
             &[ROLE_KITCHEN],
             36.0,
             13.60,
-            avail(&[
-                (&[Tue, Wed, Thu, Fri, Sat, Sun], 14, 22, Yes),
-                (&[Mon], 14, 22, Maybe),
-                (&ALL_WEEK, 6, 14, No),
-            ]),
+            avail(
+                (14, 22),
+                &[
+                    (&[Tue, Wed, Thu, Fri, Sat, Sun], 14, 22, Yes),
+                    (&[Mon], 14, 22, Maybe),
+                ],
+            ),
         ),
-        // Lena: weekender.
+        // Lena: weekender — 08–20 window, weekend days only.
         emp(
             17,
             "Lena",
             "Fisher",
             &[ROLE_KITCHEN],
-            16.0,
+            20.0,
             11.80,
-            avail(&[(&WEEKEND, 8, 20, Yes), (&WEEKDAYS, 6, 22, No)]),
+            avail((8, 20), &[(&WEEKEND, 8, 20, Yes), (&WEEKDAYS, 0, 24, No)]),
         ),
-        // Reese: flexes across both coffee and food — weekdays, Saturday at a push.
+        // Reese: flexes across both coffee and food — 07–19 window, weekdays,
+        // Saturday at a push.
         emp(
             18,
             "Reese",
@@ -311,11 +376,14 @@ pub fn sample_employees() -> Vec<Employee> {
             &[ROLE_BARISTA, ROLE_KITCHEN],
             37.0,
             13.50,
-            avail(&[
-                (&WEEKDAYS, 7, 19, Yes),
-                (&[Sat], 8, 18, Maybe),
-                (&[Sun], 6, 22, No),
-            ]),
+            avail(
+                (7, 19),
+                &[
+                    (&WEEKDAYS, 7, 19, Yes),
+                    (&[Sat], 8, 18, Maybe),
+                    (&[Sun], 0, 24, No),
+                ],
+            ),
         ),
     ]
 }
@@ -334,12 +402,14 @@ pub fn sample_templates() -> Vec<ShiftTemplate> {
             3,
             &[(ROLE_SUPERVISOR, 1), (ROLE_BARISTA, 1)],
         ),
+        // Weekdays only — on weekends the Brunch crew covers the morning
+        // kitchen instead.
         tmpl(
             2,
             "Kitchen AM",
             8,
             14,
-            &ALL_WEEK,
+            &WEEKDAYS,
             1,
             2,
             &[(ROLE_KITCHEN, 1)],
@@ -552,7 +622,7 @@ fn rfc3339_at(date: NaiveDate, hour: u32) -> String {
 /// An all-day "unavailable" exception for one employee on one date.
 fn off_day(id: i64, employee_id: i64, date: NaiveDate, note: &str) -> EmployeeAvailabilityOverride {
     let mut day = DayAvailability::default();
-    for h in 6..22u8 {
+    for h in 0..24u8 {
         day.set(h, AvailabilityState::No);
     }
     EmployeeAvailabilityOverride {
@@ -598,10 +668,20 @@ fn emp(
     }
 }
 
-/// Build an `Availability` from `(days, start-hour, end-hour, state)` spans,
-/// applied in order.
-fn avail(spans: &[(&[Weekday], u8, u8, AvailabilityState)]) -> Availability {
+/// Build an `Availability` bounded to a personal working `window`
+/// (start-hour..end-hour): hours outside it are explicitly `No` on every day —
+/// real employees have a daily band they'll work within — then the
+/// `(days, start-hour, end-hour, state)` spans apply in order inside it.
+/// Unspanned hours inside the window stay `Maybe`.
+fn avail(window: (u8, u8), spans: &[(&[Weekday], u8, u8, AvailabilityState)]) -> Availability {
     let mut a = Availability::default();
+    for &wd in &ALL_WEEK {
+        for h in 0..24u8 {
+            if h < window.0 || h >= window.1 {
+                a.set(wd, h, AvailabilityState::No);
+            }
+        }
+    }
     for &(days, start_h, end_h, state) in spans {
         for &wd in days {
             for h in start_h..end_h {
