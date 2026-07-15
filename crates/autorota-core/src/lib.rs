@@ -6,6 +6,7 @@ pub mod i18n;
 pub mod import;
 pub mod models;
 pub mod sample;
+pub mod sample_debug;
 pub mod scheduler;
 
 #[cfg(any(test, feature = "test-helpers"))]

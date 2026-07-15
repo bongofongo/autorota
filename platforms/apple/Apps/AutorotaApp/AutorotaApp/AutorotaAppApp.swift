@@ -47,6 +47,10 @@ struct AutorotaAppApp: App {
         // Demo mode never survives a relaunch: boot always inits the real DB
         // above, so a stale demo file is just dead weight (or a crash relic).
         DemoModeController.removeDemoDatabaseFiles()
+        #if DEBUG
+        // Same for the debug sample database.
+        SampleDataController.removeSampleDatabaseFiles()
+        #endif
 
         // Seam for swapping Mock ↔ Live without rebuilding env wiring.
         let backend: LicenseBackend = LiveLicenseBackend()
@@ -57,6 +61,9 @@ struct AutorotaAppApp: App {
         _demoController = State(
             initialValue: DemoModeController(environment: .live(syncEngine: engine))
         )
+        #if DEBUG
+        _sampleController = State(initialValue: SampleDataController(syncEngine: engine))
+        #endif
     }
 
     /// Two-pass DB init: try once, on failure quarantine the file and try
@@ -93,6 +100,9 @@ struct AutorotaAppApp: App {
     @State private var localeManager = LocaleManager()
     @State private var licenseService: LicenseService
     @State private var demoController: DemoModeController
+    #if DEBUG
+    @State private var sampleController: SampleDataController
+    #endif
     @State private var spotlightModel = TutorialSpotlightModel()
     @State private var syncPrompt = SyncPromptCoordinator()
     @State private var syncCheckComplete = false
@@ -125,6 +135,9 @@ struct AutorotaAppApp: App {
             .environment(localeManager)
             .environment(licenseService)
             .environment(demoController)
+            #if DEBUG
+            .environment(sampleController)
+            #endif
             .environment(spotlightModel)
             .environment(syncPrompt)
             .environment(\.locale, localeManager.effectiveLocale)

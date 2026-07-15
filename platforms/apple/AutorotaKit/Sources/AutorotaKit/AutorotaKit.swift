@@ -40,6 +40,13 @@ public func autorotaDemoDBURL() throws -> URL {
     try autorotaAppSupportDirectory().appendingPathComponent("demo.sqlite")
 }
 
+/// Resolved file URL for the throwaway debug "default" sample database. Lives
+/// beside the production DB; the `#if DEBUG` sample loader deletes and reseeds
+/// it on every load. Never used by release builds.
+public func autorotaSampleDBURL() throws -> URL {
+    try autorotaAppSupportDirectory().appendingPathComponent("sample-debug.sqlite")
+}
+
 /// Swap the process-wide Rust pool to a different database file at runtime.
 /// The target is created and migrated if missing; the previous pool is closed
 /// after the swap. Used by demo mode to enter and leave the demo database.
@@ -52,6 +59,14 @@ public func autorotaSwitchDb(to path: String) throws {
 /// created (empty) database.
 public func autorotaSeedDemoDb(weekStart: String) throws {
     try seedDemoDb(weekStart: weekStart)
+}
+
+/// Seed the current database with the debug-only "default" sample dataset
+/// (30 employees, four roles, eight templates). `weekStart` is a Monday
+/// (yyyy-MM-dd) for parity with the demo seeder. Expects a freshly created
+/// (empty) database.
+public func autorotaSeedSampleDebugDb(weekStart: String) throws {
+    try seedSampleDebugDb(weekStart: weekStart)
 }
 
 /// Quarantine a corrupted database file by renaming it `db.corrupt-<unix-ts>.sqlite`

@@ -126,6 +126,7 @@ struct AppSettingsView: View {
             #endif
 
             #if DEBUG
+            DebugSampleSection()
             DebugResetSection()
             #endif
         }

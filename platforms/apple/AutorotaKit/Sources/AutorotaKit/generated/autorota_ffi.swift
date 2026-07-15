@@ -6285,6 +6285,19 @@ public func seedPerfCorpus(employees: UInt32, seed: UInt64)throws  {try rustCall
     )
 }
 }
+/**
+ * Populate the current database with the debug-only "default" sample dataset
+ * (30 generically-named employees, four roles, eight templates). Driven from a
+ * `#if DEBUG` Settings button onto a throwaway database; expects an empty file.
+ * `week_start` is accepted for parity with `seed_demo_db` (the sample seeds no
+ * date-specific rows, so it is currently unused).
+ */
+public func seedSampleDebugDb(weekStart: String)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
+    uniffi_autorota_ffi_fn_func_seed_sample_debug_db(
+        FfiConverterString.lower(weekStart),$0
+    )
+}
+}
 public func setAvailabilityProgress(employeeId: Int64, weekStart: String, done: Bool)throws  {try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_set_availability_progress(
         FfiConverterInt64.lower(employeeId),
@@ -6593,6 +6606,9 @@ private var initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_seed_perf_corpus() != 51979) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_autorota_ffi_checksum_func_seed_sample_debug_db() != 37544) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_set_availability_progress() != 31340) {

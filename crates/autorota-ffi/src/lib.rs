@@ -379,6 +379,24 @@ pub fn seed_demo_db(week_start: String) -> Result<(), FfiError> {
         })
 }
 
+/// Populate the current database with the debug-only "default" sample dataset
+/// (30 generically-named employees, four roles, eight templates). Driven from a
+/// `#if DEBUG` Settings button onto a throwaway database; expects an empty file.
+/// `week_start` is accepted for parity with `seed_demo_db` (the sample seeds no
+/// date-specific rows, so it is currently unused).
+#[uniffi::export]
+pub fn seed_sample_debug_db(week_start: String) -> Result<(), FfiError> {
+    let pool = &pool()?;
+    let week_start = parse_date(&week_start)?;
+    rt().block_on(autorota_core::sample_debug::seed_sample_debug_data(
+        pool, week_start,
+    ))
+    .map_err(|e| FfiError::Db {
+        code: ErrorCode::DbConnectionFailed,
+        msg: e.to_string(),
+    })
+}
+
 // ── Perf corpus (debug / perf-helpers only) ──────────────────────────────────
 
 /// Populate the database with a deterministic synthetic corpus for performance

@@ -588,6 +588,11 @@ void uniffi_autorota_ffi_fn_func_seed_demo_db(RustBuffer week_start, RustCallSta
 void uniffi_autorota_ffi_fn_func_seed_perf_corpus(uint32_t employees, uint64_t seed, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_SEED_SAMPLE_DEBUG_DB
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_SEED_SAMPLE_DEBUG_DB
+void uniffi_autorota_ffi_fn_func_seed_sample_debug_db(RustBuffer week_start, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_SET_AVAILABILITY_PROGRESS
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_SET_AVAILABILITY_PROGRESS
 void uniffi_autorota_ffi_fn_func_set_availability_progress(int64_t employee_id, RustBuffer week_start, int8_t done, RustCallStatus *_Nonnull out_status
@@ -1321,6 +1326,12 @@ uint16_t uniffi_autorota_ffi_checksum_func_seed_demo_db(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_SEED_PERF_CORPUS
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_SEED_PERF_CORPUS
 uint16_t uniffi_autorota_ffi_checksum_func_seed_perf_corpus(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_SEED_SAMPLE_DEBUG_DB
+#define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_CHECKSUM_FUNC_SEED_SAMPLE_DEBUG_DB
+uint16_t uniffi_autorota_ffi_checksum_func_seed_sample_debug_db(void
     
 );
 #endif
