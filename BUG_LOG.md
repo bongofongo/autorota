@@ -185,3 +185,9 @@ Concise running log of bugs encountered. Each entry is one bullet with sub-bulle
   - Where / what / repro: `WeeklyAvailabilityView.weekStartString` built its "yyyy-MM-dd" formatter without `en_US_POSIX` (mass-availability week key could mis-format under non-Gregorian user calendars), and `ShiftTemplateEditSheet` prefill/save built "HH:mm" formatters without POSIX locale (12-hour-locale devices with forced 12-hour format could parse/emit shift times with AM/PM artifacts). `EmployeeExportViewModel.dateFormatter` had the same gap.
   - Patched: yes — pending user verification
   - Fix: consolidated all "yyyy-MM-dd" and "HH:mm" formatting onto shared cached POSIX-locale formatters (`AvailabilityWeekMath.isoFmt` / `.timeFmt`, new `Views/Shared/AvailabilityWeekMath.swift`) as part of the app-wide formatter dedup; the three offending sites now use them.
+
+- **Lasso selection survives detoggle and grid dismissal (stale highlight on reopen)**
+  - Date fixed: 2026-07-15 (pending verification)
+  - Where / what / repro: `AvailabilityGridView` only cleared the lasso selection on a tap outside the selected rectangle. Turning the lasso toggle off left the highlight in place, and because the grid can stay alive in the view hierarchy (TabView keeps children; edit-mode/sheet flows), a selection left open when the availability editor was saved/closed was still highlighted on reopen.
+  - Patched: yes — pending user verification
+  - Fix: detoggling the lasso now clears the selection immediately, and `onDisappear` clears the selection and force-resets the lasso toggle (notifying `onLassoModeChange(false)` so the enclosing scroll view is never left disabled). Tap-outside behavior unchanged.

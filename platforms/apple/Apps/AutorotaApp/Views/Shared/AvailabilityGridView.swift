@@ -6,7 +6,11 @@ import AutorotaKit
 /// Multi-select: the toolbar's lasso toggle turns drags into a rectangle
 /// selection (callers pause scrolling via `onLassoModeChange` while it's
 /// on); on release the selection persists — tap inside to bulk-cycle, tap
-/// outside to clear. A hold-then-drag activation shipped briefly but was
+/// outside to clear. Detoggling the lasso or leaving the grid (tab switch,
+/// edit-mode exit, sheet dismiss) also clears any selection.
+/// Tapping a weekday header bulk-cycles that day's in-range cells with the
+/// same majority semantics as a whole-column lasso selection.
+/// A hold-then-drag activation shipped briefly but was
 /// shelved for fighting page scrolling — see
 /// docs/availability-hold-drag-lasso.md before re-adding it.
 struct AvailabilityGridView: View {
@@ -118,6 +122,22 @@ struct AvailabilityGridView: View {
             }
             .frame(height: gridHeight)
         }
+        .onDisappear {
+            // Leaving the grid (tab switch, edit-mode exit, sheet dismiss)
+            // must not leave a stale selection or a stuck-off scroll view
+            // behind for the next appearance.
+            clearSelection()
+            if lassoToggleActive {
+                lassoToggleActive = false
+                onLassoModeChange?(false)
+            }
+        }
+    }
+
+    private func clearSelection() {
+        dragAnchorCell = nil
+        dragCurrentCell = nil
+        lassoDidDrag = false
     }
 
     // MARK: - Lasso gesture
@@ -152,10 +172,12 @@ struct AvailabilityGridView: View {
                 // Header row
                 HStack(spacing: Self.spacing) {
                     Text("").frame(width: Self.hourLabelWidth)
-                    ForEach(displayedWeekdays, id: \.self) { day in
+                    ForEach(Array(displayedWeekdays.enumerated()), id: \.element) { colIndex, day in
+                        let headerTappable = isEditable && !readOnlyWeekdays.contains(day)
                         VStack(spacing: 0) {
                             Text(day)
                                 .font(.caption2.bold())
+                                .foregroundStyle(headerTappable ? Color.accentColor : Color.primary)
                             if let sub = weekdaySubheaders[day] {
                                 Text(sub)
                                     .font(.caption2)
@@ -164,6 +186,16 @@ struct AvailabilityGridView: View {
                         }
                         .frame(width: cellWidth, height: effectiveHeaderHeight)
                         .multilineTextAlignment(.center)
+                        // Direct taps land on the unified touch layer; this
+                        // element only carries the VoiceOver surface.
+                        .accessibilityElement(children: .combine)
+                        .accessibilityAddTraits(headerTappable ? .isButton : [])
+                        .accessibilityHint(headerTappable ? "Cycles availability for every hour of \(day)" : "")
+                        .accessibilityIdentifier("availability.dayHeader.\(day)")
+                        .accessibilityAction {
+                            guard headerTappable else { return }
+                            toggleColumn(colIndex: colIndex)
+                        }
                     }
                 }
                 .frame(height: effectiveHeaderHeight)
@@ -249,6 +281,9 @@ struct AvailabilityGridView: View {
     private var lassoToggleButton: some View {
         Button {
             lassoToggleActive.toggle()
+            if !lassoToggleActive {
+                clearSelection()
+            }
             onLassoModeChange?(lassoToggleActive)
             NotificationCenter.default.post(
                 name: .autorotaTutorialAction,
@@ -364,6 +399,16 @@ struct AvailabilityGridView: View {
         return (col, row)
     }
 
+    /// Column index when `point` lands on the weekday header band, nil
+    /// elsewhere (hour-label gutter, below the header, past the last column).
+    private func headerColumn(at point: CGPoint, cellWidth: CGFloat) -> Int? {
+        let verticalPadding: CGFloat = 4
+        guard point.y < verticalPadding + effectiveHeaderHeight + Self.spacing else { return nil }
+        let col = Int(floor((point.x - Self.hourLabelWidth - Self.spacing) / (cellWidth + Self.spacing)))
+        guard (0..<displayedWeekdays.count).contains(col) else { return nil }
+        return col
+    }
+
     private func rawCell(at point: CGPoint, cellWidth: CGFloat) -> (col: Int, row: Int) {
         let verticalPadding: CGFloat = 4
         let adjustedX = point.x - Self.hourLabelWidth - Self.spacing
@@ -395,7 +440,12 @@ struct AvailabilityGridView: View {
             return
         }
 
-        guard let tapped else { return }
+        guard let tapped else {
+            if let col = headerColumn(at: location, cellWidth: cellWidth) {
+                toggleColumn(colIndex: col)
+            }
+            return
+        }
         let day = displayedWeekdays[tapped.col]
         let hour = displayedHours[tapped.row]
         guard Self.hourIsInRange(hour, start: visibleHourStart, end: visibleHourEnd),
@@ -404,6 +454,25 @@ struct AvailabilityGridView: View {
     }
 
     private func toggleSelectedCells(rect: (minCol: Int, maxCol: Int, minRow: Int, maxRow: Int)) {
+        NotificationCenter.default.post(name: .autorotaTutorialAction, object: TutorialAction.lassoApplied)
+        applyMajorityCycle(rect: rect)
+    }
+
+    /// Bulk-cycle every editable in-range cell of one weekday column — same
+    /// majority semantics as lasso-selecting the whole column and tapping
+    /// inside it. Triggered by tapping the weekday header.
+    private func toggleColumn(colIndex: Int) {
+        guard (0..<displayedWeekdays.count).contains(colIndex),
+              !readOnlyWeekdays.contains(displayedWeekdays[colIndex]),
+              displayedHours.contains(where: { Self.hourIsInRange($0, start: visibleHourStart, end: visibleHourEnd) })
+        else { return }
+        applyMajorityCycle(rect: (colIndex, colIndex, 0, displayedHours.count - 1))
+    }
+
+    /// Majority-state cycle over `rect`: counts the states of all editable
+    /// in-range cells, cycles the majority state, and applies the result to
+    /// every one of those cells.
+    private func applyMajorityCycle(rect: (minCol: Int, maxCol: Int, minRow: Int, maxRow: Int)) {
         var stateCounts: [String: Int] = ["Yes": 0, "Maybe": 0, "No": 0]
         var cellKeys: [(weekday: String, hour: Int)] = []
 
@@ -423,7 +492,6 @@ struct AvailabilityGridView: View {
 
         let majorityState = stateCounts.max(by: { $0.value < $1.value })?.key ?? "Maybe"
         let nextState = cycled(majorityState)
-        NotificationCenter.default.post(name: .autorotaTutorialAction, object: TutorialAction.lassoApplied)
 
         var updated = slots
         for (day, hour) in cellKeys {
