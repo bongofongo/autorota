@@ -46,7 +46,7 @@ struct EmployeeDetailContent: View {
     @State private var nextWeekExpanded = false
 
     @State private var showCustomRange = false
-    @State private var customStartDate: Date = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date()
+    @State private var customStartDate: Date = Date()
     @State private var customEndDate: Date = Date()
 
     @State private var availabilityWeekOffset: Int = 1
@@ -75,12 +75,6 @@ struct EmployeeDetailContent: View {
 
     private static let isoFmt = AvailabilityWeekMath.isoFmt
 
-    private static let displayFmt: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "EEE d MMM"
-        return f
-    }()
-
     private var groupedOverrides: [OverrideGroup] {
         // Exceptions list shows only rows classified as exceptions; manual
         // per-date edits share the table but are hidden here.
@@ -107,7 +101,7 @@ struct EmployeeDetailContent: View {
 
     private func pretty(_ iso: String) -> String {
         guard let d = Self.isoFmt.date(from: iso) else { return iso }
-        return Self.displayFmt.string(from: d)
+        return AvailabilityWeekMath.displayFmt.string(from: d)
     }
 
     @ViewBuilder
@@ -334,7 +328,10 @@ struct EmployeeDetailContent: View {
 
                     if showCustomRange {
                         DatePicker("From", selection: $customStartDate, displayedComponents: .date)
-                        DatePicker("To", selection: $customEndDate, displayedComponents: .date)
+                            .onChange(of: customStartDate) { _, newStart in
+                                if customEndDate < newStart { customEndDate = newStart }
+                            }
+                        DatePicker("To", selection: $customEndDate, in: customStartDate..., displayedComponents: .date)
 
                         let startStr = Self.isoFmt.string(from: customStartDate)
                         let endStr = Self.isoFmt.string(from: customEndDate)

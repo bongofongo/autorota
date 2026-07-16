@@ -46,6 +46,12 @@ struct OverridesTabView: View {
 
     private static let isoFmt = AvailabilityWeekMath.isoFmt
 
+    private var todayIso: String { AvailabilityWeekMath.isoFmt.string(from: Date()) }
+
+    private func isPast(_ group: EmpOverrideGroup) -> Bool {
+        (group.isRange ? group.endDate : group.startDate) < todayIso
+    }
+
     private var employeeOverrideGroups: [EmpOverrideGroup] {
         // Exceptions tab shows only user-classified exception rows.
         // Manual per-date edits (made via the availability grid) still live
@@ -102,13 +108,34 @@ struct OverridesTabView: View {
         }
     }
 
-    private var groupedByEmployee: [(employeeId: Int64, name: String, groups: [EmpOverrideGroup])] {
+    private var upcomingEmpGroups: [EmpOverrideGroup] {
+        filteredEmpGroups.filter { !isPast($0) }
+    }
+
+    private var pastEmpGroups: [EmpOverrideGroup] {
+        filteredEmpGroups.filter { isPast($0) }.sorted { $0.startDate > $1.startDate }
+    }
+
+    private func groupByEmployee(
+        _ groups: [EmpOverrideGroup], descending: Bool = false
+    ) -> [(employeeId: Int64, name: String, groups: [EmpOverrideGroup])] {
         let lookup = employeeLookup
-        let byEmp = Dictionary(grouping: filteredEmpGroups, by: { $0.employeeId })
+        let byEmp = Dictionary(grouping: groups, by: { $0.employeeId })
         return byEmp.map { (id, groups) in
-            (employeeId: id, name: lookup[id] ?? "Employee #\(id)", groups: groups.sorted { $0.startDate < $1.startDate })
+            let sorted = groups.sorted {
+                descending ? $0.startDate > $1.startDate : $0.startDate < $1.startDate
+            }
+            return (employeeId: id, name: lookup[id] ?? "Employee #\(id)", groups: sorted)
         }
         .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    private var groupedByEmployee: [(employeeId: Int64, name: String, groups: [EmpOverrideGroup])] {
+        groupByEmployee(upcomingEmpGroups)
+    }
+
+    private var groupedByEmployeePast: [(employeeId: Int64, name: String, groups: [EmpOverrideGroup])] {
+        groupByEmployee(pastEmpGroups, descending: true)
     }
 
     private var employeeLookup: [Int64: String] {
@@ -121,6 +148,74 @@ struct OverridesTabView: View {
 
     private func availabilityColor(for slots: [DayAvailabilitySlot]) -> Color {
         palette.availabilityColor(forSlots: slots)
+    }
+
+    private var upcomingTmplOverrides: [FfiShiftTemplateOverride] {
+        vm.shiftTemplateOverrides.filter { $0.date >= todayIso }.sorted { $0.date < $1.date }
+    }
+
+    private var pastTmplOverrides: [FfiShiftTemplateOverride] {
+        vm.shiftTemplateOverrides.filter { $0.date < todayIso }.sorted { $0.date > $1.date }
+    }
+
+    @ViewBuilder
+    private func employeeDisclosureGroup(
+        _ entry: (employeeId: Int64, name: String, groups: [EmpOverrideGroup])
+    ) -> some View {
+        DisclosureGroup(
+            isExpanded: Binding(
+                get: { expandedEmployees.contains(entry.employeeId) },
+                set: { isExpanded in
+                    if isExpanded { expandedEmployees.insert(entry.employeeId) }
+                    else { expandedEmployees.remove(entry.employeeId) }
+                }
+            )
+        ) {
+            ForEach(entry.groups) { group in
+                empOverrideGroupButton(group: group)
+            }
+        } label: {
+            HStack {
+                Text(entry.name).fontWeight(.medium)
+                Spacer()
+                Text("\(entry.groups.count)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func tmplOverrideRows(_ overrides: [FfiShiftTemplateOverride]) -> some View {
+        ForEach(overrides) { ovr in
+            Button { editingTmplOverride = ovr } label: {
+                TmplOverrideRow(ovr: ovr, templateLookup: templateLookup)
+            }
+            .buttonStyle(.plain)
+            .contextMenu {
+                Button {
+                    editingTmplOverride = ovr
+                } label: {
+                    Label("Edit", systemImage: "pencil")
+                }
+                Button(role: .destructive) {
+                    Task {
+                        await vm.deleteTemplateOverride(id: ovr.id)
+                        await vm.loadAll()
+                    }
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+        }
+        .onDelete { indexSet in
+            Task {
+                for idx in indexSet {
+                    await vm.deleteTemplateOverride(id: overrides[idx].id)
+                }
+                await vm.loadAll()
+            }
+        }
     }
 
     @ViewBuilder
@@ -248,33 +343,13 @@ struct OverridesTabView: View {
                     } else {
                         ForEach(grouped, id: \.employeeId) { entry in
                             Section {
-                                DisclosureGroup(
-                                    isExpanded: Binding(
-                                        get: { expandedEmployees.contains(entry.employeeId) },
-                                        set: { isExpanded in
-                                            if isExpanded { expandedEmployees.insert(entry.employeeId) }
-                                            else { expandedEmployees.remove(entry.employeeId) }
-                                        }
-                                    )
-                                ) {
-                                    ForEach(entry.groups) { group in
-                                        empOverrideGroupButton(group: group)
-                                    }
-                                } label: {
-                                    HStack {
-                                        Text(entry.name).fontWeight(.medium)
-                                        Spacer()
-                                        Text("\(entry.groups.count)")
-                                            .font(.subheadline)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
+                                employeeDisclosureGroup(entry)
                             }
                         }
                     }
                 } else {
                     Section {
-                        let groups = filteredEmpGroups
+                        let groups = upcomingEmpGroups
                         if groups.isEmpty {
                             Text("No exceptions")
                                 .font(.caption)
@@ -287,37 +362,26 @@ struct OverridesTabView: View {
                     }
                 }
 
+                if isByEmployee {
+                    let pastGrouped = groupedByEmployeePast
+                    if !pastGrouped.isEmpty {
+                        Section("Past") {
+                            ForEach(pastGrouped, id: \.employeeId) { entry in
+                                employeeDisclosureGroup(entry)
+                            }
+                        }
+                    }
+                } else if !pastEmpGroups.isEmpty {
+                    Section("Past") {
+                        ForEach(pastEmpGroups) { group in
+                            empOverrideGroupButton(group: group)
+                        }
+                    }
+                }
+
                 // Shift template overrides
                 Section {
-                    ForEach(vm.shiftTemplateOverrides) { ovr in
-                        Button { editingTmplOverride = ovr } label: {
-                            TmplOverrideRow(ovr: ovr, templateLookup: templateLookup)
-                        }
-                        .buttonStyle(.plain)
-                        .contextMenu {
-                            Button {
-                                editingTmplOverride = ovr
-                            } label: {
-                                Label("Edit", systemImage: "pencil")
-                            }
-                            Button(role: .destructive) {
-                                Task {
-                                    await vm.deleteTemplateOverride(id: ovr.id)
-                                    await vm.loadAll()
-                                }
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
-                    }
-                    .onDelete { indexSet in
-                        Task {
-                            for idx in indexSet {
-                                await vm.deleteTemplateOverride(id: vm.shiftTemplateOverrides[idx].id)
-                            }
-                            await vm.loadAll()
-                        }
-                    }
+                    tmplOverrideRows(upcomingTmplOverrides)
                 } header: {
                     HStack {
                         Text("Shift Changes")
@@ -325,6 +389,12 @@ struct OverridesTabView: View {
                         Button { showingTmplSheet = true } label: { Image(systemName: "plus") }
                             .buttonStyle(.borderless)
                             .accessibilityLabel("Add shift change")
+                    }
+                }
+
+                if !pastTmplOverrides.isEmpty {
+                    Section("Past") {
+                        tmplOverrideRows(pastTmplOverrides)
                     }
                 }
             }
@@ -365,17 +435,11 @@ private struct EmpOverrideGroupRow: View {
     let group: OverridesTabView.EmpOverrideGroup
     let employeeLookup: [Int64: String]
 
-    private static let displayFmt: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "EEE d MMM"
-        return f
-    }()
-
     private static let isoFmt = AvailabilityWeekMath.isoFmt
 
     private func pretty(_ iso: String) -> String {
         guard let d = Self.isoFmt.date(from: iso) else { return iso }
-        return Self.displayFmt.string(from: d)
+        return AvailabilityWeekMath.displayFmt.string(from: d)
     }
 
     var body: some View {
@@ -408,17 +472,11 @@ private struct EmpOverrideDayRow: View {
     let ovr: FfiEmployeeAvailabilityOverride
     let color: Color
 
-    private static let displayFmt: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "EEE d MMM"
-        return f
-    }()
-
     private static let isoFmt = AvailabilityWeekMath.isoFmt
 
     private var pretty: String {
         guard let d = Self.isoFmt.date(from: ovr.date) else { return ovr.date }
-        return Self.displayFmt.string(from: d)
+        return AvailabilityWeekMath.displayFmt.string(from: d)
     }
 
     var body: some View {
@@ -464,6 +522,11 @@ private struct TmplOverrideRow: View {
     let ovr: FfiShiftTemplateOverride
     let templateLookup: [Int64: String]
 
+    private var pretty: String {
+        guard let d = AvailabilityWeekMath.isoFmt.date(from: ovr.date) else { return ovr.date }
+        return AvailabilityWeekMath.displayFmt.string(from: d)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
@@ -477,7 +540,7 @@ private struct TmplOverrideRow: View {
                         .foregroundStyle(.red)
                 }
                 Spacer()
-                Text(ovr.date).font(.subheadline).foregroundStyle(.secondary)
+                Text(pretty).font(.subheadline).foregroundStyle(.secondary)
             }
             if !ovr.cancelled {
                 HStack(spacing: 6) {
@@ -525,7 +588,7 @@ struct EmployeeAvailabilityOverrideSheet: View {
 
     // Date range state (create-only)
     @State private var isDateRange = false
-    @State private var endDate: Date = Calendar.current.date(byAdding: .day, value: 6, to: Date()) ?? Date()
+    @State private var endDate: Date = Date()
     @State private var slotsByDate: [String: [AvailabilitySlot]] = [:]
     @State private var currentDateIndex = 0
     @State private var showLongRangeWarning = false
@@ -539,12 +602,6 @@ struct EmployeeAvailabilityOverrideSheet: View {
 
     private static let dateFmt = AvailabilityWeekMath.isoFmt
 
-    private static let displayFmt: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "EEE d MMM"
-        return f
-    }()
-
     private func weekday(for d: Date) -> String {
         let cal = Calendar(identifier: .iso8601)
         let idx = cal.component(.weekday, from: d)
@@ -557,7 +614,7 @@ struct EmployeeAvailabilityOverrideSheet: View {
     private var datesInRange: [Date] {
         let cal = Calendar.current
         let start = cal.startOfDay(for: date)
-        let end = cal.startOfDay(for: endDate > date ? endDate : date)
+        let end = cal.startOfDay(for: endDate)
         var result: [Date] = []
         var current = start
         while current <= end {
@@ -627,11 +684,12 @@ struct EmployeeAvailabilityOverrideSheet: View {
                     DatePicker(isDateRange ? "Start" : "Date",
                                selection: $date, displayedComponents: .date)
                         .datePickerStyle(.compact)
-                        .onChange(of: date) { _, _ in
+                        .onChange(of: date) { _, newDate in
+                            if endDate < newDate { endDate = newDate }
                             currentDateIndex = min(currentDateIndex, max(0, datesInRange.count - 1))
                         }
                     if isDateRange {
-                        DatePicker("End", selection: $endDate, displayedComponents: .date)
+                        DatePicker("End", selection: $endDate, in: date..., displayedComponents: .date)
                             .datePickerStyle(.compact)
                             .onChange(of: endDate) { _, _ in
                                 currentDateIndex = min(currentDateIndex, max(0, datesInRange.count - 1))
@@ -742,7 +800,7 @@ struct EmployeeAvailabilityOverrideSheet: View {
                 Spacer()
 
                 VStack(spacing: 2) {
-                    Text(Self.displayFmt.string(from: currentRangeDate))
+                    Text(AvailabilityWeekMath.displayFmt.string(from: currentRangeDate))
                         .fontWeight(.medium)
                     Text("\(currentDateIndex + 1) of \(dates.count)")
                         .font(.caption2)

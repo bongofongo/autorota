@@ -2,6 +2,12 @@
 
 Concise running log of bugs encountered. Each entry is one bullet with sub-bullets. New entries appended at top. Patched entries remain `pending verification` until the user confirms.
 
+- **Date-range pickers allow End before Start, silently narrowing exceptions to a single day**
+  - Date fixed: 2026-07-16 (pending verification)
+  - Where / what / repro: `OverridesTabView.swift`'s `EmployeeAvailabilityOverrideSheet` let the End `DatePicker` pick a date earlier than Start with no bound. `datesInRange` then silently fell back to treating the range as one day (the start date) — the End picker kept showing the invalid earlier date while the day-navigator, "Not Available (all N dates)" bulk action, and save all quietly behaved as a 1-day exception, with no error shown. Same missing-bounds pattern existed on `EmployeeDetailContent.swift`'s Custom Range shift-history filter and `SendSchedulePicker.swift`'s date-range mode (partial — had the `in:` bound but no clamp when Start moved past an already-picked End). `AnalyticsView.swift`'s date-range filter already did this correctly and was used as the reference pattern.
+  - Patched: yes — pending user verification
+  - Fix: all three now constrain the End `DatePicker` with `in: start...` and clamp End up to Start via `.onChange(of: start)` when Start moves past it, matching `AnalyticsView`. Also: date-range fields on the three fixed screens now default both Start/End to today (previously mismatched defaults, e.g. `start+6d`, `today-1mo`); a shared `AvailabilityWeekMath.displayFmt` ("MMM d, yyyy") replaced 4 duplicated local date formatters plus 2 raw-ISO-string date displays in the Exceptions list; and the Exceptions list now splits both Employee Exceptions and Shift Changes into upcoming + a new "Past" section (end date, or date for single-day, before today).
+
 - **Scheduler ignores overnight shifts in overlap + daily-hour checks (double-booking possible)**
   - Date fixed: 2026-07-12 (pending verification)
   - Where / what / repro: `crates/autorota-core/src/scheduler/mod.rs`. `has_time_overlap` compared bare `NaiveTime`s, so an overnight shift (e.g. Fri 22:00–02:00) never overlapped anything: a same-day 20:00–23:00 shift or a next-day 01:00–05:00 shift could be assigned to the same employee. Additionally all overnight hours were booked on the start date, so the post-midnight tail never counted against the next day's `max_daily_hours`. Found by the test-gap audit; repro pinned in `tests/scheduler_overnight_test.rs` (tests failed before the fix).

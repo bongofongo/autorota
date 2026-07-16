@@ -15,8 +15,8 @@ struct SendSchedulePicker: View {
 
     @State private var dateMode: DateMode = .singleWeek
     @State private var weekStart: Date = Self.currentWeekStart()
-    @State private var startDate: Date = Self.currentWeekStart()
-    @State private var endDate: Date = Self.currentWeekStart().addingTimeInterval(6 * 24 * 3600)
+    @State private var startDate: Date = Date()
+    @State private var endDate: Date = Date()
 
     // Employee exports have a fixed shape: shift name + times, never wages.
     private let profile = "staff_schedule"
@@ -67,6 +67,9 @@ struct SendSchedulePicker: View {
                         DatePicker("Week of", selection: $weekStart, displayedComponents: .date)
                     } else {
                         DatePicker("Start", selection: $startDate, displayedComponents: .date)
+                            .onChange(of: startDate) { _, newStart in
+                                if endDate < newStart { endDate = newStart }
+                            }
                         DatePicker("End", selection: $endDate, in: startDate..., displayedComponents: .date)
                     }
                 }

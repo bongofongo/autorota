@@ -33,6 +33,15 @@ enum AvailabilityWeekMath {
         return f
     }()
 
+    /// Shared cached "MMM d, yyyy" formatter (POSIX locale) for human-readable
+    /// date display, e.g. exception rows and range pickers.
+    static let displayFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMM d, yyyy"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+
     static func weekDays(from weekStartIso: String) -> [(weekday: String, date: Date, iso: String)] {
         guard let monday = isoFmt.date(from: weekStartIso) else { return [] }
         let cal = Calendar(identifier: .iso8601)
