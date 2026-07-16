@@ -3076,6 +3076,9 @@
         }
       }
     },
+    "Cycles availability for every hour of %@" : {
+
+    },
     "Dark" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3325,6 +3328,9 @@
           }
         }
       }
+    },
+    "DEBUG · Sample Data" : {
+
     },
     "Decrease %@" : {
       "localizations" : {
@@ -13134,6 +13140,9 @@
         }
       }
     },
+    "Load “Default” Sample" : {
+
+    },
     "Loading analytics…" : {
       "localizations" : {
         "ar" : {
@@ -13373,6 +13382,9 @@
           }
         }
       }
+    },
+    "Loads a throwaway 30-employee cafe dataset onto a separate database. Your real data is untouched; unloading restores it." : {
+
     },
     "Long date range" : {
       "localizations" : {
@@ -21633,7 +21645,7 @@
     "Text Message" : {
 
     },
-    "The exported binary payload could not be decoded." : {
+    "The export payload could not be decoded." : {
 
     },
     "The selected employee could not be found." : {
@@ -22480,6 +22492,9 @@
           }
         }
       }
+    },
+    "Unload “Default” Sample" : {
+
     },
     "Unsupported format" : {
       "localizations" : {

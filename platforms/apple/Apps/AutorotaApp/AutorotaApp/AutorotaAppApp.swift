@@ -56,6 +56,24 @@ struct AutorotaAppApp: App {
         let backend: LicenseBackend = LiveLicenseBackend()
         _licenseService = State(initialValue: LicenseService(backend: backend))
 
+        // Boot animation: only for users who have already completed
+        // onboarding (i.e. picked a plan) — a first boot goes straight to
+        // the onboarding flow instead. Captured once here so the flag can't
+        // flip mid-boot (checkFirstLaunchSync may set the UserDefaults key
+        // a couple of seconds in when sync hydrates existing data).
+        // (Never in the perf harness: LaunchPerfTests measures real boot
+        // time, and the perf branch above pre-sets hasCompletedOnboarding.)
+        #if PERF_HELPERS
+        let perfHarnessActive = Self.perfMode != nil
+        #else
+        let perfHarnessActive = false
+        #endif
+        _playBootAnimation = State(initialValue:
+            !perfHarnessActive
+                && ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
+                && UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
+        )
+
         let engine = AutorotaSyncEngine()
         _syncEngine = State(initialValue: engine)
         _demoController = State(
@@ -107,6 +125,9 @@ struct AutorotaAppApp: App {
     @State private var syncPrompt = SyncPromptCoordinator()
     @State private var syncCheckComplete = false
     @State private var dbInitOutcome: DBInitOutcome
+    /// Whether this boot shows `LoadingScreenView` (set once in `init`).
+    @State private var playBootAnimation: Bool
+    @State private var bootAnimationDone = false
 
     private var selectedAppearance: AppAppearance {
         AppAppearance(rawValue: appearance) ?? .system
@@ -116,6 +137,13 @@ struct AutorotaAppApp: App {
         AccessibilityPalette.palette(for: ColorBlindnessMode(rawValue: colorBlindnessMode) ?? .none)
     }
 
+    /// The app content mounts only when data loading is done AND (when the
+    /// boot animation plays) the animation has finished — the user never
+    /// sees a half-loaded rota.
+    private var appIsReady: Bool {
+        syncCheckComplete && (bootAnimationDone || !playBootAnimation)
+    }
+
     var body: some Scene {
         WindowGroup {
             Group {
@@ -123,11 +151,20 @@ struct AutorotaAppApp: App {
                 case .failed(let message):
                     DatabaseRecoveryView(errorMessage: message)
                 case .ok, .recovered:
-                    if syncCheckComplete {
-                        ContentView()
-                    } else {
-                        ProgressView("Loading...")
+                    ZStack {
+                        if appIsReady {
+                            ContentView()
+                                .transition(.opacity)
+                        } else if playBootAnimation {
+                            LoadingScreenView { bootAnimationDone = true }
+                                .transition(.opacity)
+                        } else {
+                            // First boot (no plan chosen yet): onboarding
+                            // handles the wait, keep the plain spinner.
+                            ProgressView("Loading...")
+                        }
                     }
+                    .animation(.easeInOut(duration: 0.35), value: appIsReady)
                 }
             }
             .environment(exchangeRateService)
