@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// Help hub pushed from the Menu landing: the full guide plus ways to learn about
-/// or get help with the app.
-struct HelpCenterView: View {
+/// or get help with the app. Platform shells apply the platform's own form
+/// style; see `Views/Platform/{iOS,macOS}/HelpCenterView_*.swift`.
+struct HelpCenterContent: View {
     @Environment(DemoModeController.self) private var demo
 
     private var appVersion: String {
@@ -41,9 +42,6 @@ struct HelpCenterView: View {
                 }
             }
         }
-        #if os(macOS)
-        .formStyle(.grouped)
-        #endif
         .navigationTitle("Help")
     }
 }

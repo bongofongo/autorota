@@ -117,7 +117,7 @@ final class AutorotaSyncEngine: @unchecked Sendable {
         pendingPushTask = Task { [weak self] in
             try? await Task.sleep(for: AutorotaSyncEngine.pushDebounceWindow)
             guard !Task.isCancelled else { return }
-            await self?.performScheduledPush()
+            self?.performScheduledPush()
         }
     }
 

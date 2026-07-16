@@ -2,7 +2,11 @@ import AutorotaKit
 import CloudKit
 import Foundation
 
-enum SyncRecordMapper {
+/// Pure CKRecord <-> FfiSyncRecord mapping, no shared state — kept nonisolated
+/// so it can be called from the Sendable closures CKSyncEngine hands sync
+/// callbacks on (record provider, conflict resolution), which don't run on
+/// the main actor.
+nonisolated enum SyncRecordMapper {
     /// All table names that participate in sync, in dependency order
     /// (parents before children for inserts, reverse for deletes).
     static let allTables = [

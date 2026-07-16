@@ -111,8 +111,8 @@ final class RotaViewModel {
 
     let service: AutorotaServiceProtocol
 
-    init(service: AutorotaServiceProtocol = GatedAutorotaService()) {
-        self.service = service
+    init(service: AutorotaServiceProtocol? = nil) {
+        self.service = service ?? GatedAutorotaService()
     }
 
     // MARK: - Week category

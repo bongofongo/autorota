@@ -118,13 +118,10 @@ struct DemoBanner: View {
     /// Nudge the user toward the hint card when the spotlight can't help:
     /// on iOS that's the guidance-hidden state (wrong tab / skipped dry);
     /// macOS has no spotlight overlay at all, so the nudge always shows
-    /// while a step is pending.
+    /// while a step is pending. See `DemoModeController.showsSpotlightHintNudge`
+    /// in `Views/Platform/{iOS,macOS}`.
     private var showsHintNudge: Bool {
-        #if os(iOS)
-        demo.isGuidanceHidden
-        #else
-        true
-        #endif
+        demo.showsSpotlightHintNudge
     }
 
     private var progressDots: some View {
@@ -202,9 +199,7 @@ private struct DemoChecklistSheet: View {
                 }
             }
             .navigationTitle("demo.checklist.title")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
+            .demoChecklistInlineTitle()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("demo.checklist.done") { dismiss() }
