@@ -1,6 +1,6 @@
-# Performance testing
+# Performance testing — reference
 
-How to measure scheduler / save / export / launch perf locally and in CI.
+Deep reference for what's covered and how to read results. For the CI-facing summary (how `perf.yml` behaves, the soft regression gate, one-time Xcode setup, troubleshooting), see [`ci-cd-guide.md`](ci-cd-guide.md#reading-perf-checks) — that's the better starting point if you just hit a red Perf check.
 
 ## TL;DR
 
@@ -10,7 +10,7 @@ make swift-perf-ios     # XCUITest cold launch + week nav + render (~2 min)
 make perf-all           # Both
 ```
 
-> The canonical Swift perf path is iOS Simulator (`swift-perf-ios`). `swift-perf-macos` exists but requires a one-time Accessibility grant (see Troubleshooting) and is omitted from `perf-all` and CI.
+> The canonical Swift perf path is iOS Simulator (`swift-perf-ios`). `swift-perf-macos` exists but requires a one-time Accessibility grant (see `ci-cd-guide.md`) and is omitted from `perf-all` and CI.
 
 Rust results: `target/criterion/report/index.html`. Swift results: latest `.xcresult` bundle in `~/Library/Developer/Xcode/DerivedData/AutorotaApp-*/Logs/Test/`.
 
@@ -65,7 +65,7 @@ Output goes to `target/criterion/`. `target/criterion/report/index.html` is the 
 ```bash
 make swift-perf-xcframework   # rebuild XCFramework with PERF_HELPERS=1
 make swift-perf-ios           # iPhone 17 Pro Max simulator (canonical)
-make swift-perf-macos         # macOS XCUITest — needs TCC grant, see below
+make swift-perf-macos         # macOS XCUITest — needs TCC grant, see ci-cd-guide.md
 ```
 
 Behind the scenes: `PERF_HELPERS=1 bash scripts/build_xcframework.sh --debug` then `xcodebuild test -testPlan Perf -only-testing:AutorotaAppPerfTests SWIFT_ACTIVE_COMPILATION_CONDITIONS='PERF_HELPERS' …`.
@@ -99,21 +99,6 @@ In Xcode's test report, each `measure` block shows:
 
 To set a baseline: in Xcode, open the test result, click the metric, choose **Set Baseline**. Baselines persist in the xctestplan and are committed to the repo (`AutorotaAppPerfTests/Baselines/`).
 
-## CI behaviour
-
-`.github/workflows/perf.yml` runs both suites on every PR. Both jobs use `continue-on-error: true` and never block merge. Artifacts:
-
-- `criterion-html` — full HTML report from `target/criterion/`.
-- `swift-perf-xcresult` — latest `.xcresult` bundle.
-
-A short bencher-format summary is written to the GitHub job summary.
-
-### Soft regression gate
-
-The `rust-bench` job also runs a **soft gate** on the scheduler engine. It benches the PR's merge base and the PR head on the *same* runner — so absolute timings are directly comparable and machine variance cancels out — then lets criterion's own statistical comparison decide. If `schedule_pure*` regresses with `p < 0.05`, the step exits non-zero: because the job is `continue-on-error`, this turns the check red and adds a `::warning::` annotation **without blocking merge**. Read the `criterion-html` artifact (or the step's `cmp.txt`) to see which group moved and by how much.
-
-A genuine, intended slowdown (e.g. a new scheduling constraint) is acknowledged by merging past the red check; there is no baseline file to update. The gate is scoped to the scheduler bench only — save/export stay purely informational.
-
 ## MVP non-goals
 
 These are intentionally out of scope for the first cut. Re-open if a regression makes one necessary:
@@ -124,21 +109,6 @@ These are intentionally out of scope for the first cut. Re-open if a regression 
 - **Trend dashboard.** No `bencher.dev` / `github-action-benchmark` integration.
 - **`save_restore_roundtrip` async DB bench.** Snapshot serialization covers the dominant cost; the round-trip is sqlite I/O.
 - **DB query timings for individual hot queries.** The whole-pipeline benches surface query cost in aggregate.
-
-## One-time Xcode setup
-
-The Rust side is fully wired and you can run `make bench` immediately. The Swift perf target needs a one-time setup in Xcode:
-
-1. Open `platforms/apple/Apps/AutorotaApp/AutorotaApp.xcodeproj`.
-2. **File → New → Target → UI Testing Bundle**. Name it `AutorotaAppPerfTests`. Bundle id `com.toadmountain.AutorotaAppPerfTests`. Target App: `AutorotaApp`.
-3. Delete the auto-generated `AutorotaAppPerfTestsLaunchTests.swift` and `AutorotaAppPerfTests.swift` stubs.
-4. Drag the four files at `platforms/apple/Apps/AutorotaApp/AutorotaAppPerfTests/` (`LaunchPerfTests.swift`, `WeekNavigationPerfTests.swift`, `RotaRenderPerfTests.swift`, `Perf.xctestplan`) into the new target.
-5. **Product → Scheme → Edit Scheme → Test → Test Plans → Add Test Plan → Choose `Perf.xctestplan`**.
-6. In the perf target's Build Settings, add `PERF_HELPERS` to **Active Compilation Conditions** for the *Debug* configuration.
-7. Build the perf XCFramework: `make swift-perf-xcframework`.
-8. `make swift-perf-ios` — first run records baselines into the xctestplan; commit them.
-
-This is needed exactly once. After that the Makefile target is the only command.
 
 ## Refreshing baselines
 
@@ -157,16 +127,8 @@ cargo bench -p autorota-core --bench scheduler -- --baseline pre-refactor
 
 ## Troubleshooting
 
-**`make swift-perf-macos` fails with "No such module 'XCTest'"**: the perf target hasn't been created in Xcode yet. See **One-time Xcode setup** above.
-
-**`make swift-perf-macos` fails with "Timed out while enabling automation mode"**: the test runner needs Accessibility permission. Open System Settings → Privacy & Security → Accessibility and enable the entry for `Terminal` (or whichever shell host runs the build), plus `Xcode`. First run after granting may still time out; re-run once.
-
-**`make swift-perf-macos` fails with `Could not launch ... LaunchServices error -10661`**: app sandbox is active. The Make target now passes `ENABLE_APP_SANDBOX=NO` and clears entitlements/team for the perf run; if the error returns, confirm those overrides survived.
-
-**`seedPerfCorpus` symbol not found**: XCFramework was built without `PERF_HELPERS=1`. Run `make swift-perf-xcframework`.
+See the [Troubleshooting index](ci-cd-guide.md#troubleshooting-index) in `ci-cd-guide.md` for the perf-related entries (missing XCTest target, Accessibility permission, sandbox errors, missing `seedPerfCorpus` symbol). One additional one not CI-specific:
 
 **XCTest baseline shows ±100% delta on every run**: machine warmup. First run on a freshly booted Mac is always noisy — discard and re-record the baseline.
-
-**Criterion says "Unable to complete benchmarks"**: usually a panic in setup. Run with `cargo bench -p autorota-core --bench <name> 2>&1 | head -50` to see the panic message.
 
 **Sample sizes are too small at 500 employees**: criterion adapts sample size automatically. For long benches (`export_pdf_weekly`) we cap `sample_size` to 20 explicitly; tweak that knob in the bench file if results are unstable.
