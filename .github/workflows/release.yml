@@ -116,7 +116,7 @@ jobs:
             -authenticationKeyIssuerID "$API_ISSUER_ID"
 
       - name: Upload iOS build to TestFlight
-        uses: Apple-Actions/upload-testflight-build@v3
+        uses: Apple-Actions/upload-testflight-build@v5
         with:
           app-path: ${{ runner.temp }}/export-ios/AutorotaApp.ipa
           app-type: ios
@@ -225,7 +225,7 @@ jobs:
             -authenticationKeyIssuerID "$API_ISSUER_ID"
 
       - name: Upload macOS build to TestFlight
-        uses: Apple-Actions/upload-testflight-build@v3
+        uses: Apple-Actions/upload-testflight-build@v5
         with:
           app-path: ${{ runner.temp }}/export-mas/AutorotaApp.pkg
           app-type: osx
