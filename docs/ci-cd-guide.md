@@ -10,7 +10,7 @@ Everything runs on GitHub Actions. Seven workflow files under `.github/workflows
 
 | Pipeline | File | When | What |
 |---|---|---|---|
-| **CI** | `ci.yml` | every PR + push to `main` | Rust fmt/clippy/tests, builds the XCFramework, runs Swift ViewModel + SPM tests, compile-checks Swift on macOS/iOS/iPadOS |
+| **CI** | `ci.yml` | every PR + push to `main` | Rust fmt/clippy/tests, builds the XCFramework, runs SPM integration tests, compile-checks Swift on macOS/iOS/iPadOS. ViewModel test jobs are shelved (run them locally; revisit with the perf-test work) |
 | **Rust checks** | `rust-checks.yml` | called by `ci.yml` and `release.yml` (not triggered directly) | `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test` — all excluding `app-desktop` (Tauri is not checked in CI at all while desktop is out of production; check locally with `cargo check -p app-desktop`) |
 | **release-plz** | `release-plz.yml` | every push to `main` | Opens/updates a single "Release PR" with a version bump + `CHANGELOG.md` diff |
 | **Release** | `release.yml` | push of tag `vX.Y.Z` | Builds, signs, and ships: iOS → TestFlight, macOS → TestFlight (Mac App Store) + notarized `.dmg`, GitHub Release |
@@ -42,7 +42,6 @@ Do this once per repo (not per developer), typically as the person setting up re
 - [ ] Branch protection on `main` (Settings → Branches → Add rule): require these status checks before merging —
   - `Rust`
   - `Build XCFramework`
-  - `Swift ViewModel — macOS`, `Swift ViewModel — iOS`, `Swift ViewModel — iPadOS`
   - `Swift Compile — macOS`, `Swift Compile — iOS`, `Swift Compile — iPadOS`
   - `Swift Package Integration`
   - `Conventional Commit`
@@ -85,7 +84,7 @@ Narrower Rust test targets exist too — `make rust-test-scheduler`, `rust-test-
 |---|---|---|
 | `Rust` | `cargo fmt`, `cargo clippy`, or `cargo test` failed | `make lint && make rust-test` |
 | `Build XCFramework` | Rust FFI broke, or a target/toolchain issue | `make swift-build-xcframework` |
-| `Swift ViewModel — <platform>` | A ViewModel test failed (uses `MockAutorotaService`, no XCFramework needed) | `make swift-test-app-macos` / `-ios` / `-ipad` |
+| ViewModel test failures | Not run in CI (shelved 2026-07-17, revisit with perf-test work) — local only | `make swift-test-app-macos` / `-ios` / `-ipad` |
 | `Swift Compile — <platform>` | A Swift file that no test imports failed to compile | `make swift-build-check` |
 | `Swift Package Integration` | A real-FFI test in `AutorotaKit`'s SPM test suite failed | `make swift-build-xcframework && make swift-test-package` |
 | `Conventional Commit` | PR title doesn't match the required format | Rename the PR (no rebase needed — the check re-runs on title edit) |
