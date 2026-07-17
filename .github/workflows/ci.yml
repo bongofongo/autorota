@@ -136,6 +136,15 @@ jobs:
         with:
           xcode-version: latest-stable
 
+      # Runner images only pre-create current-gen simulators; the SE (3rd gen)
+      # device type ships with Xcode but usually has no device instance.
+      # Build-only needs the destination to resolve, not to boot.
+      - name: Ensure iPhone SE (3rd generation) simulator exists
+        run: |
+          xcrun simctl list devices available | grep -q "iPhone SE (3rd generation)" || \
+            xcrun simctl create "iPhone SE (3rd generation)" \
+              "com.apple.CoreSimulator.SimDeviceType.iPhone-SE-3rd-generation"
+
       - name: Build — iPhone SE (3rd generation)
         run: |
           xcodebuild build \
