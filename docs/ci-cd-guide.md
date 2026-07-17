@@ -13,7 +13,7 @@ Everything runs on GitHub Actions. Seven workflow files under `.github/workflows
 | **CI** | `ci.yml` | every PR + push to `main` | Rust fmt/clippy/tests, builds the XCFramework, runs SPM integration tests, compile-checks Swift on macOS/iOS/iPadOS. ViewModel test jobs are shelved (run them locally; revisit with the perf-test work) |
 | **Rust checks** | `rust-checks.yml` | called by `ci.yml` and `release.yml` (not triggered directly) | `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test` — all excluding `app-desktop` (Tauri is not checked in CI at all while desktop is out of production; check locally with `cargo check -p app-desktop`) |
 | **release-plz** | `release-plz.yml` | every push to `main` | Opens/updates a single "Release PR" with a version bump + `CHANGELOG.md` diff |
-| **Release** | `release.yml` | push of tag `vX.Y.Z` | Builds, signs, and ships: iOS → TestFlight, macOS → TestFlight (Mac App Store) + notarized `.dmg`, GitHub Release |
+| **Release** | `release.yml` | push of tag `vX.Y.Z` | Builds, signs, and ships iOS → TestFlight, then a GitHub Release. macOS (Mac App Store + notarized `.dmg`) is shelved while there's no macOS app record — restore from git history when macOS ships |
 | **Supply Chain** | `supply-chain.yml` | push/PR touching `Cargo.toml`/`Cargo.lock`/`deny.toml`, weekly Monday 06:00 UTC | `cargo audit` (known vulnerabilities) + `cargo deny` (license/source policy) |
 | **Perf** | `perf.yml` | every PR to `main` | Rust criterion benches + Swift XCUITest perf suite. Never blocks merge — informational only, plus a soft scheduler-regression warning |
 | **pr-title** | `pr-title.yml` | PR opened/edited/synced/reopened | Lints the PR title against Conventional Commits |
@@ -105,11 +105,11 @@ You never tag manually in the normal flow — release-plz does it for you.
    - `tag-parse` — validates the tag matches `vX.Y.Z` exactly (semver, no `v0.1` or `v1.0.0-beta`), extracts the version; build number = the GitHub Actions run number.
    - `rust-checks` — the same fmt/clippy/test gate as CI, re-run for safety.
    - `release-ios` — builds the XCFramework, patches `MARKETING_VERSION`/`CURRENT_PROJECT_VERSION` into `project.pbxproj` via `sed`, archives with `xcodebuild archive -allowProvisioningUpdates` authenticated via the App Store Connect API key, exports using `platforms/apple/ExportOptions.plist`, uploads the `.ipa` to TestFlight.
-   - `release-macos` — same XCFramework/version-patch steps, then **two parallel export paths** from the same archive setup: (a) Mac App Store export (`ExportOptions-MacAppStore.plist`) → TestFlight upload; (b) Developer ID export (`ExportOptions-DeveloperID.plist`) → `hdiutil` builds a `.dmg` → `xcrun notarytool submit --wait` → `xcrun stapler staple` → a Gatekeeper check (`spctl --assess`, fails the job if not "accepted") → `.dmg` uploaded as a 7-day build artifact.
-   - Both `release-ios` and `release-macos` end by zipping the archive's `dSYMs/` and uploading them as build artifacts (`dSYMs-ios-vX.Y.Z` / `dSYMs-macos-vX.Y.Z`, 90-day retention). **Download and keep these for any build that ships to real users** — CI archives vanish with the runner, and without the matching dSYMs a crash report from that build can never be symbolicated.
-   - `publish` — downloads the `.dmg` artifact, creates a GitHub Release (not draft, not prerelease) with auto-generated release notes and the `.dmg` attached.
-   - `notify-failure` — if any job above failed, auto-files a GitHub Issue titled `Release vX.Y.Z failed` linking the run. This is the failure signal: a half-shipped release (e.g. iOS uploaded, macOS failed) shows up as an issue, not just a red check in the Actions tab.
-6. ~15–20 minutes after the tag push: iOS and macOS builds appear in App Store Connect → TestFlight, and a GitHub Release with the notarized `.dmg` is published.
+   - `release-ios` ends by zipping the archive's `dSYMs/` and uploading them as a build artifact (`dSYMs-ios-vX.Y.Z`, 90-day retention). **Download and keep these for any build that ships to real users** — CI archives vanish with the runner, and without the matching dSYMs a crash report from that build can never be symbolicated.
+   - (`release-macos` — Mac App Store TestFlight + notarized `.dmg` — is shelved while there's no macOS app record in App Store Connect. Restore it from git history when macOS distribution resumes.)
+   - `publish` — creates a GitHub Release (not draft, not prerelease) with auto-generated release notes. No artifacts attached while macOS/.dmg is shelved.
+   - `notify-failure` — if any job above failed, auto-files a GitHub Issue titled `Release vX.Y.Z failed` linking the run. This is the failure signal: a half-shipped release (e.g. TestFlight upload succeeded but publish failed) shows up as an issue, not just a red check in the Actions tab.
+6. ~10–15 minutes after the tag push: the iOS build appears in App Store Connect → TestFlight, and a GitHub Release is published.
 7. **Manually confirm the TestFlight builds actually finished processing** in App Store Connect before telling testers — a green `release.yml` only confirms the upload succeeded; Apple's binary processing (export compliance / asset validation) happens afterward and isn't currently monitored by CI. See gap #5 in [`ci-cd-improvement-plan.md`](ci-cd-improvement-plan.md).
 8. Promote builds to TestFlight testers, or submit to the App Store, from App Store Connect when ready — that step is manual and intentionally not automated.
 
@@ -174,7 +174,7 @@ Use this only when a correctness bug is already in a shipped build (TestFlight o
    git tag v0.2.1
    git push origin v0.2.1
    ```
-6. **Watch `release.yml`** run through the full iOS/macOS build-sign-ship path described above.
+6. **Watch `release.yml`** run through the full iOS build-sign-ship path described above.
 7. **Backmerge to `main`**, even though you cherry-picked — the version bump and changelog still need to land there:
    ```bash
    git checkout main
@@ -239,8 +239,8 @@ All secrets live as GitHub Actions repo secrets (Settings → Secrets and variab
 Three files under `platforms/apple/`, each referenced by exact path in `release.yml`:
 
 - `ExportOptions.plist` — `method: app-store-connect`, team `34VGHNCG6J`, destination `upload` → used for the iOS TestFlight export.
-- `ExportOptions-MacAppStore.plist` — same method/team, destination `upload` → macOS Mac App Store TestFlight export.
-- `ExportOptions-DeveloperID.plist` — `method: developer-id`, `signingStyle: automatic`, destination `export` → the notarized-`.dmg` path.
+- `ExportOptions-MacAppStore.plist` — same method/team, destination `upload` → macOS Mac App Store TestFlight export. Currently unused (macOS release shelved); kept for when it resumes.
+- `ExportOptions-DeveloperID.plist` — `method: developer-id`, `signingStyle: automatic`, destination `export` → the notarized-`.dmg` path. Currently unused, same reason.
 
 These files are **intentionally committed** — they contain a team ID and export method, not private keys (each carries a comment saying so). Keep them in sync with the signing certificates and team ID if either ever changes.
 

@@ -142,215 +142,24 @@ jobs:
         if: always()
         run: rm -rf ~/private_keys
 
-  # ─── macOS: Mac App Store + notarized .dmg ─────────────────────────────────
-  release-macos:
-    name: macOS → Mac App Store + .dmg
-    runs-on: macos-26
-    needs: [tag-parse, rust-checks]
-    env:
-      VERSION: ${{ needs.tag-parse.outputs.version }}
-      BUILD_NUMBER: ${{ needs.tag-parse.outputs.build_number }}
-      PROJECT: platforms/apple/Apps/AutorotaApp/AutorotaApp.xcodeproj
-      SCHEME: AutorotaApp
-    outputs:
-      dmg-path: ${{ steps.dmg.outputs.path }}
-    steps:
-      - uses: actions/checkout@v4
+  # ─── macOS: shelved (2026-07-17) ───────────────────────────────────────────
+  # The release-macos job (Mac App Store TestFlight upload + notarized .dmg)
+  # was removed while there is no macOS app record in App Store Connect and
+  # macOS is not being shipped. Restore it from git history (last present at
+  # tag-time commit 29aab38) when macOS distribution resumes; it also fed the
+  # .dmg into the publish job and dSYMs-macos artifact, and belongs back in
+  # the publish/notify-failure `needs` lists.
 
-      - name: Install Rust toolchain (Apple targets)
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: >-
-            aarch64-apple-darwin
-            x86_64-apple-darwin
-            aarch64-apple-ios
-            aarch64-apple-ios-sim
-
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          key: apple-release
-
-      - name: Select Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
-
-      - name: Build XCFramework (release)
-        run: bash scripts/build_xcframework.sh
-
-      - name: Set version in Xcode project
-        run: |
-          sed -i '' "s/MARKETING_VERSION = .*;/MARKETING_VERSION = $VERSION;/g" \
-            "$PROJECT/project.pbxproj"
-          sed -i '' "s/CURRENT_PROJECT_VERSION = .*;/CURRENT_PROJECT_VERSION = $BUILD_NUMBER;/g" \
-            "$PROJECT/project.pbxproj"
-
-      - name: Install App Store Connect API key
-        env:
-          API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
-          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-        run: |
-          mkdir -p ~/private_keys
-          echo "$API_KEY_P8" | base64 --decode > ~/private_keys/AuthKey_${API_KEY_ID}.p8
-
-      # ── Mac App Store branch ───────────────────────────────────────────────
-      - name: Archive (macOS, App Store)
-        env:
-          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
-        run: |
-          xcodebuild archive \
-            -project "$PROJECT" \
-            -scheme "$SCHEME" \
-            -destination 'generic/platform=macOS' \
-            -archivePath "$RUNNER_TEMP/AutorotaApp-macOS-AppStore.xcarchive" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
-            -authenticationKeyID "$API_KEY_ID" \
-            -authenticationKeyIssuerID "$API_ISSUER_ID"
-
-      - name: Export (Mac App Store)
-        env:
-          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
-        run: |
-          xcodebuild -exportArchive \
-            -archivePath "$RUNNER_TEMP/AutorotaApp-macOS-AppStore.xcarchive" \
-            -exportOptionsPlist platforms/apple/ExportOptions-MacAppStore.plist \
-            -exportPath "$RUNNER_TEMP/export-mas" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
-            -authenticationKeyID "$API_KEY_ID" \
-            -authenticationKeyIssuerID "$API_ISSUER_ID"
-
-      - name: Upload macOS build to TestFlight
-        uses: Apple-Actions/upload-testflight-build@v3
-        with:
-          app-path: ${{ runner.temp }}/export-mas/AutorotaApp.pkg
-          app-type: osx
-          api-key-id: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          api-issuer: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
-          api-private-key: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
-
-      # ── Developer ID notarized .dmg branch ─────────────────────────────────
-      - name: Archive (macOS, Developer ID)
-        env:
-          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
-        run: |
-          xcodebuild archive \
-            -project "$PROJECT" \
-            -scheme "$SCHEME" \
-            -destination 'generic/platform=macOS' \
-            -archivePath "$RUNNER_TEMP/AutorotaApp-macOS-DevID.xcarchive" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
-            -authenticationKeyID "$API_KEY_ID" \
-            -authenticationKeyIssuerID "$API_ISSUER_ID" \
-            CODE_SIGN_STYLE=Automatic
-
-      - name: Export (Developer ID)
-        env:
-          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
-        run: |
-          xcodebuild -exportArchive \
-            -archivePath "$RUNNER_TEMP/AutorotaApp-macOS-DevID.xcarchive" \
-            -exportOptionsPlist platforms/apple/ExportOptions-DeveloperID.plist \
-            -exportPath "$RUNNER_TEMP/export-devid" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
-            -authenticationKeyID "$API_KEY_ID" \
-            -authenticationKeyIssuerID "$API_ISSUER_ID"
-
-      - name: Create .dmg
-        id: dmg
-        run: |
-          DMG_PATH="$RUNNER_TEMP/AutorotaApp-$VERSION.dmg"
-          hdiutil create \
-            -volname "AutorotaApp" \
-            -srcfolder "$RUNNER_TEMP/export-devid/AutorotaApp.app" \
-            -ov -format ULFO \
-            "$DMG_PATH"
-          echo "path=$DMG_PATH" >> "$GITHUB_OUTPUT"
-
-      - name: Notarize .dmg
-        env:
-          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
-          DMG_PATH: ${{ steps.dmg.outputs.path }}
-        run: |
-          xcrun notarytool submit "$DMG_PATH" \
-            --key ~/private_keys/AuthKey_${API_KEY_ID}.p8 \
-            --key-id "$API_KEY_ID" \
-            --issuer "$API_ISSUER_ID" \
-            --wait
-
-      - name: Staple .dmg
-        env:
-          DMG_PATH: ${{ steps.dmg.outputs.path }}
-        run: xcrun stapler staple "$DMG_PATH"
-
-      - name: Verify Gatekeeper acceptance
-        env:
-          DMG_PATH: ${{ steps.dmg.outputs.path }}
-        # spctl assess on the .dmg confirms the staple is valid and
-        # Gatekeeper will accept the install on a fresh Mac. Catches
-        # silent notarization regressions (e.g. signature broken between
-        # notarize and staple) before users hit them.
-        run: |
-          OUTPUT=$(xcrun spctl --assess --type install --verbose=4 "$DMG_PATH" 2>&1)
-          echo "$OUTPUT"
-          if ! echo "$OUTPUT" | grep -q "accepted"; then
-            echo "::error::spctl did not accept the stapled .dmg — Gatekeeper would reject this build"
-            exit 1
-          fi
-
-      - name: Upload .dmg artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: autorota-dmg
-          path: ${{ steps.dmg.outputs.path }}
-          retention-days: 7
-
-      # Both macOS archives (App Store + Developer ID) produce dSYMs; keep
-      # both — the shipped binaries differ, so their UUIDs differ.
-      - name: Collect dSYMs
-        run: |
-          mkdir -p "$RUNNER_TEMP/dSYMs-macos"
-          cp -R "$RUNNER_TEMP/AutorotaApp-macOS-AppStore.xcarchive/dSYMs" \
-            "$RUNNER_TEMP/dSYMs-macos/AppStore"
-          cp -R "$RUNNER_TEMP/AutorotaApp-macOS-DevID.xcarchive/dSYMs" \
-            "$RUNNER_TEMP/dSYMs-macos/DeveloperID"
-          cd "$RUNNER_TEMP/dSYMs-macos"
-          zip -r "$RUNNER_TEMP/dSYMs-macos-v$VERSION.zip" .
-
-      - name: Upload dSYMs artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: dSYMs-macos-v${{ env.VERSION }}
-          path: ${{ runner.temp }}/dSYMs-macos-v${{ env.VERSION }}.zip
-          retention-days: 90
-
-      - name: Cleanup API key
-        if: always()
-        run: rm -rf ~/private_keys
-
-  # ─── Publish GitHub Release with .dmg attached ─────────────────────────────
+  # ─── Publish GitHub Release ────────────────────────────────────────────────
+  # No artifacts attached while macOS (.dmg) is shelved — the release exists
+  # for the tag + auto-generated notes; iOS ships via TestFlight.
   publish:
     name: GitHub Release
     runs-on: ubuntu-latest
-    needs: [tag-parse, release-ios, release-macos]
+    needs: [tag-parse, release-ios]
     env:
       VERSION: ${{ needs.tag-parse.outputs.version }}
     steps:
-      - name: Download .dmg
-        uses: actions/download-artifact@v4
-        with:
-          name: autorota-dmg
-          path: ./dist
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -359,8 +168,6 @@ jobs:
           generate_release_notes: true
           draft: false
           prerelease: false
-          files: |
-            dist/*.dmg
 
   # ─── File an issue if anything failed ──────────────────────────────────────
   # A release that half-ships (e.g. iOS uploaded, macOS failed) is otherwise
@@ -369,7 +176,7 @@ jobs:
   notify-failure:
     name: File issue on failure
     runs-on: ubuntu-latest
-    needs: [tag-parse, rust-checks, release-ios, release-macos, publish]
+    needs: [tag-parse, rust-checks, release-ios, publish]
     if: failure()
     permissions:
       issues: write
