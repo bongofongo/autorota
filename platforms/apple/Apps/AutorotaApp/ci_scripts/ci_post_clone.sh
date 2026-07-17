@@ -2,6 +2,14 @@
 #
 # Xcode Cloud post-clone hook.
 #
+# NOTE: Xcode Cloud is NOT the release path — GitHub Actions
+# (.github/workflows/release.yml) is. This hook only runs if an Xcode Cloud
+# workflow is configured for this app in App Store Connect; kept as cheap
+# insurance because it works around two real bootstrap incidents (see
+# BUG_LOG.md: DNS failure fetching rustup, keg-only Homebrew PATH issue).
+# If an Xcode Cloud workflow IS active, it would be a second, unmonitored
+# build/submit path — check App Store Connect before enabling one.
+#
 # Xcode Cloud runners ship with Xcode but no Rust toolchain, and the
 # AutorotaFFI.xcframework is gitignored (built from the Rust workspace by
 # `scripts/build_xcframework.sh`). This script installs Rust, adds the four

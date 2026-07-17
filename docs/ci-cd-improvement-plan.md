@@ -8,6 +8,20 @@ The catch: as of this writing, **the pipeline has never actually run for a real 
 
 Gaps below are grouped by when they should be addressed relative to the first real tag push, not by abstract severity — that ordering is the point.
 
+## Status (2026-07-17)
+
+Repo-side fixes are implemented; the remaining items need actions outside the repo (pushing a tag, checking App Store Connect).
+
+- **#1 Done** — all Swift/Apple jobs in `ci.yml`, `release.yml`, `perf.yml` now run on `macos-26`. Still to do: land this and confirm the full CI matrix goes green on the new image.
+- **#2 Pending** — the `v0.1.0-rc1` dry-run tag hasn't been pushed yet. Do this after #1 is confirmed green.
+- **#3 Done** — both release jobs zip the archive `dSYMs/` and upload them as 90-day artifacts (`dSYMs-ios-vX.Y.Z`, `dSYMs-macos-vX.Y.Z`; the macOS zip contains both App Store and Developer ID symbol sets).
+- **#4 Done** — a `notify-failure` job in `release.yml` auto-files a GitHub Issue (`Release vX.Y.Z failed`, linking the run) when any release job fails.
+- **#5 Done (doc)** — manual "Ready to Test" check documented in the guide's release steps; automation deferred as planned.
+- **#6 Done** — resolved as option (a): `.gitignore` entry removed, each `ExportOptions*.plist` carries a comment explaining it's intentionally committed.
+- **#7 Partially done** — `ci_post_clone.sh` header now documents that it's not the release path and why it exists. Still to do: check App Store Connect → Xcode Cloud for an active workflow.
+- **#8 Done** — root `README.md` added with CI + Release badges and a link to the guide.
+- **#9 / #10** — deferred, unchanged.
+
 ## Gap table
 
 | # | Gap | Why it matters for a released app | Fix | Effort |

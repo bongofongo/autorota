@@ -28,7 +28,7 @@ jobs:
   # ─── Build XCFramework once, share with Swift package tests ────────────────
   xcframework:
     name: Build XCFramework
-    runs-on: macos-15
+    runs-on: macos-26
     needs: rust-checks
     steps:
       - uses: actions/checkout@v4
@@ -73,7 +73,7 @@ jobs:
   # NOTE: Requires Xcode 26+ (Swift 6.2 / iOS 26 SDK).
   swift-app-tests:
     name: Swift ViewModel — ${{ matrix.platform }}
-    runs-on: macos-15
+    runs-on: macos-26
     needs: rust-checks
     strategy:
       fail-fast: false
@@ -110,7 +110,7 @@ jobs:
   # second simulator boot for the full suite.
   swift-iphone-se-compile:
     name: Swift compile — iPhone SE
-    runs-on: macos-15
+    runs-on: macos-26
     needs: rust-checks
 
     steps:
@@ -132,7 +132,7 @@ jobs:
   # ─── Swift: AutorotaKit SPM integration tests (real FFI) ────────────────────
   swift-package-tests:
     name: Swift Package Integration
-    runs-on: macos-15
+    runs-on: macos-26
     needs: xcframework
 
     steps:
@@ -163,7 +163,7 @@ jobs:
   # Inputs are author-controlled matrix values, no PR-injected strings used.
   swift-compile-check:
     name: Swift Compile — ${{ matrix.platform }}
-    runs-on: macos-15
+    runs-on: macos-26
     needs: xcframework
     strategy:
       fail-fast: false
@@ -204,7 +204,7 @@ jobs:
   # ─── Tauri desktop: compile verification on macOS ──────────────────────────
   tauri-desktop:
     name: Tauri Desktop (macOS)
-    runs-on: macos-15
+    runs-on: macos-26
     needs: rust-checks
     steps:
       - uses: actions/checkout@v4

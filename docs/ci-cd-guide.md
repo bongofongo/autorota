@@ -109,7 +109,9 @@ You never tag manually in the normal flow — release-plz does it for you.
    - `rust-checks` — the same fmt/clippy/test gate as CI, re-run for safety.
    - `release-ios` — builds the XCFramework, patches `MARKETING_VERSION`/`CURRENT_PROJECT_VERSION` into `project.pbxproj` via `sed`, archives with `xcodebuild archive -allowProvisioningUpdates` authenticated via the App Store Connect API key, exports using `platforms/apple/ExportOptions.plist`, uploads the `.ipa` to TestFlight.
    - `release-macos` — same XCFramework/version-patch steps, then **two parallel export paths** from the same archive setup: (a) Mac App Store export (`ExportOptions-MacAppStore.plist`) → TestFlight upload; (b) Developer ID export (`ExportOptions-DeveloperID.plist`) → `hdiutil` builds a `.dmg` → `xcrun notarytool submit --wait` → `xcrun stapler staple` → a Gatekeeper check (`spctl --assess`, fails the job if not "accepted") → `.dmg` uploaded as a 7-day build artifact.
+   - Both `release-ios` and `release-macos` end by zipping the archive's `dSYMs/` and uploading them as build artifacts (`dSYMs-ios-vX.Y.Z` / `dSYMs-macos-vX.Y.Z`, 90-day retention). **Download and keep these for any build that ships to real users** — CI archives vanish with the runner, and without the matching dSYMs a crash report from that build can never be symbolicated.
    - `publish` — downloads the `.dmg` artifact, creates a GitHub Release (not draft, not prerelease) with auto-generated release notes and the `.dmg` attached.
+   - `notify-failure` — if any job above failed, auto-files a GitHub Issue titled `Release vX.Y.Z failed` linking the run. This is the failure signal: a half-shipped release (e.g. iOS uploaded, macOS failed) shows up as an issue, not just a red check in the Actions tab.
 6. ~15–20 minutes after the tag push: iOS and macOS builds appear in App Store Connect → TestFlight, and a GitHub Release with the notarized `.dmg` is published.
 7. **Manually confirm the TestFlight builds actually finished processing** in App Store Connect before telling testers — a green `release.yml` only confirms the upload succeeded; Apple's binary processing (export compliance / asset validation) happens afterward and isn't currently monitored by CI. See gap #5 in [`ci-cd-improvement-plan.md`](ci-cd-improvement-plan.md).
 8. Promote builds to TestFlight testers, or submit to the App Store, from App Store Connect when ready — that step is manual and intentionally not automated.
@@ -243,11 +245,11 @@ Three files under `platforms/apple/`, each referenced by exact path in `release.
 - `ExportOptions-MacAppStore.plist` — same method/team, destination `upload` → macOS Mac App Store TestFlight export.
 - `ExportOptions-DeveloperID.plist` — `method: developer-id`, `signingStyle: automatic`, destination `export` → the notarized-`.dmg` path.
 
-These files are tracked in git even though `.gitignore` has an entry for `platforms/apple/ExportOptions*.plist` — a known inconsistency, tracked as gap #6 in [`ci-cd-improvement-plan.md`](ci-cd-improvement-plan.md). Until that's resolved: treat them as intentionally committed (they contain a team ID and export method, not private keys) and keep them in sync with the signing certificates and team ID if either ever changes.
+These files are **intentionally committed** — they contain a team ID and export method, not private keys (each carries a comment saying so). Keep them in sync with the signing certificates and team ID if either ever changes.
 
 ### The Xcode Cloud hook
 
-`platforms/apple/Apps/AutorotaApp/ci_scripts/ci_post_clone.sh` is Apple's auto-detected Xcode Cloud post-clone hook — it installs `rustup` via Homebrew and builds the XCFramework, working around two real incidents documented in `BUG_LOG.md` (a DNS resolution failure fetching the rustup installer, and a keg-only Homebrew formula not exposing `cargo`/`rustc` on `PATH`). It predates `release.yml` and isn't referenced by any current doc. It only does anything if an Xcode Cloud workflow is actually configured for this app in App Store Connect — check there if unsure whether it's live. See gap #7 in the improvement plan.
+`platforms/apple/Apps/AutorotaApp/ci_scripts/ci_post_clone.sh` is Apple's auto-detected Xcode Cloud post-clone hook — it installs `rustup` via Homebrew and builds the XCFramework, working around two real incidents documented in `BUG_LOG.md` (a DNS resolution failure fetching the rustup installer, and a keg-only Homebrew formula not exposing `cargo`/`rustc` on `PATH`). Xcode Cloud is **not** the release path — GitHub Actions is — and the script's header comment now says so. The hook only does anything if an Xcode Cloud workflow is actually configured for this app in App Store Connect; if one is, that's a second, unmonitored build/submit path and should be disabled (gap #7 in the improvement plan — confirming App Store Connect state is still pending).
 
 ## Troubleshooting index
 
@@ -263,8 +265,9 @@ These files are tracked in git even though `.gitignore` has an entry for `platfo
 | `make swift-perf-macos` fails with `LaunchServices error -10661` | App sandbox is active; confirm the `ENABLE_APP_SANDBOX=NO` and cleared-entitlements overrides in the `swift-perf-macos` Make target survived |
 | `seedPerfCorpus` symbol not found | XCFramework was built without `PERF_HELPERS=1` — run `make swift-perf-xcframework` |
 | Criterion says "Unable to complete benchmarks" | Usually a panic during setup — run `cargo bench -p autorota-core --bench <name> 2>&1 \| head -50` to see the message |
-| CI Swift jobs failing on `macos-15` for no obvious code reason | Known runner/Xcode-version mismatch — see gap #1 in [`ci-cd-improvement-plan.md`](ci-cd-improvement-plan.md) |
+| A Swift CI job fails selecting Xcode (`setup-xcode` can't find `26.0`) | Swift/Apple jobs run on the `macos-26` runner image; if GitHub rotates the preinstalled Xcode versions, bump `xcode-version` in `ci.yml` / `release.yml` / `perf.yml` to a version present on the image |
 | `release.yml` green but the build never shows up in TestFlight | Apple's async binary processing failed after upload — this isn't currently monitored by CI (gap #5); check App Store Connect directly for a rejection reason |
+| `release.yml` failed and you weren't watching | A GitHub Issue titled `Release vX.Y.Z failed` is auto-filed with a link to the run — check whether either platform already uploaded to TestFlight before the failure |
 
 ## Reference
 
