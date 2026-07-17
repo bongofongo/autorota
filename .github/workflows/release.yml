@@ -115,14 +115,9 @@ jobs:
             -authenticationKeyID "$API_KEY_ID" \
             -authenticationKeyIssuerID "$API_ISSUER_ID"
 
-      - name: Upload iOS build to TestFlight
-        uses: Apple-Actions/upload-testflight-build@v3
-        with:
-          app-path: ${{ runner.temp }}/export-ios/AutorotaApp.ipa
-          app-type: ios
-          api-key-id: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          api-issuer: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
-          api-private-key: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+      # No separate TestFlight upload step: ExportOptions.plist sets
+      # `destination: upload`, so the Export IPA step above uploads straight
+      # to App Store Connect itself.
 
       # CI-built archives vanish with the runner — keep the dSYMs or crash
       # reports from this build are unsymbolicatable forever.
