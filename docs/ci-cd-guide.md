@@ -86,7 +86,6 @@ Narrower Rust test targets exist too — `make rust-test-scheduler`, `rust-test-
 | `Rust` | `cargo fmt`, `cargo clippy`, or `cargo test` failed | `make lint && make rust-test` |
 | `Build XCFramework` | Rust FFI broke, or a target/toolchain issue | `make swift-build-xcframework` |
 | `Swift ViewModel — <platform>` | A ViewModel test failed (uses `MockAutorotaService`, no XCFramework needed) | `make swift-test-app-macos` / `-ios` / `-ipad` |
-| `Swift compile — iPhone SE` | Compile-only check on a small-screen simulator (catches layout overflow at 375pt width); doesn't run tests | `$(XCB) build -destination 'platform=iOS Simulator,name=iPhone SE (3rd generation)'` from the Makefile's `XCB` var, or just open the simulator locally |
 | `Swift Compile — <platform>` | A Swift file that no test imports failed to compile | `make swift-build-check` |
 | `Swift Package Integration` | A real-FFI test in `AutorotaKit`'s SPM test suite failed | `make swift-build-xcframework && make swift-test-package` |
 | `Conventional Commit` | PR title doesn't match the required format | Rename the PR (no rebase needed — the check re-runs on title edit) |

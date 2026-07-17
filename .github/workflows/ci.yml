@@ -106,52 +106,10 @@ jobs:
             -scheme AutorotaApp \
             -destination "$DESTINATION"
 
-  # ─── Swift: small-screen compile check (iPhone SE) ──────────────────────────
-  # Compile-only on iPhone SE so layouts that overflow at 4.7"/375pt-wide are
-  # caught at PR time. Doesn't run tests (the iPhone 17 leg above already
-  # exercises behaviour) so the extra cost is just one compilation, not a
-  # second simulator boot for the full suite.
-  swift-iphone-se-compile:
-    name: Swift compile — iPhone SE
-    runs-on: macos-26
-    needs: xcframework
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download XCFramework
-        uses: actions/download-artifact@v4
-        with:
-          name: xcframework
-          path: platforms/apple/AutorotaKit/XCFrameworks/
-
-      - name: Download generated bindings
-        uses: actions/download-artifact@v4
-        with:
-          name: generated-bindings
-          path: platforms/apple/AutorotaKit/Sources/AutorotaKit/generated/
-
-      - name: Select Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
-
-      # Runner images only pre-create current-gen simulators; the SE (3rd gen)
-      # device type ships with Xcode but usually has no device instance.
-      # Build-only needs the destination to resolve, not to boot.
-      - name: Ensure iPhone SE (3rd generation) simulator exists
-        run: |
-          xcrun simctl list devices available | grep -q "iPhone SE (3rd generation)" || \
-            xcrun simctl create "iPhone SE (3rd generation)" \
-              "com.apple.CoreSimulator.SimDeviceType.iPhone-SE-3rd-generation"
-
-      - name: Build — iPhone SE (3rd generation)
-        run: |
-          xcodebuild build \
-            -project platforms/apple/Apps/AutorotaApp/AutorotaApp.xcodeproj \
-            -scheme AutorotaApp \
-            -destination 'platform=iOS Simulator,name=iPhone SE (3rd generation)' \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+  # The former "Swift compile — iPhone SE" job was removed: compile-only builds
+  # are destination-independent, so it duplicated Swift Compile — iOS exactly
+  # (a build can't catch 375pt layout overflow — that needs a UI test), and no
+  # iOS 26 simulator runtime pairs with the SE (3rd gen) device type anyway.
 
   # ─── Swift: AutorotaKit SPM integration tests (real FFI) ────────────────────
   swift-package-tests:
