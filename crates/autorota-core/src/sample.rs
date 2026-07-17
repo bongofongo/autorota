@@ -73,7 +73,8 @@ pub fn build_sample_week() -> SampleWeek {
     let templates = sample_templates();
 
     // (date_offset, template_id, optional (employee_id, status)).
-    let spec: &[(i64, i64, Option<(i64, AssignmentStatus)>)] = &[
+    type AssignmentSpec = (i64, i64, Option<(i64, AssignmentStatus)>);
+    let spec: &[AssignmentSpec] = &[
         // Mon
         (0, 1, Some((1, AssignmentStatus::Confirmed))),
         (0, 2, Some((2, AssignmentStatus::Confirmed))),

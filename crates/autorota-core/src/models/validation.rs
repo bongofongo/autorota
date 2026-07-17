@@ -31,10 +31,10 @@ pub fn validate_employee(emp: &Employee) -> Result<(), ValidationError> {
     if emp.first_name.trim().is_empty() {
         return Err(ValidationError::EmptyFirstName);
     }
-    if let Some(w) = emp.hourly_wage {
-        if !w.is_finite() || w < 0.0 {
-            return Err(ValidationError::InvalidWage(format!("{w}")));
-        }
+    if let Some(w) = emp.hourly_wage
+        && (!w.is_finite() || w < 0.0)
+    {
+        return Err(ValidationError::InvalidWage(format!("{w}")));
     }
     if !(0.0..=24.0).contains(&emp.max_daily_hours) {
         return Err(ValidationError::InvalidMaxDailyHours(emp.max_daily_hours));

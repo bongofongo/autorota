@@ -31,6 +31,18 @@ type ShiftRow = (
     u32,
     u32,
 );
+type AssignmentRow = (i64, i64, i64, i64, String, Option<String>, Option<f64>);
+type ShiftTemplateOverrideRow = (
+    i64,
+    i64,
+    String,
+    i64,
+    Option<String>,
+    Option<String>,
+    Option<i64>,
+    Option<i64>,
+    Option<String>,
+);
 
 // ─── Employees ───────────────────────────────────────────────
 
@@ -960,7 +972,7 @@ pub async fn list_assignments_for_rota(
     pool: &SqlitePool,
     rota_id: i64,
 ) -> Result<Vec<Assignment>, sqlx::Error> {
-    let rows: Vec<(i64, i64, i64, i64, String, Option<String>, Option<f64>)> = sqlx::query_as(
+    let rows: Vec<AssignmentRow> = sqlx::query_as(
         "SELECT id, rota_id, shift_id, employee_id, status, employee_name, hourly_wage
          FROM assignments WHERE rota_id = ? ORDER BY id",
     )
@@ -1493,7 +1505,7 @@ pub async fn get_shift_template_override(
     template_id: i64,
     date: NaiveDate,
 ) -> Result<Option<ShiftTemplateOverride>, sqlx::Error> {
-    let row: Option<(i64, i64, String, i64, Option<String>, Option<String>, Option<i64>, Option<i64>, Option<String>)> = sqlx::query_as(
+    let row: Option<ShiftTemplateOverrideRow> = sqlx::query_as(
         "SELECT id, template_id, date, cancelled, start_time, end_time, min_employees, max_employees, notes
          FROM shift_template_overrides WHERE template_id = ? AND date = ?",
     )
@@ -1508,7 +1520,7 @@ pub async fn list_shift_template_overrides_for_template(
     pool: &SqlitePool,
     template_id: i64,
 ) -> Result<Vec<ShiftTemplateOverride>, sqlx::Error> {
-    let rows: Vec<(i64, i64, String, i64, Option<String>, Option<String>, Option<i64>, Option<i64>, Option<String>)> = sqlx::query_as(
+    let rows: Vec<ShiftTemplateOverrideRow> = sqlx::query_as(
         "SELECT id, template_id, date, cancelled, start_time, end_time, min_employees, max_employees, notes
          FROM shift_template_overrides WHERE template_id = ? ORDER BY date",
     )
@@ -1524,7 +1536,7 @@ pub async fn list_shift_template_overrides_for_template(
 pub async fn list_all_shift_template_overrides(
     pool: &SqlitePool,
 ) -> Result<Vec<ShiftTemplateOverride>, sqlx::Error> {
-    let rows: Vec<(i64, i64, String, i64, Option<String>, Option<String>, Option<i64>, Option<i64>, Option<String>)> = sqlx::query_as(
+    let rows: Vec<ShiftTemplateOverrideRow> = sqlx::query_as(
         "SELECT id, template_id, date, cancelled, start_time, end_time, min_employees, max_employees, notes
          FROM shift_template_overrides ORDER BY date, template_id",
     )
@@ -1546,17 +1558,7 @@ pub async fn delete_shift_template_override(pool: &SqlitePool, id: i64) -> Resul
 }
 
 fn shift_template_override_from_row(
-    row: (
-        i64,
-        i64,
-        String,
-        i64,
-        Option<String>,
-        Option<String>,
-        Option<i64>,
-        Option<i64>,
-        Option<String>,
-    ),
+    row: ShiftTemplateOverrideRow,
 ) -> Option<ShiftTemplateOverride> {
     let (id, template_id, date_str, cancelled, start_str, end_str, min_emp, max_emp, notes) = row;
     Some(ShiftTemplateOverride {

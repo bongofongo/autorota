@@ -72,10 +72,10 @@ pub fn render_markdown(grid: &ExportGrid) -> String {
 
     for row in &rows {
         out.push('|');
-        for i in 0..header.len() {
+        for (i, w) in widths.iter().enumerate().take(header.len()) {
             let cell = row.get(i).map(String::as_str).unwrap_or("");
             out.push(' ');
-            out.push_str(&pad(cell, widths[i]));
+            out.push_str(&pad(cell, *w));
             out.push_str(" |");
         }
         out.push('\n');

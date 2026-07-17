@@ -280,11 +280,9 @@ fn build_employee_grid(
                             parts.push(r.shift.required_role.clone());
                         }
                         let mut text = parts.join("\n");
-                        if is_manager {
-                            if let Some(wage) = r.hourly_wage {
-                                let cost = wage * r.shift.duration_hours();
-                                text.push_str(&format!(" (${cost:.2})"));
-                            }
+                        if is_manager && let Some(wage) = r.hourly_wage {
+                            let cost = wage * r.shift.duration_hours();
+                            text.push_str(&format!(" (${cost:.2})"));
                         }
                         if is_manager {
                             daily_hours[col] += r.shift.duration_hours();
@@ -433,11 +431,9 @@ fn build_shift_grid(
                         // layout, so the data cell is just the employee name
                         // (plus cost in manager mode).
                         let mut text = r.employee_name.clone();
-                        if is_manager {
-                            if let Some(wage) = r.hourly_wage {
-                                let cost = wage * r.shift.duration_hours();
-                                text.push_str(&format!(" ${cost:.2}"));
-                            }
+                        if is_manager && let Some(wage) = r.hourly_wage {
+                            let cost = wage * r.shift.duration_hours();
+                            text.push_str(&format!(" ${cost:.2}"));
                         }
                         if is_manager {
                             daily_hours[col] += r.shift.duration_hours();
@@ -543,12 +539,10 @@ pub fn build_single_employee_grid(
                         ));
                     }
                     let mut text = line_parts.join("\n");
-                    if is_manager {
-                        if let Some(wage) = a.hourly_wage {
-                            let cost = wage * shift.duration_hours();
-                            total_cost += cost;
-                            text.push_str(&format!(" (${cost:.2})"));
-                        }
+                    if is_manager && let Some(wage) = a.hourly_wage {
+                        let cost = wage * shift.duration_hours();
+                        total_cost += cost;
+                        text.push_str(&format!(" (${cost:.2})"));
                     }
                     Some(text)
                 })

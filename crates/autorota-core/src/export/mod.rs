@@ -369,6 +369,7 @@ pub async fn export_employee_schedules(
 
 /// Pure-render version of employee-schedule export. Assumes `assignments` and
 /// `shifts` are already filtered to this employee / range.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn render_employee_export(
     employee_name: &str,
     employee_id: i64,

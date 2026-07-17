@@ -399,7 +399,7 @@ impl HeaderMap {
 }
 
 fn split_full_name(full: &str) -> (String, String) {
-    let parts: Vec<&str> = full.trim().split_whitespace().collect();
+    let parts: Vec<&str> = full.split_whitespace().collect();
     match parts.len() {
         0 => (String::new(), String::new()),
         1 => (parts[0].to_string(), String::new()),

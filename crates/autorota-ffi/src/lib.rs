@@ -549,17 +549,16 @@ pub fn delete_shift_template(id: i64) -> Result<(), FfiError> {
 pub fn create_assignment(mut assignment: FfiAssignment) -> Result<i64, FfiError> {
     let pool = &pool()?;
     // Snapshot employee name and wage if missing
-    if assignment.employee_name.is_none() || assignment.hourly_wage.is_none() {
-        if let Some(emp) = rt()
+    if (assignment.employee_name.is_none() || assignment.hourly_wage.is_none())
+        && let Some(emp) = rt()
             .block_on(queries::get_employee(pool, assignment.employee_id))
             .map_err(FfiError::from)?
-        {
-            if assignment.employee_name.is_none() {
-                assignment.employee_name = Some(emp.display_name());
-            }
-            if assignment.hourly_wage.is_none() {
-                assignment.hourly_wage = emp.hourly_wage;
-            }
+    {
+        if assignment.employee_name.is_none() {
+            assignment.employee_name = Some(emp.display_name());
+        }
+        if assignment.hourly_wage.is_none() {
+            assignment.hourly_wage = emp.hourly_wage;
         }
     }
     let core = ffi_to_assignment(assignment)?;
