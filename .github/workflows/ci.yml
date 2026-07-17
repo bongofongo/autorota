@@ -52,8 +52,11 @@ jobs:
         with:
           xcode-version: '26.0'
 
+      # PERF_HELPERS=1: the app's Debug config compiles with the PERF_HELPERS
+      # condition (pbxproj), so Debug builds link seedPerfCorpus — a plain
+      # framework fails at link. Release ships its own plain build in release.yml.
       - name: Build XCFramework
-        run: bash scripts/build_xcframework.sh
+        run: PERF_HELPERS=1 bash scripts/build_xcframework.sh
 
       - name: Upload XCFramework artifact
         uses: actions/upload-artifact@v4
@@ -111,10 +114,22 @@ jobs:
   swift-iphone-se-compile:
     name: Swift compile — iPhone SE
     runs-on: macos-26
-    needs: rust-checks
+    needs: xcframework
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download XCFramework
+        uses: actions/download-artifact@v4
+        with:
+          name: xcframework
+          path: platforms/apple/AutorotaKit/XCFrameworks/
+
+      - name: Download generated bindings
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-bindings
+          path: platforms/apple/AutorotaKit/Sources/AutorotaKit/generated/
 
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
