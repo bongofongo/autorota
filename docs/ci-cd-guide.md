@@ -49,7 +49,7 @@ Do this once per repo (not per developer), typically as the person setting up re
 
   Also recommended: require linear history, require PR before merge, require conversation resolution before merge.
 - [ ] Each developer runs `make install-hooks` once, locally (optional but reduces CI churn — see [Local hooks](#local-hooks-optional)).
-- [ ] **Before the first real release**, dry-run the pipeline against a pre-release tag (e.g. `v0.1.0-rc1`) so signing/secrets/runner issues surface at low stakes instead of during the actual first ship. See [`ci-cd-improvement-plan.md`](ci-cd-improvement-plan.md) gap #2.
+- [ ] **Before the first real release**, dry-run the pipeline against a throwaway tag below the real version (`v0.0.1` — a `-rc1` suffix won't trigger the workflow; the tag filter and `tag-parse` both require exactly `vX.Y.Z`) so signing/secrets/runner issues surface at low stakes instead of during the actual first ship. Delete the tag, GitHub Release, and TestFlight build afterward. See [`ci-cd-improvement-plan.md`](ci-cd-improvement-plan.md) gap #2.
 
 ## Day-to-day: writing code
 
