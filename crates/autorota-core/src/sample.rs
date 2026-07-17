@@ -109,10 +109,9 @@ pub fn build_sample_week() -> SampleWeek {
 
     let mut shifts = Vec::with_capacity(spec.len());
     let mut assignments = Vec::new();
-    let mut next_shift_id: i64 = 1;
     let mut next_assignment_id: i64 = 1;
 
-    for (offset, template_id, who) in spec {
+    for (next_shift_id, (offset, template_id, who)) in (1_i64..).zip(spec.iter()) {
         let tmpl = tmpl_by_id
             .get(template_id)
             .expect("BUG: sample.rs spec references template_id not in sample_templates()");
@@ -147,7 +146,6 @@ pub fn build_sample_week() -> SampleWeek {
         }
 
         shifts.push(shift);
-        next_shift_id += 1;
     }
 
     SampleWeek {

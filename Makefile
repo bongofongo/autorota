@@ -99,8 +99,10 @@ rust-test-loud:
 rust-fmt:
 	cargo fmt --check --all
 
+# app-desktop excluded to match CI's rust-checks job (known pre-existing
+# breakage; it has its own compile-check job). Check it with: cargo check -p app-desktop
 rust-clippy:
-	cargo clippy --workspace -- -D warnings
+	cargo clippy --workspace --exclude app-desktop -- -D warnings
 
 lint: rust-fmt rust-clippy
 

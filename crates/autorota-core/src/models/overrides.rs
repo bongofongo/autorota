@@ -101,17 +101,12 @@ impl DayAvailability {
 /// exceptions list. `Manual` rows are normal per-date edits made through
 /// the availability grid — they still drive the scheduler but do not
 /// appear as exceptions.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum OverrideSource {
     Manual,
+    #[default]
     Exception,
-}
-
-impl Default for OverrideSource {
-    fn default() -> Self {
-        Self::Exception
-    }
 }
 
 impl OverrideSource {
