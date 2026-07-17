@@ -11,7 +11,7 @@ Everything runs on GitHub Actions. Seven workflow files under `.github/workflows
 | Pipeline | File | When | What |
 |---|---|---|---|
 | **CI** | `ci.yml` | every PR + push to `main` | Rust fmt/clippy/tests, builds the XCFramework, runs Swift ViewModel + SPM tests, compile-checks Swift on macOS/iOS/iPadOS, cargo-checks Tauri desktop |
-| **Rust checks** | `rust-checks.yml` | called by `ci.yml` and `release.yml` (not triggered directly) | `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test` |
+| **Rust checks** | `rust-checks.yml` | called by `ci.yml` and `release.yml` (not triggered directly) | `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test` — all excluding `app-desktop` (Tauri needs GTK/glib system libs absent on the Linux runner; it has its own macOS compile-check job in `ci.yml`) |
 | **release-plz** | `release-plz.yml` | every push to `main` | Opens/updates a single "Release PR" with a version bump + `CHANGELOG.md` diff |
 | **Release** | `release.yml` | push of tag `vX.Y.Z` | Builds, signs, and ships: iOS → TestFlight, macOS → TestFlight (Mac App Store) + notarized `.dmg`, GitHub Release |
 | **Supply Chain** | `supply-chain.yml` | push/PR touching `Cargo.toml`/`Cargo.lock`/`deny.toml`, weekly Monday 06:00 UTC | `cargo audit` (known vulnerabilities) + `cargo deny` (license/source policy) |

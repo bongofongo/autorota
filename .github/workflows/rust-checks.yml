@@ -21,11 +21,14 @@ jobs:
       - name: Check formatting
         run: cargo fmt --check --all
 
+      # app-desktop (Tauri) is excluded: on Linux it needs GTK/glib system
+      # libs that aren't installed here, and it has its own dedicated
+      # compile-check job on macOS in ci.yml.
       - name: Clippy
-        run: cargo clippy --workspace -- -D warnings
+        run: cargo clippy --workspace --exclude app-desktop -- -D warnings
 
       - name: Unit tests
-        run: cargo test --lib --workspace
+        run: cargo test --lib --workspace --exclude app-desktop
 
       - name: Integration tests
         run: cargo test --test '*' -p autorota-core
