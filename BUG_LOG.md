@@ -197,3 +197,9 @@ Concise running log of bugs encountered. Each entry is one bullet with sub-bulle
   - Where / what / repro: `AvailabilityGridView` only cleared the lasso selection on a tap outside the selected rectangle. Turning the lasso toggle off left the highlight in place, and because the grid can stay alive in the view hierarchy (TabView keeps children; edit-mode/sheet flows), a selection left open when the availability editor was saved/closed was still highlighted on reopen.
   - Patched: yes — pending user verification
   - Fix: detoggling the lasso now clears the selection immediately, and `onDisappear` clears the selection and force-resets the lasso toggle (notifying `onLassoModeChange(false)` so the enclosing scroll view is never left disabled). Tap-outside behavior unchanged.
+
+- **AutorotaKit SPM integration tests broken by stale fixtures (two accumulated API drifts)**
+  - Date fixed: 2026-07-17 (pending verification)
+  - Where / what / repro: `make swift-test-package` failed on clean main. (1) `Tests/AutorotaKitTests/Fixtures.swift` never gained the `roleRequirements` parameter added to `FfiShiftTemplate` by the multi-role shifts work, so the suite didn't compile. (2) `IntegrationTests.testAvailabilityRoundtrip` asserted 3 explicit availability slots round-tripped, but the dense-availability model intentionally drops `Maybe` cells on serialization (implicit default), so only 2 come back. Surfaced when CI's Swift Package Integration job ran the suite for the first time on a working XCFramework.
+  - Patched: yes — pending user verification
+  - Fix: fixture passes `roleRequirements: []`; roundtrip test expects 2 explicit slots and asserts the `Maybe` slot is not materialized.

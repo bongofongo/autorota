@@ -50,7 +50,7 @@ jobs:
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '26.0'
+          xcode-version: latest-stable
 
       # PERF_HELPERS=1: the app's Debug config compiles with the PERF_HELPERS
       # condition (pbxproj), so Debug builds link seedPerfCorpus — a plain
@@ -95,7 +95,7 @@ jobs:
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '26.0'
+          xcode-version: latest-stable
 
       - name: Test — ${{ matrix.platform }}
         env:
@@ -134,7 +134,7 @@ jobs:
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '26.0'
+          xcode-version: latest-stable
 
       - name: Build — iPhone SE (3rd generation)
         run: |
@@ -168,7 +168,7 @@ jobs:
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '26.0'
+          xcode-version: latest-stable
 
       - name: Test AutorotaKit package
         run: cd platforms/apple/AutorotaKit && swift test
@@ -209,7 +209,7 @@ jobs:
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '26.0'
+          xcode-version: latest-stable
 
       - name: Compile-check
         env:

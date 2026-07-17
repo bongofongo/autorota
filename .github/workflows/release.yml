@@ -66,7 +66,7 @@ jobs:
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '26.0'
+          xcode-version: latest-stable
 
       - name: Build XCFramework (release)
         run: bash scripts/build_xcframework.sh
@@ -174,7 +174,7 @@ jobs:
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '26.0'
+          xcode-version: latest-stable
 
       - name: Build XCFramework (release)
         run: bash scripts/build_xcframework.sh

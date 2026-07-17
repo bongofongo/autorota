@@ -111,7 +111,7 @@ jobs:
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '26.0'
+          xcode-version: latest-stable
 
       - name: Build XCFramework with PERF_HELPERS=1
         run: PERF_HELPERS=1 bash scripts/build_xcframework.sh

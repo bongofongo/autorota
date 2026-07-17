@@ -52,6 +52,7 @@ enum Fixtures {
             requiredRole: role,
             minEmployees: 1,
             maxEmployees: 1,
+            roleRequirements: [],
             deleted: false
         )
     }

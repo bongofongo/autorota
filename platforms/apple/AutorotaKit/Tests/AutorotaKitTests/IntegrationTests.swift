@@ -190,7 +190,10 @@ final class IntegrationTests: XCTestCase {
         let employees = try await listEmployeesAsync()
         let found = employees.first(where: { $0.id == empId })!
 
-        XCTAssertEqual(found.defaultAvailability.count, 3)
+        // Maybe is the implicit default in the dense availability model, so
+        // the Tue/14 "Maybe" slot is not round-tripped as an explicit slot.
+        XCTAssertEqual(found.defaultAvailability.count, 2)
+        XCTAssertNil(found.defaultAvailability.first(where: { $0.weekday == "Tue" && $0.hour == 14 }))
 
         let monSlot = found.defaultAvailability.first(where: { $0.weekday == "Mon" && $0.hour == 8 })
         XCTAssertEqual(monSlot?.state, "Yes")
