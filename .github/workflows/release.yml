@@ -47,7 +47,7 @@ jobs:
       PROJECT: platforms/apple/Apps/AutorotaApp/AutorotaApp.xcodeproj
       SCHEME: AutorotaApp
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust toolchain (Apple targets)
         uses: dtolnay/rust-toolchain@stable
@@ -132,7 +132,7 @@ jobs:
           zip -r "$RUNNER_TEMP/dSYMs-ios-v$VERSION.zip" dSYMs
 
       - name: Upload dSYMs artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dSYMs-ios-v${{ env.VERSION }}
           path: ${{ runner.temp }}/dSYMs-ios-v${{ env.VERSION }}.zip
@@ -182,7 +182,7 @@ jobs:
       issues: write
     steps:
       - name: File tracking issue
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const tag = context.ref.replace('refs/tags/', '');
