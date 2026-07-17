@@ -230,7 +230,7 @@ All secrets live as GitHub Actions repo secrets (Settings → Secrets and variab
 | Secret | Used by | What it is | Rotation |
 |---|---|---|---|
 | `RELEASE_PLZ_TOKEN` | `release-plz.yml` | PAT (`repo` scope, classic) or GitHub App token | Falls back to `GITHUB_TOKEN` if unset, but then the tag it pushes can't trigger `release.yml` (GitHub's anti-recursion rule) — see [troubleshooting](#the-release-pr-merged-but-releaseyml-never-fired). Rotate by generating a new PAT and updating the secret; no downstream code changes needed. |
-| `APP_STORE_CONNECT_API_KEY_P8` | `release.yml` (both `release-ios` and `release-macos`) | Base64-encoded contents of an App Store Connect API key `.p8` file | Generate at App Store Connect → Users and Access → Integrations → App Store Connect API → Team Keys. Base64-encode with `base64 -i AuthKey_XXXX.p8 \| pbcopy` before pasting into the GitHub secret. Decoded to `~/private_keys/AuthKey_<ID>.p8` at job start and `rm -rf`'d in an `if: always()` cleanup step — never persists on the runner. |
+| `APP_STORE_CONNECT_API_KEY_P8` | `release.yml` | Base64-encoded contents of an App Store Connect API key `.p8` file. **The key must have the Admin role** — cloud signing (`-allowProvisioningUpdates` creating the distribution cert/profile) fails with "Cloud signing permission error" on an App Manager key | Generate at App Store Connect → Users and Access → Integrations → App Store Connect API → Team Keys. Base64-encode with `base64 -i AuthKey_XXXX.p8 \| pbcopy` before pasting into the GitHub secret. Decoded to `~/private_keys/AuthKey_<ID>.p8` at job start and `rm -rf`'d in an `if: always()` cleanup step — never persists on the runner. |
 | `APP_STORE_CONNECT_API_KEY_ID` | `release.yml` | The key ID shown next to the key in App Store Connect | Changes whenever the key is regenerated. |
 | `APP_STORE_CONNECT_API_ISSUER_ID` | `release.yml` | The Issuer ID for the whole App Store Connect account (same for all keys) | Rarely changes. |
 
@@ -265,6 +265,7 @@ These files are **intentionally committed** — they contain a team ID and expor
 | A Swift CI job fails selecting Xcode (`setup-xcode` can't find `26.0`) | Swift/Apple jobs run on the `macos-26` runner image; if GitHub rotates the preinstalled Xcode versions, bump `xcode-version` in `ci.yml` / `release.yml` / `perf.yml` to a version present on the image |
 | `release.yml` green but the build never shows up in TestFlight | Apple's async binary processing failed after upload — this isn't currently monitored by CI (gap #5); check App Store Connect directly for a rejection reason |
 | `release.yml` failed and you weren't watching | A GitHub Issue titled `Release vX.Y.Z failed` is auto-filed with a link to the run — check whether either platform already uploaded to TestFlight before the failure |
+| Export step fails with `Cloud signing permission error` / `No profiles for '<bundle id>' were found` | The App Store Connect API key can't create signing assets — generate a new Team Key with the **Admin** role, update `APP_STORE_CONNECT_API_KEY_P8` + `_KEY_ID` secrets, re-push the tag |
 
 ## Reference
 
