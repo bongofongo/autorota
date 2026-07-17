@@ -10,8 +10,8 @@ Everything runs on GitHub Actions. Seven workflow files under `.github/workflows
 
 | Pipeline | File | When | What |
 |---|---|---|---|
-| **CI** | `ci.yml` | every PR + push to `main` | Rust fmt/clippy/tests, builds the XCFramework, runs Swift ViewModel + SPM tests, compile-checks Swift on macOS/iOS/iPadOS, cargo-checks Tauri desktop |
-| **Rust checks** | `rust-checks.yml` | called by `ci.yml` and `release.yml` (not triggered directly) | `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test` — all excluding `app-desktop` (Tauri needs GTK/glib system libs absent on the Linux runner; it has its own macOS compile-check job in `ci.yml`) |
+| **CI** | `ci.yml` | every PR + push to `main` | Rust fmt/clippy/tests, builds the XCFramework, runs Swift ViewModel + SPM tests, compile-checks Swift on macOS/iOS/iPadOS |
+| **Rust checks** | `rust-checks.yml` | called by `ci.yml` and `release.yml` (not triggered directly) | `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test` — all excluding `app-desktop` (Tauri is not checked in CI at all while desktop is out of production; check locally with `cargo check -p app-desktop`) |
 | **release-plz** | `release-plz.yml` | every push to `main` | Opens/updates a single "Release PR" with a version bump + `CHANGELOG.md` diff |
 | **Release** | `release.yml` | push of tag `vX.Y.Z` | Builds, signs, and ships: iOS → TestFlight, macOS → TestFlight (Mac App Store) + notarized `.dmg`, GitHub Release |
 | **Supply Chain** | `supply-chain.yml` | push/PR touching `Cargo.toml`/`Cargo.lock`/`deny.toml`, weekly Monday 06:00 UTC | `cargo audit` (known vulnerabilities) + `cargo deny` (license/source policy) |
@@ -89,7 +89,6 @@ Narrower Rust test targets exist too — `make rust-test-scheduler`, `rust-test-
 | `Swift compile — iPhone SE` | Compile-only check on a small-screen simulator (catches layout overflow at 375pt width); doesn't run tests | `$(XCB) build -destination 'platform=iOS Simulator,name=iPhone SE (3rd generation)'` from the Makefile's `XCB` var, or just open the simulator locally |
 | `Swift Compile — <platform>` | A Swift file that no test imports failed to compile | `make swift-build-check` |
 | `Swift Package Integration` | A real-FFI test in `AutorotaKit`'s SPM test suite failed | `make swift-build-xcframework && make swift-test-package` |
-| `Tauri Desktop (macOS)` | `crates/app-desktop` frontend build or `cargo check` failed | `cd crates/app-desktop && npm ci && npm run build`, then `cargo check -p app-desktop` |
 | `Conventional Commit` | PR title doesn't match the required format | Rename the PR (no rebase needed — the check re-runs on title edit) |
 | `cargo audit` / `cargo deny` (Supply Chain) | A dependency has a known vulnerability, or violates the license/source policy in `deny.toml` | `cargo audit` / `cargo deny check` locally (needs `cargo install cargo-audit cargo-deny` once) |
 

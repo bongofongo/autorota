@@ -20,7 +20,7 @@ Repo-side fixes are implemented; the remaining items need actions outside the re
 - **#6 Done** — resolved as option (a): `.gitignore` entry removed, each `ExportOptions*.plist` carries a comment explaining it's intentionally committed.
 - **#7 Partially done** — `ci_post_clone.sh` header now documents that it's not the release path and why it exists. Still to do: check App Store Connect → Xcode Cloud for an active workflow.
 - **#8 Done** — root `README.md` added with CI + Release badges and a link to the guide.
-- **#9 / #10** — deferred, unchanged.
+- **#9 / #10** — deferred, unchanged. Update 2026-07-17 on #9: the `Tauri Desktop (macOS)` cargo-check job was removed from `ci.yml` entirely — desktop is out of production and doesn't compile on clean main, so the job was permanently red. Re-add CI coverage when desktop work resumes.
 
 ## Gap table
 
