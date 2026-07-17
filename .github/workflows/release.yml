@@ -47,7 +47,7 @@ jobs:
       PROJECT: platforms/apple/Apps/AutorotaApp/AutorotaApp.xcodeproj
       SCHEME: AutorotaApp
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust toolchain (Apple targets)
         uses: dtolnay/rust-toolchain@stable
@@ -155,7 +155,7 @@ jobs:
     outputs:
       dmg-path: ${{ steps.dmg.outputs.path }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Rust toolchain (Apple targets)
         uses: dtolnay/rust-toolchain@stable
