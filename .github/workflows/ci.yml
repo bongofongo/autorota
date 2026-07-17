@@ -56,14 +56,14 @@ jobs:
         run: bash scripts/build_xcframework.sh
 
       - name: Upload XCFramework artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: xcframework
           path: platforms/apple/AutorotaKit/XCFrameworks/
           retention-days: 1
 
       - name: Upload generated bindings
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: generated-bindings
           path: platforms/apple/AutorotaKit/Sources/AutorotaKit/generated/
