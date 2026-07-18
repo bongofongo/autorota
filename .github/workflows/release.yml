@@ -152,6 +152,8 @@ jobs:
     name: GitHub Release
     runs-on: ubuntu-latest
     needs: [tag-parse, release-ios]
+    permissions:
+      contents: write
     env:
       VERSION: ${{ needs.tag-parse.outputs.version }}
     steps:
