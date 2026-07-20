@@ -42,9 +42,11 @@ jobs:
           key: perf-rust
 
       - name: Run benches (bencher format)
+        # --benches: without it the lib target's libtest harness also runs and
+        # rejects criterion's --output-format flag (exit 101).
         run: |
           set -o pipefail
-          cargo bench -p autorota-core -- --output-format bencher \
+          cargo bench -p autorota-core --benches -- --output-format bencher \
             | tee bench-output.txt
           {
             echo '## Rust criterion (bencher format)'
