@@ -111,8 +111,54 @@ final class RotaViewModel {
 
     let service: AutorotaServiceProtocol
 
-    init(service: AutorotaServiceProtocol? = nil) {
+    // Reference data (employees, roles, availability overrides) is
+    // week-invariant: week navigation reuses the cached copies and only the
+    // tables a mutation actually touched are refetched. Starts all-stale so
+    // the first load fetches everything. The observer only marks staleness —
+    // it never triggers a load — so every existing reload trigger (week
+    // change, tab reappear, mutators) keeps its exact behavior.
+    private static let refTables: Set<AutorotaDataChange.Table> =
+        [.employee, .role, .employeeAvailabilityOverride]
+    private var staleRefTables: Set<AutorotaDataChange.Table> = RotaViewModel.refTables
+    // nonisolated(unsafe): written once in init, read once in deinit —
+    // never touched concurrently.
+    nonisolated(unsafe) private var dataChangedObserver: (any NSObjectProtocol)?
+
+    // Injected so tests can use a private center — the suite runs in
+    // parallel, and observers on `.default` would hear other tests' posts.
+    private let notificationCenter: NotificationCenter
+
+    init(
+        service: AutorotaServiceProtocol? = nil,
+        notificationCenter: NotificationCenter = .default
+    ) {
         self.service = service ?? GatedAutorotaService()
+        self.notificationCenter = notificationCenter
+        dataChangedObserver = notificationCenter.addObserver(
+            forName: .autorotaDataChanged, object: nil, queue: .main
+        ) { [weak self] note in
+            let change = note.autorotaDataChange
+            MainActor.assumeIsolated {
+                self?.invalidateReferenceData(for: change)
+            }
+        }
+    }
+
+    deinit {
+        if let dataChangedObserver {
+            notificationCenter.removeObserver(dataChangedObserver)
+        }
+    }
+
+    /// A `nil` change (legacy posts, demo enter/exit, sample-data swaps) means
+    /// "unknown scope" — treat everything as stale. Applies to `.remoteSync`
+    /// changes the same as local ones.
+    private func invalidateReferenceData(for change: AutorotaDataChange?) {
+        guard let change else {
+            staleRefTables = Self.refTables
+            return
+        }
+        staleRefTables.formUnion(change.tables.intersection(Self.refTables))
     }
 
     // MARK: - Week category
@@ -148,30 +194,13 @@ final class RotaViewModel {
         )
         defer { PerfSignposts.poster.endInterval("loadSchedule", signpostState) }
 
-        // Fetch the schedule and the conflict-detection data concurrently
-        // rather than four sequential FFI round-trips. The conflict data is
-        // best-effort (`try?`): a failure leaves that cache as-is.
+        // Fetch the week's schedule concurrently with whatever reference data
+        // went stale. On a plain week step nothing is stale, so navigation
+        // costs a single FFI round-trip. Reference data is refreshed first so
+        // that assigning `schedule` (which rebuilds the derived caches via
+        // `didSet`) sees fresh employees and availability overrides.
         async let scheduleResult = service.getWeekSchedule(weekStart: selectedWeekStart)
-        async let empsResult = service.listEmployees()
-        async let overridesResult = service.listAllEmployeeAvailabilityOverrides()
-        async let rolesResult = service.listRoles()
-
-        // Update the conflict-detection data first so that assigning `schedule`
-        // (which rebuilds the derived caches via `didSet`) sees fresh employees
-        // and availability overrides. Conflict data is best-effort (`try?`).
-        if let emps = try? await empsResult {
-            employees = emps
-            employeesById = Dictionary(uniqueKeysWithValues: emps.map { ($0.id, $0) })
-        }
-        if let overrides = try? await overridesResult {
-            availabilityOverridesByKey = Dictionary(
-                overrides.map { ("\($0.employeeId)-\($0.date)", $0) },
-                uniquingKeysWith: { first, _ in first }
-            )
-        }
-        if let loadedRoles = try? await rolesResult {
-            roles = loadedRoles
-        }
+        await ensureReferenceData()
         do {
             schedule = try await scheduleResult
         } catch {
@@ -180,6 +209,39 @@ final class RotaViewModel {
 
         hasLoaded = true
         if isColdLoad { isLoading = false }
+    }
+
+    /// Refetch only the reference tables marked stale, concurrently. Fetches
+    /// are best-effort (`try?`): a failure leaves the table stale so the next
+    /// load retries it — same semantics the old always-refetch path had.
+    func ensureReferenceData() async {
+        let stale = staleRefTables
+        guard !stale.isEmpty else { return }
+
+        let empsTask: Task<[FfiEmployee], Error>? = stale.contains(.employee)
+            ? Task { try await self.service.listEmployees() } : nil
+        let overridesTask: Task<[FfiEmployeeAvailabilityOverride], Error>? =
+            stale.contains(.employeeAvailabilityOverride)
+            ? Task { try await self.service.listAllEmployeeAvailabilityOverrides() } : nil
+        let rolesTask: Task<[FfiRole], Error>? = stale.contains(.role)
+            ? Task { try await self.service.listRoles() } : nil
+
+        if let empsTask, let emps = try? await empsTask.value {
+            employees = emps
+            employeesById = Dictionary(uniqueKeysWithValues: emps.map { ($0.id, $0) })
+            staleRefTables.remove(.employee)
+        }
+        if let overridesTask, let overrides = try? await overridesTask.value {
+            availabilityOverridesByKey = Dictionary(
+                overrides.map { ("\($0.employeeId)-\($0.date)", $0) },
+                uniquingKeysWith: { first, _ in first }
+            )
+            staleRefTables.remove(.employeeAvailabilityOverride)
+        }
+        if let rolesTask, let loadedRoles = try? await rolesTask.value {
+            roles = loadedRoles
+            staleRefTables.remove(.role)
+        }
     }
 
     /// Rebuild the grouping / lookup / conflict caches from the freshly-loaded
@@ -396,12 +458,9 @@ final class RotaViewModel {
                 return
             }
         }
-        do {
-            employees = try await service.listEmployees()
-            roles = try await service.listRoles()
-        } catch {
-            self.error = userFacingMessage(error)
-        }
+        // Reference data is usually fresh from the last loadSchedule; this
+        // refetches only tables invalidated since (no-op in the common case).
+        await ensureReferenceData()
         isEditMode = true
     }
 
