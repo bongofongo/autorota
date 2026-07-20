@@ -194,6 +194,14 @@ struct AutorotaAppApp: App {
             .environment(\.locale, localeManager.effectiveLocale)
             .environment(\.accessibilityPalette, selectedPalette)
             .task {
+                // Kick off the first week's data fetch immediately — it runs
+                // while the boot animation (or perf-mode launch) proceeds, and
+                // RotaViewModel's cold load adopts the result. Runs in perf
+                // mode too so the harness measures the production path.
+                RotaLoadPrefetcher.shared.start(
+                    service: GatedAutorotaService(),
+                    weekStart: currentWeekStart()
+                )
                 if inPerfMode {
                     // Perf harness needs an immediately-usable license too —
                     // ContentView gates onboarding on `state == .unset`.

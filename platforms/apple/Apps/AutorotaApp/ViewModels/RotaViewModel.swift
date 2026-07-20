@@ -128,12 +128,18 @@ final class RotaViewModel {
     // parallel, and observers on `.default` would hear other tests' posts.
     private let notificationCenter: NotificationCenter
 
+    // Prefetcher started by the App during the boot animation; the cold load
+    // consumes it. Tests pass nil (or simply never start the shared one).
+    private let prefetcher: RotaLoadPrefetcher?
+
     init(
         service: AutorotaServiceProtocol? = nil,
-        notificationCenter: NotificationCenter = .default
+        notificationCenter: NotificationCenter = .default,
+        prefetcher: RotaLoadPrefetcher? = .shared
     ) {
         self.service = service ?? GatedAutorotaService()
         self.notificationCenter = notificationCenter
+        self.prefetcher = prefetcher
         dataChangedObserver = notificationCenter.addObserver(
             forName: .autorotaDataChanged, object: nil, queue: .main
         ) { [weak self] note in
@@ -193,6 +199,35 @@ final class RotaViewModel {
             "loadSchedule", id: signpostID, "\(isColdLoad ? "cold" : "warm")"
         )
         defer { PerfSignposts.poster.endInterval("loadSchedule", signpostState) }
+
+        // Cold load: adopt the boot-time prefetch if one is ready for this
+        // week — the App started it while the boot animation played, so the
+        // data is typically already sitting here.
+        if isColdLoad, let prefetched = await prefetcher?.take(weekStart: selectedWeekStart) {
+            if let emps = prefetched.employees {
+                employees = emps
+                employeesById = Dictionary(uniqueKeysWithValues: emps.map { ($0.id, $0) })
+                staleRefTables.remove(.employee)
+            }
+            if let overrides = prefetched.overrides {
+                availabilityOverridesByKey = Dictionary(
+                    overrides.map { ("\($0.employeeId)-\($0.date)", $0) },
+                    uniquingKeysWith: { first, _ in first }
+                )
+                staleRefTables.remove(.employeeAvailabilityOverride)
+            }
+            if let loadedRoles = prefetched.roles {
+                roles = loadedRoles
+                staleRefTables.remove(.role)
+            }
+            switch prefetched.scheduleResult {
+            case .success(let loaded): schedule = loaded
+            case .failure(let err): self.error = userFacingMessage(err)
+            }
+            hasLoaded = true
+            isLoading = false
+            return
+        }
 
         // Fetch the week's schedule concurrently with whatever reference data
         // went stale. On a plain week step nothing is stale, so navigation
