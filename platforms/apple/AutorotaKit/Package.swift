@@ -33,5 +33,13 @@ let package = Package(
             dependencies: ["AutorotaKit"],
             path: "Tests/AutorotaKitTests"
         ),
+        // FFI perf tests (require XCFramework built with PERF_HELPERS=1 in
+        // release mode: `make kit-perf-xcframework`). Excluded from normal
+        // `swift test` runs via --skip; run with `make kit-perf`.
+        .testTarget(
+            name: "AutorotaKitPerfTests",
+            dependencies: ["AutorotaKit"],
+            path: "Tests/AutorotaKitPerfTests"
+        ),
     ]
 )

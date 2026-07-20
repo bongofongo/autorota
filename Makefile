@@ -156,8 +156,10 @@ swift-test-app-ipad:
 
 .PHONY: swift-test-package
 
+# Perf tests are excluded here — they need a release PERF_HELPERS XCFramework
+# and only produce meaningful numbers via `make kit-perf`.
 swift-test-package:
-	cd $(SPM_PKG) && swift test $(SWIFT_TEST_QUIET)
+	cd $(SPM_PKG) && swift test --skip AutorotaKitPerfTests $(SWIFT_TEST_QUIET)
 
 # ─── Combined ────────────────────────────────────────────────────────────────
 
@@ -174,13 +176,22 @@ test-all: rust-test swift-test-all
 # Rust criterion benches and Swift XCUITest perf target. Results are
 # informational — see docs/perf-testing.md for how to read them.
 
-.PHONY: bench bench-scheduler bench-save bench-export
+.PHONY: bench bench-scheduler bench-hotpath bench-save bench-export
 .PHONY: swift-perf-xcframework swift-perf-macos swift-perf-ios perf-all
 
-bench: bench-scheduler bench-save bench-export
+bench: bench-scheduler bench-hotpath bench-save bench-export
 
 bench-scheduler:
 	cargo bench -p autorota-core --bench scheduler
+
+bench-hotpath:
+	cargo bench -p autorota-core --bench hotpath
+
+# Fast single-bench sanity run (~10s): make bench-quick BENCH=scheduler
+BENCH ?= scheduler
+.PHONY: bench-quick
+bench-quick:
+	cargo bench -p autorota-core --bench $(BENCH) -- --quick
 
 bench-save:
 	cargo bench -p autorota-core --bench save
@@ -193,6 +204,28 @@ bench-export:
 swift-perf-xcframework:
 	PERF_HELPERS=1 bash scripts/build_xcframework.sh --debug
 
+# ── FFI hot-path perf (AutorotaKitPerfTests) ──
+# Release Rust build: debug timings are 10-50x off and worthless for trends.
+.PHONY: kit-perf-xcframework kit-perf sync-merge-perf
+
+kit-perf-xcframework:
+	PERF_HELPERS=1 bash scripts/build_xcframework.sh
+
+# XCTest prints "measured [Clock Monotonic Time, s] average: ..." lines that
+# scripts/perf_report.py parses from the teed log.
+kit-perf:
+	cd $(SPM_PKG) && mkdir -p .build && set -o pipefail && \
+	  swift test --filter AutorotaKitPerfTests 2>&1 | tee .build/kit-perf.txt
+
+# Sync three-way merge perf lives in the app target (resolver isn't in the Kit).
+# Env-gated: the test self-skips without AUTOROTA_PERF=1.
+# Verbose so the "measured [...]" lines reach the teed log for perf_report.py.
+sync-merge-perf:
+	mkdir -p .build
+	set -o pipefail && TEST_RUNNER_AUTOROTA_PERF=1 $(XCB) test -destination 'platform=macOS' \
+	  -only-testing:AutorotaAppTests/SyncMergePerfTests $(NOSIGN) \
+	  2>&1 | tee .build/sync-merge-perf.txt
+
 swift-perf-macos: swift-perf-xcframework
 	$(XCB) test $(XCB_QUIET) -destination 'platform=macOS' \
 	  -testPlan Perf -only-testing:AutorotaAppPerfTests \
@@ -203,12 +236,25 @@ swift-perf-macos: swift-perf-xcframework
 	  DEVELOPMENT_TEAM= \
 	  CODE_SIGN_IDENTITY="-" CODE_SIGN_STYLE=Manual
 
-swift-perf-ios: swift-perf-xcframework
+# Release Rust (kit-perf-xcframework): UI timings include DB work, and debug
+# Rust distorts them. Results land in ./perf-results.xcresult and flow into
+# `make perf-report` automatically.
+swift-perf-ios: kit-perf-xcframework
+	rm -rf perf-results.xcresult
 	$(XCB) test $(XCB_QUIET) -destination 'platform=iOS Simulator,name=iPhone 17 Pro Max' \
 	  -testPlan Perf -only-testing:AutorotaAppPerfTests \
+	  -resultBundlePath perf-results.xcresult \
 	  SWIFT_ACTIVE_COMPILATION_CONDITIONS='$$(inherited) PERF_HELPERS' $(NOSIGN)
+	python3 scripts/perf_report.py
 
 perf-all: bench swift-perf-ios
+
+# Aggregate whatever perf outputs exist (criterion, kit-perf log, optional
+# xcresult) into one informational table. PERF_RECORD=1 appends to
+# perf/history.jsonl. Never fails on regression.
+.PHONY: perf-report
+perf-report:
+	python3 scripts/perf_report.py
 
 # ─── Devex ───────────────────────────────────────────────────────────────────
 

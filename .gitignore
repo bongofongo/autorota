@@ -31,3 +31,8 @@ crates/autorota-core/migrations/test.db-shm
 design/app-icon-ideas/
 
 docs/sessions/*
+
+# Generated perf reports (make perf-report); recorded history lives in perf/history.jsonl
+/perf-report.md
+/perf-report.json
+/perf-results.xcresult/
