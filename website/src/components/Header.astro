@@ -1,0 +1,66 @@
+---
+import icon from "../assets/rota-icon.svg";
+import { href } from "../consts";
+---
+
+<header class="site-header">
+  <div class="wrap bar">
+    <a class="brand" href={href("/")}>
+      <img src={icon.src} alt="" width="30" height="30" />
+      <span>autorota</span>
+    </a>
+    <nav aria-label="Site">
+      <a href={href("/support")}>Support</a>
+      <a href={href("/privacy")}>Privacy</a>
+    </nav>
+  </div>
+</header>
+
+<style>
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: rgb(255 255 255 / 82%);
+    -webkit-backdrop-filter: saturate(1.5) blur(14px);
+    backdrop-filter: saturate(1.5) blur(14px);
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-weight: 700;
+    font-size: 1.15rem;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+
+  .brand:hover {
+    text-decoration: none;
+  }
+
+  nav {
+    display: flex;
+    gap: 1.6rem;
+  }
+
+  nav a {
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 0.95rem;
+  }
+
+  nav a:hover {
+    color: var(--ink);
+    text-decoration: none;
+  }
+</style>

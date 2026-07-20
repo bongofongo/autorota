@@ -1,0 +1,55 @@
+---
+import { Image } from "astro:assets";
+import AppStoreBadge from "./AppStoreBadge.astro";
+import { EMAIL } from "../consts";
+import logoArt from "../assets/screenshots/iphone/first-shot-clear.png";
+---
+
+<section class="section section-alt closing">
+  <div class="wrap inner reveal">
+    <div class="art" aria-hidden="true">
+      <Image
+        src={logoArt}
+        alt=""
+        widths={[300, 480]}
+        sizes="220px"
+        loading="lazy"
+      />
+    </div>
+    <h2>Give your Sunday evening back.</h2>
+    <p class="lede">Free at launch. iPhone and iPad.</p>
+    <AppStoreBadge />
+    <p class="contact">
+      Questions before then? <a href={`mailto:${EMAIL}`}>{EMAIL}</a>
+    </p>
+  </div>
+</section>
+
+<style>
+  .inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1.3rem;
+  }
+
+  .art {
+    width: 200px;
+    border-radius: 40px;
+    overflow: hidden;
+    /* first-shot art is square-ish logo art on the screenshot canvas; crop to its heart */
+    aspect-ratio: 1;
+  }
+
+  .art :global(img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .contact {
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+</style>

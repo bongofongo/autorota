@@ -1,0 +1,77 @@
+---
+import { href } from "../consts";
+---
+
+<section class="panel">
+  <div class="wrap inner reveal">
+    <h2>No accounts. No tracking.<br />Nothing collected.</h2>
+    <div class="cols">
+      <div>
+        <h3>On your device</h3>
+        <p>
+          Your schedule lives in a local database on your iPhone or iPad. It is
+          never sent to us — there is no server of ours to send it to.
+        </p>
+      </div>
+      <div>
+        <h3>Your own iCloud</h3>
+        <p>
+          Optional sync moves data between your devices through your private
+          iCloud account. Protected by Apple; invisible to us.
+        </p>
+      </div>
+      <div>
+        <h3>One anonymous request</h3>
+        <p>
+          The only network call is an optional currency-rate lookup, carrying no
+          personal data at all. That's the entire list.
+        </p>
+      </div>
+    </div>
+    <a class="policy" href={href("/privacy")}>Read the full privacy policy</a>
+  </div>
+</section>
+
+<style>
+  .panel {
+    background: var(--ink-panel);
+    color: #eef2f7;
+    padding-block: var(--section-y);
+  }
+
+  h2 {
+    text-align: center;
+    margin-bottom: 3rem;
+  }
+
+  .cols {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 2.4rem;
+  }
+
+  h3 {
+    color: #fff;
+    margin-bottom: 0.5rem;
+  }
+
+  .cols p {
+    color: #aab6c4;
+    font-size: 0.97rem;
+  }
+
+  .policy {
+    display: block;
+    text-align: center;
+    margin-top: 3rem;
+    color: #8ab0ff;
+    font-weight: 600;
+  }
+
+  @media (max-width: 820px) {
+    .cols {
+      grid-template-columns: 1fr;
+      gap: 1.6rem;
+    }
+  }
+</style>

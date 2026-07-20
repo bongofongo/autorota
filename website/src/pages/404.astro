@@ -1,0 +1,27 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+import { href } from "../consts";
+---
+
+<SiteLayout
+  title="Page not found — autorota"
+  description="That page isn't on the rota."
+>
+  <div class="wrap lost">
+    <h1 class="display">Off shift.</h1>
+    <p class="lede">That page isn't on the rota.</p>
+    <a class="btn btn-primary" href={href("/")}>Back to autorota</a>
+  </div>
+</SiteLayout>
+
+<style>
+  .lost {
+    min-height: 50vh;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 1.2rem;
+    padding-block: 80px;
+  }
+</style>

@@ -1,0 +1,86 @@
+---
+import { Picture } from "astro:assets";
+import type { ImageMetadata } from "astro";
+
+const iphone = import.meta.glob<{ default: ImageMetadata }>(
+  "../assets/screenshots/iphone/rota-*.png",
+  { eager: true }
+);
+const ipad = import.meta.glob<{ default: ImageMetadata }>(
+  "../assets/screenshots/ipad/prev-*.png",
+  { eager: true }
+);
+
+// Interleave portrait and landscape shots so the rail has rhythm.
+const phones = Object.values(iphone).map((m) => m.default);
+// reverse the iPad set so interleaving doesn't pair same-topic shots side by side
+const pads = Object.values(ipad).map((m) => m.default).reverse();
+const shots: { img: ImageMetadata; kind: "phone" | "pad" }[] = [];
+const max = Math.max(phones.length, pads.length);
+for (let i = 0; i < max; i++) {
+  if (phones[i]) shots.push({ img: phones[i], kind: "phone" });
+  if (pads[i]) shots.push({ img: pads[i], kind: "pad" });
+}
+---
+
+<section class="section section-alt">
+  <div class="wrap">
+    <span class="eyebrow">Gallery</span>
+    <h2>Have a look around.</h2>
+  </div>
+  <div class="rail" tabindex="0" aria-label="App screenshots, scroll sideways">
+    {
+      shots.map(({ img, kind }) => (
+        <div class:list={["cell", kind]}>
+          <Picture
+            src={img}
+            alt="autorota app screenshot"
+            widths={[420, 640, 900]}
+            formats={["avif", "webp"]}
+            sizes="(max-width: 760px) 78vw, 460px"
+            loading="lazy"
+          />
+        </div>
+      ))
+    }
+  </div>
+</section>
+
+<style>
+  h2 {
+    margin-bottom: 2rem;
+  }
+
+  .rail {
+    display: flex;
+    gap: 1.2rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding-inline: max(var(--pad-x), calc((100vw - var(--content-max)) / 2 + var(--pad-x)));
+    padding-bottom: 1rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cell {
+    scroll-snap-align: center;
+    flex: 0 0 auto;
+    border-radius: var(--radius-card);
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgb(28 39 51 / 10%);
+  }
+
+  .cell :global(img) {
+    height: min(58vh, 460px);
+    width: auto;
+    display: block;
+  }
+
+  .rail::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  .rail::-webkit-scrollbar-thumb {
+    background: var(--hairline);
+    border-radius: 4px;
+  }
+</style>

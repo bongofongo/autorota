@@ -1,0 +1,48 @@
+---
+import { EMAIL, PERSONAL_SITE, href } from "../consts";
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer">
+  <div class="wrap cols">
+    <nav aria-label="Footer">
+      <a href={href("/support")}>Support</a>
+      <a href={href("/privacy")}>Privacy</a>
+      <a href={`mailto:${EMAIL}`}>{EMAIL}</a>
+    </nav>
+    <p>© {year} · Made by Oliver — <a href={PERSONAL_SITE}>fongo.uk</a></p>
+  </div>
+</footer>
+
+<style>
+  .site-footer {
+    border-top: 1px solid var(--hairline);
+    padding-block: 2.2rem;
+    font-size: 0.92rem;
+    color: var(--muted);
+  }
+
+  .cols {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem 2rem;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.6rem;
+  }
+
+  nav a,
+  p a {
+    color: var(--muted);
+  }
+
+  nav a:hover,
+  p a:hover {
+    color: var(--ink);
+  }
+</style>

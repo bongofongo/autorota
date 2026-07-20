@@ -1,0 +1,52 @@
+---
+import { Picture } from "astro:assets";
+import type { ImageMetadata } from "astro";
+
+// App Store screenshots carry a baked-in blue caption band at the top; `crop`
+// trims it so feature sections show only the framed device. The rail shows
+// them uncropped, where the captions act as gallery labels.
+interface Props {
+  src: ImageMetadata;
+  alt: string;
+  crop?: "iphone" | "ipad";
+  sizes?: string;
+  eager?: boolean;
+}
+
+const { src, alt, crop, sizes = "(max-width: 760px) 92vw, 520px", eager = false } = Astro.props;
+
+const CROP_FRACTION = { iphone: 0.155, ipad: 0.21 } as const;
+const fraction = crop ? CROP_FRACTION[crop] : 0;
+const ratio = src.width / (src.height * (1 - fraction));
+// margin percentages resolve against width, so convert the vertical offset
+const offsetPctOfWidth = (fraction * src.height * 100) / src.width;
+---
+
+<div
+  class="shot"
+  style={`aspect-ratio: ${ratio.toFixed(4)}; --offset: -${offsetPctOfWidth.toFixed(2)}%`}
+>
+  <Picture
+    src={src}
+    alt={alt}
+    widths={[360, 540, 760, 1080]}
+    formats={["avif", "webp"]}
+    sizes={sizes}
+    loading={eager ? "eager" : "lazy"}
+    fetchpriority={eager ? "high" : "auto"}
+  />
+</div>
+
+<style>
+  .shot {
+    overflow: hidden;
+    border-radius: var(--radius-tile);
+    background: var(--bg-alt);
+  }
+
+  .shot :global(img) {
+    width: 100%;
+    height: auto;
+    margin-top: var(--offset, 0);
+  }
+</style>
