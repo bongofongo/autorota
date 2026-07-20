@@ -25,6 +25,9 @@ ignore = [
 
 [licenses]
 version = 2
+# Workspace crates are an internal app (publish = false) — skip license
+# checks on them; the allow-list below governs third-party deps only.
+private = { ignore = true }
 confidence-threshold = 0.93
 allow = [
     "MIT",

@@ -9,6 +9,9 @@ resolver = "2"
 
 [workspace.package]
 version = "0.9.1"
+# Internal app crates — never published to crates.io. Also what lets
+# cargo-deny's `private = { ignore = true }` skip license checks on them.
+publish = false
 edition = "2024"
 
 [profile.release]
