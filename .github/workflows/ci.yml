@@ -72,13 +72,40 @@ jobs:
           path: platforms/apple/AutorotaKit/Sources/AutorotaKit/generated/
           retention-days: 1
 
-  # ViewModel unit tests (Swift ViewModel — macOS/iOS/iPadOS) are shelved from
-  # CI as of 2026-07-17 — to be revisited alongside the planned perf-test work.
-  # Run locally with: make swift-test-app-macos / -ios / -ipad
-  # When restoring: the job needs `needs: xcframework` plus the same
-  # XCFramework + generated-bindings artifact downloads as swift-compile-check
-  # (xcodebuild resolves the package graph even though the tests only use
-  # MockAutorotaService).
+  # ─── Swift: ViewModel unit tests (macOS host; MockAutorotaService) ─────────
+  # Restored 2026-07-20: the shelving cause (XCUITest perf runner booting — and
+  # crashing — during plain `xcodebuild test`) is fixed by the scheme's default
+  # AutorotaApp.xctestplan, which contains AutorotaAppTests only. macOS
+  # destination only: the suite is host-agnostic ViewModel logic, and one
+  # destination keeps CI minutes down (compile breakage per-platform is caught
+  # by swift-compile-check).
+  swift-app-tests:
+    name: Swift ViewModel Tests
+    runs-on: macos-26
+    needs: xcframework
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download XCFramework
+        uses: actions/download-artifact@v8
+        with:
+          name: xcframework
+          path: platforms/apple/AutorotaKit/XCFrameworks/
+
+      - name: Download generated bindings
+        uses: actions/download-artifact@v8
+        with:
+          name: generated-bindings
+          path: platforms/apple/AutorotaKit/Sources/AutorotaKit/generated/
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Run ViewModel tests (macOS)
+        run: make swift-test-app-macos
 
   # The former "Swift compile — iPhone SE" job was removed: compile-only builds
   # are destination-independent, so it duplicated Swift Compile — iOS exactly
@@ -112,7 +139,8 @@ jobs:
           xcode-version: latest-stable
 
       - name: Test AutorotaKit package
-        run: cd platforms/apple/AutorotaKit && swift test
+        # Perf suite excluded: timings belong to perf.yml, not the merge gate.
+        run: cd platforms/apple/AutorotaKit && swift test --skip AutorotaKitPerfTests
 
   # ─── Swift: compile-check matrix (catches breaks in non-test files) ────────
   # Faster than swift-app-tests; covers files no XCTest imports.
