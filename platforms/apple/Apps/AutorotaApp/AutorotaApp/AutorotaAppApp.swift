@@ -1,5 +1,6 @@
 import AutorotaKit
 import CloudKit
+import OSLog
 import SwiftUI
 
 /// Result of the App's two-pass database init. `failed` short-circuits the
@@ -22,6 +23,7 @@ struct AutorotaAppApp: App {
 
     init() {
         let initOutcome: DBInitOutcome
+        let dbSignpost = PerfSignposts.poster.beginInterval("dbInit")
         do {
             #if PERF_HELPERS
             if let cfg = Self.perfMode {
@@ -40,6 +42,7 @@ struct AutorotaAppApp: App {
         } catch {
             initOutcome = .failed(message: "\(error)")
         }
+        PerfSignposts.poster.endInterval("dbInit", dbSignpost)
         _dbInitOutcome = State(initialValue: initOutcome)
 
         ExportSettingsMigration.run()
@@ -156,8 +159,11 @@ struct AutorotaAppApp: App {
                             ContentView()
                                 .transition(.opacity)
                         } else if playBootAnimation {
-                            LoadingScreenView { bootAnimationDone = true }
-                                .transition(.opacity)
+                            LoadingScreenView {
+                                PerfSignposts.poster.emitEvent("bootAnimationDone")
+                                bootAnimationDone = true
+                            }
+                            .transition(.opacity)
                         } else {
                             // First boot (no plan chosen yet): onboarding
                             // handles the wait, keep the plain spinner.
@@ -190,8 +196,10 @@ struct AutorotaAppApp: App {
                 if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil {
                     await licenseService.refresh()
                 }
+                PerfSignposts.poster.emitEvent("licenseRefreshed")
                 await exchangeRateService.fetchRates()
                 await checkFirstLaunchSync()
+                PerfSignposts.poster.emitEvent("syncCheckComplete")
             }
             .preferredColorScheme(selectedAppearance.colorScheme)
             #if os(macOS)

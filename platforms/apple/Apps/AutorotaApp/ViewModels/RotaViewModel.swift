@@ -142,6 +142,12 @@ final class RotaViewModel {
         if isColdLoad { isLoading = true }
         error = nil
 
+        let signpostID = PerfSignposts.poster.makeSignpostID()
+        let signpostState = PerfSignposts.poster.beginInterval(
+            "loadSchedule", id: signpostID, "\(isColdLoad ? "cold" : "warm")"
+        )
+        defer { PerfSignposts.poster.endInterval("loadSchedule", signpostState) }
+
         // Fetch the schedule and the conflict-detection data concurrently
         // rather than four sequential FFI round-trips. The conflict data is
         // best-effort (`try?`): a failure leaves that cache as-is.
