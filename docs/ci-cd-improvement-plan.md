@@ -18,7 +18,7 @@ Repo-side fixes are implemented; the remaining items need actions outside the re
 - **#4 Done** — a `notify-failure` job in `release.yml` auto-files a GitHub Issue (`Release vX.Y.Z failed`, linking the run) when any release job fails.
 - **#5 Done (doc)** — manual "Ready to Test" check documented in the guide's release steps; automation deferred as planned.
 - **#6 Done** — resolved as option (a): `.gitignore` entry removed, each `ExportOptions*.plist` carries a comment explaining it's intentionally committed.
-- **#7 Partially done** — `ci_post_clone.sh` header now documents that it's not the release path and why it exists. Still to do: check App Store Connect → Xcode Cloud for an active workflow.
+- **#7 Done** — `ci_post_clone.sh` header documents that it's not the release path and why it exists. 2026-07-20: the only Xcode Cloud workflow in App Store Connect was disabled by the owner — the hook is now inert insurance and GitHub Actions is the single build/submit path.
 - **#8 Done** — root `README.md` added with CI + Release badges and a link to the guide.
 - **#9 / #10** — deferred, unchanged. Update 2026-07-17 on #9: the `Tauri Desktop (macOS)` cargo-check job was removed from `ci.yml` entirely — desktop is out of production and doesn't compile on clean main, so the job was permanently red. Re-add CI coverage when desktop work resumes.
 

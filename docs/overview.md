@@ -281,18 +281,20 @@ All workflows live in `.github/workflows/`:
 ### `ci.yml` — push to `main` + PRs (concurrency-cancelling)
 - **rust-checks** (reusable) — `cargo fmt --check`, `cargo clippy -D
   warnings`, unit tests, integration tests for `autorota-core`.
-- **xcframework** (`macos-15`) — runs `scripts/build_xcframework.sh` and
-  uploads the XCFramework + generated bindings as artifacts.
-- **swift-app-tests** (`macos-15`, matrix macOS/iOS/iPadOS) — ViewModel
-  tests via `MockAutorotaService`. No XCFramework dependency.
-- **swift-package-tests** (`macos-15`) — SPM integration tests that
+- **xcframework** (`macos-26`) — builds the XCFramework with
+  `PERF_HELPERS=1` (Debug app builds link `seedPerfCorpus`) and uploads
+  it + generated bindings as artifacts.
+- **swift-package-tests** (`macos-26`) — SPM integration tests that
   download the XCFramework artifact and call the real FFI.
-- **tauri-desktop** (`macos-15`) — `npm ci`, `npm run build`,
-  `cargo check` against `crates/app-desktop`.
+- **swift-compile-check** (`macos-26`, matrix macOS/iOS/iPadOS) —
+  compile-only via `make swift-build-check-<target>`.
+- Tauri desktop is deliberately not in CI (pre-existing compile failures;
+  see the comment in `ci.yml`).
 
-> **Known gap:** `macos-15` runners do not yet ship Xcode 26, which the
-> Swift project requires. Swift jobs are expected to fail until GitHub
-> publishes a compatible image. See `GAPS.md` for details.
+### `perf.yml` — PRs + manual dispatch (never blocks merge)
+Criterion benches with a soft same-runner merge-base comparison, the Kit
+FFI perf suite, and (scheduled/dispatch) the XCUITest perf run. All
+report-only — see `perf-testing.md` and `perf-runbook.md`.
 
 ### `rust-checks.yml` — reusable
 Called by `ci.yml` and `release.yml`. Pure-Rust gate (fmt, clippy, unit

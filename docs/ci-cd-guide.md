@@ -199,29 +199,24 @@ Rust results: `target/criterion/report/index.html`. Swift results: latest `.xcre
 
 ### The soft regression gate
 
-`rust-bench` additionally benches the PR's merge base and the PR head **on the same runner** (so machine variance cancels out) and lets criterion's own statistical test decide whether the scheduler engine (`schedule_pure*` groups only — save/export stay purely informational) regressed. If it did (`p < 0.05`), the step exits non-zero — because the job is `continue-on-error`, this shows as a red check plus a `::warning::` annotation, without blocking merge. Read the `criterion-html` artifact or the step's `cmp.txt` output to see which group moved and by how much. A genuine, intended slowdown (e.g. a new scheduling constraint) is fine to merge past — there's no baseline file to update by hand.
+`rust-bench` additionally benches the PR's merge base and the PR head **on the same runner** (so machine variance cancels out) and lets criterion's own statistical test decide whether the scheduler engine (`schedule_pure*` groups only — save/export stay purely informational) regressed. If it did (`p < 0.05`), the step emits a `::warning::` annotation — it never exits non-zero, so the check stays green regardless (report-only policy). Read the `criterion-html` artifact or the step's `cmp.txt` output to see which group moved and by how much. `perf.yml` also runs the Kit FFI perf suite per-PR (`kit-perf` job, job-summary table via `scripts/perf_report.py`) and the XCUITest simulator suite weekly on `main` + on manual dispatch.
 
 ### What's covered
 
 Rust: scheduler (by employee count, by week count, two-stage enriched fill), the hottest inner primitives (`for_window`, `has_role`), save snapshot/diff, and export (grid build, CSV/JSON/markdown, xlsx, PDF). Swift: cold/warm launch, week navigation, first rota render — all via XCUITest with a synthetic seeded corpus (`--perf-seed-corpus <N>` launch argument), skipping iCloud sync/onboarding/exchange-rate fetch.
 
-### One-time Xcode setup (only needed if the perf UI test target doesn't exist yet)
+### Test plan wiring (already done — reference only)
 
-If `make swift-perf-macos` or `swift-perf-ios` fails with "No such module 'XCTest'", the `AutorotaAppPerfTests` UI-testing target hasn't been created in Xcode yet:
+The `AutorotaAppPerfTests` target exists, and the `AutorotaApp` scheme references two test plans, both living next to the `.xcodeproj`:
 
-1. Open `platforms/apple/Apps/AutorotaApp/AutorotaApp.xcodeproj`.
-2. **File → New → Target → UI Testing Bundle**, name `AutorotaAppPerfTests`, bundle id `com.toadmountain.AutorotaAppPerfTests`, target app `AutorotaApp`.
-3. Delete the auto-generated `AutorotaAppPerfTestsLaunchTests.swift` and `AutorotaAppPerfTests.swift` stubs.
-4. Drag in the four files at `platforms/apple/Apps/AutorotaApp/AutorotaAppPerfTests/` (`LaunchPerfTests.swift`, `WeekNavigationPerfTests.swift`, `RotaRenderPerfTests.swift`, `Perf.xctestplan`).
-5. **Product → Scheme → Edit Scheme → Test → Test Plans → Add Test Plan → `Perf.xctestplan`**.
-6. In the perf target's Build Settings, add `PERF_HELPERS` to **Active Compilation Conditions** for the Debug configuration.
-7. `make swift-perf-xcframework`, then `make swift-perf-ios` — the first run records baselines into the xctestplan; commit them.
+- `AutorotaApp.xctestplan` (default) — `AutorotaAppTests` only. Plain `xcodebuild test` / `make swift-test-app-*` uses this, so the XCUITest perf runner never boots during unit runs.
+- `Perf.xctestplan` — `AutorotaAppPerfTests` only, selected via `-testPlan Perf` by `make swift-perf-ios` / `swift-perf-macos` and `perf.yml`.
 
-This is a one-time setup. `perf.yml`'s `swift-perf` job checks whether the target exists and exits cleanly with a notice if it doesn't, rather than failing — so CI stays green until this is set up.
+If either plan stops resolving (e.g. after a project rename), check the `<TestPlans>` block in `AutorotaApp.xcscheme` and verify with `xcodebuild -showTestPlans -project … -scheme AutorotaApp`.
 
-### Refreshing baselines
+### Baselines
 
-xctestplan baselines drift as code legitimately gets faster or slower. Suggested cadence: quarterly, review the latest passing perf run on `main` and reset baselines for any test whose green-mean shifted ≥10%; also reset immediately after a known, intentional optimization. Criterion baselines: `cargo bench -p autorota-core --bench scheduler -- --save-baseline <name>`, then compare with `-- --baseline <name>`.
+This repo never records Xcode perf baselines — comparison happens outside Xcode via `make perf-report` and `perf/history.jsonl` (see [`perf-testing.md`](perf-testing.md#why-we-dont-use-xcode-baselines)). Criterion named baselines for refactors: `cargo bench -p autorota-core --bench scheduler -- --save-baseline <name>`, then compare with `-- --baseline <name>`.
 
 ## Secrets and signing reference
 
@@ -246,7 +241,7 @@ These files are **intentionally committed** — they contain a team ID and expor
 
 ### The Xcode Cloud hook
 
-`platforms/apple/Apps/AutorotaApp/ci_scripts/ci_post_clone.sh` is Apple's auto-detected Xcode Cloud post-clone hook — it installs `rustup` via Homebrew and builds the XCFramework, working around two real incidents documented in `BUG_LOG.md` (a DNS resolution failure fetching the rustup installer, and a keg-only Homebrew formula not exposing `cargo`/`rustc` on `PATH`). Xcode Cloud is **not** the release path — GitHub Actions is — and the script's header comment now says so. The hook only does anything if an Xcode Cloud workflow is actually configured for this app in App Store Connect; if one is, that's a second, unmonitored build/submit path and should be disabled (gap #7 in the improvement plan — confirming App Store Connect state is still pending).
+`platforms/apple/Apps/AutorotaApp/ci_scripts/ci_post_clone.sh` is Apple's auto-detected Xcode Cloud post-clone hook — it installs `rustup` via Homebrew and builds the XCFramework, working around two real incidents documented in `BUG_LOG.md` (a DNS resolution failure fetching the rustup installer, and a keg-only Homebrew formula not exposing `cargo`/`rustc` on `PATH`). Xcode Cloud is **not** the release path — GitHub Actions is — and the script's header comment now says so. The hook only does anything if an Xcode Cloud workflow is actually configured for this app in App Store Connect. As of 2026-07-20 the only workflow there was disabled (gap #7 closed) — GitHub Actions is the single build/submit path, and nothing (including perf) runs on Xcode Cloud.
 
 ## Troubleshooting index
 
@@ -257,7 +252,7 @@ These files are **intentionally committed** — they contain a team ID and expor
 | `<a name="the-release-pr-merged-but-releaseyml-never-fired"></a>`Tag pushed (via merging the Release PR) but `release.yml` never fired | `RELEASE_PLZ_TOKEN` is missing or under-scoped. Fix permanently by adding a `repo`-scope PAT as that secret. Recover the stuck release by re-pushing the tag manually: `git fetch --tags && git push origin :refs/tags/vX.Y.Z && git push origin refs/tags/vX.Y.Z` |
 | A `CHANGELOG.md` entry reads wrong | Edit it directly in the open Release PR — release-plz preserves manual edits on subsequent updates |
 | Stale Release PR after a force-push to `main` | Close it; release-plz opens a fresh one on the next push |
-| `make swift-perf-macos` / `-ios` fails with "No such module 'XCTest'" | The perf UI-test target hasn't been created yet — see [One-time Xcode setup](#one-time-xcode-setup-only-needed-if-the-perf-ui-test-target-doesnt-exist-yet) |
+| `make swift-perf-macos` / `-ios` fails with "scheme does not contain a test plan named Perf" | The scheme's `<TestPlans>` block lost its `Perf.xctestplan` reference — see [Test plan wiring](#test-plan-wiring-already-done--reference-only) |
 | `make swift-perf-macos` fails with "Timed out while enabling automation mode" | Needs Accessibility permission: System Settings → Privacy & Security → Accessibility, enable for Terminal (or your shell host) and Xcode. First run after granting may still time out — re-run once. |
 | `make swift-perf-macos` fails with `LaunchServices error -10661` | App sandbox is active; confirm the `ENABLE_APP_SANDBOX=NO` and cleared-entitlements overrides in the `swift-perf-macos` Make target survived |
 | `seedPerfCorpus` symbol not found | XCFramework was built without `PERF_HELPERS=1` — run `make swift-perf-xcframework` |

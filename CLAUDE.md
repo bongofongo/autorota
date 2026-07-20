@@ -49,6 +49,25 @@ make test-all                             # everything
 
 Set `VERBOSE=1` for full build output. `NOSIGN=1` is set automatically in make targets to disable code signing.
 
+## Performance testing
+
+Three layers, all report-only (a perf regression never blocks a build; never record Xcode baselines — see `docs/perf-testing.md`):
+
+1. **criterion** (`crates/autorota-core/benches/`) — pure Rust algorithm timings
+2. **Kit FFI perf** (`AutorotaKit/Tests/AutorotaKitPerfTests/`) — hot paths through the real FFI + SQLite, no simulator
+3. **XCUITest perf** (`AutorotaAppPerfTests`) — user-perceived launch/render/navigation on the iOS simulator
+
+```bash
+make bench-quick BENCH=scheduler   # ~10s criterion sanity run (also: hotpath, save, export)
+make bench                        # full criterion suite
+make kit-perf-xcframework         # release PERF_HELPERS XCFramework (required before kit-perf)
+make kit-perf                     # FFI perf suite, ~3s, output teed to .build/kit-perf.txt
+make sync-merge-perf              # sync three-way merge perf (macOS, app target, env-gated)
+make perf-report                  # aggregate everything into one table; PERF_RECORD=1 appends to perf/history.jsonl
+```
+
+Claude may run freely: `bench-*`, `kit-perf`, `sync-merge-perf`, `perf-report`. **Ask first, never auto-run:** `swift-perf-ios`, `swift-perf-macos`, `perf-all` (they boot simulators / need TCC). Debug-Rust timings are meaningless — `kit-perf` requires the release build from `kit-perf-xcframework`.
+
 ## Working conventions
 
 - Use `make` targets or XcodeBuildMCP tools, not raw `xcodebuild`
