@@ -71,10 +71,14 @@ struct AutorotaAppApp: App {
         #else
         let perfHarnessActive = false
         #endif
+        // Snapshot once (same rationale as playBootAnimation below):
+        // checkFirstLaunchSync may flip the UserDefaults key mid-boot.
+        let onboardedSnapshot = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
+        onboardedAtBoot = onboardedSnapshot
         _playBootAnimation = State(initialValue:
             !perfHarnessActive
                 && ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
-                && UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
+                && onboardedSnapshot
         )
 
         let engine = AutorotaSyncEngine()
@@ -127,6 +131,10 @@ struct AutorotaAppApp: App {
     @State private var spotlightModel = TutorialSpotlightModel()
     @State private var syncPrompt = SyncPromptCoordinator()
     @State private var syncCheckComplete = false
+    /// Snapshot of `hasCompletedOnboarding` at boot. For onboarded users the
+    /// first-launch sync question is already answered locally, so the paint
+    /// gate is released immediately and `checkFirstLaunchSync` runs behind it.
+    private let onboardedAtBoot: Bool
     @State private var dbInitOutcome: DBInitOutcome
     /// Whether this boot shows `LoadingScreenView` (set once in `init`).
     @State private var playBootAnimation: Bool
@@ -197,9 +205,24 @@ struct AutorotaAppApp: App {
                     await licenseService.refresh()
                 }
                 PerfSignposts.poster.emitEvent("licenseRefreshed")
-                await exchangeRateService.fetchRates()
+                // Rates are display-only and the service loads a cached copy
+                // in init — never let this network fetch (no timeout) gate
+                // first paint.
+                Task { await exchangeRateService.fetchRates() }
+                // Onboarded users have nothing to wait for: the sync check
+                // only decides whether to show onboarding for fresh installs
+                // with existing cloud data. Release the paint gate now and
+                // let the (idempotent) check run behind the content. License
+                // refresh above must stay awaited — ContentView shows
+                // onboarding on `license.state == .unset`.
+                if onboardedAtBoot {
+                    syncCheckComplete = true
+                    PerfSignposts.poster.emitEvent("syncCheckComplete")
+                }
                 await checkFirstLaunchSync()
-                PerfSignposts.poster.emitEvent("syncCheckComplete")
+                if !onboardedAtBoot {
+                    PerfSignposts.poster.emitEvent("syncCheckComplete")
+                }
             }
             .preferredColorScheme(selectedAppearance.colorScheme)
             #if os(macOS)
