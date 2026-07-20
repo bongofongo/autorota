@@ -4,6 +4,13 @@ version.workspace = true
 edition.workspace = true
 publish.workspace = true
 
+# Benchmarks live in benches/ with criterion (harness = false). The default
+# libtest bench harness on the lib target rejects criterion CLI flags
+# (`cargo bench -- --output-format bencher` fails with exit 101), so keep the
+# lib out of `cargo bench`.
+[lib]
+bench = false
+
 [dependencies]
 tokio.workspace = true
 sqlx.workspace = true
