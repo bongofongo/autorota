@@ -91,6 +91,10 @@ jobs:
 
   swift-perf:
     name: Swift XCUITest perf (iOS Simulator)
+    # Sim runs on shared runners are too noisy for per-PR signal, and the
+    # scheme's Perf test plan association lands with the perf-testing
+    # overhaul branch — manual dispatch only until then.
+    if: github.event_name != 'pull_request'
     runs-on: macos-26
     continue-on-error: true
     steps:
