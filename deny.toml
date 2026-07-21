@@ -4,7 +4,24 @@ all-features = false
 [advisories]
 version = 2
 yanked = "warn"
-ignore = []
+# Only error on unmaintained crates that are direct workspace deps; the
+# transitive ones (gtk3/unic-* via tauri, rusttype/stb_truetype/lzw via
+# printpdf 0.3) have no upgrade path until upstream moves.
+unmaintained = "workspace"
+ignore = [
+    # lopdf < 0.42 stack overflow is in the PDF *parsing* path (load_mem).
+    # We only generate PDFs (printpdf 0.3 -> lopdf 0.26); the sole parse
+    # call is a dev test reading our own renderer output. Fix requires
+    # printpdf 0.11 (full API rewrite) — tracked, not urgent.
+    "RUSTSEC-2026-0187",
+    # quick-xml 0.31 DoS (quadratic attr check / unbounded xmlns alloc)
+    # via calamine 0.24. Latest calamine (0.34) still pins quick-xml
+    # ^0.39 < 0.41, so no fixed upgrade path exists yet. XLSX import is
+    # local user files in a desktop/mobile app — worst case is the user
+    # hanging their own import. Re-check when calamine bumps quick-xml.
+    "RUSTSEC-2026-0194",
+    "RUSTSEC-2026-0195",
+]
 
 [licenses]
 version = 2
