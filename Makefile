@@ -128,8 +128,12 @@ swift-build-check-macos:
 swift-build-check-ios:
 	$(XCB) build $(XCB_QUIET) -destination 'platform=iOS Simulator,name=iPhone 17' $(NOSIGN)
 
+# Generic destination: compile-only, so no concrete simulator is needed —
+# CI runner images don't reliably ship a given iPad device name. ARCHS=arm64
+# because the generic destination otherwise wants an x86_64 slice the
+# XCFramework doesn't carry.
 swift-build-check-ipad:
-	$(XCB) build $(XCB_QUIET) -destination 'platform=iOS Simulator,name=iPad Pro 13-inch (M5)' $(NOSIGN)
+	$(XCB) build $(XCB_QUIET) -destination 'generic/platform=iOS Simulator' ARCHS=arm64 $(NOSIGN)
 
 swift-platform-lint:
 	@bash scripts/check-platform-isolation.sh
