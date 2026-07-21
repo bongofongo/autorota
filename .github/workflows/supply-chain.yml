@@ -27,6 +27,9 @@ jobs:
   audit:
     name: cargo audit
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write # audit-check publishes results as a check run
     steps:
       - uses: actions/checkout@v7
       - uses: rustsec/audit-check@v2
