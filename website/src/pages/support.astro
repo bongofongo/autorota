@@ -1,0 +1,16 @@
+---
+import { getEntry, render } from "astro:content";
+import DocLayout from "../layouts/DocLayout.astro";
+
+const entry = await getEntry("docs", "support");
+if (!entry) throw new Error("support doc missing");
+const { Content } = await render(entry);
+---
+
+<DocLayout
+  title={entry.data.title}
+  description={entry.data.description}
+  lastUpdated={entry.data.lastUpdated}
+>
+  <Content />
+</DocLayout>

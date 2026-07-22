@@ -24,7 +24,8 @@ struct TierPickView: View {
                 tierCard(.localManager)
                 // Employee + Cloud (Multi-Site) tiers hidden for now.
                 // Re-enable: tierCard(.employee); tierCard(.saas)
-                restoreRow
+                // Restore Purchases hidden while the app is free.
+                // Re-enable: restoreRow
                 syncRestoreRow
                 offlineEscapeRow
                 if license.state.allowsMutation {
@@ -277,6 +278,8 @@ struct TierPickView: View {
                     Group {
                         if isWorking == .purchase {
                             ProgressView().controlSize(.small)
+                        } else if PricingCatalog.isFree(for: tier) {
+                            Text("license.cta.enter")
                         } else {
                             Text("license.cta.buy")
                         }
@@ -287,21 +290,23 @@ struct TierPickView: View {
                 .controlSize(.large)
                 .disabled(isWorking != nil)
 
-                Button {
-                    runTrial()
-                } label: {
-                    Group {
-                        if isWorking == .trial {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Text("license.cta.start_trial")
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-                .disabled(isWorking != nil || isTrialUsed)
+                // Trial button hidden while the app is free.
+                // Re-enable when paid pricing lands:
+                // Button {
+                //     runTrial()
+                // } label: {
+                //     Group {
+                //         if isWorking == .trial {
+                //             ProgressView().controlSize(.small)
+                //         } else {
+                //             Text("license.cta.start_trial")
+                //         }
+                //     }
+                //     .frame(maxWidth: .infinity)
+                // }
+                // .buttonStyle(.bordered)
+                // .controlSize(.large)
+                // .disabled(isWorking != nil || isTrialUsed)
             }
         }
     }

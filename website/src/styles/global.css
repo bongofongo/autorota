@@ -1,0 +1,197 @@
+/* autorota marketing site — design tokens + base styles.
+   Palette derived from the app icon (rota-app-icon.svg) and the App Store
+   screenshot art: watch-face white, hairline grays, one vivid blue. */
+
+:root {
+  --blue: #2563eb;
+  --blue-deep: #1a48c4;
+  --blue-tint: #eaf0fd;
+  --ink: #1c2733;
+  --muted: #5f6b7a;
+  --faint: #8794a3;
+  --hairline: #e3e7ec;
+  --bg: #ffffff;
+  --bg-alt: #f5f6f8;
+  --ink-panel: #0f1a2b;
+  --radius-card: 20px;
+  --radius-tile: 28px;
+  --content-max: 1100px;
+  --pad-x: clamp(20px, 5vw, 40px);
+  --section-y: clamp(72px, 10vw, 128px);
+  color-scheme: light;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  color: var(--ink);
+  background: var(--bg);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+img,
+picture {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+a {
+  color: var(--blue);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* ---- type scale ---- */
+
+h1,
+h2,
+h3 {
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+  text-wrap: balance;
+}
+
+.display {
+  font-size: clamp(2.4rem, 6.5vw, 4.4rem);
+  letter-spacing: -0.028em;
+}
+
+h2 {
+  font-size: clamp(1.7rem, 3.6vw, 2.6rem);
+}
+
+h3 {
+  font-size: 1.2rem;
+  letter-spacing: -0.01em;
+}
+
+.lede {
+  font-size: clamp(1.1rem, 2vw, 1.3rem);
+  line-height: 1.5;
+  color: var(--muted);
+  text-wrap: pretty;
+}
+
+.eyebrow {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--blue);
+  margin-bottom: 0.9rem;
+}
+
+.accent {
+  background: linear-gradient(100deg, var(--blue) 20%, var(--blue-deep) 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ---- layout ---- */
+
+.wrap {
+  max-width: var(--content-max);
+  margin-inline: auto;
+  padding-inline: var(--pad-x);
+}
+
+.section {
+  padding-block: var(--section-y);
+}
+
+.section-alt {
+  background: var(--bg-alt);
+}
+
+/* ---- buttons ---- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.8em 1.5em;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 1rem;
+  line-height: 1.2;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn:hover {
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+.btn-primary {
+  background: var(--blue);
+  color: #fff;
+  box-shadow: 0 6px 18px rgb(37 99 235 / 28%);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 8px 22px rgb(37 99 235 / 36%);
+}
+
+.btn-quiet {
+  color: var(--blue);
+  background: var(--blue-tint);
+}
+
+/* ---- scroll reveals (JS adds .js to <html>; content is fully visible without it) ---- */
+
+.js .reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.2, 0.6, 0.2, 1);
+}
+
+.js .reveal.in-view {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .js .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

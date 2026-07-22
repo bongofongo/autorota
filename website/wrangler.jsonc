@@ -1,0 +1,16 @@
+// Assets-only Worker serving the autorota marketing site at fongo.uk/autorota*.
+// The rest of fongo.uk stays on Cloudflare Pages (paper_web); this zone route
+// shadows just the /autorota path. Asset requests are free and unmetered.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "autorota-web",
+  "compatibility_date": "2026-07-20",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page",
+    "html_handling": "auto-trailing-slash"
+  },
+  "routes": [
+    { "pattern": "fongo.uk/autorota*", "zone_name": "fongo.uk" }
+  ]
+}

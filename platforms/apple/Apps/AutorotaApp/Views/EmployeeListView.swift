@@ -75,6 +75,7 @@ struct EmployeeListView: View {
                             }
                         }
                     }
+                    .accessibilityIdentifier("employees.list")
                 }
             }
             .navigationTitle("Employees")

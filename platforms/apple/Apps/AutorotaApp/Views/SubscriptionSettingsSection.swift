@@ -46,19 +46,21 @@ struct SubscriptionSettingsSection: View {
                 .tint(.primary)
             }
 
-            Button {
-                runRestore()
-            } label: {
-                HStack {
-                    Label("license.cta.restore", systemImage: "arrow.clockwise")
-                    Spacer()
-                    if isWorking == .restore {
-                        ProgressView().controlSize(.small)
-                    }
-                }
-            }
-            .disabled(isWorking != nil)
-            .tint(.primary)
+            // Restore Purchases hidden while the app is free — nothing to restore.
+            // Re-enable when paid pricing lands:
+            // Button {
+            //     runRestore()
+            // } label: {
+            //     HStack {
+            //         Label("license.cta.restore", systemImage: "arrow.clockwise")
+            //         Spacer()
+            //         if isWorking == .restore {
+            //             ProgressView().controlSize(.small)
+            //         }
+            //     }
+            // }
+            // .disabled(isWorking != nil)
+            // .tint(.primary)
 
             // Manage-subscription link hidden while Local Manager is the only
             // (one-time purchase) tier — nothing to manage in App Store.

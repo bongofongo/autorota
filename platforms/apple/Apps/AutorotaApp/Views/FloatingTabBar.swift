@@ -49,6 +49,7 @@ struct FloatingTabBar: View {
             .contentShape(Capsule(style: .continuous))
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("tab.\(page.rawValue)")
         .accessibilityLabel(page.titleString)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }

@@ -1,0 +1,109 @@
+---
+interface Props {
+  eyebrow: string;
+  title: string;
+  bullets: string[];
+  flip?: boolean;
+  alt?: boolean;
+}
+
+const { eyebrow, title, bullets, flip = false, alt = false } = Astro.props;
+---
+
+<section class:list={["section", { "section-alt": alt }]}>
+  <div class:list={["wrap", "grid", { flip }]}>
+    <div class="copy reveal">
+      <span class="eyebrow">{eyebrow}</span>
+      <h2>{title}</h2>
+      <p class="body"><slot name="body" /></p>
+      <ul>
+        {bullets.map((b) => <li>{b}</li>)}
+      </ul>
+    </div>
+    <div class="media reveal">
+      <slot name="media" />
+    </div>
+  </div>
+</section>
+
+<style>
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    gap: clamp(2rem, 6vw, 5rem);
+    align-items: center;
+  }
+
+  .flip .copy {
+    order: 2;
+  }
+
+  .flip .media {
+    order: 1;
+  }
+
+  h2 {
+    margin-bottom: 1.1rem;
+    max-width: 18ch;
+  }
+
+  .body {
+    color: var(--muted);
+    margin-bottom: 1.3rem;
+  }
+
+  ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  li {
+    padding-left: 1.7rem;
+    position: relative;
+    font-size: 0.98rem;
+  }
+
+  li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.42em;
+    width: 0.85em;
+    height: 0.85em;
+    border-radius: 4px;
+    background: var(--blue);
+    opacity: 0.18;
+  }
+
+  li::after {
+    content: "";
+    position: absolute;
+    left: 0.22em;
+    top: 0.55em;
+    width: 0.42em;
+    height: 0.26em;
+    border-left: 2.5px solid var(--blue);
+    border-bottom: 2.5px solid var(--blue);
+    transform: rotate(-45deg);
+  }
+
+  @media (max-width: 900px) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+
+    .flip .copy {
+      order: 1;
+    }
+
+    .flip .media {
+      order: 2;
+    }
+
+    .media {
+      max-width: 480px;
+    }
+  }
+</style>

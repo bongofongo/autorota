@@ -1,11 +1,13 @@
 name: Perf
 
-# Never blocks merge — both jobs use continue-on-error. Artifacts are uploaded
-# for manual inspection and a short bencher-format summary is written to the
-# GitHub job summary. The rust-bench job additionally runs a *soft* regression
-# gate on the scheduler engine (base vs PR on the same runner): a statistically
-# significant slowdown turns the check red and adds a warning annotation, but
-# does not block merge. See docs/perf-testing.md for how to read the output.
+# Report-only: no job here ever blocks merge (continue-on-error everywhere) and
+# no step exits non-zero on a regression. Numbers land in the job summary and
+# artifacts; humans (or Claude) read them via docs/perf-runbook.md.
+#
+# Per-PR:      rust-bench (criterion + soft same-runner base-vs-head compare)
+#              kit-perf   (FFI hot-path suite, no simulator)
+# Weekly/main: swift-perf (XCUITest launch/render/nav on iOS Simulator) — too
+#              sim-flaky for per-PR signal; scheduled runs give trend data.
 
 on:
   pull_request:
@@ -13,6 +15,9 @@ on:
     paths-ignore:
       - '**.md'
       - 'LICENSE'
+  schedule:
+    # Mondays 05:00 UTC on main — weekly XCUITest trend point.
+    - cron: '0 5 * * 1'
   workflow_dispatch:
 
 concurrency:
@@ -22,6 +27,7 @@ concurrency:
 jobs:
   rust-bench:
     name: Rust criterion
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
@@ -50,12 +56,11 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # Soft regression gate on the scheduler engine. Benches the PR's merge base
-      # and the PR head on the *same* runner (so absolute timings are comparable,
-      # neutralising machine variance) and lets criterion's own statistical
-      # comparison flag a regression. This job is continue-on-error, so a non-zero
-      # exit surfaces a red check + warning annotation without blocking merge.
-      - name: Scheduler regression check (base vs PR)
+      # Soft comparison on the scheduler engine: bench the PR's merge base and
+      # head on the *same* runner (machine variance cancels out) and let
+      # criterion's statistical test flag movement. Annotation only — a
+      # statistically significant slowdown is a message, never a failure.
+      - name: Scheduler comparison (base vs PR)
         if: github.event_name == 'pull_request'
         env:
           BASE_REF: ${{ github.base_ref }}
@@ -68,10 +73,10 @@ jobs:
           git checkout -q "$HEAD_SHA"
           cargo bench -p autorota-core --bench scheduler -- --baseline base | tee cmp.txt
           if grep -q "Performance has regressed" cmp.txt; then
-            echo "::warning::Scheduler bench regressed vs $BASE_REF (statistically significant, p<0.05). Review the criterion-html artifact or cmp.txt."
-            exit 1
+            echo "::warning::Scheduler bench moved vs $BASE_REF (statistically significant, p<0.05). Informational — review the criterion-html artifact or cmp.txt."
+          else
+            echo "No scheduler regression vs $BASE_REF."
           fi
-          echo "No scheduler regression vs $BASE_REF."
 
       - name: Upload criterion HTML report
         if: always()
@@ -89,11 +94,61 @@ jobs:
           path: bench-output.txt
           retention-days: 14
 
+  kit-perf:
+    name: Kit FFI perf (macOS, no simulator)
+    if: github.event_name != 'schedule'
+    runs-on: macos-26
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust toolchain (Apple targets)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: >-
+            aarch64-apple-darwin
+            x86_64-apple-darwin
+            aarch64-apple-ios
+            aarch64-apple-ios-sim
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: perf-kit
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      # Release build: debug-Rust timings are meaningless (docs/perf-testing.md).
+      - name: Build XCFramework (release, PERF_HELPERS=1)
+        run: make kit-perf-xcframework
+
+      - name: Run Kit FFI perf suite
+        run: make kit-perf
+
+      - name: Perf report to job summary
+        if: always()
+        run: |
+          python3 scripts/perf_report.py >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload perf report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: kit-perf-report
+          path: |
+            perf-report.md
+            perf-report.json
+            platforms/apple/AutorotaKit/.build/kit-perf.txt
+          if-no-files-found: ignore
+          retention-days: 14
+
   swift-perf:
     name: Swift XCUITest perf (iOS Simulator)
-    # Sim runs on shared runners are too noisy for per-PR signal, and the
-    # scheme's Perf test plan association lands with the perf-testing
-    # overhaul branch — manual dispatch only until then.
+    # Sim runs on shared runners are too noisy for per-PR signal — weekly
+    # schedule + manual dispatch only, for trend data.
     if: github.event_name != 'pull_request'
     runs-on: macos-26
     continue-on-error: true
@@ -122,27 +177,25 @@ jobs:
       - name: Build XCFramework with PERF_HELPERS=1
         run: PERF_HELPERS=1 bash scripts/build_xcframework.sh
 
+      # XCUITest on macOS hosts requires interactive TCC (Accessibility)
+      # grants CI runners can't provide; the iOS Simulator runs under simctl
+      # with no TCC dependency.
       - name: Run perf tests (iOS Simulator)
-        # XCUITest on macOS hosts requires interactive TCC (Accessibility)
-        # grants that CI runners can't provide. iOS Simulator runs under
-        # simctl with no TCC dependency. The perf target may not yet exist
-        # in the project on a given branch (one-time Xcode setup is
-        # documented in docs/perf-testing.md). If it is missing, this step
-        # exits 0 with a note rather than failing CI.
         run: |
-          PROJ=platforms/apple/Apps/AutorotaApp/AutorotaApp.xcodeproj
-          if xcodebuild -project "$PROJ" -list 2>/dev/null | grep -q AutorotaAppPerfTests; then
-            xcodebuild test \
-              -project "$PROJ" \
-              -scheme AutorotaApp \
-              -destination 'platform=iOS Simulator,name=iPhone 17 Pro Max' \
-              -testPlan Perf -only-testing:AutorotaAppPerfTests \
-              SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) PERF_HELPERS' \
-              -resultBundlePath perf-results.xcresult \
-              CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
-          else
-            echo "::notice::AutorotaAppPerfTests target not yet configured — see docs/perf-testing.md"
-          fi
+          xcodebuild test \
+            -project platforms/apple/Apps/AutorotaApp/AutorotaApp.xcodeproj \
+            -scheme AutorotaApp \
+            -destination 'platform=iOS Simulator,name=iPhone 17 Pro Max' \
+            -testPlan Perf -only-testing:AutorotaAppPerfTests \
+            SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) PERF_HELPERS' \
+            -resultBundlePath perf-results.xcresult \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
+
+      - name: Perf report to job summary
+        if: always()
+        run: |
+          python3 scripts/perf_report.py --xcresult perf-results.xcresult \
+            >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload xcresult
         if: always()

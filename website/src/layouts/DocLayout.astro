@@ -1,0 +1,70 @@
+---
+import SiteLayout from "./SiteLayout.astro";
+
+interface Props {
+  title: string;
+  description: string;
+  lastUpdated: Date;
+}
+
+const { title, description, lastUpdated } = Astro.props;
+const updated = lastUpdated.toLocaleDateString("en-GB", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
+---
+
+<SiteLayout title={title} description={description}>
+  <article class="wrap doc">
+    <slot />
+    <p class="updated">Last updated {updated}</p>
+  </article>
+</SiteLayout>
+
+<style>
+  .doc {
+    max-width: 720px;
+    padding-block: clamp(48px, 7vw, 88px);
+  }
+
+  .doc :global(h1) {
+    font-size: clamp(2rem, 4.5vw, 2.8rem);
+    margin-bottom: 1.4rem;
+  }
+
+  .doc :global(h2) {
+    font-size: 1.5rem;
+    margin-block: 2.4rem 0.9rem;
+  }
+
+  .doc :global(h3) {
+    margin-block: 1.8rem 0.5rem;
+  }
+
+  .doc :global(p),
+  .doc :global(li) {
+    color: #33404d;
+  }
+
+  .doc :global(p) {
+    margin-block: 0.8rem;
+  }
+
+  .doc :global(ul) {
+    padding-left: 1.3rem;
+    margin-block: 0.8rem;
+  }
+
+  .doc :global(li) {
+    margin-block: 0.35rem;
+  }
+
+  .updated {
+    margin-top: 3rem;
+    font-size: 0.88rem;
+    color: var(--faint);
+    border-top: 1px solid var(--hairline);
+    padding-top: 1.2rem;
+  }
+</style>

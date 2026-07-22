@@ -1,5 +1,6 @@
 import AutorotaKit
 import CloudKit
+import OSLog
 import SwiftUI
 
 /// Result of the App's two-pass database init. `failed` short-circuits the
@@ -22,6 +23,7 @@ struct AutorotaAppApp: App {
 
     init() {
         let initOutcome: DBInitOutcome
+        let dbSignpost = PerfSignposts.poster.beginInterval("dbInit")
         do {
             #if PERF_HELPERS
             if let cfg = Self.perfMode {
@@ -40,6 +42,7 @@ struct AutorotaAppApp: App {
         } catch {
             initOutcome = .failed(message: "\(error)")
         }
+        PerfSignposts.poster.endInterval("dbInit", dbSignpost)
         _dbInitOutcome = State(initialValue: initOutcome)
 
         ExportSettingsMigration.run()
@@ -68,10 +71,14 @@ struct AutorotaAppApp: App {
         #else
         let perfHarnessActive = false
         #endif
+        // Snapshot once (same rationale as playBootAnimation below):
+        // checkFirstLaunchSync may flip the UserDefaults key mid-boot.
+        let onboardedSnapshot = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
+        onboardedAtBoot = onboardedSnapshot
         _playBootAnimation = State(initialValue:
             !perfHarnessActive
                 && ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
-                && UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
+                && onboardedSnapshot
         )
 
         let engine = AutorotaSyncEngine()
@@ -124,6 +131,10 @@ struct AutorotaAppApp: App {
     @State private var spotlightModel = TutorialSpotlightModel()
     @State private var syncPrompt = SyncPromptCoordinator()
     @State private var syncCheckComplete = false
+    /// Snapshot of `hasCompletedOnboarding` at boot. For onboarded users the
+    /// first-launch sync question is already answered locally, so the paint
+    /// gate is released immediately and `checkFirstLaunchSync` runs behind it.
+    private let onboardedAtBoot: Bool
     @State private var dbInitOutcome: DBInitOutcome
     /// Whether this boot shows `LoadingScreenView` (set once in `init`).
     @State private var playBootAnimation: Bool
@@ -156,8 +167,11 @@ struct AutorotaAppApp: App {
                             ContentView()
                                 .transition(.opacity)
                         } else if playBootAnimation {
-                            LoadingScreenView { bootAnimationDone = true }
-                                .transition(.opacity)
+                            LoadingScreenView {
+                                PerfSignposts.poster.emitEvent("bootAnimationDone")
+                                bootAnimationDone = true
+                            }
+                            .transition(.opacity)
                         } else {
                             // First boot (no plan chosen yet): onboarding
                             // handles the wait, keep the plain spinner.
@@ -180,6 +194,14 @@ struct AutorotaAppApp: App {
             .environment(\.locale, localeManager.effectiveLocale)
             .environment(\.accessibilityPalette, selectedPalette)
             .task {
+                // Kick off the first week's data fetch immediately — it runs
+                // while the boot animation (or perf-mode launch) proceeds, and
+                // RotaViewModel's cold load adopts the result. Runs in perf
+                // mode too so the harness measures the production path.
+                RotaLoadPrefetcher.shared.start(
+                    service: GatedAutorotaService(),
+                    weekStart: currentWeekStart()
+                )
                 if inPerfMode {
                     // Perf harness needs an immediately-usable license too —
                     // ContentView gates onboarding on `state == .unset`.
@@ -190,8 +212,25 @@ struct AutorotaAppApp: App {
                 if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil {
                     await licenseService.refresh()
                 }
-                await exchangeRateService.fetchRates()
+                PerfSignposts.poster.emitEvent("licenseRefreshed")
+                // Rates are display-only and the service loads a cached copy
+                // in init — never let this network fetch (no timeout) gate
+                // first paint.
+                Task { await exchangeRateService.fetchRates() }
+                // Onboarded users have nothing to wait for: the sync check
+                // only decides whether to show onboarding for fresh installs
+                // with existing cloud data. Release the paint gate now and
+                // let the (idempotent) check run behind the content. License
+                // refresh above must stay awaited — ContentView shows
+                // onboarding on `license.state == .unset`.
+                if onboardedAtBoot {
+                    syncCheckComplete = true
+                    PerfSignposts.poster.emitEvent("syncCheckComplete")
+                }
                 await checkFirstLaunchSync()
+                if !onboardedAtBoot {
+                    PerfSignposts.poster.emitEvent("syncCheckComplete")
+                }
             }
             .preferredColorScheme(selectedAppearance.colorScheme)
             #if os(macOS)

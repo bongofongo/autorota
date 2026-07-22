@@ -1,0 +1,47 @@
+---
+const audiences = ["cafés", "bars", "shops", "salons", "studios", "clinics"];
+---
+
+<section class="section strip">
+  <div class="wrap reveal">
+    <p class="line">
+      If your week runs on shifts and you're the one juggling them, autorota is
+      for you.
+    </p>
+    <ul>
+      {audiences.map((a) => <li>{a}</li>)}
+    </ul>
+  </div>
+</section>
+
+<style>
+  .strip .wrap {
+    text-align: center;
+  }
+
+  .line {
+    font-size: clamp(1.15rem, 2.4vw, 1.5rem);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    max-width: 34ch;
+    margin-inline: auto;
+    margin-bottom: 1.6rem;
+    text-wrap: balance;
+  }
+
+  ul {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.6rem;
+  }
+
+  li {
+    padding: 0.35rem 1rem;
+    border: 1px solid var(--hairline);
+    border-radius: 999px;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+</style>

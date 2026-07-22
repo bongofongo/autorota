@@ -647,4 +647,97 @@ struct RotaViewModelTests {
         let vm = RotaViewModel(service: mock)
         #expect(vm.allWeekdays == ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])
     }
+
+    // MARK: - Reference-data cache (week-invariant across navigation)
+
+    private func calls(_ mock: MockAutorotaService, _ prefix: String) -> Int {
+        mock.callLog.filter { $0.hasPrefix(prefix) }.count
+    }
+
+    @Test func weekNavigationReusesReferenceData() async {
+        let mock = MockAutorotaService()
+        let vm = RotaViewModel(service: mock, notificationCenter: NotificationCenter())
+
+        await vm.loadSchedule()
+        vm.selectedWeekStart = "2026-03-30"
+        await vm.loadSchedule()
+
+        #expect(calls(mock, "getWeekSchedule") == 2)
+        #expect(calls(mock, "listEmployees") == 1)
+        #expect(calls(mock, "listRoles") == 1)
+        #expect(calls(mock, "listAllEmployeeAvailabilityOverrides") == 1)
+    }
+
+    @Test func employeeChangeRefetchesOnlyEmployees() async {
+        let mock = MockAutorotaService()
+        let center = NotificationCenter()
+        let vm = RotaViewModel(service: mock, notificationCenter: center)
+        await vm.loadSchedule()
+
+        center.postAutorotaDataChange(tables: [.employee])
+        await vm.loadSchedule()
+
+        #expect(calls(mock, "listEmployees") == 2)
+        #expect(calls(mock, "listRoles") == 1)
+        #expect(calls(mock, "listAllEmployeeAvailabilityOverrides") == 1)
+    }
+
+    @Test func legacyPayloadlessPostInvalidatesEverything() async {
+        let mock = MockAutorotaService()
+        let center = NotificationCenter()
+        let vm = RotaViewModel(service: mock, notificationCenter: center)
+        await vm.loadSchedule()
+
+        // Demo enter/exit and sample-data swaps post with no typed payload.
+        center.post(name: .autorotaDataChanged, object: nil)
+        await vm.loadSchedule()
+
+        #expect(calls(mock, "listEmployees") == 2)
+        #expect(calls(mock, "listRoles") == 2)
+        #expect(calls(mock, "listAllEmployeeAvailabilityOverrides") == 2)
+    }
+
+    @Test func remoteSyncChangeInvalidates() async {
+        let mock = MockAutorotaService()
+        let center = NotificationCenter()
+        let vm = RotaViewModel(service: mock, notificationCenter: center)
+        await vm.loadSchedule()
+
+        center.postAutorotaDataChange(
+            source: .remoteSync, tables: [.role]
+        )
+        await vm.loadSchedule()
+
+        #expect(calls(mock, "listRoles") == 2)
+        #expect(calls(mock, "listEmployees") == 1)
+    }
+
+    @Test func assignmentChangeDoesNotInvalidateReferenceData() async {
+        let mock = MockAutorotaService()
+        let center = NotificationCenter()
+        let vm = RotaViewModel(service: mock, notificationCenter: center)
+        await vm.loadSchedule()
+
+        // Own mutators post assignment/shift/rota/save tables — none of these
+        // touch the reference caches.
+        center.postAutorotaDataChange(tables: [.assignment, .shift, .rota, .save])
+        await vm.loadSchedule()
+
+        #expect(calls(mock, "listEmployees") == 1)
+        #expect(calls(mock, "listRoles") == 1)
+        #expect(calls(mock, "listAllEmployeeAvailabilityOverrides") == 1)
+    }
+
+    @Test func enterEditModeAddsNoExtraFetchesWhenFresh() async {
+        let mock = MockAutorotaService()
+        mock.stubbedWeekSchedule = makeSchedule(shifts: [makeShiftInfo()])
+        let vm = RotaViewModel(service: mock, notificationCenter: NotificationCenter())
+        await vm.loadSchedule()
+
+        await vm.enterEditMode()
+
+        #expect(vm.isEditMode)
+        #expect(calls(mock, "listEmployees") == 1)
+        #expect(calls(mock, "listRoles") == 1)
+    }
 }

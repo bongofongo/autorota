@@ -1,0 +1,24 @@
+{
+  "configurations" : [
+    {
+      "id" : "7A31A0D2-40FB-4C88-9E01-1D2B64C2A001",
+      "name" : "Configuration 1",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:AutorotaApp.xcodeproj",
+        "identifier" : "CC0002082F80000000205001",
+        "name" : "AutorotaAppTests"
+      }
+    }
+  ],
+  "version" : 1
+}

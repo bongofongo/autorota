@@ -1,0 +1,127 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+import Hero from "../components/Hero.astro";
+import HowItWorks from "../components/HowItWorks.astro";
+import FeatureSection from "../components/FeatureSection.astro";
+import DeviceShot from "../components/DeviceShot.astro";
+import ScreenshotRail from "../components/ScreenshotRail.astro";
+import PrivacyPanel from "../components/PrivacyPanel.astro";
+import AudienceStrip from "../components/AudienceStrip.astro";
+import DownloadCTA from "../components/DownloadCTA.astro";
+import { SUBLINE, TAGLINE } from "../consts";
+
+import shotShifts from "../assets/screenshots/iphone/rota-shifts.png";
+import shotAvailability from "../assets/screenshots/iphone/rota-availability.png";
+import shotEdits from "../assets/screenshots/iphone/rota-edits.png";
+import shotExport from "../assets/screenshots/ipad/prev-export.png";
+import shotAnalytics from "../assets/screenshots/ipad/prev-analytics.png";
+---
+
+<SiteLayout title={`autorota — ${TAGLINE}`} description={SUBLINE}>
+  <Hero />
+  <HowItWorks />
+
+  <FeatureSection
+    eyebrow="Shifts & availability"
+    title="Scheduling that actually fits your team."
+    alt
+    bullets={[
+      "Recurring shifts with roles and flexible headcount — or wildcard shifts anyone can cover",
+      "Hour-by-hour availability: yes, maybe, or no, with a reusable weekly pattern",
+      "Date-specific exceptions for real life: edited times, extra cover, cancellations",
+      "Weekly and daily hour limits, so nobody quietly ends up with 60 hours",
+    ]}
+  >
+    <Fragment slot="body">
+      Describe the week you need and the people you have. autorota handles the
+      rest — including the odd week that looks nothing like the usual one.
+    </Fragment>
+    <Fragment slot="media">
+      <div class="pair">
+        <DeviceShot src={shotShifts} alt="Shift setup screen" crop="iphone" sizes="(max-width: 760px) 45vw, 260px" />
+        <DeviceShot src={shotAvailability} alt="Availability grid screen" crop="iphone" sizes="(max-width: 760px) 45vw, 260px" />
+      </div>
+    </Fragment>
+  </FeatureSection>
+
+  <FeatureSection
+    eyebrow="Edit Log"
+    title="Edit freely, with a safety net."
+    flip
+    bullets={[
+      "Every change saved automatically — no commit button to forget",
+      "Expand any entry to see exactly what changed, and label versions worth keeping",
+      "Restore any earlier state in a tap",
+    ]}
+  >
+    <Fragment slot="body">
+      The Edit Log keeps a timeline of your rota's history. Experiment as much
+      as you like; you can always get back.
+    </Fragment>
+    <Fragment slot="media">
+      <div class="solo">
+        <DeviceShot src={shotEdits} alt="Edit Log timeline screen" crop="iphone" sizes="(max-width: 760px) 80vw, 330px" />
+      </div>
+    </Fragment>
+  </FeatureSection>
+
+  <FeatureSection
+    eyebrow="Export & share"
+    title="Share the schedule, not the spreadsheet."
+    alt
+    bullets={[
+      "PDF layouts: full weekly grid, by role, or individual schedules",
+      "Staff version, or a manager version that includes costs",
+      "CSV and JSON for everything else, sent with the standard share sheet",
+    ]}
+  >
+    <Fragment slot="body">
+      Build the export your team actually reads — then send it anywhere.
+    </Fragment>
+    <Fragment slot="media">
+      <DeviceShot src={shotExport} alt="Export settings on iPad" crop="ipad" sizes="(max-width: 900px) 92vw, 560px" />
+    </Fragment>
+  </FeatureSection>
+
+  <FeatureSection
+    eyebrow="Costs"
+    title="Know what the week costs."
+    flip
+    bullets={[
+      "Hourly wages per person — in each person's own currency if your team is mixed",
+      "Weekly hours and labour costs, with charts to spot trends",
+      "See the cost before you publish the schedule, not after payday",
+    ]}
+  >
+    <Fragment slot="body">
+      The rota is also a budget. autorota does that arithmetic while you build
+      the week.
+    </Fragment>
+    <Fragment slot="media">
+      <DeviceShot src={shotAnalytics} alt="Analytics dashboard on iPad" crop="ipad" sizes="(max-width: 900px) 92vw, 560px" />
+    </Fragment>
+  </FeatureSection>
+
+  <ScreenshotRail />
+  <PrivacyPanel />
+  <AudienceStrip />
+  <DownloadCTA />
+</SiteLayout>
+
+<style>
+  .pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    align-items: start;
+  }
+
+  .pair > :global(*:last-child) {
+    margin-top: 2.5rem;
+  }
+
+  .solo {
+    max-width: 340px;
+    margin-inline: auto;
+  }
+</style>
