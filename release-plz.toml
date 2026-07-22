@@ -27,9 +27,8 @@ pr_branch_prefix = "release-plz/"
 pr_name = "chore: release v{{ version }}"
 pr_labels = ["release"]
 
-# Don't create per-crate PRs — one PR per release across the workspace.
-# All crates share workspace.package.version, so they bump together.
-single_pull_request = true
+# One PR per release across the workspace is release-plz's default —
+# all crates share workspace.package.version, so they bump together.
 
 [changelog]
 header = """# Changelog
