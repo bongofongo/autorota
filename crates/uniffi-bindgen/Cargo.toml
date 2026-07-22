@@ -2,6 +2,7 @@
 name = "uniffi-bindgen"
 version.workspace = true
 edition.workspace = true
+publish.workspace = true
 # Standalone binary for generating UniFFI language bindings.
 # Must use the same uniffi version as autorota-ffi.
 # Usage: cargo run -p uniffi-bindgen -- generate --library <dylib> --language swift --out-dir <dir>

@@ -36,9 +36,11 @@ jobs:
           key: perf-rust
 
       - name: Run benches (bencher format)
+        # --benches: without it the lib target's libtest harness also runs and
+        # rejects criterion's --output-format flag (exit 101).
         run: |
           set -o pipefail
-          cargo bench -p autorota-core -- --output-format bencher \
+          cargo bench -p autorota-core --benches -- --output-format bencher \
             | tee bench-output.txt
           {
             echo '## Rust criterion (bencher format)'
@@ -89,6 +91,10 @@ jobs:
 
   swift-perf:
     name: Swift XCUITest perf (iOS Simulator)
+    # Sim runs on shared runners are too noisy for per-PR signal, and the
+    # scheme's Perf test plan association lands with the perf-testing
+    # overhaul branch — manual dispatch only until then.
+    if: github.event_name != 'pull_request'
     runs-on: macos-26
     continue-on-error: true
     steps:

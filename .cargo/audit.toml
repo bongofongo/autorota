@@ -1,0 +1,17 @@
+# Keep in sync with deny.toml [advisories].ignore — CI runs both
+# cargo audit (rustsec/audit-check) and cargo deny.
+[advisories]
+ignore = [
+    # lopdf < 0.42 parse-path stack overflow; we only generate PDFs.
+    # Fix requires printpdf 0.11 (full API rewrite).
+    "RUSTSEC-2026-0187",
+    # quick-xml < 0.41 DoS via calamine 0.24; no fixed calamine exists
+    # yet (0.34 pins quick-xml ^0.39). Local-file XLSX import only.
+    "RUSTSEC-2026-0194",
+    "RUSTSEC-2026-0195",
+    # rsa Marvin timing sidechannel — no fix upstream. rsa is in the
+    # lockfile only via sqlx-mysql; we enable only sqlite features, so
+    # it is never compiled (cargo deny's feature-resolved graph agrees:
+    # `cargo tree -i rsa` finds nothing).
+    "RUSTSEC-2023-0071",
+]
