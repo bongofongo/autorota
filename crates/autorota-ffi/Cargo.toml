@@ -12,7 +12,7 @@ crate-type = ["staticlib", "cdylib"]
 
 [dependencies]
 autorota-core = { path = "../autorota-core" }
-uniffi = "0.28"
+uniffi = "0.31"
 tokio.workspace = true
 sqlx.workspace = true
 chrono.workspace = true
