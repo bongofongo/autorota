@@ -8,7 +8,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.9.1"
+version = "0.9.2"
 # Internal app crates — never published to crates.io. Also what lets
 # cargo-deny's `private = { ignore = true }` skip license checks on them.
 publish = false
