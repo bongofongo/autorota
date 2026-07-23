@@ -84,7 +84,7 @@ import padShot from "../assets/screenshots/ipad/prev-rota.png";
     /* the baked caption band sits in the top 21% — clip it off */
     clip-path: inset(21% 0 0 0 round 24px);
     transform: rotate(1.4deg) translateY(-8%);
-    filter: drop-shadow(0 30px 45px rgb(28 39 51 / 18%));
+    filter: drop-shadow(0 30px 45px rgb(var(--shadow-rgb) / 18%));
   }
 
   .phone {
@@ -94,7 +94,7 @@ import padShot from "../assets/screenshots/ipad/prev-rota.png";
     left: -4%;
     clip-path: inset(15.5% 0 0 0 round 20px);
     transform: rotate(-2deg);
-    filter: drop-shadow(0 24px 38px rgb(28 39 51 / 26%));
+    filter: drop-shadow(0 24px 38px rgb(var(--shadow-rgb) / 26%));
   }
 
   @media (max-width: 900px) {

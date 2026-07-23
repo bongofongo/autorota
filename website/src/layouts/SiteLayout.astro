@@ -27,8 +27,23 @@ const canonical = new URL(Astro.url.pathname, Astro.site);
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
+    <meta name="theme-color" content="#ffffff" />
     <script is:inline>
       document.documentElement.classList.add("js");
+      (() => {
+        let t = null;
+        try {
+          t = sessionStorage.getItem("theme");
+        } catch {}
+        if (t !== "light" && t !== "dark") {
+          const h = new Date().getHours();
+          t = h >= 19 || h < 7 ? "dark" : "light";
+        }
+        document.documentElement.dataset.theme = t;
+        document
+          .querySelector('meta[name="theme-color"]')
+          .setAttribute("content", t === "dark" ? "#0d1520" : "#ffffff");
+      })();
     </script>
   </head>
   <body>

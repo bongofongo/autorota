@@ -13,12 +13,33 @@
   --bg: #ffffff;
   --bg-alt: #f5f6f8;
   --ink-panel: #0f1a2b;
+  --header-bg: rgb(255 255 255 / 82%);
+  --ink-soft: #33404d;
+  --shadow-rgb: 28 39 51;
   --radius-card: 20px;
   --radius-tile: 28px;
   --content-max: 1100px;
   --pad-x: clamp(20px, 5vw, 40px);
   --section-y: clamp(72px, 10vw, 128px);
   color-scheme: light;
+}
+
+/* Dark theme — set pre-paint by the inline script in SiteLayout, toggled in Header.
+   Navy direction keyed to --ink-panel so the privacy panel still belongs. */
+:root[data-theme="dark"] {
+  --blue: #6d97ff;
+  --blue-deep: #4d7bf0;
+  --blue-tint: #16233a;
+  --ink: #e8edf4;
+  --muted: #9daabb;
+  --faint: #6b7a8e;
+  --hairline: #253141;
+  --bg: #0d1520;
+  --bg-alt: #131e2c;
+  --header-bg: rgb(13 21 32 / 80%);
+  --ink-soft: #c3cdd9;
+  --shadow-rgb: 0 0 0;
+  color-scheme: dark;
 }
 
 * {
