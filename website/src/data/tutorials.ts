@@ -77,7 +77,7 @@ function buildFlow(slug: string, title: string): TutorialFlow {
 }
 
 export const tutorialFlows: TutorialFlow[] = [
-  buildFlow("create-shift", "Create a shift"),
+  buildFlow("create-shift", "Set a recurring shift"),
   buildFlow("employee-holiday", "Add an employee holiday"),
   buildFlow("one-off-shift", "Add a one-off shift and assign an employee"),
 ];
