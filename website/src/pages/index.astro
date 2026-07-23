@@ -10,11 +10,11 @@ import AudienceStrip from "../components/AudienceStrip.astro";
 import DownloadCTA from "../components/DownloadCTA.astro";
 import { SUBLINE, TAGLINE } from "../consts";
 
-import shotShifts from "../assets/screenshots/iphone/rota-shifts.png";
-import shotAvailability from "../assets/screenshots/iphone/rota-availability.png";
-import shotEdits from "../assets/screenshots/iphone/rota-edits.png";
-import shotExport from "../assets/screenshots/ipad/prev-export.png";
-import shotAnalytics from "../assets/screenshots/ipad/prev-analytics.png";
+import shotShifts from "../assets/framed/feat-shifts.png";
+import shotAvailability from "../assets/framed/feat-availability.png";
+import shotEdits from "../assets/framed/feat-editlog.png";
+import shotExport from "../assets/framed/feat-export.png";
+import shotAnalytics from "../assets/framed/feat-analytics.png";
 ---
 
 <SiteLayout title={`autorota — ${TAGLINE}`} description={SUBLINE}>
@@ -38,8 +38,8 @@ import shotAnalytics from "../assets/screenshots/ipad/prev-analytics.png";
     </Fragment>
     <Fragment slot="media">
       <div class="pair">
-        <DeviceShot src={shotShifts} alt="Shift setup screen" crop="iphone" sizes="(max-width: 760px) 45vw, 260px" />
-        <DeviceShot src={shotAvailability} alt="Availability grid screen" crop="iphone" sizes="(max-width: 760px) 45vw, 260px" />
+        <DeviceShot src={shotShifts} alt="Shift setup screen" sizes="(max-width: 760px) 45vw, 260px" />
+        <DeviceShot src={shotAvailability} alt="Availability grid screen" sizes="(max-width: 760px) 45vw, 260px" />
       </div>
     </Fragment>
   </FeatureSection>
@@ -60,7 +60,7 @@ import shotAnalytics from "../assets/screenshots/ipad/prev-analytics.png";
     </Fragment>
     <Fragment slot="media">
       <div class="solo">
-        <DeviceShot src={shotEdits} alt="Edit Log timeline screen" crop="iphone" sizes="(max-width: 760px) 80vw, 330px" />
+        <DeviceShot src={shotEdits} alt="Edit Log timeline screen" sizes="(max-width: 760px) 80vw, 330px" />
       </div>
     </Fragment>
   </FeatureSection>
@@ -79,7 +79,7 @@ import shotAnalytics from "../assets/screenshots/ipad/prev-analytics.png";
       Build the export your team actually reads — then send it anywhere.
     </Fragment>
     <Fragment slot="media">
-      <DeviceShot src={shotExport} alt="Export settings on iPad" crop="ipad" sizes="(max-width: 900px) 92vw, 560px" />
+      <DeviceShot src={shotExport} alt="Export settings on iPad" sizes="(max-width: 900px) 92vw, 560px" />
     </Fragment>
   </FeatureSection>
 
@@ -98,7 +98,7 @@ import shotAnalytics from "../assets/screenshots/ipad/prev-analytics.png";
       the week.
     </Fragment>
     <Fragment slot="media">
-      <DeviceShot src={shotAnalytics} alt="Analytics dashboard on iPad" crop="ipad" sizes="(max-width: 900px) 92vw, 560px" />
+      <DeviceShot src={shotAnalytics} alt="Analytics dashboard on iPad" sizes="(max-width: 900px) 92vw, 560px" />
     </Fragment>
   </FeatureSection>
 

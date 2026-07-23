@@ -2,8 +2,8 @@
 import { Image } from "astro:assets";
 import AppStoreBadge from "./AppStoreBadge.astro";
 import { SUBLINE, href } from "../consts";
-import phoneShot from "../assets/screenshots/iphone/rota-rota.png";
-import padShot from "../assets/screenshots/ipad/prev-rota.png";
+import phoneShot from "../assets/framed/hero-phone.png";
+import padShot from "../assets/framed/hero-pad.png";
 ---
 
 <section class="hero section-alt">
@@ -74,27 +74,22 @@ import padShot from "../assets/screenshots/ipad/prev-rota.png";
     color: var(--faint);
   }
 
-  /* Overlapped iPad-behind / iPhone-front composition, App-Store-art style. */
+  /* Overlapped iPad-behind / iPhone-front composition. Tilt and device
+     bodies are baked into the transparent framed PNGs — no CSS effects. */
   .art {
     position: relative;
     min-height: 340px;
   }
 
   .pad {
-    /* the baked caption band sits in the top 21% — clip it off */
-    clip-path: inset(21% 0 0 0 round 24px);
-    transform: rotate(1.4deg) translateY(-8%);
-    filter: drop-shadow(0 30px 45px rgb(var(--shadow-rgb) / 18%));
+    margin-left: 12%;
   }
 
   .phone {
     position: absolute;
-    width: 42%;
-    bottom: -6%;
-    left: -4%;
-    clip-path: inset(15.5% 0 0 0 round 20px);
-    transform: rotate(-2deg);
-    filter: drop-shadow(0 24px 38px rgb(var(--shadow-rgb) / 26%));
+    width: 34%;
+    bottom: -8%;
+    left: -2%;
   }
 
   @media (max-width: 900px) {
@@ -108,7 +103,7 @@ import padShot from "../assets/screenshots/ipad/prev-rota.png";
     }
 
     .phone {
-      width: 40%;
+      width: 32%;
       left: 0;
     }
   }
