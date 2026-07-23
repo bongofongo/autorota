@@ -16,6 +16,7 @@ use autorota_core::models::availability::AvailabilityState;
 use autorota_core::models::overrides::{
     DayAvailability, EmployeeAvailabilityOverride, OverrideSource, ShiftTemplateOverride,
 };
+use autorota_core::models::save::SaveSource;
 use autorota_core::models::shift::ShiftTemplate;
 use autorota_core::scheduler::schedule_pure;
 use chrono::{NaiveDate, NaiveTime, Weekday};
@@ -701,7 +702,9 @@ async fn create_save_and_retrieve() {
     let pool = test_pool().await;
     let (rota_id, _ids) = seed_rota_with_past_shifts(&pool).await;
 
-    let save_id = queries::create_save(&pool, rota_id).await.unwrap();
+    let save_id = queries::create_save(&pool, rota_id, SaveSource::Manual)
+        .await
+        .unwrap();
     assert!(save_id > 0);
 
     let got = queries::get_save(&pool, save_id).await.unwrap().unwrap();
@@ -715,7 +718,7 @@ async fn create_save_rejects_empty_rota() {
     let pool = test_pool().await;
     let rota_id = queries::insert_rota(&pool, week_start()).await.unwrap();
 
-    let result = queries::create_save(&pool, rota_id).await;
+    let result = queries::create_save(&pool, rota_id, SaveSource::Manual).await;
     assert!(result.is_err(), "rota with no shifts should be rejected");
 }
 
@@ -724,10 +727,14 @@ async fn list_saves_orders_newest_first() {
     let pool = test_pool().await;
     let (rota_id, _ids) = seed_rota_with_past_shifts(&pool).await;
 
-    let s1 = queries::create_save(&pool, rota_id).await.unwrap();
+    let s1 = queries::create_save(&pool, rota_id, SaveSource::Manual)
+        .await
+        .unwrap();
     // Ensure distinct timestamps.
     tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
-    let s2 = queries::create_save(&pool, rota_id).await.unwrap();
+    let s2 = queries::create_save(&pool, rota_id, SaveSource::Manual)
+        .await
+        .unwrap();
 
     let saves = queries::list_saves(&pool, Some(rota_id)).await.unwrap();
     assert_eq!(saves.len(), 2);
@@ -741,7 +748,9 @@ async fn rota_has_saves_reflects_state() {
     let (rota_id, _ids) = seed_rota_with_past_shifts(&pool).await;
     assert!(!queries::rota_has_saves(&pool, rota_id).await.unwrap());
 
-    queries::create_save(&pool, rota_id).await.unwrap();
+    queries::create_save(&pool, rota_id, SaveSource::Manual)
+        .await
+        .unwrap();
     assert!(queries::rota_has_saves(&pool, rota_id).await.unwrap());
 }
 
@@ -752,7 +761,9 @@ async fn save_tags_add_remove_and_validation() {
 
     let pool = test_pool().await;
     let (rota_id, _ids) = seed_rota_with_past_shifts(&pool).await;
-    let save_id = queries::create_save(&pool, rota_id).await.unwrap();
+    let save_id = queries::create_save(&pool, rota_id, SaveSource::Manual)
+        .await
+        .unwrap();
 
     // Initially no tags.
     let got = queries::get_save(&pool, save_id).await.unwrap().unwrap();
@@ -820,7 +831,9 @@ async fn diff_rota_detects_no_changes_after_save() {
     let pool = test_pool().await;
     let (rota_id, _ids) = seed_rota_with_past_shifts(&pool).await;
 
-    queries::create_save(&pool, rota_id).await.unwrap();
+    queries::create_save(&pool, rota_id, SaveSource::Manual)
+        .await
+        .unwrap();
     let diffs = queries::diff_rota_vs_latest_save(&pool, rota_id)
         .await
         .unwrap();
@@ -913,7 +926,9 @@ async fn list_saves_skips_orphaned_saves_with_deleted_rota() {
     let pool = test_pool().await;
     let (rota_id, _ids) = seed_rota_with_past_shifts(&pool).await;
 
-    let save_id = queries::create_save(&pool, rota_id).await.unwrap();
+    let save_id = queries::create_save(&pool, rota_id, SaveSource::Manual)
+        .await
+        .unwrap();
     assert!(save_id > 0);
 
     // Verify save exists
@@ -936,7 +951,9 @@ async fn get_save_returns_none_for_orphaned_save() {
     let pool = test_pool().await;
     let (rota_id, _ids) = seed_rota_with_past_shifts(&pool).await;
 
-    let save_id = queries::create_save(&pool, rota_id).await.unwrap();
+    let save_id = queries::create_save(&pool, rota_id, SaveSource::Manual)
+        .await
+        .unwrap();
 
     // Verify save exists
     let save = queries::get_save(&pool, save_id).await.unwrap();
@@ -959,8 +976,12 @@ async fn delete_rota_removes_associated_saves() {
     let (rota_id, _ids) = seed_rota_with_past_shifts(&pool).await;
 
     // Create two saves for this rota
-    queries::create_save(&pool, rota_id).await.unwrap();
-    queries::create_save(&pool, rota_id).await.unwrap();
+    queries::create_save(&pool, rota_id, SaveSource::Manual)
+        .await
+        .unwrap();
+    queries::create_save(&pool, rota_id, SaveSource::Manual)
+        .await
+        .unwrap();
 
     let before = queries::list_saves(&pool, Some(rota_id)).await.unwrap();
     assert_eq!(before.len(), 2, "should have 2 saves before deletion");
@@ -1045,7 +1066,9 @@ async fn restore_from_save_recreates_shifts_and_assignments() {
     let pool = test_pool().await;
     let (rota_id, _shift_ids, _) = seed_rota_with_assignments(&pool).await;
 
-    let save_id = queries::create_save(&pool, rota_id).await.unwrap();
+    let save_id = queries::create_save(&pool, rota_id, SaveSource::Manual)
+        .await
+        .unwrap();
 
     // Get shift ids from the live state before mutation.
     let shifts_before = queries::list_shifts_for_rota(&pool, rota_id).await.unwrap();
@@ -1079,7 +1102,9 @@ async fn restore_from_save_skips_assignments_for_deleted_employees() {
     let pool = test_pool().await;
     let (rota_id, _shift_ids, _) = seed_rota_with_assignments(&pool).await;
 
-    let save_id = queries::create_save(&pool, rota_id).await.unwrap();
+    let save_id = queries::create_save(&pool, rota_id, SaveSource::Manual)
+        .await
+        .unwrap();
 
     // Delete Alice (the employee on shift_ids[0]).
     let emp_rows: Vec<(i64, String)> = sqlx::query_as("SELECT id, first_name FROM employees")

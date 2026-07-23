@@ -13,15 +13,15 @@ final class SavePerfTests: XCTestCase {
         // Storage metric: every save writes a snapshot — excessive logical
         // writes show up as battery drain and I/O stalls on device.
         measure(metrics: [XCTClockMetric(), XCTStorageMetric()]) {
-            _ = try! createSave(rotaId: PerfHarness.corpusRotaId)
+            _ = try! createSave(rotaId: PerfHarness.corpusRotaId, source: "manual")
         }
     }
 
     func testDiffSaveVsPrevious200Employees() throws {
         // Two snapshots so the diff has a previous to compare against; the
         // measured call is a pure read.
-        _ = try createSave(rotaId: PerfHarness.corpusRotaId)
-        let saveId = try createSave(rotaId: PerfHarness.corpusRotaId)
+        _ = try createSave(rotaId: PerfHarness.corpusRotaId, source: "manual")
+        let saveId = try createSave(rotaId: PerfHarness.corpusRotaId, source: "manual")
         measure(metrics: [XCTClockMetric()]) {
             _ = try! diffSaveVsPrevious(saveId: saveId)
         }

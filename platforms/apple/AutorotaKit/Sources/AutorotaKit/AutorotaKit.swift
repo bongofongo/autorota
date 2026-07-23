@@ -300,8 +300,8 @@ public func listAllShiftHistoryAsync(startDate: String?, endDate: String?) async
 
 // MARK: - Saves
 
-public func createSaveAsync(rotaId: Int64) async throws -> Int64 {
-    try await detached { try createSave(rotaId: rotaId) }
+public func createSaveAsync(rotaId: Int64, source: String) async throws -> Int64 {
+    try await detached { try createSave(rotaId: rotaId, source: source) }
 }
 
 public func listSavesAsync(rotaId: Int64?) async throws -> [FfiSave] {

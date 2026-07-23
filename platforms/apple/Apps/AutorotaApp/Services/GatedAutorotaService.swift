@@ -152,8 +152,8 @@ struct GatedAutorotaService: AutorotaServiceProtocol {
     }
 
     // MARK: - Saves
-    func createSave(rotaId: Int64) async throws -> Int64 {
-        try check(); return try await inner.createSave(rotaId: rotaId)
+    func createSave(rotaId: Int64, source: SaveSource) async throws -> Int64 {
+        try check(); return try await inner.createSave(rotaId: rotaId, source: source)
     }
     func diffRota(rotaId: Int64) async throws -> [FfiShiftDiff] {
         try await inner.diffRota(rotaId: rotaId)

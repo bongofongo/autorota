@@ -10,7 +10,7 @@ use autorota_core::models::availability::AvailabilityState;
 use autorota_core::models::overrides::{
     DayAvailability, EmployeeAvailabilityOverride, OverrideSource,
 };
-use autorota_core::models::save::{ChangeKind, SaveSnapshot};
+use autorota_core::models::save::{ChangeKind, SaveSnapshot, SaveSource};
 use autorota_core::models::shift::{RoleRequirement, Shift};
 use chrono::{NaiveDate, NaiveTime};
 use sqlx::SqlitePool;
@@ -146,7 +146,9 @@ async fn create_save_persists_live_snapshot() {
     let s = seed_week(&pool).await;
 
     let live = queries::snapshot_from_live(&pool, s.rota_id).await.unwrap();
-    let save_id = queries::create_save(&pool, s.rota_id).await.unwrap();
+    let save_id = queries::create_save(&pool, s.rota_id, SaveSource::Manual)
+        .await
+        .unwrap();
     let save = queries::get_save(&pool, save_id).await.unwrap().unwrap();
 
     let stored: SaveSnapshot = serde_json::from_str(&save.snapshot_json).unwrap();
@@ -156,13 +158,46 @@ async fn create_save_persists_live_snapshot() {
     assert_eq!(save.rota_id, s.rota_id);
 }
 
+#[tokio::test]
+async fn save_source_round_trips() {
+    let pool = test_pool().await;
+    let s = seed_week(&pool).await;
+
+    let gen_id = queries::create_save(&pool, s.rota_id, SaveSource::Generation)
+        .await
+        .unwrap();
+    let manual_id = queries::create_save(&pool, s.rota_id, SaveSource::Manual)
+        .await
+        .unwrap();
+
+    let gen_save = queries::get_save(&pool, gen_id).await.unwrap().unwrap();
+    assert_eq!(gen_save.source, SaveSource::Generation);
+    let manual = queries::get_save(&pool, manual_id).await.unwrap().unwrap();
+    assert_eq!(manual.source, SaveSource::Manual);
+
+    let listed = queries::list_saves(&pool, Some(s.rota_id)).await.unwrap();
+    assert_eq!(listed.len(), 2);
+    assert!(
+        listed
+            .iter()
+            .any(|m| m.id == gen_id && m.source == SaveSource::Generation)
+    );
+    assert!(
+        listed
+            .iter()
+            .any(|m| m.id == manual_id && m.source == SaveSource::Manual)
+    );
+}
+
 // ── diffs ────────────────────────────────────────────────────
 
 #[tokio::test]
 async fn first_save_diffs_against_empty_snapshot() {
     let pool = test_pool().await;
     let s = seed_week(&pool).await;
-    let save_id = queries::create_save(&pool, s.rota_id).await.unwrap();
+    let save_id = queries::create_save(&pool, s.rota_id, SaveSource::Manual)
+        .await
+        .unwrap();
 
     let changes = queries::diff_save_vs_previous(&pool, save_id)
         .await
@@ -178,7 +213,9 @@ async fn first_save_diffs_against_empty_snapshot() {
 async fn diff_save_vs_previous_shows_mutations_between_saves() {
     let pool = test_pool().await;
     let s = seed_week(&pool).await;
-    queries::create_save(&pool, s.rota_id).await.unwrap();
+    queries::create_save(&pool, s.rota_id, SaveSource::Manual)
+        .await
+        .unwrap();
 
     // Mutate: capacity change on shift 1, new assignment on shift 2.
     queries::update_shift_capacity(&pool, s.shift_ids[0], 2, 4)
@@ -199,7 +236,9 @@ async fn diff_save_vs_previous_shows_mutations_between_saves() {
     .await
     .unwrap();
 
-    let second = queries::create_save(&pool, s.rota_id).await.unwrap();
+    let second = queries::create_save(&pool, s.rota_id, SaveSource::Manual)
+        .await
+        .unwrap();
     let changes = queries::diff_save_vs_previous(&pool, second).await.unwrap();
 
     assert!(
@@ -226,12 +265,16 @@ async fn diff_save_vs_previous_shows_mutations_between_saves() {
 async fn diff_saves_between_two_ids_and_bad_ids() {
     let pool = test_pool().await;
     let s = seed_week(&pool).await;
-    let first = queries::create_save(&pool, s.rota_id).await.unwrap();
+    let first = queries::create_save(&pool, s.rota_id, SaveSource::Manual)
+        .await
+        .unwrap();
 
     queries::update_shift_capacity(&pool, s.shift_ids[0], 1, 3)
         .await
         .unwrap();
-    let second = queries::create_save(&pool, s.rota_id).await.unwrap();
+    let second = queries::create_save(&pool, s.rota_id, SaveSource::Manual)
+        .await
+        .unwrap();
 
     let changes = queries::diff_saves(&pool, first, second).await.unwrap();
     assert!(
@@ -276,7 +319,9 @@ async fn diff_live_vs_latest_save() {
     );
 
     // After a save, an untouched rota diffs clean; a live edit shows up.
-    queries::create_save(&pool, s.rota_id).await.unwrap();
+    queries::create_save(&pool, s.rota_id, SaveSource::Manual)
+        .await
+        .unwrap();
     assert!(
         queries::diff_rota_vs_latest_save_detailed(&pool, s.rota_id)
             .await
@@ -298,7 +343,9 @@ async fn diff_live_vs_latest_save() {
 async fn corrupt_snapshot_json_yields_error_not_panic() {
     let pool = test_pool().await;
     let s = seed_week(&pool).await;
-    let save_id = queries::create_save(&pool, s.rota_id).await.unwrap();
+    let save_id = queries::create_save(&pool, s.rota_id, SaveSource::Manual)
+        .await
+        .unwrap();
 
     sqlx::query("UPDATE saves SET snapshot_json = 'not json' WHERE id = ?")
         .bind(save_id)
@@ -324,7 +371,9 @@ async fn corrupt_snapshot_json_yields_error_not_panic() {
 async fn save_tags_roundtrip() {
     let pool = test_pool().await;
     let s = seed_week(&pool).await;
-    let save_id = queries::create_save(&pool, s.rota_id).await.unwrap();
+    let save_id = queries::create_save(&pool, s.rota_id, SaveSource::Manual)
+        .await
+        .unwrap();
 
     assert!(
         queries::list_save_tags(&pool, save_id)
@@ -361,7 +410,9 @@ async fn save_tags_roundtrip() {
 async fn restore_from_save_rolls_live_state_back() {
     let pool = test_pool().await;
     let s = seed_week(&pool).await;
-    let save_id = queries::create_save(&pool, s.rota_id).await.unwrap();
+    let save_id = queries::create_save(&pool, s.rota_id, SaveSource::Manual)
+        .await
+        .unwrap();
 
     // Drift the live state: capacity edit + an extra shift.
     queries::update_shift_capacity(&pool, s.shift_ids[0], 3, 6)
@@ -475,7 +526,9 @@ async fn restore_preserves_template_linkage_and_diffs_clean() {
         "materialised shift should be template-linked"
     );
 
-    let save_id = queries::create_save(&pool, rota_id).await.unwrap();
+    let save_id = queries::create_save(&pool, rota_id, SaveSource::Manual)
+        .await
+        .unwrap();
     queries::restore_from_save(&pool, save_id).await.unwrap();
 
     let after = queries::list_shifts_for_rota(&pool, rota_id).await.unwrap();

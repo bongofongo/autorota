@@ -1289,10 +1289,13 @@ public func FfiConverterTypeFfiBundleSections_lower(_ value: FfiBundleSections) 
  * - `"shift_time_changed"` — old_start_time, new_start_time, old_end_time, new_end_time
  * - `"shift_capacity_changed"` — old_min_employees, new_min_employees, old/new_max_employees
  * - `"shift_role_changed"` — old_required_role, new_required_role
- * - `"assignment_added"` — employee_id, employee_name
- * - `"assignment_removed"` — employee_id, employee_name
- * - `"assignment_status_changed"` — employee_id, employee_name, old_status, new_status
- * - `"employee_moved"` — employee_id, employee_name, from_shift_id, from_start_time, from_end_time
+ * - `"assignment_added"` — employee_id, employee_name; new_start_time/new_end_time carry the shift's times
+ * - `"assignment_removed"` — employee_id, employee_name; old_start_time/old_end_time carry the removed-from shift's times
+ * - `"assignment_status_changed"` — employee_id, employee_name, old_status, new_status; new_start_time/new_end_time carry the shift's times
+ * - `"employee_moved"` — employee_id, employee_name, from_shift_id, from_start_time, from_end_time; new_start_time/new_end_time carry the destination shift's times
+ * - `"employees_swapped"` — two mirrored moves collapsed: employee_id/employee_name = A (now on `shift_id`),
+ * other_employee_id/other_employee_name = B (now on `from_shift_id`); new_start_time/new_end_time = shift A's
+ * times, from_start_time/from_end_time = shift B's times
  */
 public struct FfiChangeDetail {
     public var kind: String
@@ -1318,13 +1321,15 @@ public struct FfiChangeDetail {
     public var fromShiftId: Int64?
     public var fromStartTime: String?
     public var fromEndTime: String?
+    public var otherEmployeeId: Int64?
+    public var otherEmployeeName: String?
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
     public init(kind: String, shiftId: Int64, 
         /**
          * `"YYYY-MM-DD"` — date of the shift this change is attached to.
-         */date: String, oldStartTime: String?, newStartTime: String?, oldEndTime: String?, newEndTime: String?, oldRequiredRole: String?, newRequiredRole: String?, oldMinEmployees: UInt32?, newMinEmployees: UInt32?, oldMaxEmployees: UInt32?, newMaxEmployees: UInt32?, employeeId: Int64?, employeeName: String?, oldStatus: String?, newStatus: String?, fromShiftId: Int64?, fromStartTime: String?, fromEndTime: String?) {
+         */date: String, oldStartTime: String?, newStartTime: String?, oldEndTime: String?, newEndTime: String?, oldRequiredRole: String?, newRequiredRole: String?, oldMinEmployees: UInt32?, newMinEmployees: UInt32?, oldMaxEmployees: UInt32?, newMaxEmployees: UInt32?, employeeId: Int64?, employeeName: String?, oldStatus: String?, newStatus: String?, fromShiftId: Int64?, fromStartTime: String?, fromEndTime: String?, otherEmployeeId: Int64?, otherEmployeeName: String?) {
         self.kind = kind
         self.shiftId = shiftId
         self.date = date
@@ -1345,6 +1350,8 @@ public struct FfiChangeDetail {
         self.fromShiftId = fromShiftId
         self.fromStartTime = fromStartTime
         self.fromEndTime = fromEndTime
+        self.otherEmployeeId = otherEmployeeId
+        self.otherEmployeeName = otherEmployeeName
     }
 }
 
@@ -1412,6 +1419,12 @@ extension FfiChangeDetail: Equatable, Hashable {
         if lhs.fromEndTime != rhs.fromEndTime {
             return false
         }
+        if lhs.otherEmployeeId != rhs.otherEmployeeId {
+            return false
+        }
+        if lhs.otherEmployeeName != rhs.otherEmployeeName {
+            return false
+        }
         return true
     }
 
@@ -1436,6 +1449,8 @@ extension FfiChangeDetail: Equatable, Hashable {
         hasher.combine(fromShiftId)
         hasher.combine(fromStartTime)
         hasher.combine(fromEndTime)
+        hasher.combine(otherEmployeeId)
+        hasher.combine(otherEmployeeName)
     }
 }
 
@@ -1466,7 +1481,9 @@ public struct FfiConverterTypeFfiChangeDetail: FfiConverterRustBuffer {
                 newStatus: FfiConverterOptionString.read(from: &buf), 
                 fromShiftId: FfiConverterOptionInt64.read(from: &buf), 
                 fromStartTime: FfiConverterOptionString.read(from: &buf), 
-                fromEndTime: FfiConverterOptionString.read(from: &buf)
+                fromEndTime: FfiConverterOptionString.read(from: &buf), 
+                otherEmployeeId: FfiConverterOptionInt64.read(from: &buf), 
+                otherEmployeeName: FfiConverterOptionString.read(from: &buf)
         )
     }
 
@@ -1491,6 +1508,8 @@ public struct FfiConverterTypeFfiChangeDetail: FfiConverterRustBuffer {
         FfiConverterOptionInt64.write(value.fromShiftId, into: &buf)
         FfiConverterOptionString.write(value.fromStartTime, into: &buf)
         FfiConverterOptionString.write(value.fromEndTime, into: &buf)
+        FfiConverterOptionInt64.write(value.otherEmployeeId, into: &buf)
+        FfiConverterOptionString.write(value.otherEmployeeName, into: &buf)
     }
 }
 
@@ -3183,6 +3202,10 @@ public struct FfiSave {
      * red "Restored" badge and promotes the entry to the top of its week.
      */
     public var restoredAt: String?
+    /**
+     * What triggered the save: "generation" | "regeneration" | "manual" | "restore".
+     */
+    public var source: String
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
@@ -3196,7 +3219,10 @@ public struct FfiSave {
         /**
          * RFC3339 timestamp set when the user restored to this save. Drives the
          * red "Restored" badge and promotes the entry to the top of its week.
-         */restoredAt: String?) {
+         */restoredAt: String?, 
+        /**
+         * What triggered the save: "generation" | "regeneration" | "manual" | "restore".
+         */source: String) {
         self.id = id
         self.rotaId = rotaId
         self.savedAt = savedAt
@@ -3204,6 +3230,7 @@ public struct FfiSave {
         self.tags = tags
         self.weekStart = weekStart
         self.restoredAt = restoredAt
+        self.source = source
     }
 }
 
@@ -3232,6 +3259,9 @@ extension FfiSave: Equatable, Hashable {
         if lhs.restoredAt != rhs.restoredAt {
             return false
         }
+        if lhs.source != rhs.source {
+            return false
+        }
         return true
     }
 
@@ -3243,6 +3273,7 @@ extension FfiSave: Equatable, Hashable {
         hasher.combine(tags)
         hasher.combine(weekStart)
         hasher.combine(restoredAt)
+        hasher.combine(source)
     }
 }
 
@@ -3260,7 +3291,8 @@ public struct FfiConverterTypeFfiSave: FfiConverterRustBuffer {
                 summary: FfiConverterString.read(from: &buf), 
                 tags: FfiConverterSequenceString.read(from: &buf), 
                 weekStart: FfiConverterString.read(from: &buf), 
-                restoredAt: FfiConverterOptionString.read(from: &buf)
+                restoredAt: FfiConverterOptionString.read(from: &buf), 
+                source: FfiConverterString.read(from: &buf)
         )
     }
 
@@ -3272,6 +3304,7 @@ public struct FfiConverterTypeFfiSave: FfiConverterRustBuffer {
         FfiConverterSequenceString.write(value.tags, into: &buf)
         FfiConverterString.write(value.weekStart, into: &buf)
         FfiConverterOptionString.write(value.restoredAt, into: &buf)
+        FfiConverterString.write(value.source, into: &buf)
     }
 }
 
@@ -3303,10 +3336,17 @@ public struct FfiSaveDetail {
     public var weekStart: String
     public var snapshotJson: String
     public var restoredAt: String?
+    /**
+     * What triggered the save: "generation" | "regeneration" | "manual" | "restore".
+     */
+    public var source: String
 
     // Default memberwise initializers are never public by default, so we
     // declare one manually.
-    public init(id: Int64, rotaId: Int64, savedAt: String, summary: String, tags: [String], weekStart: String, snapshotJson: String, restoredAt: String?) {
+    public init(id: Int64, rotaId: Int64, savedAt: String, summary: String, tags: [String], weekStart: String, snapshotJson: String, restoredAt: String?, 
+        /**
+         * What triggered the save: "generation" | "regeneration" | "manual" | "restore".
+         */source: String) {
         self.id = id
         self.rotaId = rotaId
         self.savedAt = savedAt
@@ -3315,6 +3355,7 @@ public struct FfiSaveDetail {
         self.weekStart = weekStart
         self.snapshotJson = snapshotJson
         self.restoredAt = restoredAt
+        self.source = source
     }
 }
 
@@ -3346,6 +3387,9 @@ extension FfiSaveDetail: Equatable, Hashable {
         if lhs.restoredAt != rhs.restoredAt {
             return false
         }
+        if lhs.source != rhs.source {
+            return false
+        }
         return true
     }
 
@@ -3358,6 +3402,7 @@ extension FfiSaveDetail: Equatable, Hashable {
         hasher.combine(weekStart)
         hasher.combine(snapshotJson)
         hasher.combine(restoredAt)
+        hasher.combine(source)
     }
 }
 
@@ -3376,7 +3421,8 @@ public struct FfiConverterTypeFfiSaveDetail: FfiConverterRustBuffer {
                 tags: FfiConverterSequenceString.read(from: &buf), 
                 weekStart: FfiConverterString.read(from: &buf), 
                 snapshotJson: FfiConverterString.read(from: &buf), 
-                restoredAt: FfiConverterOptionString.read(from: &buf)
+                restoredAt: FfiConverterOptionString.read(from: &buf), 
+                source: FfiConverterString.read(from: &buf)
         )
     }
 
@@ -3389,6 +3435,7 @@ public struct FfiConverterTypeFfiSaveDetail: FfiConverterRustBuffer {
         FfiConverterString.write(value.weekStart, into: &buf)
         FfiConverterString.write(value.snapshotJson, into: &buf)
         FfiConverterOptionString.write(value.restoredAt, into: &buf)
+        FfiConverterString.write(value.source, into: &buf)
     }
 }
 
@@ -5824,10 +5871,11 @@ public func createRole(name: String)throws  -> Int64 {
     )
 })
 }
-public func createSave(rotaId: Int64)throws  -> Int64 {
+public func createSave(rotaId: Int64, source: String)throws  -> Int64 {
     return try  FfiConverterInt64.lift(try rustCallWithError(FfiConverterTypeFfiError.lift) {
     uniffi_autorota_ffi_fn_func_create_save(
-        FfiConverterInt64.lower(rotaId),$0
+        FfiConverterInt64.lower(rotaId),
+        FfiConverterString.lower(source),$0
     )
 })
 }
@@ -6443,7 +6491,7 @@ private var initializationResult: InitializationResult = {
     if (uniffi_autorota_ffi_checksum_func_create_role() != 26640) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_autorota_ffi_checksum_func_create_save() != 46185) {
+    if (uniffi_autorota_ffi_checksum_func_create_save() != 15462) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_autorota_ffi_checksum_func_create_shift_template() != 50193) {

@@ -1,5 +1,38 @@
 use serde::{Deserialize, Serialize};
 
+/// What triggered a save. Distinguishes scheduler-generated saves from
+/// manual edit-session saves so the Edit Log can badge and abbreviate them.
+/// `Restore` is reserved for pre-restore checkpoints (no writer yet).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SaveSource {
+    Generation,
+    Regeneration,
+    #[default]
+    Manual,
+    Restore,
+}
+
+impl SaveSource {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Generation => "generation",
+            Self::Regeneration => "regeneration",
+            Self::Manual => "manual",
+            Self::Restore => "restore",
+        }
+    }
+
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "generation" => Self::Generation,
+            "regeneration" => Self::Regeneration,
+            "restore" => Self::Restore,
+            _ => Self::Manual,
+        }
+    }
+}
+
 /// A saved snapshot of shift/assignment data at a point in time.
 #[derive(Debug, Clone)]
 pub struct Save {
@@ -14,6 +47,7 @@ pub struct Save {
     /// Non-NULL means the entry gets a red "Restored" badge and is sorted
     /// above its week siblings by `COALESCE(restored_at, saved_at)`.
     pub restored_at: Option<String>,
+    pub source: SaveSource,
 }
 
 /// Lightweight save metadata for list views. Deliberately omits `snapshot_json`
@@ -31,6 +65,7 @@ pub struct SaveMeta {
     /// User-assigned tags for this save, ordered by insertion.
     pub tags: Vec<String>,
     pub restored_at: Option<String>,
+    pub source: SaveSource,
 }
 
 // ── Tag validation ──────────────────────────────────────────────────────────
@@ -252,22 +287,31 @@ pub enum ChangeKind {
     },
     /// A shift's required role changed.
     ShiftRoleChanged { old_role: String, new_role: String },
-    /// An employee was assigned to a shift.
+    /// An employee was assigned to a shift. Carries the shift's times so the
+    /// UI can say *which* shift without a lookup.
     AssignmentAdded {
         employee_id: i64,
         employee_name: String,
+        start_time: String,
+        end_time: String,
     },
-    /// An employee was unassigned from a shift.
+    /// An employee was unassigned from a shift. Times are the removed-from
+    /// (old) shift's.
     AssignmentRemoved {
         employee_id: i64,
         employee_name: String,
+        start_time: String,
+        end_time: String,
     },
-    /// An assignment's status changed (e.g. Proposed → Confirmed).
+    /// An assignment's status changed (e.g. Proposed → Confirmed). Times are
+    /// the current (new) shift's.
     AssignmentStatusChanged {
         employee_id: i64,
         employee_name: String,
         old_status: String,
         new_status: String,
+        start_time: String,
+        end_time: String,
     },
     /// An employee was moved between shifts on the same date — collapsed from
     /// one AssignmentRemoved + one AssignmentAdded. `shift_id` on the parent
@@ -278,6 +322,23 @@ pub enum ChangeKind {
         from_shift_id: i64,
         from_start_time: String,
         from_end_time: String,
+        to_start_time: String,
+        to_end_time: String,
+    },
+    /// Two employees exchanged shifts on the same date — collapsed from two
+    /// mirrored EmployeeMoved entries. `shift_id` on the parent `ChangeDetail`
+    /// is employee A's destination shift; `from_shift_id` is employee B's
+    /// destination (A's source).
+    EmployeesSwapped {
+        employee_a_id: i64,
+        employee_a_name: String,
+        employee_b_id: i64,
+        employee_b_name: String,
+        from_shift_id: i64,
+        shift_a_start: String,
+        shift_a_end: String,
+        shift_b_start: String,
+        shift_b_end: String,
     },
 }
 
@@ -370,6 +431,8 @@ pub fn diff_snapshots(old: &SaveSnapshot, new: &SaveSnapshot) -> Vec<ChangeDetai
                     kind: ChangeKind::AssignmentAdded {
                         employee_id: a.employee_id,
                         employee_name: a.employee_name.clone(),
+                        start_time: shift.start_time.clone(),
+                        end_time: shift.end_time.clone(),
                     },
                 });
             }
@@ -395,6 +458,8 @@ pub fn diff_snapshots(old: &SaveSnapshot, new: &SaveSnapshot) -> Vec<ChangeDetai
                     kind: ChangeKind::AssignmentRemoved {
                         employee_id: a.employee_id,
                         employee_name: a.employee_name.clone(),
+                        start_time: shift.start_time.clone(),
+                        end_time: shift.end_time.clone(),
                     },
                 });
             }
@@ -469,6 +534,8 @@ pub fn diff_snapshots(old: &SaveSnapshot, new: &SaveSnapshot) -> Vec<ChangeDetai
                     kind: ChangeKind::AssignmentAdded {
                         employee_id: *emp_id,
                         employee_name: new_a.employee_name.clone(),
+                        start_time: new_shift.start_time.clone(),
+                        end_time: new_shift.end_time.clone(),
                     },
                 }),
                 Some(old_a) if old_a.status != new_a.status => {
@@ -480,6 +547,8 @@ pub fn diff_snapshots(old: &SaveSnapshot, new: &SaveSnapshot) -> Vec<ChangeDetai
                             employee_name: new_a.employee_name.clone(),
                             old_status: old_a.status.clone(),
                             new_status: new_a.status.clone(),
+                            start_time: new_shift.start_time.clone(),
+                            end_time: new_shift.end_time.clone(),
                         },
                     });
                 }
@@ -494,13 +563,15 @@ pub fn diff_snapshots(old: &SaveSnapshot, new: &SaveSnapshot) -> Vec<ChangeDetai
                     kind: ChangeKind::AssignmentRemoved {
                         employee_id: *emp_id,
                         employee_name: old_a.employee_name.clone(),
+                        start_time: old_shift.start_time.clone(),
+                        end_time: old_shift.end_time.clone(),
                     },
                 });
             }
         }
     }
 
-    collapse_moves(&old_by_id, changes)
+    collapse_swaps(collapse_moves(&old_by_id, changes))
 }
 
 /// Collapse matching (AssignmentRemoved, AssignmentAdded) pairs with the same
@@ -540,11 +611,18 @@ fn collapse_moves(
         if add.shift_id == rm.shift_id {
             continue; // same shift — not a move
         }
-        let (emp_id, emp_name) = match &add.kind {
+        let (emp_id, emp_name, to_start, to_end) = match &add.kind {
             ChangeKind::AssignmentAdded {
                 employee_id,
                 employee_name,
-            } => (*employee_id, employee_name.clone()),
+                start_time,
+                end_time,
+            } => (
+                *employee_id,
+                employee_name.clone(),
+                start_time.clone(),
+                end_time.clone(),
+            ),
             _ => continue,
         };
         let (from_start, from_end) = old_by_id
@@ -564,6 +642,8 @@ fn collapse_moves(
                     from_shift_id: rm.shift_id,
                     from_start_time: from_start,
                     from_end_time: from_end,
+                    to_start_time: to_start,
+                    to_end_time: to_end,
                 },
             },
         );
@@ -576,6 +656,94 @@ fn collapse_moves(
         }
         if let Some(mv) = moves.remove(&i) {
             result.push(mv);
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
+/// Collapse two mirrored EmployeeMoved entries (A: s1→s2, B: s2→s1, same
+/// date) into a single EmployeesSwapped entry. Runs after `collapse_moves`.
+/// Each move is consumed at most once; non-mirrored moves pass through.
+fn collapse_swaps(changes: Vec<ChangeDetail>) -> Vec<ChangeDetail> {
+    use std::collections::{HashMap, HashSet};
+
+    // (date, destination shift, source shift) → change index.
+    let mut move_at: HashMap<(String, i64, i64), usize> = HashMap::new();
+    for (i, c) in changes.iter().enumerate() {
+        if let ChangeKind::EmployeeMoved { from_shift_id, .. } = &c.kind {
+            move_at.insert((c.date.clone(), c.shift_id, *from_shift_id), i);
+        }
+    }
+
+    // Indices of moves consumed as the "B side" of a swap.
+    let mut suppressed: HashSet<usize> = HashSet::new();
+    // A-side move index → replacement swap entry.
+    let mut swaps: HashMap<usize, ChangeDetail> = HashMap::new();
+
+    for (i, c) in changes.iter().enumerate() {
+        if suppressed.contains(&i) || swaps.contains_key(&i) {
+            continue;
+        }
+        let ChangeKind::EmployeeMoved {
+            employee_id,
+            employee_name,
+            from_shift_id,
+            from_start_time,
+            from_end_time,
+            to_start_time,
+            to_end_time,
+        } = &c.kind
+        else {
+            continue;
+        };
+        // Mirror: same date, destination == our source, source == our destination.
+        let Some(&j) = move_at.get(&(c.date.clone(), *from_shift_id, c.shift_id)) else {
+            continue;
+        };
+        if j == i || suppressed.contains(&j) || swaps.contains_key(&j) {
+            continue;
+        }
+        let ChangeKind::EmployeeMoved {
+            employee_id: b_id,
+            employee_name: b_name,
+            ..
+        } = &changes[j].kind
+        else {
+            continue;
+        };
+
+        suppressed.insert(j);
+        swaps.insert(
+            i,
+            ChangeDetail {
+                shift_id: c.shift_id,
+                date: c.date.clone(),
+                kind: ChangeKind::EmployeesSwapped {
+                    employee_a_id: *employee_id,
+                    employee_a_name: employee_name.clone(),
+                    employee_b_id: *b_id,
+                    employee_b_name: b_name.clone(),
+                    from_shift_id: *from_shift_id,
+                    // A's destination shift (parent shift_id).
+                    shift_a_start: to_start_time.clone(),
+                    shift_a_end: to_end_time.clone(),
+                    // B's destination shift == A's source.
+                    shift_b_start: from_start_time.clone(),
+                    shift_b_end: from_end_time.clone(),
+                },
+            },
+        );
+    }
+
+    let mut result: Vec<ChangeDetail> = Vec::with_capacity(changes.len());
+    for (i, c) in changes.into_iter().enumerate() {
+        if suppressed.contains(&i) {
+            continue;
+        }
+        if let Some(sw) = swaps.remove(&i) {
+            result.push(sw);
         } else {
             result.push(c);
         }
@@ -893,6 +1061,166 @@ mod diff_tests {
             other => panic!("expected EmployeeMoved, got {:?}", other),
         }
         assert_eq!(d[0].shift_id, 2); // destination
+    }
+
+    #[test]
+    fn collapses_mirrored_moves_into_swap() {
+        // Alice s1→s2 and Bob s2→s1 on the same date = one swap.
+        let old = snap(vec![
+            shift(
+                1,
+                "2026-04-20",
+                "09:00",
+                "13:00",
+                "barista",
+                1,
+                1,
+                vec![assign(10, "Alice", "Confirmed")],
+            ),
+            shift(
+                2,
+                "2026-04-20",
+                "14:00",
+                "18:00",
+                "cashier",
+                1,
+                1,
+                vec![assign(11, "Bob", "Confirmed")],
+            ),
+        ]);
+        let new = snap(vec![
+            shift(
+                1,
+                "2026-04-20",
+                "09:00",
+                "13:00",
+                "barista",
+                1,
+                1,
+                vec![assign(11, "Bob", "Confirmed")],
+            ),
+            shift(
+                2,
+                "2026-04-20",
+                "14:00",
+                "18:00",
+                "cashier",
+                1,
+                1,
+                vec![assign(10, "Alice", "Confirmed")],
+            ),
+        ]);
+        let d = diff_snapshots(&old, &new);
+        assert_eq!(d.len(), 1, "unexpected changes: {:?}", d);
+        match &d[0].kind {
+            ChangeKind::EmployeesSwapped {
+                employee_a_id,
+                employee_b_id,
+                from_shift_id,
+                shift_a_start,
+                shift_a_end,
+                shift_b_start,
+                shift_b_end,
+                ..
+            } => {
+                // One employee lands on each shift; both shifts' times present.
+                assert_ne!(employee_a_id, employee_b_id);
+                assert!([10, 11].contains(employee_a_id));
+                assert!([10, 11].contains(employee_b_id));
+                assert_ne!(d[0].shift_id, *from_shift_id);
+                let times = [
+                    (shift_a_start.as_str(), shift_a_end.as_str()),
+                    (shift_b_start.as_str(), shift_b_end.as_str()),
+                ];
+                assert!(times.contains(&("09:00", "13:00")));
+                assert!(times.contains(&("14:00", "18:00")));
+            }
+            other => panic!("expected EmployeesSwapped, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn one_directional_move_stays_move_with_destination_times() {
+        // Alice s1→s2, nothing moves back — stays a single EmployeeMoved and
+        // now carries the destination shift's times too.
+        let old = snap(vec![
+            shift(
+                1,
+                "2026-04-20",
+                "09:00",
+                "13:00",
+                "barista",
+                1,
+                1,
+                vec![assign(10, "Alice", "Confirmed")],
+            ),
+            shift(2, "2026-04-20", "14:00", "18:00", "cashier", 1, 1, vec![]),
+        ]);
+        let new = snap(vec![
+            shift(1, "2026-04-20", "09:00", "13:00", "barista", 1, 1, vec![]),
+            shift(
+                2,
+                "2026-04-20",
+                "14:00",
+                "18:00",
+                "cashier",
+                1,
+                1,
+                vec![assign(10, "Alice", "Confirmed")],
+            ),
+        ]);
+        let d = diff_snapshots(&old, &new);
+        assert_eq!(d.len(), 1);
+        match &d[0].kind {
+            ChangeKind::EmployeeMoved {
+                from_start_time,
+                from_end_time,
+                to_start_time,
+                to_end_time,
+                ..
+            } => {
+                assert_eq!(from_start_time, "09:00");
+                assert_eq!(from_end_time, "13:00");
+                assert_eq!(to_start_time, "14:00");
+                assert_eq!(to_end_time, "18:00");
+            }
+            other => panic!("expected EmployeeMoved, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn assignment_changes_carry_shift_times() {
+        let old = snap(vec![shift(
+            1,
+            "2026-04-20",
+            "09:00",
+            "17:00",
+            "barista",
+            1,
+            2,
+            vec![assign(11, "Bob", "Confirmed")],
+        )]);
+        let new = snap(vec![shift(
+            1,
+            "2026-04-20",
+            "09:00",
+            "17:00",
+            "barista",
+            1,
+            2,
+            vec![assign(12, "Carol", "Proposed")],
+        )]);
+        let d = diff_snapshots(&old, &new);
+        assert!(d.iter().any(|c| matches!(
+            &c.kind,
+            ChangeKind::AssignmentRemoved { employee_id: 11, start_time, end_time, .. }
+                if start_time == "09:00" && end_time == "17:00"
+        )));
+        assert!(d.iter().any(|c| matches!(
+            &c.kind,
+            ChangeKind::AssignmentAdded { employee_id: 12, start_time, end_time, .. }
+                if start_time == "09:00" && end_time == "17:00"
+        )));
     }
 
     #[test]

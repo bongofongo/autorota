@@ -309,7 +309,7 @@ int64_t uniffi_autorota_ffi_fn_func_create_role(RustBuffer name, RustCallStatus 
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_CREATE_SAVE
 #define UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_CREATE_SAVE
-int64_t uniffi_autorota_ffi_fn_func_create_save(int64_t rota_id, RustCallStatus *_Nonnull out_status
+int64_t uniffi_autorota_ffi_fn_func_create_save(int64_t rota_id, RustBuffer source, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_AUTOROTA_FFI_FN_FUNC_CREATE_SHIFT_TEMPLATE

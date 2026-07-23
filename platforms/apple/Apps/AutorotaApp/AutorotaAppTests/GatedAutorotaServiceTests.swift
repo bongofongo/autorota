@@ -16,7 +16,7 @@ struct GatedAutorotaServiceTests {
         await #expect(throws: LicenseError.readOnly) { _ = try await gated.createRole(name: "Barista") }
         await #expect(throws: LicenseError.readOnly) { _ = try await gated.createEmployee(makeEmployee()) }
         await #expect(throws: LicenseError.readOnly) { _ = try await gated.runSchedule(weekStart: "2026-04-27") }
-        await #expect(throws: LicenseError.readOnly) { _ = try await gated.createSave(rotaId: 1) }
+        await #expect(throws: LicenseError.readOnly) { _ = try await gated.createSave(rotaId: 1, source: .manual) }
         await #expect(throws: LicenseError.readOnly) {
             _ = try await gated.applyRosterImport(rows: [])
         }

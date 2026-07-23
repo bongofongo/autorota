@@ -348,6 +348,52 @@ struct RotaViewModelTests {
         #expect(vm.isScheduling == false)
     }
 
+    @Test func runScheduleOnEmptyWeekCreatesGenerationSave() async {
+        let mock = MockAutorotaService()
+        mock.stubbedScheduleResult = FfiScheduleResult(assignments: [], warnings: [])
+        mock.stubbedWeekSchedule = makeSchedule()
+        let vm = RotaViewModel(service: mock)
+        vm.selectedWeekStart = "2099-01-07"
+
+        await vm.runSchedule()
+
+        #expect(mock.callLog.contains("createSave:1:generation"))
+        #expect(vm.isDirty == false)
+
+        // The immediate generation save cleared isDirty — the end-of-session
+        // auto-save must not produce a second save.
+        await vm.autoSave()
+        #expect(mock.callLog.filter { $0.hasPrefix("createSave") }.count == 1)
+    }
+
+    @Test func runScheduleOnPopulatedWeekCreatesRegenerationSave() async {
+        let mock = MockAutorotaService()
+        mock.stubbedScheduleResult = FfiScheduleResult(assignments: [], warnings: [])
+        mock.stubbedWeekSchedule = makeSchedule(entries: [makeEntry(assignmentId: 1, shiftId: 1)])
+        let vm = RotaViewModel(service: mock)
+        vm.selectedWeekStart = "2099-01-07"
+        await vm.loadSchedule()
+
+        // A populated future week gates `runSchedule()` behind the regenerate
+        // confirmation — drive the confirmed path directly.
+        await vm.confirmRegenerate()
+
+        #expect(mock.callLog.contains("createSave:1:regeneration"))
+    }
+
+    @Test func autoSaveAfterManualEditCreatesManualSave() async {
+        let mock = MockAutorotaService()
+        mock.stubbedWeekSchedule = makeSchedule()
+        let vm = RotaViewModel(service: mock)
+        await vm.loadSchedule()
+        vm.isDirty = true
+
+        await vm.autoSave()
+
+        #expect(mock.callLog.contains("createSave:1:manual"))
+        #expect(vm.isDirty == false)
+    }
+
     // MARK: - Staffing issues
 
     /// min 2 / max 3 with one entry → one under-minimum warning, no note.

@@ -235,6 +235,8 @@ pub struct FfiSave {
     /// RFC3339 timestamp set when the user restored to this save. Drives the
     /// red "Restored" badge and promotes the entry to the top of its week.
     pub restored_at: Option<String>,
+    /// What triggered the save: "generation" | "regeneration" | "manual" | "restore".
+    pub source: String,
 }
 
 /// A save record with the full snapshot JSON (for detail views).
@@ -248,6 +250,8 @@ pub struct FfiSaveDetail {
     pub week_start: String,
     pub snapshot_json: String,
     pub restored_at: Option<String>,
+    /// What triggered the save: "generation" | "regeneration" | "manual" | "restore".
+    pub source: String,
 }
 
 /// One detailed change attached to a shift on a specific date.
@@ -262,10 +266,13 @@ pub struct FfiSaveDetail {
 /// - `"shift_time_changed"` — old_start_time, new_start_time, old_end_time, new_end_time
 /// - `"shift_capacity_changed"` — old_min_employees, new_min_employees, old/new_max_employees
 /// - `"shift_role_changed"` — old_required_role, new_required_role
-/// - `"assignment_added"` — employee_id, employee_name
-/// - `"assignment_removed"` — employee_id, employee_name
-/// - `"assignment_status_changed"` — employee_id, employee_name, old_status, new_status
-/// - `"employee_moved"` — employee_id, employee_name, from_shift_id, from_start_time, from_end_time
+/// - `"assignment_added"` — employee_id, employee_name; new_start_time/new_end_time carry the shift's times
+/// - `"assignment_removed"` — employee_id, employee_name; old_start_time/old_end_time carry the removed-from shift's times
+/// - `"assignment_status_changed"` — employee_id, employee_name, old_status, new_status; new_start_time/new_end_time carry the shift's times
+/// - `"employee_moved"` — employee_id, employee_name, from_shift_id, from_start_time, from_end_time; new_start_time/new_end_time carry the destination shift's times
+/// - `"employees_swapped"` — two mirrored moves collapsed: employee_id/employee_name = A (now on `shift_id`),
+///   other_employee_id/other_employee_name = B (now on `from_shift_id`); new_start_time/new_end_time = shift A's
+///   times, from_start_time/from_end_time = shift B's times
 #[derive(Clone, uniffi::Record)]
 pub struct FfiChangeDetail {
     pub kind: String,
@@ -295,6 +302,10 @@ pub struct FfiChangeDetail {
     pub from_shift_id: Option<i64>,
     pub from_start_time: Option<String>,
     pub from_end_time: Option<String>,
+
+    // Swap fields — the second employee of an `employees_swapped` change.
+    pub other_employee_id: Option<i64>,
+    pub other_employee_name: Option<String>,
 }
 
 /// Summary returned by `restore_to_save`.

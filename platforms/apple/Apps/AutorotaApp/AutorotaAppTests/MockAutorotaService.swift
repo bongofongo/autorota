@@ -278,8 +278,8 @@ final class MockAutorotaService: AutorotaServiceProtocol, @unchecked Sendable {
         rotaId: 1, shiftsRestored: 0, assignmentsRestored: 0, assignmentsSkipped: 0
     )
 
-    func createSave(rotaId: Int64) async throws -> Int64 {
-        callLog.append("createSave:\(rotaId)")
+    func createSave(rotaId: Int64, source: SaveSource) async throws -> Int64 {
+        callLog.append("createSave:\(rotaId):\(source.rawValue)")
         if let e = errorToThrow { throw e }
         return 1
     }

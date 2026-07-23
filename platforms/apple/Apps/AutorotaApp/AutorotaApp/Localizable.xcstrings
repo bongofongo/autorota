@@ -2338,6 +2338,9 @@
         }
       }
     },
+    "Checkpoint" : {
+
+    },
     "Choose a CSV, JSON, or XLSX file to import." : {
       "localizations" : {
         "ar" : {
@@ -3246,6 +3249,9 @@
         }
       }
     },
+    "Day affected" : {
+
+    },
     "Days" : {
       "localizations" : {
         "ar" : {
@@ -3285,6 +3291,9 @@
           }
         }
       }
+    },
+    "Days affected" : {
+
     },
     "DEBUG · App" : {
 
@@ -6811,6 +6820,9 @@
           }
         }
       }
+    },
+    "Generation" : {
+
     },
     "Get Started" : {
       "extractionState" : "stale",
@@ -14875,6 +14887,9 @@
         }
       }
     },
+    "No changes" : {
+
+    },
     "No changes from previous save" : {
       "localizations" : {
         "ar" : {
@@ -18316,6 +18331,9 @@
     "Regenerate schedule for %@?" : {
 
     },
+    "Regeneration" : {
+
+    },
     "Remaining weekdays" : {
 
     },
@@ -19248,6 +19266,9 @@
         }
       }
     },
+    "Save Details" : {
+
+    },
     "Save the rota first" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -19288,6 +19309,9 @@
           }
         }
       }
+    },
+    "Saved" : {
+
     },
     "Saves will appear here as you edit schedules." : {
       "localizations" : {
@@ -20777,6 +20801,9 @@
         }
       }
     },
+    "Source" : {
+
+    },
     "Spreadsheet (XLSX)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -21186,6 +21213,9 @@
           }
         }
       }
+    },
+    "Summary" : {
+
     },
     "Swap" : {
       "localizations" : {
@@ -22835,6 +22865,9 @@
           }
         }
       }
+    },
+    "View full details" : {
+
     },
     "Warnings" : {
       "localizations" : {

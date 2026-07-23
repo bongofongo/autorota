@@ -2,6 +2,18 @@
 
 Concise running log of bugs encountered. Each entry is one bullet with sub-bullets. New entries appended at top. Patched entries remain `pending verification` until the user confirms.
 
+- **Edit Log "View full details" button very difficult to tap (caught in dev, same session as the feature)**
+  - Date fixed: 2026-07-23 (pending verification)
+  - Where / what / repro: the new detail-page affordance in `SaveEntryView`'s expanded content was a `NavigationLink` nested among other buttons inside a List row, and `EditLogView` carried a top-level `.onTapGesture { dismissKeyboard() }` — the same tap-swallowing class as IOS_BUGS.md #3 (shift template "Required role" Picker inert under `dismissesKeyboardOnTap()`). Taps mostly landed on the row/gesture instead of the link.
+  - Patched: yes — pending user verification
+  - Fix: removed the top-level tap gesture entirely (the List already has `.scrollDismissesKeyboard(.immediately)`, and tag entry lives in a self-dismissing popover), and replaced the inline `NavigationLink` with a full-width `.borderless` `Button` (+ `.contentShape(Rectangle())`) that sets `detailSave`, driving a single `navigationDestination(item:)` on the List.
+
+- **Edit Log never refreshed while on-screen — saves only appeared after leaving and re-entering the tab**
+  - Date fixed: 2026-07-23 (pending verification)
+  - Where / what / repro: `EditLogView` loaded saves only in `.task` (first appearance) and pull-to-refresh; unlike `RotaView`/`EmployeeListView` it had no `.onReceive(.autorotaDataChanged)` subscription, so saves created elsewhere (edit-mode exit, week navigation, schedule generation, restore on another screen) never showed up until the view was recreated. Reproduced with the default sample load.
+  - Patched: yes — pending user verification
+  - Fix: `EditLogView` now subscribes to `.autorotaDataChanged` filtered to `.save`/`.rota` table changes (nil payload → reload to be safe, matching `EmployeeListView`) and re-runs `vm.loadSaves()`. The per-save diff cache (`changesBySaveId`) is kept — diffs are immutable per save id.
+
 - **Date-range pickers allow End before Start, silently narrowing exceptions to a single day**
   - Date fixed: 2026-07-16 (pending verification)
   - Where / what / repro: `OverridesTabView.swift`'s `EmployeeAvailabilityOverrideSheet` let the End `DatePicker` pick a date earlier than Start with no bound. `datesInRange` then silently fell back to treating the range as one day (the start date) — the End picker kept showing the invalid earlier date while the day-navigator, "Not Available (all N dates)" bulk action, and save all quietly behaved as a 1-day exception, with no error shown. Same missing-bounds pattern existed on `EmployeeDetailContent.swift`'s Custom Range shift-history filter and `SendSchedulePicker.swift`'s date-range mode (partial — had the `in:` bound but no clamp when Start moved past an already-picked End). `AnalyticsView.swift`'s date-range filter already did this correctly and was used as the reference pattern.

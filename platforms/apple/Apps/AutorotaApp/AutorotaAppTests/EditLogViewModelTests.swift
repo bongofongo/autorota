@@ -15,7 +15,8 @@ struct EditLogViewModelTests {
         rotaId: Int64 = 1,
         weekStart: String = "2026-03-30",
         tags: [String] = [],
-        restoredAt: String? = nil
+        restoredAt: String? = nil,
+        source: String = "manual"
     ) -> FfiSave {
         FfiSave(
             id: id,
@@ -24,7 +25,8 @@ struct EditLogViewModelTests {
             summary: "2 shifts, 1 employee, 8h",
             tags: tags,
             weekStart: weekStart,
-            restoredAt: restoredAt
+            restoredAt: restoredAt,
+            source: source
         )
     }
 
@@ -111,6 +113,22 @@ struct EditLogViewModelTests {
         #expect(groups[0].key == "2026")
         #expect(groups[0].title == "2026")
         #expect(groups[1].key == "2025")
+    }
+
+    @Test("groupedSaves is unaffected by save source")
+    func groupingIgnoresSource() async {
+        let mock = makeMock()
+        mock.stubbedSaves = [
+            makeSave(id: 1, weekStart: "2026-03-30", source: "generation"),
+            makeSave(id: 2, weekStart: "2026-03-30", source: "manual"),
+        ]
+        let vm = EditLogViewModel(service: mock)
+        await vm.loadSaves()
+        vm.grouping = .week
+
+        let groups = vm.groupedSaves
+        #expect(groups.count == 1)
+        #expect(groups[0].saves.count == 2)
     }
 
     // MARK: - Expand/Collapse

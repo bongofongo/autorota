@@ -152,7 +152,8 @@ final class EditLogViewModel {
             summary: save.summary,
             tags: tags,
             weekStart: save.weekStart,
-            restoredAt: save.restoredAt
+            restoredAt: save.restoredAt,
+            source: save.source
         )
     }
 

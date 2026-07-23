@@ -39,9 +39,9 @@
 		CC0045013110000000205001 /* LiveLicenseBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0045023110000000205001 /* LiveLicenseBackend.swift */; };
 		CC0046013110000000205001 /* LicenseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0046023110000000205001 /* LicenseService.swift */; };
 		CC0047013110000000205001 /* PricingCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0047023110000000205001 /* PricingCatalog.swift */; };
+		CC0048013110000000205001 /* GatedAutorotaService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0048023110000000205001 /* GatedAutorotaService.swift */; };
 		CC0050013110000000205001 /* PerfSignposts.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0050023110000000205001 /* PerfSignposts.swift */; };
 		CC0051013110000000205001 /* RotaLoadPrefetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0051023110000000205001 /* RotaLoadPrefetcher.swift */; };
-		CC0048013110000000205001 /* GatedAutorotaService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0048023110000000205001 /* GatedAutorotaService.swift */; };
 		CC0060013300000000205001 /* ExportCustomLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0060023300000000205001 /* ExportCustomLayout.swift */; };
 		CC0061013300000000205001 /* FullExportConfigBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0061023300000000205001 /* FullExportConfigBuilder.swift */; };
 		CC0062013300000000205001 /* ExportSettingsMigration.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0062023300000000205001 /* ExportSettingsMigration.swift */; };
@@ -103,9 +103,9 @@
 		CC0045023110000000205001 /* LiveLicenseBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveLicenseBackend.swift; sourceTree = "<group>"; };
 		CC0046023110000000205001 /* LicenseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LicenseService.swift; sourceTree = "<group>"; };
 		CC0047023110000000205001 /* PricingCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PricingCatalog.swift; sourceTree = "<group>"; };
+		CC0048023110000000205001 /* GatedAutorotaService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatedAutorotaService.swift; sourceTree = "<group>"; };
 		CC0050023110000000205001 /* PerfSignposts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerfSignposts.swift; sourceTree = "<group>"; };
 		CC0051023110000000205001 /* RotaLoadPrefetcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RotaLoadPrefetcher.swift; sourceTree = "<group>"; };
-		CC0048023110000000205001 /* GatedAutorotaService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GatedAutorotaService.swift; sourceTree = "<group>"; };
 		CC0060023300000000205001 /* ExportCustomLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportCustomLayout.swift; sourceTree = "<group>"; };
 		CC0061023300000000205001 /* FullExportConfigBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FullExportConfigBuilder.swift; sourceTree = "<group>"; };
 		CC0062023300000000205001 /* ExportSettingsMigration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportSettingsMigration.swift; sourceTree = "<group>"; };

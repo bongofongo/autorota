@@ -430,10 +430,26 @@ final class RotaViewModel {
     private func performSchedule() async {
         isScheduling = true
         error = nil
+        // Captured before the run: decides Generation (empty week) vs
+        // Regeneration (week already had assignments) for the save badge.
+        let hadAssignments = !(schedule?.entries.isEmpty ?? true)
         do {
             _ = try await service.runSchedule(weekStart: selectedWeekStart)
-            isDirty = true
             await loadSchedule()
+            if let rotaId = schedule?.rotaId {
+                do {
+                    _ = try await service.createSave(
+                        rotaId: rotaId,
+                        source: hadAssignments ? .regeneration : .generation
+                    )
+                    isDirty = false
+                } catch {
+                    // Non-fatal: fall back to the end-of-session manual save.
+                    isDirty = true
+                }
+            } else {
+                isDirty = true
+            }
         } catch {
             self.error = userFacingMessage(error)
         }
@@ -523,7 +539,7 @@ final class RotaViewModel {
     func autoSave() async {
         guard isDirty, let rotaId = schedule?.rotaId else { return }
         do {
-            _ = try await service.createSave(rotaId: rotaId)
+            _ = try await service.createSave(rotaId: rotaId, source: .manual)
             isDirty = false
         } catch {
             // Non-fatal: save failed but user can continue editing

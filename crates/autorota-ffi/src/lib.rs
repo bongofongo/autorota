@@ -10,6 +10,7 @@ use autorota_core::models::employee::Employee;
 use autorota_core::models::overrides::{
     DayAvailability, EmployeeAvailabilityOverride, OverrideSource, ShiftTemplateOverride,
 };
+use autorota_core::models::save::SaveSource;
 use autorota_core::models::shift::{RoleRequirement, Shift, ShiftTemplate};
 use autorota_core::models::shift_history::EmployeeShiftRecord;
 use chrono::{Datelike, Local, NaiveDate, NaiveTime, Weekday};
@@ -2071,7 +2072,7 @@ mod tests {
         run_schedule(week.into()).unwrap();
 
         assert!(!rota_has_saves(rota_id).unwrap());
-        let save_id = create_save(rota_id).unwrap();
+        let save_id = create_save(rota_id, "manual".into()).unwrap();
         assert!(rota_has_saves(rota_id).unwrap());
         assert_eq!(list_saves(Some(rota_id)).unwrap().len(), 1);
         assert!(get_save_detail(save_id).unwrap().is_some());
@@ -2378,10 +2379,14 @@ pub fn list_all_shift_history(
 // ── Saves ──────────────────────────────────────────────────────────────────────
 
 #[uniffi::export]
-pub fn create_save(rota_id: i64) -> Result<i64, FfiError> {
+pub fn create_save(rota_id: i64, source: String) -> Result<i64, FfiError> {
     let pool = &pool()?;
-    rt().block_on(queries::create_save(pool, rota_id))
-        .map_err(Into::into)
+    rt().block_on(queries::create_save(
+        pool,
+        rota_id,
+        SaveSource::parse(&source),
+    ))
+    .map_err(Into::into)
 }
 
 #[uniffi::export]
@@ -2418,6 +2423,7 @@ pub fn list_saves(rota_id: Option<i64>) -> Result<Vec<FfiSave>, FfiError> {
                 tags: s.tags,
                 week_start: s.week_start,
                 restored_at: s.restored_at,
+                source: s.source.as_str().to_string(),
             })
             .collect();
         Ok(ffi_saves)
@@ -2451,6 +2457,7 @@ pub fn get_save_detail(save_id: i64) -> Result<Option<FfiSaveDetail>, FfiError> 
             week_start,
             snapshot_json: save.snapshot_json,
             restored_at: save.restored_at,
+            source: save.source.as_str().to_string(),
         }))
     });
     result.map_err(Into::into)
@@ -2558,6 +2565,8 @@ fn change_detail_to_ffi(d: autorota_core::models::save::ChangeDetail) -> FfiChan
         from_shift_id: None,
         from_start_time: None,
         from_end_time: None,
+        other_employee_id: None,
+        other_employee_name: None,
     };
     match d.kind {
         K::ShiftAdded {
@@ -2616,30 +2625,42 @@ fn change_detail_to_ffi(d: autorota_core::models::save::ChangeDetail) -> FfiChan
         K::AssignmentAdded {
             employee_id,
             employee_name,
+            start_time,
+            end_time,
         } => {
             out.kind = "assignment_added".into();
             out.employee_id = Some(employee_id);
             out.employee_name = Some(employee_name);
+            out.new_start_time = Some(start_time);
+            out.new_end_time = Some(end_time);
         }
         K::AssignmentRemoved {
             employee_id,
             employee_name,
+            start_time,
+            end_time,
         } => {
             out.kind = "assignment_removed".into();
             out.employee_id = Some(employee_id);
             out.employee_name = Some(employee_name);
+            out.old_start_time = Some(start_time);
+            out.old_end_time = Some(end_time);
         }
         K::AssignmentStatusChanged {
             employee_id,
             employee_name,
             old_status,
             new_status,
+            start_time,
+            end_time,
         } => {
             out.kind = "assignment_status_changed".into();
             out.employee_id = Some(employee_id);
             out.employee_name = Some(employee_name);
             out.old_status = Some(old_status);
             out.new_status = Some(new_status);
+            out.new_start_time = Some(start_time);
+            out.new_end_time = Some(end_time);
         }
         K::EmployeeMoved {
             employee_id,
@@ -2647,6 +2668,8 @@ fn change_detail_to_ffi(d: autorota_core::models::save::ChangeDetail) -> FfiChan
             from_shift_id,
             from_start_time,
             from_end_time,
+            to_start_time,
+            to_end_time,
         } => {
             out.kind = "employee_moved".into();
             out.employee_id = Some(employee_id);
@@ -2654,6 +2677,30 @@ fn change_detail_to_ffi(d: autorota_core::models::save::ChangeDetail) -> FfiChan
             out.from_shift_id = Some(from_shift_id);
             out.from_start_time = Some(from_start_time);
             out.from_end_time = Some(from_end_time);
+            out.new_start_time = Some(to_start_time);
+            out.new_end_time = Some(to_end_time);
+        }
+        K::EmployeesSwapped {
+            employee_a_id,
+            employee_a_name,
+            employee_b_id,
+            employee_b_name,
+            from_shift_id,
+            shift_a_start,
+            shift_a_end,
+            shift_b_start,
+            shift_b_end,
+        } => {
+            out.kind = "employees_swapped".into();
+            out.employee_id = Some(employee_a_id);
+            out.employee_name = Some(employee_a_name);
+            out.other_employee_id = Some(employee_b_id);
+            out.other_employee_name = Some(employee_b_name);
+            out.from_shift_id = Some(from_shift_id);
+            out.new_start_time = Some(shift_a_start);
+            out.new_end_time = Some(shift_a_end);
+            out.from_start_time = Some(shift_b_start);
+            out.from_end_time = Some(shift_b_end);
         }
     }
     out

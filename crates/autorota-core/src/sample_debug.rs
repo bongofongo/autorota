@@ -39,6 +39,7 @@ use crate::models::employee::Employee;
 use crate::models::overrides::{
     DayAvailability, EmployeeAvailabilityOverride, OverrideSource, ShiftTemplateOverride,
 };
+use crate::models::save::SaveSource;
 use crate::models::shift::{RoleRequirement, ShiftTemplate};
 
 pub const ROLE_BARISTA: &str = "Barista";
@@ -597,7 +598,7 @@ pub async fn seed_sample_debug_data(
 
         // Save dated the weekend before (the "built next week's rota" moment).
         let first_saved_at = rfc3339_at(week - Duration::days(2), 18);
-        queries::create_save_at(pool, rota_id, &first_saved_at).await?;
+        queries::create_save_at(pool, rota_id, &first_saved_at, SaveSource::Generation).await?;
 
         // On a handful of weeks, simulate a mid-week edit (a staff drop) and
         // save again so the Edit Log shows a real diff.
@@ -606,7 +607,8 @@ pub async fn seed_sample_debug_data(
             if let Some(first) = assignments.first() {
                 queries::delete_assignment(pool, first.id).await?;
                 let second_saved_at = rfc3339_at(week - Duration::days(1), 12);
-                queries::create_save_at(pool, rota_id, &second_saved_at).await?;
+                queries::create_save_at(pool, rota_id, &second_saved_at, SaveSource::Manual)
+                    .await?;
             }
         }
     }

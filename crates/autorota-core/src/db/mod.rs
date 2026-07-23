@@ -340,5 +340,15 @@ async fn run_migrations(pool: &SqlitePool) -> Result<(), sqlx::Error> {
         run_migration_tx(pool, m25).await?;
     }
 
+    // Migration 026: index saves by rota_id (idempotent CREATE INDEX).
+    let m26 = include_str!("../../migrations/026_saves_rota_id_index.sql");
+    run_migration_tx(pool, m26).await?;
+
+    // Migration 027: save source discriminator for the Edit Log.
+    if !has_column(pool, "saves", "source").await? {
+        let m27 = include_str!("../../migrations/027_save_source.sql");
+        run_migration_tx(pool, m27).await?;
+    }
+
     Ok(())
 }

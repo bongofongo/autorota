@@ -9,6 +9,15 @@ import AutorotaKit
 /// update `GatedAutorotaService` accordingly. Mutations must call `try check()`
 /// before delegating; reads pass through. Skipping that step lets writes
 /// bypass the read-only license gate.
+/// What triggered a save. Mirrors the core `SaveSource` enum; crosses the FFI
+/// as its raw string value.
+enum SaveSource: String, Sendable {
+    case generation
+    case regeneration
+    case manual
+    case restore
+}
+
 protocol AutorotaServiceProtocol: Sendable {
     // Roles
     func listRoles() async throws -> [FfiRole]
@@ -66,7 +75,7 @@ protocol AutorotaServiceProtocol: Sendable {
     func deleteShiftTemplateOverride(id: Int64) async throws
 
     // Saves
-    func createSave(rotaId: Int64) async throws -> Int64
+    func createSave(rotaId: Int64, source: SaveSource) async throws -> Int64
     func diffRota(rotaId: Int64) async throws -> [FfiShiftDiff]
     func diffRotaDetailed(rotaId: Int64) async throws -> [FfiChangeDetail]
     func listSaves(rotaId: Int64?) async throws -> [FfiSave]

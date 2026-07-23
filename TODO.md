@@ -36,16 +36,14 @@
   - Scope: preview tiles ONLY. Do NOT touch `UIApplication.shared.setAlternateIconName` (line 223) — the home-screen icon must keep following Apple's system dark mode via the asset catalog, never the in-app appearance toggle
   - Gotcha: latte icon's dark art intentionally reuses the sunrise dark art — not a cross-wire
 
-## 2. Edit Log — freshness + generation saves (added 2026-07-23)
-- [ ] Edit Log doesn't update as rota changes (reproduced with default sample load)
-  - Cause (a): `EditLogView` only loads on `.task` / pull-to-refresh (`Views/EditLogView.swift:64,97`) — it has no `.onReceive(.autorotaDataChanged)` unlike `RotaView.swift:222` / `EmployeeListView.swift:137`. Fix: subscribe and `await vm.loadSaves()`
-  - Cause (b): saves are only written by `autoSave()` (`ViewModels/RotaViewModel.swift:523-531`) on edit-mode exit (502-509) or week navigation (`RotaView.swift:112-113`); individual mutations just set `isDirty`. So nothing appears in the log until the session ends. Decide: keep per-session granularity (then (a) alone fixes perceived lag) vs debounced per-mutation auto-save (~2-3s after last change) — debounce preserves grouping without save spam
-- [ ] Abbreviate generation/regeneration saves + auto-tag; full detail on tap only
-  - `FfiSave` has no origin field (`id, rotaId, savedAt, summary, tags, weekStart, restoredAt` — generated `autorota_ffi.swift:3168-3207`); generation saves are indistinguishable from manual edits. Add a `source` discriminator to Save in core + FFI (`Generation | Regeneration | Manual | Restore`) — new migration
-  - Thread origin through: `performSchedule()` (`RotaViewModel.swift:430-441`) / `confirmRegenerate()` (426-428) → currently both just set `isDirty` and share `autoSave()` with manual edits → extend `createSave(rotaId:)` (`Services/LiveAutorotaService.swift:249`) to carry source
-  - Auto-label: "Generation" when week had no prior assignments, "Regeneration" otherwise. Render as system tag/badge in `SaveEntryView`; must not count against user tag limits (3 tags / 15 chars, `EditLogViewModel.swift:74-76,103-145`) and must not be user-removable — prefer the `source` field over a reserved tag string
-  - Abbreviated rendering: for generation saves, `SaveEntryView` shows summary counts only (`ChangeSummaryCard` style, `EditLogView.swift:379-424`) — suppress per-assignment `ChangeRow`s (449-516)
-  - Tap abbreviated entry → push new detail page (`NavigationLink`) listing every change via existing `DayChangesGroup`/`ChangeRow`; page reachable ONLY from abbreviated entries, no other nav path
+## 2. Edit Log — freshness + generation saves (added 2026-07-23, done 2026-07-23)
+- [x] Edit Log doesn't update as rota changes — fixed via cause (a): `EditLogView` now subscribes to `.autorotaDataChanged` (filtered to `.save`/`.rota` tables) and reloads. Per user decision, save-creation timing for manual edits is unchanged (per-session granularity kept; no debounced per-mutation auto-save)
+- [x] Generation/regeneration saves badged + abbreviated; full-detail page on tap
+  - `SaveSource` enum (`Generation | Regeneration | Manual | Restore`) added to core (`models/save.rs`), migration `027_save_source.sql` (also wired previously-orphaned `026_saves_rota_id_index.sql`), threaded through FFI (`FfiSave`/`FfiSaveDetail.source` as string) and the Swift service layer (`createSave(rotaId:source:)`)
+  - `performSchedule()` now creates a save immediately after generating, badged Generation (week had no prior assignments) or Regeneration; clears `isDirty` on success so edit-mode exit doesn't duplicate-save. `Restore` variant reserved (no writer yet)
+  - `SaveSourceBadge` (SystemBadge-based, from the `source` field) — not a tag, so tag limits untouched and not removable. Generation saves render abbreviated inline (summary counts only)
+  - Scope change (user): the new detail page (`EditLogSaveDetailView`) is reachable from EVERY save's expanded entry via "View full details", not just abbreviated ones — shows full metadata, tags, restore action, and the complete diff
+  - UI rework alongside: Edit Log list converted from one dense `DisclosureGroup` list to one inset-grouped `Section` (island) per week/month/year group with tappable collapsible headers; shared components extracted to `Views/EditLogComponents.swift`
 
 ## 3. Rota — manual shift creation
 - [ ] Inline employee assignment in the Add Shift sheet (with role-aware filtering)

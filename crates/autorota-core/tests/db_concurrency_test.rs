@@ -9,6 +9,7 @@ use autorota_core::db;
 use autorota_core::db::queries;
 use autorota_core::models::assignment::{Assignment, AssignmentStatus};
 use autorota_core::models::availability::AvailabilityState;
+use autorota_core::models::save::SaveSource;
 use autorota_core::models::shift::Shift;
 use chrono::{NaiveDate, NaiveTime};
 use sqlx::SqlitePool;
@@ -175,7 +176,9 @@ async fn concurrent_save_creation_yields_distinct_saves() {
     let handles: Vec<_> = (0..SAVERS)
         .map(|_| {
             let pool = pool.clone();
-            tokio::spawn(async move { queries::create_save(&pool, rota_id).await })
+            tokio::spawn(
+                async move { queries::create_save(&pool, rota_id, SaveSource::Manual).await },
+            )
         })
         .collect();
 

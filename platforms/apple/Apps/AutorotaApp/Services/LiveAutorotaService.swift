@@ -246,8 +246,8 @@ struct LiveAutorotaService: AutorotaServiceProtocol {
     }
 
     // Saves
-    func createSave(rotaId: Int64) async throws -> Int64 {
-        let id = try await createSaveAsync(rotaId: rotaId)
+    func createSave(rotaId: Int64, source: SaveSource) async throws -> Int64 {
+        let id = try await createSaveAsync(rotaId: rotaId, source: source.rawValue)
         notify([.save], rowIDs: [id])
         return id
     }
