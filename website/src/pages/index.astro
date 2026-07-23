@@ -8,7 +8,7 @@ import ScreenshotRail from "../components/ScreenshotRail.astro";
 import PrivacyPanel from "../components/PrivacyPanel.astro";
 import AudienceStrip from "../components/AudienceStrip.astro";
 import DownloadCTA from "../components/DownloadCTA.astro";
-import { SUBLINE, TAGLINE } from "../consts";
+import { SUBLINE, TAGLINE, href } from "../consts";
 
 import shotShifts from "../assets/framed/feat-shifts.png";
 import shotAvailability from "../assets/framed/feat-availability.png";
@@ -20,6 +20,10 @@ import shotAnalytics from "../assets/framed/feat-analytics.png";
 <SiteLayout title={`autorota — ${TAGLINE}`} description={SUBLINE}>
   <Hero />
   <HowItWorks />
+
+  <div class="tutorials-teaser">
+    <a class="btn btn-quiet" href={href("/tutorials")}>See it step by step →</a>
+  </div>
 
   <FeatureSection
     eyebrow="Shifts & availability"
@@ -123,5 +127,11 @@ import shotAnalytics from "../assets/framed/feat-analytics.png";
   .solo {
     max-width: 340px;
     margin-inline: auto;
+  }
+
+  .tutorials-teaser {
+    text-align: center;
+    margin-top: -2.5rem;
+    padding-bottom: 1.5rem;
   }
 </style>

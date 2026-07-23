@@ -1,0 +1,70 @@
+---
+import { Picture } from "astro:assets";
+import type { TutorialFlow } from "../data/tutorials";
+
+interface Props {
+  flow: TutorialFlow;
+}
+
+const { flow } = Astro.props;
+---
+
+<button
+  type="button"
+  class="flow-card"
+  data-open-flow={flow.slug}
+  aria-haspopup="dialog"
+>
+  <div class="cover">
+    <Picture
+      src={flow.steps[0].image}
+      alt=""
+      widths={[360, 540]}
+      formats={["avif", "webp"]}
+      sizes="(max-width: 760px) 80vw, 300px"
+      loading="lazy"
+    />
+  </div>
+  <h3>{flow.title}</h3>
+  <p class="count">{flow.steps.length} steps</p>
+</button>
+
+<style>
+  .flow-card {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 1.6rem 1.4rem 1.5rem;
+    background: var(--bg);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-card);
+    cursor: pointer;
+    font: inherit;
+    color: var(--ink);
+    text-align: center;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .flow-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 28px rgb(var(--shadow-rgb) / 12%);
+  }
+
+  .cover {
+    width: min(60%, 190px);
+    margin-bottom: 0.8rem;
+  }
+
+  .cover :global(img) {
+    width: 100%;
+    height: auto;
+  }
+
+  .count {
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+</style>

@@ -1,0 +1,53 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+import FlowCard from "../components/FlowCard.astro";
+import TutorialViewer from "../components/TutorialViewer.astro";
+import { tutorialFlows } from "../data/tutorials";
+---
+
+<SiteLayout
+  title="autorota — Tutorials"
+  description="Step-by-step walkthroughs of everyday autorota tasks: creating shifts, handling holidays, and covering one-off changes."
+>
+  <section class="section">
+    <div class="wrap">
+      <header class="intro">
+        <span class="eyebrow">Tutorials</span>
+        <h2>See how it's done, step by step.</h2>
+        <p class="lede">
+          Short walkthroughs of everyday tasks. Pick one to flick through the
+          screens at your own pace — tap any picture to look closer.
+        </p>
+      </header>
+
+      <div class="grid">
+        {
+          tutorialFlows.map((flow) => (
+            <div class="reveal">
+              <FlowCard flow={flow} />
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  {tutorialFlows.map((flow) => <TutorialViewer flow={flow} />)}
+</SiteLayout>
+
+<style>
+  .intro {
+    max-width: 44rem;
+    margin-bottom: clamp(2.5rem, 6vw, 4rem);
+  }
+
+  .intro .lede {
+    margin-top: 1rem;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+  }
+</style>

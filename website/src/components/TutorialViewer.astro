@@ -1,0 +1,345 @@
+---
+import { Picture } from "astro:assets";
+import type { TutorialFlow } from "../data/tutorials";
+
+interface Props {
+  flow: TutorialFlow;
+}
+
+const { flow } = Astro.props;
+const titleId = `tut-${flow.slug}-title`;
+---
+
+<dialog class="tutorial-dialog" data-flow={flow.slug} aria-labelledby={titleId}>
+  <header class="dialog-bar">
+    <h2 id={titleId}>{flow.title}</h2>
+    <button type="button" class="close" aria-label="Close tutorial">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+        <path d="M5 5l14 14M19 5L5 19"></path>
+      </svg>
+    </button>
+  </header>
+
+  <div class="stage">
+    <button type="button" class="nav prev" aria-label="Previous step">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M15 5l-7 7 7 7"></path>
+      </svg>
+    </button>
+    <div class="track" style="--i: 0">
+      {
+        flow.steps.map((step, i) => (
+          <div
+            class={`slide${i === 0 ? " is-active" : ""}`}
+            data-index={i}
+            data-caption={step.caption}
+            aria-hidden={i === 0 ? undefined : "true"}
+          >
+            <Picture
+              src={step.image}
+              alt={step.caption}
+              widths={[360, 640, 960]}
+              formats={["avif", "webp"]}
+              sizes="(max-width: 760px) 60vw, 300px"
+              loading="lazy"
+            />
+          </div>
+        ))
+      }
+    </div>
+    <button type="button" class="nav next" aria-label="Next step">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 5l7 7-7 7"></path>
+      </svg>
+    </button>
+  </div>
+
+  <footer class="dialog-foot">
+    <p class="caption" aria-live="polite">{flow.steps[0].caption}</p>
+    <p class="indicator">Step 1 of {flow.steps.length}</p>
+  </footer>
+</dialog>
+
+<style>
+  .tutorial-dialog {
+    /* the global `* { margin: 0 }` reset removes the UA's centering margins */
+    margin: auto;
+    width: min(1100px, 96vw);
+    height: min(880px, 94vh);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-card);
+    padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    overflow: hidden;
+  }
+
+  .tutorial-dialog:not([open]) {
+    display: none;
+  }
+
+  .tutorial-dialog::backdrop {
+    /* fixed scrim: ::backdrop can't reliably read theme custom properties in Safari */
+    background: rgb(9 14 20 / 62%);
+    backdrop-filter: blur(6px);
+  }
+
+  .dialog-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .dialog-bar h2 {
+    font-size: 1.15rem;
+    letter-spacing: -0.01em;
+  }
+
+  .close,
+  .nav {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--hairline);
+    background: var(--bg-alt);
+    color: var(--ink);
+    border-radius: 999px;
+    cursor: pointer;
+  }
+
+  .close {
+    width: 2.2rem;
+    height: 2.2rem;
+    flex: none;
+  }
+
+  .stage {
+    position: relative;
+    overflow: hidden;
+    touch-action: pan-y;
+  }
+
+  .nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+    width: 2.8rem;
+    height: 2.8rem;
+  }
+
+  .nav:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  .prev {
+    left: clamp(0.5rem, 3vw, 1.5rem);
+  }
+
+  .next {
+    right: clamp(0.5rem, 3vw, 1.5rem);
+  }
+
+  .track {
+    --slide-w: min(56vw, 290px);
+    --gap: clamp(1rem, 3vw, 2rem);
+    display: flex;
+    align-items: center;
+    gap: var(--gap);
+    height: 100%;
+    width: max-content;
+    margin-left: 50%;
+    transform: translateX(
+      calc(-1 * ((var(--i) + 0.5) * var(--slide-w) + var(--i) * var(--gap)))
+    );
+    transition: transform 0.35s cubic-bezier(0.2, 0.6, 0.2, 1);
+  }
+
+  .slide {
+    flex: 0 0 var(--slide-w);
+    opacity: 0.35;
+    transform: scale(0.82);
+    transition: opacity 0.35s ease, transform 0.35s ease;
+    cursor: pointer;
+  }
+
+  .slide :global(img) {
+    width: 100%;
+    height: auto;
+    max-height: calc(94vh - 190px);
+    object-fit: contain;
+  }
+
+  .slide.is-active {
+    opacity: 1;
+    transform: none;
+    cursor: zoom-in;
+  }
+
+  /* ---- lightbox zoom: same dialog, single full-size slide ---- */
+
+  .tutorial-dialog.zoomed .track {
+    margin-left: 0;
+    width: 100%;
+    transform: none;
+    justify-content: center;
+  }
+
+  .tutorial-dialog.zoomed .slide:not(.is-active) {
+    display: none;
+  }
+
+  .tutorial-dialog.zoomed .slide.is-active {
+    flex: none;
+    width: auto;
+    max-width: 100%;
+    cursor: zoom-out;
+  }
+
+  .tutorial-dialog.zoomed .slide.is-active :global(img) {
+    width: auto;
+    max-width: 100%;
+    max-height: calc(94vh - 150px);
+    margin-inline: auto;
+  }
+
+  .tutorial-dialog.zoomed .dialog-foot {
+    padding-block: 0.6rem;
+  }
+
+  .dialog-foot {
+    border-top: 1px solid var(--hairline);
+    padding: 0.9rem 3rem 1rem;
+    text-align: center;
+  }
+
+  .caption {
+    max-width: 46rem;
+    margin-inline: auto;
+    text-wrap: pretty;
+  }
+
+  .indicator {
+    margin-top: 0.2rem;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .track,
+    .slide {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  function initViewer(dialog: HTMLDialogElement) {
+    const track = dialog.querySelector<HTMLElement>(".track")!;
+    const slides = [...dialog.querySelectorAll<HTMLElement>(".slide")];
+    const caption = dialog.querySelector<HTMLElement>(".caption")!;
+    const indicator = dialog.querySelector<HTMLElement>(".indicator")!;
+    const prev = dialog.querySelector<HTMLButtonElement>(".nav.prev")!;
+    const next = dialog.querySelector<HTMLButtonElement>(".nav.next")!;
+    const close = dialog.querySelector<HTMLButtonElement>(".close")!;
+    let index = 0;
+
+    const setIndex = (i: number) => {
+      index = Math.max(0, Math.min(slides.length - 1, i));
+      track.style.setProperty("--i", String(index));
+      slides.forEach((s, j) => {
+        s.classList.toggle("is-active", j === index);
+        if (j === index) s.removeAttribute("aria-hidden");
+        else s.setAttribute("aria-hidden", "true");
+      });
+      caption.textContent = slides[index].dataset.caption ?? "";
+      indicator.textContent = `Step ${index + 1} of ${slides.length}`;
+      prev.disabled = index === 0;
+      next.disabled = index === slides.length - 1;
+      if (dialog.classList.contains("zoomed")) upgradeSizes();
+    };
+
+    // While zoomed, let the browser pick the largest srcset candidate.
+    const upgradeSizes = () => {
+      const img = slides[index].querySelector("img");
+      if (img) img.sizes = "960px";
+      slides[index]
+        .querySelectorAll("source")
+        .forEach((s) => (s.sizes = "960px"));
+    };
+
+    const setZoom = (on: boolean) => {
+      dialog.classList.toggle("zoomed", on);
+      if (on) upgradeSizes();
+    };
+
+    document
+      .querySelectorAll<HTMLButtonElement>(
+        `[data-open-flow="${dialog.dataset.flow}"]`
+      )
+      .forEach((opener) => {
+        opener.addEventListener("click", () => {
+          setZoom(false);
+          setIndex(0);
+          dialog.showModal();
+          document.body.style.overflow = "hidden";
+          close.focus();
+        });
+      });
+
+    dialog.addEventListener("close", () => {
+      document.body.style.overflow = "";
+    });
+
+    // Esc backs out of zoom first; a second Esc closes the dialog.
+    dialog.addEventListener("cancel", (e) => {
+      if (dialog.classList.contains("zoomed")) {
+        e.preventDefault();
+        setZoom(false);
+      }
+    });
+
+    close.addEventListener("click", () => dialog.close());
+    prev.addEventListener("click", () => setIndex(index - 1));
+    next.addEventListener("click", () => setIndex(index + 1));
+
+    track.addEventListener("click", (e) => {
+      const slide = (e.target as HTMLElement).closest<HTMLElement>(".slide");
+      if (!slide) return;
+      const i = Number(slide.dataset.index);
+      if (i === index) setZoom(!dialog.classList.contains("zoomed"));
+      else setIndex(i);
+    });
+
+    dialog.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft") setIndex(index - 1);
+      else if (e.key === "ArrowRight") setIndex(index + 1);
+    });
+
+    let downX = 0;
+    let downY = 0;
+    const stage = dialog.querySelector<HTMLElement>(".stage")!;
+    stage.addEventListener("pointerdown", (e) => {
+      downX = e.clientX;
+      downY = e.clientY;
+    });
+    stage.addEventListener("pointerup", (e) => {
+      const dx = e.clientX - downX;
+      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(e.clientY - downY)) {
+        setIndex(dx < 0 ? index + 1 : index - 1);
+      }
+    });
+
+    setIndex(0);
+  }
+
+  document
+    .querySelectorAll<HTMLDialogElement>(".tutorial-dialog")
+    .forEach(initViewer);
+</script>
