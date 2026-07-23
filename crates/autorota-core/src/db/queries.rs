@@ -20,6 +20,9 @@ use crate::models::sync::{BaseSnapshot, SyncRecord, Tombstone};
 use std::collections::{HashMap, HashSet};
 
 type ShiftTemplateRow = (i64, String, String, String, String, String, u32, u32, bool);
+/// (id, rota_id, saved_at/week_start, summary, snapshot_json-or-summary, restored_at, source)
+/// — shared row shape for `saves` SELECTs; see each query's column list.
+type SaveRow = (i64, i64, String, String, String, Option<String>, String);
 type ShiftRow = (
     i64,
     Option<i64>,
@@ -1762,7 +1765,7 @@ pub async fn list_saves(
     pool: &SqlitePool,
     rota_id: Option<i64>,
 ) -> Result<Vec<SaveMeta>, sqlx::Error> {
-    let rows: Vec<(i64, i64, String, String, String, Option<String>, String)> = sqlx::query_as(
+    let rows: Vec<SaveRow> = sqlx::query_as(
         "SELECT s.id, s.rota_id, r.week_start, s.saved_at, s.summary, s.restored_at, s.source
          FROM saves s
          JOIN rotas r ON r.id = s.rota_id
@@ -1800,7 +1803,7 @@ pub async fn list_saves(
 
 /// Get a single save by ID.
 pub async fn get_save(pool: &SqlitePool, id: i64) -> Result<Option<Save>, sqlx::Error> {
-    let row: Option<(i64, i64, String, String, String, Option<String>, String)> = sqlx::query_as(
+    let row: Option<SaveRow> = sqlx::query_as(
         "SELECT id, rota_id, saved_at, summary, snapshot_json, restored_at, source FROM saves WHERE id = ?",
     )
     .bind(id)
@@ -1821,7 +1824,7 @@ pub async fn rota_has_saves(pool: &SqlitePool, rota_id: i64) -> Result<bool, sql
     Ok(exists)
 }
 
-fn save_from_row(row: (i64, i64, String, String, String, Option<String>, String)) -> Save {
+fn save_from_row(row: SaveRow) -> Save {
     let (id, rota_id, saved_at, summary, snapshot_json, restored_at, source) = row;
     Save {
         id,
@@ -1959,14 +1962,13 @@ pub async fn diff_rota_vs_latest_save(
     rota_id: i64,
 ) -> Result<Vec<ShiftDiff>, sqlx::Error> {
     // Fetch latest save for this rota.
-    let latest: Option<(i64, i64, String, String, String, Option<String>, String)> =
-        sqlx::query_as(
-            "SELECT id, rota_id, saved_at, summary, snapshot_json, restored_at, source
+    let latest: Option<SaveRow> = sqlx::query_as(
+        "SELECT id, rota_id, saved_at, summary, snapshot_json, restored_at, source
          FROM saves WHERE rota_id = ? ORDER BY saved_at DESC LIMIT 1",
-        )
-        .bind(rota_id)
-        .fetch_optional(pool)
-        .await?;
+    )
+    .bind(rota_id)
+    .fetch_optional(pool)
+    .await?;
 
     let Some(row) = latest else {
         // No saves yet — every shift is "new".
@@ -2174,14 +2176,13 @@ pub async fn diff_rota_vs_latest_save_detailed(
     pool: &SqlitePool,
     rota_id: i64,
 ) -> Result<Vec<ChangeDetail>, sqlx::Error> {
-    let latest: Option<(i64, i64, String, String, String, Option<String>, String)> =
-        sqlx::query_as(
-            "SELECT id, rota_id, saved_at, summary, snapshot_json, restored_at, source
+    let latest: Option<SaveRow> = sqlx::query_as(
+        "SELECT id, rota_id, saved_at, summary, snapshot_json, restored_at, source
          FROM saves WHERE rota_id = ? ORDER BY saved_at DESC LIMIT 1",
-        )
-        .bind(rota_id)
-        .fetch_optional(pool)
-        .await?;
+    )
+    .bind(rota_id)
+    .fetch_optional(pool)
+    .await?;
 
     let live = snapshot_from_live(pool, rota_id).await?;
 
@@ -2229,7 +2230,7 @@ pub async fn diff_save_vs_previous(
         .await?
         .ok_or_else(|| sqlx::Error::RowNotFound)?;
 
-    let prev: Option<(i64, i64, String, String, String, Option<String>, String)> = sqlx::query_as(
+    let prev: Option<SaveRow> = sqlx::query_as(
         "SELECT id, rota_id, saved_at, summary, snapshot_json, restored_at, source
          FROM saves WHERE rota_id = ? AND saved_at < ?
          ORDER BY saved_at DESC LIMIT 1",
