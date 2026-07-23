@@ -1,0 +1,11 @@
+{
+  "name": "rota-frame-cli",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "CLI wrapper around rota-device-frame-sandbox.html — frames simulator screenshots into device PNGs",
+  "bin": { "rota-frame": "./frame.mjs" },
+  "dependencies": {
+    "playwright-core": "^1.49.0"
+  }
+}

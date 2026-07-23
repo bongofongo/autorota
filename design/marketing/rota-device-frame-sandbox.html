@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Rota — Device Frame Sandbox (marketing site)</title>
+<style>
+  :root { color-scheme: light; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    background:#F2F3F5; height:100vh; display:flex; overflow:hidden;
+  }
+
+  /* ---------- layout ---------- */
+  #viewport {
+    flex:1; display:flex; align-items:center; justify-content:center;
+    overflow:auto; padding:24px;
+  }
+  #panel {
+    width:308px; flex:0 0 308px; background:#fff; border-left:1px solid #E3E5E8;
+    overflow-y:auto; padding:18px 18px 40px 18px;
+  }
+  #panel h1 { font-size:15px; font-weight:700; margin-bottom:2px; }
+  #panel .sub { font-size:11.5px; color:#8a8f98; margin-bottom:14px; }
+  #panel h2 {
+    font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+    color:#6b7280; margin:18px 0 8px 0; border-top:1px solid #EEF0F2; padding-top:14px;
+  }
+  #panel h2:first-of-type { border-top:none; padding-top:0; }
+  .row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .row label { font-size:12px; color:#374151; width:96px; flex:0 0 96px; }
+  .row input[type=range] { flex:1; accent-color:#2563EB; }
+  .row output { font-size:11px; color:#6b7280; width:44px; text-align:right; font-variant-numeric:tabular-nums; }
+  .row input[type=checkbox] { accent-color:#2563EB; }
+  .row .cklabel { font-size:12px; color:#374151; }
+  .row select {
+    flex:1; font-size:12.5px; padding:5px 6px; border:1px solid #d7dade; border-radius:7px;
+  }
+  .btn {
+    display:block; width:100%; padding:9px 0; margin-top:8px; border:none; border-radius:9px;
+    font-size:13px; font-weight:600; cursor:pointer;
+  }
+  .btn.primary { background:#2563EB; color:#fff; }
+  .btn.primary:hover { background:#1D4ED8; }
+  .btn.ghost { background:#EEF2F8; color:#1f2937; }
+  .btn.ghost:hover { background:#E3EAF5; }
+  #drop {
+    border:1.5px dashed #b9c2d0; border-radius:10px; padding:12px; text-align:center;
+    font-size:12px; color:#6b7280; cursor:pointer; transition:all .15s;
+  }
+  #drop.over { border-color:#2563EB; background:#F0F5FF; color:#2563EB; }
+  #thumbs { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .thumb { position:relative; width:52px; height:52px; border-radius:6px; overflow:hidden;
+    border:2px solid transparent; cursor:pointer; background:#eceef1; }
+  .thumb.active { border-color:#2563EB; }
+  .thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+  .thumb .x { position:absolute; top:0; right:0; width:14px; height:14px; line-height:13px;
+    text-align:center; font-size:10px; background:rgba(0,0,0,.55); color:#fff;
+    border-radius:0 0 0 6px; }
+  #note { font-size:11px; color:#9aa0aa; margin-top:14px; line-height:1.5; }
+
+  /* ---------- stage (auto-sized, transparent) ---------- */
+  #stagewrap {
+    flex:0 0 auto; position:relative;
+    /* preview-only checkerboard so transparency is visible; NOT exported */
+    background: conic-gradient(#E7EAEE 0 25%, #fff 0 50%, #E7EAEE 0 75%, #fff 0) 0 0/24px 24px;
+    outline:1px dashed #C2C9D2;
+  }
+  #stage {
+    position:relative; overflow:visible; background:transparent;
+    transform-origin:top left;
+  }
+  #device {
+    position:absolute; z-index:1;
+    background:linear-gradient(155deg,#C9D6E2 0%,#9FB3C4 16%,#71879B 38%,#5B7083 55%,#6B8093 72%,#93A8BA 90%,#B6C6D4 100%);
+    box-shadow:inset 1px 1px 1px rgba(255,255,255,.55), inset -1px -2px 2px rgba(30,45,60,.35), 0 0 0 1px rgba(70,85,100,.28);
+  }
+  /* 3D body: stacked slices along the device's own Z axis. Each slice carries its
+     own full (flattened) transform chain, so depth survives the foreignObject export
+     where transform-style:preserve-3d would be flattened away. */
+  #bodylayers, #btnlayer { position:absolute; z-index:0; pointer-events:none; }
+  .blayer { position:absolute; left:0; top:0; width:100%; height:100%; }
+  .sidebtn {
+    position:absolute; z-index:0;
+    background:linear-gradient(90deg,#57697A 0%,#8199AC 45%,#A9BCCB 60%,#6E8496 100%);
+    box-shadow:0 1px 1px rgba(30,45,60,.3);
+  }
+  .sb-l { border-radius:3.5px 0 0 3.5px; }
+  .sb-t { border-radius:3.5px 3.5px 0 0;
+    background:linear-gradient(180deg,#57697A 0%,#8199AC 45%,#A9BCCB 60%,#6E8496 100%); }
+  .sb-r { border-radius:0 3.5px 3.5px 0;
+    background:linear-gradient(90deg,#6E8496 0%,#A9BCCB 40%,#8199AC 55%,#57697A 100%); }
+  #bezel { width:100%; height:100%; background:#060607; }
+  #screenbox { width:100%; height:100%; background:#F4F5F7; overflow:hidden; position:relative; }
+  #shot { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none; }
+  #hint {
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    color:#9aa2ad; font-size:40px; text-align:center; padding:40px;
+  }
+  #island { position:absolute; left:50%; transform:translateX(-50%); background:#060607; z-index:50; }
+</style>
+</head>
+<body>
+
+<div id="viewport"><div id="stagewrap"><div id="stage">
+  <div id="bodylayers"></div>
+  <div id="btnlayer">
+    <div class="sidebtn" id="sbA"></div>
+    <div class="sidebtn" id="sbV1"></div>
+    <div class="sidebtn" id="sbV2"></div>
+    <div class="sidebtn" id="sbP"></div>
+  </div>
+  <div id="device">
+    <div id="bezel"><div id="screenbox">
+      <div id="hint">Drop a screenshot →</div>
+      <img id="shot" alt="" src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=="/>
+    </div></div>
+    <div id="island"></div>
+  </div>
+</div></div></div>
+
+<div id="panel">
+  <h1>Rota device frame sandbox</h1>
+  <div class="sub" id="osub">Marketing site &middot; transparent PNG</div>
+
+  <h2>Device</h2>
+  <div class="row"><label>Device</label>
+    <select id="mode">
+      <option value="iphone" selected>iPhone 17 Pro Max (portrait)</option>
+      <option value="ipadp">iPad 13&#8243; (portrait)</option>
+      <option value="ipadl">iPad 13&#8243; (landscape)</option>
+    </select>
+  </div>
+
+  <h2>Screenshot</h2>
+  <div id="drop">Drop simulator screenshot PNGs here<br/>(or click &mdash; multiple allowed)</div>
+  <input type="file" id="file" accept="image/*" multiple style="display:none"/>
+  <div id="thumbs"></div>
+  <div class="row" style="margin-top:8px">
+    <input type="checkbox" id="islandOn" checked/>
+    <span class="cklabel" id="islandLbl">Draw Dynamic Island overlay</span>
+  </div>
+
+  <h2>Rotation</h2>
+  <div class="row"><label>Rotate &#8635;/&#8634;</label><input type="range" id="rz" min="-180" max="180" step="0.5" value="0"/><output id="o-rz">0&deg;</output></div>
+  <div class="row"><label>3D tilt X</label><input type="range" id="tx" min="-30" max="30" step="0.5" value="0"/><output id="o-tx">0&deg;</output></div>
+  <div class="row"><label>3D tilt Y</label><input type="range" id="ty" min="-30" max="30" step="0.5" value="0"/><output id="o-ty">0&deg;</output></div>
+  <div class="row"><label>Perspective</label><input type="range" id="persp" min="500" max="4000" step="50" value="1600"/><output id="o-persp">1600</output></div>
+  <div class="row"><label>Body depth</label><input type="range" id="dscale" min="25" max="300" step="5" value="100"/><output id="o-dscale">100%</output></div>
+  <button class="btn ghost" id="resetrot">Reset rotation</button>
+
+  <h2>Canvas</h2>
+  <div class="row"><label>Margin</label><input type="range" id="margin" min="0" max="400" step="4" value="60"/><output id="o-margin">60</output></div>
+  <div class="row"><label>Export scale</label><input type="range" id="escale" min="25" max="200" step="5" value="100"/><output id="o-escale">100%</output></div>
+
+  <h2>Preview</h2>
+  <div class="row"><label>Zoom</label><input type="range" id="zoom" min="10" max="80" step="1" value="30"/><output id="o-zoom">30%</output></div>
+
+  <h2>Export</h2>
+  <button class="btn primary" id="export">Export PNG</button>
+  <button class="btn ghost" id="copycfg">Copy settings JSON</button>
+  <button class="btn ghost" id="loadcfg">Load settings JSON</button>
+  <div id="cfgbox" style="display:none">
+    <textarea id="cfgtxt" rows="5" style="width:100%;margin-top:8px;font-size:11px;font-family:monospace;padding:6px;border:1px solid #d7dade;border-radius:7px" placeholder='paste settings JSON here'></textarea>
+    <button class="btn primary" id="applycfg">Apply settings</button>
+  </div>
+  <div id="note">Background is transparent (checkerboard is preview-only). Canvas auto-fits the rotated device plus the margin. Settings are NOT saved on reload &mdash; use Copy&nbsp;settings&nbsp;JSON to keep a preset, Load to restore it, or paste the JSON to Claude to bake in new defaults.</div>
+</div>
+
+<script>
+var $ = function(id){ return document.getElementById(id); };
+
+/* ---------- device geometry (same casing constants as the App Store sandboxes) ---------- */
+var MODES = {
+  // depthRatio = real thickness / real width (iPhone 8.8/78mm, iPad Pro 13" 5.1mm)
+  iphone: { W:1120, slop:14, depthRatio:8.8/78,
+            pad:11, bez:19, rDev:184, rBez:173, rScr:154,
+            island:'iphone', islandLbl:'Draw Dynamic Island overlay' },
+  ipadl:  { W:2000, slop:14, depthRatio:5.1/281.6,
+            pad:8, bez:40, rDev:84, rBez:76, rScr:34, ui:[1376,1032],
+            island:'ipad', islandLbl:'Draw front camera dot' },
+  ipadp:  { W:1630, slop:14, depthRatio:5.1/215.5,
+            pad:8, bez:40, rDev:84, rBez:76, rScr:34, ui:[1032,1376],
+            island:'ipad', islandLbl:'Draw front camera dot' }
+};
+function devHeight(m){
+  var g = MODES[m];
+  if (m === 'iphone') return 2363 * (g.W/1120);
+  var screenW = g.W - 2*(g.pad + g.bez);
+  return screenW * (g.ui[1]/g.ui[0]) + 2*(g.pad + g.bez);
+}
+
+/* ---------- state ---------- */
+var S = {
+  mode:'iphone',
+  rz:0, tx:0, ty:0, persp:1600, dscale:1,
+  margin:60, escale:1, islandOn:true, zoom:0.30
+};
+var stageW = 100, stageH = 100;
+
+/* ---------- 4x4 matrix helpers for projected bounding box ---------- */
+function ident(){ return [[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]; }
+function mul(A,B){
+  var C = ident();
+  for (var i=0;i<4;i++) for (var j=0;j<4;j++){
+    var s=0; for (var k=0;k<4;k++) s += A[i][k]*B[k][j];
+    C[i][j]=s;
+  }
+  return C;
+}
+function rotX(a){ var c=Math.cos(a), s=Math.sin(a);
+  return [[1,0,0,0],[0,c,-s,0],[0,s,c,0],[0,0,0,1]]; }
+function rotY(a){ var c=Math.cos(a), s=Math.sin(a);
+  return [[c,0,s,0],[0,1,0,0],[-s,0,c,0],[0,0,0,1]]; }
+function rotZ(a){ var c=Math.cos(a), s=Math.sin(a);
+  return [[c,-s,0,0],[s,c,0,0],[0,0,1,0],[0,0,0,1]]; }
+function projectedHalf(W, H, D){
+  var r = Math.PI/180;
+  var P = ident(); P[3][2] = -1/S.persp;
+  var M = mul(mul(mul(P, rotX(S.tx*r)), rotY(S.ty*r)), rotZ(S.rz*r));
+  var mx=0, my=0;
+  // 8 corners of the body box: front face at z=0, back at z=-D
+  var corners = [[-W/2,-H/2],[W/2,-H/2],[W/2,H/2],[-W/2,H/2]];
+  for (var zi=0; zi<2; zi++){
+    var z = zi===0 ? 0 : -(D||0);
+    for (var ci=0; ci<4; ci++){
+      var v = [corners[ci][0], corners[ci][1], z, 1], o=[0,0,0,0];
+      for (var i=0;i<4;i++){ var s=0; for (var k=0;k<4;k++) s += M[i][k]*v[k]; o[i]=s; }
+      var w = o[3] > 0.05 ? o[3] : 0.05;
+      mx = Math.max(mx, Math.abs(o[0]/w));
+      my = Math.max(my, Math.abs(o[1]/w));
+    }
+  }
+  return [mx, my];
+}
+
+/* ---------- apply ---------- */
+function apply(){
+  var g = MODES[S.mode];
+  var W = g.W, H = devHeight(S.mode);
+  var k = S.mode==='iphone' ? W/1120 : W/(S.mode==='ipadl'?2000:1630);
+  var D = g.depthRatio * W * S.dscale;
+  var dev=$('device'), bez=$('bezel'), scr=$('screenbox'), isl=$('island');
+
+  // canvas auto-fit: projected bbox of the rotated body box (+slop for buttons) + margin
+  var half = projectedHalf(W + 2*g.slop, H + 2*g.slop, D);
+  stageW = Math.ceil(2*half[0] + 2*S.margin);
+  stageH = Math.ceil(2*half[1] + 2*S.margin);
+
+  var stage=$('stage');
+  stage.style.width = stageW+'px'; stage.style.height = stageH+'px';
+  stage.style.transform = 'scale('+S.zoom+')';
+  $('stagewrap').style.width  = (stageW*S.zoom)+'px';
+  $('stagewrap').style.height = (stageH*S.zoom)+'px';
+
+  var boxL = ((stageW-W)/2)+'px', boxT = ((stageH-H)/2)+'px';
+  var chain = 'perspective('+S.persp+'px) rotateX('+S.tx+'deg) rotateY('+S.ty+'deg) rotate('+S.rz+'deg)';
+
+  dev.style.width = W+'px';
+  dev.style.height = Math.round(H)+'px';
+  dev.style.left = boxL; dev.style.top = boxT;
+  dev.style.transform = chain;
+  dev.style.borderRadius = (g.rDev*k)+'px';
+  dev.style.padding = (g.pad*k)+'px';
+  bez.style.borderRadius = (g.rBez*k)+'px';
+  bez.style.padding = (g.bez*k)+'px';
+  scr.style.borderRadius = (g.rScr*k)+'px';
+
+  // ----- 3D body: slice stack from z=-D (back) to z≈0, back-to-front DOM order -----
+  var bl = $('bodylayers');
+  bl.style.width = W+'px'; bl.style.height = Math.round(H)+'px';
+  bl.style.left = boxL; bl.style.top = boxT;
+  var n = Math.min(260, Math.max(4, Math.ceil(D/1.25)));
+  while (bl.childElementCount > n) bl.removeChild(bl.lastChild);
+  while (bl.childElementCount < n) {
+    var nd = document.createElement('div'); nd.className='blayer'; bl.appendChild(nd);
+  }
+  for (var li=0; li<n; li++){
+    var el = bl.children[li];
+    var z = -D * (n-li)/n;           // li=0 → -D (backmost), last → -D/n
+    var t = (n-li)/n;                // 0 front → 1 back, for shading
+    el.style.transform = chain + ' translateZ('+z.toFixed(2)+'px)';
+    el.style.borderRadius = (g.rDev*k)+'px';
+    var dk = (0.06 + 0.30*t).toFixed(3);
+    el.style.background =
+      'linear-gradient(rgba(10,18,26,'+dk+'), rgba(10,18,26,'+dk+')), ' +
+      'linear-gradient(155deg,#9FB3C4 0%,#71879B 32%,#54687A 55%,#61768A 75%,#8DA2B4 100%)';
+  }
+  // back panel: finished titanium back on the deepest slice
+  if (n) bl.children[0].style.background =
+    'linear-gradient(rgba(10,18,26,.10), rgba(10,18,26,.10)), ' +
+    'linear-gradient(155deg,#C9D6E2 0%,#9FB3C4 16%,#71879B 38%,#5B7083 55%,#6B8093 72%,#93A8BA 90%,#B6C6D4 100%)';
+
+  // buttons sit on the side wall: ease them from the face plane (flat look)
+  // to mid-depth as tilt increases, so they never vanish behind the face
+  var btl = $('btnlayer');
+  btl.style.width = W+'px'; btl.style.height = Math.round(H)+'px';
+  btl.style.left = boxL; btl.style.top = boxT;
+  var tiltAmt = Math.min(1, Math.max(Math.abs(S.tx), Math.abs(S.ty))/8);
+  btl.style.transform = chain + ' translateZ('+(-(D/2)*tiltAmt).toFixed(2)+'px)';
+
+  // buttons
+  var elA=$('sbA'), elV1=$('sbV1'), elV2=$('sbV2'), elP=$('sbP');
+  [elA,elV1,elV2,elP].forEach(function(el){
+    el.style.left=el.style.right=el.style.top=el.style.bottom='auto';
+    el.style.display='block';
+  });
+  if (S.mode==='iphone'){
+    // action + volume pair on the left, power on the right
+    var btns = [[elA,'sb-l',437,76],[elV1,'sb-l',574,118],[elV2,'sb-l',724,118]];
+    btns.forEach(function(b){
+      b[0].className='sidebtn '+b[1];
+      b[0].style.top=(b[2]*k)+'px'; b[0].style.height=(b[3]*k)+'px';
+      b[0].style.width=(7*k)+'px'; b[0].style.left=(-6*k)+'px';
+    });
+    elP.className='sidebtn sb-r';
+    elP.style.top=(618*k)+'px'; elP.style.height=(208*k)+'px';
+    elP.style.width=(7*k)+'px'; elP.style.right=(-6*k)+'px';
+  } else if (S.mode==='ipadl'){
+    // landscape: power at top-left edge, volume pair at top-right edge
+    elP.style.display='none';
+    elA.className='sidebtn sb-t';
+    elA.style.top=(-6*k)+'px'; elA.style.left=(130*k)+'px';
+    elA.style.width=(150*k)+'px'; elA.style.height=(7*k)+'px';
+    elV1.className='sidebtn sb-t';
+    elV1.style.top=(-6*k)+'px'; elV1.style.right=(260*k)+'px';
+    elV1.style.width=(110*k)+'px'; elV1.style.height=(7*k)+'px';
+    elV2.className='sidebtn sb-t';
+    elV2.style.top=(-6*k)+'px'; elV2.style.right=(120*k)+'px';
+    elV2.style.width=(110*k)+'px'; elV2.style.height=(7*k)+'px';
+  } else {
+    // portrait: power on top edge, volumes on the right edge
+    elP.style.display='none';
+    elA.className='sidebtn sb-t';
+    elA.style.top=(-6*k)+'px'; elA.style.right=(150*k)+'px';
+    elA.style.width=(150*k)+'px'; elA.style.height=(7*k)+'px';
+    elV1.className='sidebtn sb-r';
+    elV1.style.top=(160*k)+'px'; elV1.style.right=(-6*k)+'px';
+    elV1.style.width=(7*k)+'px'; elV1.style.height=(110*k)+'px';
+    elV2.className='sidebtn sb-r';
+    elV2.style.top=(300*k)+'px'; elV2.style.right=(-6*k)+'px';
+    elV2.style.width=(7*k)+'px'; elV2.style.height=(110*k)+'px';
+  }
+
+  // Dynamic Island / camera dot
+  $('islandLbl').textContent = g.islandLbl;
+  isl.style.display = S.islandOn ? 'block' : 'none';
+  if (g.island==='iphone'){
+    // Dynamic Island floats inside the screen, 29px below it (island is a
+    // sibling of the bezel, so offsets are measured from the device edge)
+    isl.style.width=(302*k)+'px'; isl.style.height=(89*k)+'px';
+    isl.style.top=((g.pad + g.bez + 29)*k)+'px'; isl.style.borderRadius=(48*k)+'px';
+    isl.style.border='none'; isl.style.background='#060607';
+  } else {
+    // front camera dot centred in the top bezel
+    isl.style.width=(14*k)+'px'; isl.style.height=(14*k)+'px';
+    isl.style.top=((g.pad + g.bez/2 - 7)*k)+'px'; isl.style.borderRadius='50%';
+    isl.style.background='#14161a'; isl.style.border='2px solid rgba(96,108,124,.55)';
+  }
+
+  $('osub').textContent = 'Marketing site · transparent PNG · canvas '
+    + Math.round(stageW*S.escale) + '×' + Math.round(stageH*S.escale);
+  $('export').textContent = 'Export PNG (' + Math.round(stageW*S.escale) + '×' + Math.round(stageH*S.escale) + ')';
+}
+
+/* ---------- bindings ---------- */
+function bind(id, key, fmt, scale) {
+  $(id).addEventListener('input', function(){
+    var v = parseFloat(this.value); if (scale) v = v*scale;
+    S[key]=v;
+    var o=$('o-'+id); if(o) o.textContent = fmt ? fmt(v) : v;
+    apply();
+  });
+}
+var deg = function(v){ return v+'°'; };
+bind('rz','rz',deg);
+bind('tx','tx',deg);
+bind('ty','ty',deg);
+bind('persp','persp');
+bind('dscale','dscale',function(v){return Math.round(v*100)+'%';},0.01);
+bind('margin','margin');
+bind('escale','escale',function(v){return Math.round(v*100)+'%';},0.01);
+bind('zoom','zoom',function(v){return Math.round(v*100)+'%';},0.01);
+$('mode').addEventListener('change', function(){ S.mode=this.value; apply(); });
+$('islandOn').addEventListener('change', function(){ S.islandOn=this.checked; apply(); });
+$('resetrot').addEventListener('click', function(){
+  S.rz=0; S.tx=0; S.ty=0; syncControls(); apply();
+});
+
+function syncControls(){
+  var set = function(id,v){ var el=$(id); if(el) el.value=v; };
+  set('mode',S.mode);
+  set('rz',S.rz); $('o-rz').textContent=deg(S.rz);
+  set('tx',S.tx); $('o-tx').textContent=deg(S.tx);
+  set('ty',S.ty); $('o-ty').textContent=deg(S.ty);
+  set('persp',S.persp); $('o-persp').textContent=S.persp;
+  set('dscale',Math.round(S.dscale*100)); $('o-dscale').textContent=Math.round(S.dscale*100)+'%';
+  set('margin',S.margin); $('o-margin').textContent=S.margin;
+  set('escale',Math.round(S.escale*100)); $('o-escale').textContent=Math.round(S.escale*100)+'%';
+  set('zoom',Math.round(S.zoom*100)); $('o-zoom').textContent=Math.round(S.zoom*100)+'%';
+  $('islandOn').checked=S.islandOn;
+}
+
+/* ---------- swappable screenshot slots ---------- */
+var shots = [], activeShot = -1;
+function renderThumbs(){
+  var t = $('thumbs'); t.innerHTML='';
+  shots.forEach(function(sh, i){
+    var d = document.createElement('div');
+    d.className = 'thumb' + (i===activeShot ? ' active' : '');
+    d.title = sh.name;
+    var im = document.createElement('img'); im.src = sh.url; d.appendChild(im);
+    var x = document.createElement('div'); x.className='x'; x.textContent='×';
+    x.addEventListener('click', function(e){
+      e.stopPropagation();
+      shots.splice(i,1);
+      if (activeShot===i) setActiveShot(shots.length? Math.max(0,i-1) : -1);
+      else { if (activeShot>i) activeShot--; renderThumbs(); }
+    });
+    d.appendChild(x);
+    d.addEventListener('click', function(){ setActiveShot(i); });
+    t.appendChild(d);
+  });
+}
+function setActiveShot(i){
+  activeShot = i;
+  if (i<0 || !shots[i]) {
+    $('shot').style.display='none';
+    $('hint').style.display='flex';
+  } else {
+    $('shot').src = shots[i].url;
+    $('shot').style.display='block';
+    $('hint').style.display='none';
+  }
+  renderThumbs();
+}
+function loadFiles(fl) {
+  for (var i=0; i<fl.length; i++) (function(f){
+    if (!f || !f.type || f.type.indexOf('image')!==0) return;
+    var r = new FileReader();
+    r.onload = function(e){
+      shots.push({name:f.name, url:e.target.result});
+      setActiveShot(shots.length-1);
+    };
+    r.readAsDataURL(f);
+  })(fl[i]);
+}
+$('drop').addEventListener('click', function(){ $('file').click(); });
+$('file').addEventListener('change', function(){ loadFiles(this.files); this.value=''; });
+['dragover','dragenter'].forEach(function(ev){
+  $('drop').addEventListener(ev, function(e){ e.preventDefault(); this.classList.add('over'); });
+});
+['dragleave','drop'].forEach(function(ev){
+  $('drop').addEventListener(ev, function(e){ e.preventDefault(); this.classList.remove('over'); });
+});
+$('drop').addEventListener('drop', function(e){ loadFiles(e.dataTransfer.files); });
+
+/* ---------- settings import ---------- */
+$('loadcfg').addEventListener('click', function(){
+  var b=$('cfgbox'); b.style.display = b.style.display==='none' ? 'block' : 'none';
+});
+$('applycfg').addEventListener('click', function(){
+  try {
+    var parsed = JSON.parse($('cfgtxt').value);
+    for (var key in S) if (Object.prototype.hasOwnProperty.call(parsed, key)) S[key]=parsed[key];
+    syncControls(); apply();
+    this.textContent='Applied ✓';
+    var btn=this; setTimeout(function(){ btn.textContent='Apply settings'; }, 1400);
+  } catch(err) { this.textContent='Invalid JSON'; var btn=this; setTimeout(function(){ btn.textContent='Apply settings'; }, 1400); }
+});
+
+/* ---------- copy settings ---------- */
+$('copycfg').addEventListener('click', function(){
+  var btn = this;
+  var json = JSON.stringify(S, null, 2);
+  var ok = function(){
+    btn.textContent='Copied ✓';
+    setTimeout(function(){ btn.textContent='Copy settings JSON'; }, 1400);
+  };
+  var fallback = function(){
+    var ta = document.createElement('textarea');
+    ta.value = json;
+    ta.style.position='fixed'; ta.style.top='-1000px';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    var done = false;
+    try { done = document.execCommand('copy'); } catch(e) { done = false; }
+    document.body.removeChild(ta);
+    if (done) { ok(); return; }
+    $('cfgbox').style.display='block';
+    $('cfgtxt').value = json;
+    $('cfgtxt').focus(); $('cfgtxt').select();
+    btn.textContent='Press ⌘C to copy';
+    setTimeout(function(){ btn.textContent='Copy settings JSON'; }, 2600);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(json).then(ok, fallback);
+  } else {
+    fallback();
+  }
+});
+
+/* ---------- export (transparent PNG) ---------- */
+$('export').addEventListener('click', function(){
+  var btn=this; btn.textContent='Rendering…';
+  try {
+    var stage = $('stage');
+    var clone = stage.cloneNode(true);
+    clone.style.transform='none';
+    // never export the placeholder hint
+    var h = clone.querySelector('#hint'); if (h) h.parentNode.removeChild(h);
+    // gather all style rules from this document
+    var css='';
+    for (var i=0;i<document.styleSheets.length;i++){
+      var rules=document.styleSheets[i].cssRules;
+      for (var j=0;j<rules.length;j++) css+=rules[j].cssText+'\n';
+    }
+    var cw = Math.round(stageW*S.escale), ch = Math.round(stageH*S.escale);
+    var ser = new XMLSerializer().serializeToString(clone);
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="'+stageW+'" height="'+stageH+'">'
+      + '<foreignObject width="100%" height="100%">'
+      + '<div xmlns="http://www.w3.org/1999/xhtml"><style>'+css.replace(/</g,'&lt;')+'</style>'
+      + ser + '</div></foreignObject></svg>';
+    var url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    var img = new Image();
+    img.onload = function(){
+      var c = document.createElement('canvas');
+      c.width=cw; c.height=ch;
+      var ctx=c.getContext('2d');
+      // no background fill — alpha stays transparent
+      ctx.drawImage(img,0,0,cw,ch);
+      try {
+        c.toBlob(function(b){
+          var a=document.createElement('a');
+          a.href=URL.createObjectURL(b);
+          a.download='rota-frame-'+S.mode+'.png';
+          a.click();
+          apply();
+        },'image/png');
+      } catch(err) {
+        alert('Export blocked by the browser — use “Copy settings JSON” instead.');
+        apply();
+      }
+    };
+    img.onerror = function(){
+      alert('Export failed in this browser — use “Copy settings JSON” instead.');
+      apply();
+    };
+    img.src = url;
+  } catch(e) {
+    alert('Export failed: '+e.message+' — use “Copy settings JSON”.');
+    apply();
+  }
+});
+
+syncControls();
+apply();
+</script>
+</body>
+</html>
