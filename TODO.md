@@ -45,7 +45,12 @@
   - Scope change (user): the new detail page (`EditLogSaveDetailView`) is reachable from EVERY save's expanded entry via "View full details", not just abbreviated ones — shows full metadata, tags, restore action, and the complete diff
   - UI rework alongside: Edit Log list converted from one dense `DisclosureGroup` list to one inset-grouped `Section` (island) per week/month/year group with tappable collapsible headers; shared components extracted to `Views/EditLogComponents.swift`
 
-## 3. Rota — manual shift creation
+## 3. CI/CD — release-plz never opens release PRs (added 2026-07-23)
+- [ ] `release-plz release-pr` returns `{"prs":[]}` on every push to main despite releasable conventional commits (verified on `895f1da`, which touched crates/ with feat commits since v0.9.1). No `chore: release` PR has ever been opened in this repo — v0.9.0/v0.9.1/v0.9.2 were all tagged manually. The `release-plz release` step's "nothing to release" is the expected no-op (git_release_enable=false); the silent empty release-pr output is the bug
+  - Debug locally: `cargo install release-plz`, then `release-plz update --dry-run` (or `release-pr --dry-run`) against the repo to see version-detection reasoning; suspect tag→version mapping or workspace `publish = false` interaction
+  - Until fixed, releases are manual: bump `workspace.package.version` + `Cargo.lock` + `CHANGELOG.md`, commit `chore(release): vX.Y.Z`, tag `vX.Y.Z`, push tag (release.yml fires fine — verified with v0.9.2)
+
+## 4. Rota — manual shift creation
 - [ ] Inline employee assignment in the Add Shift sheet (with role-aware filtering)
   - Edit `AddShiftSheet` in `platforms/apple/Apps/AutorotaApp/Views/RotaView.swift:939` — currently asks for time + role only and calls `vm.createAdHocShift(date:startTime:endTime:requiredRole:)`
   - Add new `Section("Assign")` with an Employee picker; default selection = sentinel `nil` (or `Optional<Int64>.none`) labelled "Empty" → leaves shift unassigned (existing behaviour)
@@ -58,7 +63,7 @@
   - Accessibility: announce filter changes via `.accessibilityValue` on the pickers; ensure VoiceOver reads disabled roles as "Barista, dimmed, unavailable for selected employee"
   - Tests: extend `RotaViewModelTests` with cases for (a) shift+assign happy path, (b) role filter excluding employees, (c) employee filter disabling roles, (d) assignment failure after successful shift creation
 
-## 4. Onboarding refinement
+## 5. Onboarding refinement
 - [ ] Skip-to-end affordance for returning users
   - Detect prior install via Keychain flag `onboarding.completed` (survives app reinstall on same Apple ID)
 - [ ] Animate role/availability sample data seed
