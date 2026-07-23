@@ -3,6 +3,16 @@
     {
       "filename" : "rota-icon-sunrise.png",
       "idiom" : "universal"
+    },
+    {
+      "appearances" : [
+        {
+          "appearance" : "luminosity",
+          "value" : "dark"
+        }
+      ],
+      "filename" : "rota-icon-sunrise-dark.png",
+      "idiom" : "universal"
     }
   ],
   "info" : {

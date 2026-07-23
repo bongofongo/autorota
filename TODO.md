@@ -30,8 +30,24 @@
 - [ ] Polish empty states (Employees, Shifts, Rota, Edit Log)
   - Use `ContentUnavailableView` (iOS 17+) with SF Symbol, title, description, primary action button
   - Ensure each empty state has a clear next-step CTA wired to the correct flow
+- [x] App icon previews in Settings should follow in-app dark mode (added 2026-07-23, done 2026-07-23 — asset-only: dark appearance variants added to the three `AppIconPreview*` imagesets; no code change)
+  - `AppIconPicker` (`Views/AppSettingsView.swift:180-229`) renders static preview assets via `AppIconOption.previewImageName` (`AppIconPreviewDefault/Jazz/Latte`, lines 158-164) — no dark variants today
+  - Add dark preview variants (asset appearance variants in `Assets.xcassets`, or `…Dark`-suffixed assets picked in code) and resolve against the *in-app* effective scheme: `@AppStorage("appAppearance")`, falling back to `@Environment(\.colorScheme)` when `.system`
+  - Scope: preview tiles ONLY. Do NOT touch `UIApplication.shared.setAlternateIconName` (line 223) — the home-screen icon must keep following Apple's system dark mode via the asset catalog, never the in-app appearance toggle
+  - Gotcha: latte icon's dark art intentionally reuses the sunrise dark art — not a cross-wire
 
-## 2. Rota — manual shift creation
+## 2. Edit Log — freshness + generation saves (added 2026-07-23)
+- [ ] Edit Log doesn't update as rota changes (reproduced with default sample load)
+  - Cause (a): `EditLogView` only loads on `.task` / pull-to-refresh (`Views/EditLogView.swift:64,97`) — it has no `.onReceive(.autorotaDataChanged)` unlike `RotaView.swift:222` / `EmployeeListView.swift:137`. Fix: subscribe and `await vm.loadSaves()`
+  - Cause (b): saves are only written by `autoSave()` (`ViewModels/RotaViewModel.swift:523-531`) on edit-mode exit (502-509) or week navigation (`RotaView.swift:112-113`); individual mutations just set `isDirty`. So nothing appears in the log until the session ends. Decide: keep per-session granularity (then (a) alone fixes perceived lag) vs debounced per-mutation auto-save (~2-3s after last change) — debounce preserves grouping without save spam
+- [ ] Abbreviate generation/regeneration saves + auto-tag; full detail on tap only
+  - `FfiSave` has no origin field (`id, rotaId, savedAt, summary, tags, weekStart, restoredAt` — generated `autorota_ffi.swift:3168-3207`); generation saves are indistinguishable from manual edits. Add a `source` discriminator to Save in core + FFI (`Generation | Regeneration | Manual | Restore`) — new migration
+  - Thread origin through: `performSchedule()` (`RotaViewModel.swift:430-441`) / `confirmRegenerate()` (426-428) → currently both just set `isDirty` and share `autoSave()` with manual edits → extend `createSave(rotaId:)` (`Services/LiveAutorotaService.swift:249`) to carry source
+  - Auto-label: "Generation" when week had no prior assignments, "Regeneration" otherwise. Render as system tag/badge in `SaveEntryView`; must not count against user tag limits (3 tags / 15 chars, `EditLogViewModel.swift:74-76,103-145`) and must not be user-removable — prefer the `source` field over a reserved tag string
+  - Abbreviated rendering: for generation saves, `SaveEntryView` shows summary counts only (`ChangeSummaryCard` style, `EditLogView.swift:379-424`) — suppress per-assignment `ChangeRow`s (449-516)
+  - Tap abbreviated entry → push new detail page (`NavigationLink`) listing every change via existing `DayChangesGroup`/`ChangeRow`; page reachable ONLY from abbreviated entries, no other nav path
+
+## 3. Rota — manual shift creation
 - [ ] Inline employee assignment in the Add Shift sheet (with role-aware filtering)
   - Edit `AddShiftSheet` in `platforms/apple/Apps/AutorotaApp/Views/RotaView.swift:939` — currently asks for time + role only and calls `vm.createAdHocShift(date:startTime:endTime:requiredRole:)`
   - Add new `Section("Assign")` with an Employee picker; default selection = sentinel `nil` (or `Optional<Int64>.none`) labelled "Empty" → leaves shift unassigned (existing behaviour)
@@ -44,7 +60,7 @@
   - Accessibility: announce filter changes via `.accessibilityValue` on the pickers; ensure VoiceOver reads disabled roles as "Barista, dimmed, unavailable for selected employee"
   - Tests: extend `RotaViewModelTests` with cases for (a) shift+assign happy path, (b) role filter excluding employees, (c) employee filter disabling roles, (d) assignment failure after successful shift creation
 
-## 3. Onboarding refinement
+## 4. Onboarding refinement
 - [ ] Skip-to-end affordance for returning users
   - Detect prior install via Keychain flag `onboarding.completed` (survives app reinstall on same Apple ID)
 - [ ] Animate role/availability sample data seed
