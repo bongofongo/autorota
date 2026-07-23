@@ -8,7 +8,7 @@ lastUpdated: 2026-07-18
 
 **Effective date: 18 July 2026**
 
-This policy covers **autorota** (published on the App Store as **Rota**), a shift-scheduling app for iPhone and iPad.
+This policy covers **autorota**, a shift-scheduling app for iPhone and iPad.
 
 ## The short version
 
